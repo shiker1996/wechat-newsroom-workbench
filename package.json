@@ -1,0 +1,15 @@
+{
+  "name": "wechat-newsroom-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "本地优先的公众号热点、成稿与排版工作台",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.mjs",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

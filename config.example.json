@@ -1,0 +1,75 @@
+{
+  "port": 4317,
+  "workspaceRoot": "E:\\Documents\\write-assistant",
+  "contentRoots": [],
+  "reddit": {
+    "cdpUrl": "http://127.0.0.1:9222",
+    "subreddits": ["technology", "programming", "artificial", "sysadmin"],
+    "limitPerSubreddit": 15,
+    "navigationTimeoutMs": 30000
+  },
+  "rsshub": {
+    "baseUrl": "http://127.0.0.1:1200",
+    "startScript": "C:\\Users\\Administrator\\.openclaw\\workspace\\rsshub-start.ps1",
+    "stopScript": "C:\\Users\\Administrator\\.openclaw\\workspace\\rsshub-stop.ps1",
+    "startupTimeoutMs": 180000,
+    "keepAlive": false,
+    "maxAgeHours": 168,
+    "allowUndated": true,
+    "concurrency": 5,
+    "disabledRoutes": [],
+    "directFeeds": [],
+    "routes": [
+      "/latepost?limit=30",
+      "/techcrunch/news?limit=30",
+      "/huxiu/article?limit=30",
+      "/solidot?limit=30",
+      "/readhub?limit=30",
+      "/jiemian/lists/65?limit=30",
+      "/anthropic/engineering?limit=30",
+      "/anthropic/news?limit=30",
+      "/36kr/hot-list?limit=30"
+    ]
+  },
+  "llm": {
+    "defaultProvider": "deepseek",
+    "requestTimeoutMs": 120000,
+    "safetyReserveTokens": 2048,
+    "recentMessageCount": 8,
+    "providers": {
+      "deepseek": {
+        "label": "DeepSeek",
+        "baseUrl": "https://api.deepseek.com",
+        "model": "deepseek-v4-flash",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 8192,
+        "maxTokensField": "max_tokens",
+        "supportsJsonMode": true,
+        "enabled": true
+      },
+      "minimax": {
+        "label": "MiniMax",
+        "baseUrl": "https://api.minimaxi.com/v1",
+        "model": "MiniMax-M2.7",
+        "apiKeyEnv": "MINIMAX_API_KEY",
+        "contextWindow": 204800,
+        "maxOutputTokens": 2048,
+        "maxTokensField": "max_completion_tokens",
+        "supportsJsonMode": true,
+        "enabled": true
+      },
+      "kimi": {
+        "label": "Kimi",
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "model": "kimi-k2.6",
+        "apiKeyEnv": "MOONSHOT_API_KEY",
+        "contextWindow": 262144,
+        "maxOutputTokens": 8192,
+        "maxTokensField": "max_tokens",
+        "supportsJsonMode": true,
+        "enabled": true
+      }
+    }
+  }
+}

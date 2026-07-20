@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>见字 · 公众号编辑工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="paper-noise"></div>
+  <aside class="rail">
+    <div class="brand">
+      <span class="brand-seal">见</span>
+      <div><strong>见字</strong><small>NEWSROOM OS</small></div>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active" data-view="dashboard"><span>01</span>今日值班</button>
+      <button class="nav-item" data-view="batches"><span>02</span>每日批次</button>
+      <button class="nav-item" data-view="overview"><span>03</span>热点全景</button>
+      <button class="nav-item" data-view="topics"><span>04</span>选题池</button>
+      <button class="nav-item" data-view="editorial"><span>05</span>编辑室</button>
+      <button class="nav-item" data-view="editor"><span>06</span>文章编辑器</button>
+      <button class="nav-item" data-view="preview"><span>07</span>排版预览</button>
+      <button class="nav-item" data-view="hotspots"><span>08</span>热点档案</button>
+      <button class="nav-item" data-view="artifacts"><span>09</span>产物柜</button>
+      <button class="nav-item" data-view="system"><span>10</span>采集控制</button>
+      <button class="nav-item" data-view="sources"><span>11</span>订阅源</button>
+      <button class="nav-item" data-view="models"><span>12</span>模型中心</button>
+    </nav>
+    <div class="rail-foot">
+      <span class="pulse-dot"></span>
+      <div><b>LOCAL FIRST</b><small>数据留在本机</small></div>
+    </div>
+  </aside>
+
+  <main class="shell">
+    <header class="topbar">
+      <div><span class="eyebrow">编辑工作台</span><h1 id="page-title">今日值班</h1></div>
+      <div class="top-actions">
+        <select id="batch-switcher" class="batch-switcher" aria-label="当前批次"></select>
+        <time id="clock"></time>
+        <button class="ghost-button" id="health-button">检查采集环境</button>
+        <button class="primary-button" id="new-batch-button">＋ 新建今日批次</button>
+      </div>
+    </header>
+
+    <section class="view active" id="view-dashboard">
+      <div class="lead-grid">
+        <article class="dispatch-card reveal">
+          <div class="dispatch-top"><span>DAILY DISPATCH</span><time id="today-label"></time></div>
+          <h2>今天，<em>写什么？</em></h2>
+          <p>从热点采集、编辑判断到排版复制，每一步都有记录，每一份材料都能回头找到。</p>
+          <div class="dispatch-actions">
+            <button class="ink-button" id="dashboard-new">开始今天的选题 →</button>
+            <button class="text-button" data-go="hotspots">翻看历史热点</button>
+          </div>
+          <div class="edition-mark"><b id="edition-number">000</b><span>累计热点<br>ARCHIVED</span></div>
+        </article>
+        <section class="metric-grid reveal delay-1" id="metrics"></section>
+      </div>
+
+      <div class="desk-grid">
+        <section class="panel reveal delay-2">
+          <div class="panel-head"><div><span class="kicker">CURRENT EDITION</span><h3>最近批次</h3></div><button class="text-button" data-go="batches">全部批次</button></div>
+          <div id="latest-batch" class="empty-state">还没有批次，先建立今天的编辑任务。</div>
+        </section>
+        <section class="panel source-panel reveal delay-3">
+          <div class="panel-head"><div><span class="kicker">SOURCE DESK</span><h3>采集席位</h3></div><span class="legend"><i></i>最近状态</span></div>
+          <div id="source-health" class="source-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="view-overview">
+      <div class="section-intro"><div><span class="kicker">HOTSPOT ATLAS · SEMANTIC EDITION</span><h2>热点全景</h2></div><p>用打标后的事件语义观察媒体覆盖结构、国内关联和议题集中度；来源数与报道数分开计算，不把跨平台热度相加。</p></div>
+      <div class="atlas-notice"><b>覆盖结构 ≠ 舆情热度</b><span id="atlas-mode">等待批次数据</span></div>
+      <div class="atlas-metrics" id="atlas-metrics"></div>
+      <div class="atlas-controls" id="atlas-controls">
+        <div class="scope-tabs" aria-label="地区筛选"><button class="active" data-atlas-scope="全部">全部</button><button data-atlas-scope="国内">国内</button><button data-atlas-scope="全球性">全球性</button><button data-atlas-scope="国外">国外</button></div>
+        <select id="atlas-category" aria-label="分类筛选"><option value="全部">全部分类</option></select>
+        <label class="atlas-multi"><input id="atlas-multisource" type="checkbox"> 只看多源报道</label>
+        <label class="atlas-search"><span>⌕</span><input id="atlas-query" placeholder="搜索事件、关键词或来源"></label>
+      </div>
+      <div class="atlas-grid atlas-semantic-grid">
+        <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
+        <section class="panel atlas-cloud-panel"><div class="panel-head"><div><span class="kicker">HOTWORD CLOUD</span><h3>热词词云</h3></div><small>点击热词查看跨事件综述，可直接创建综合选题</small></div><div id="keyword-cloud" class="keyword-cloud"></div></section>
+      </div>
+      <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>事件归纳 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+    </section>
+
+    <section class="view" id="view-topics">
+      <div class="section-intro"><div><span class="kicker">PITCH DESK</span><h2>选题池</h2></div><p>热点全景中的事件归纳卡片可直接创建综合选题进入此池。技能生成评分产物后，这里承接核心8条、黑马2条和 H/B/P/S/D/F 评分体系。</p></div>
+      <div class="topic-workspace">
+        <section class="candidate-board">
+          <div class="workspace-head"><div><span class="kicker">SHORTLIST</span><h3>编辑候选</h3></div><span id="candidate-count">0 条</span></div>
+          <div class="topic-pool-hint">选题请在「热点全景」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
+          <div id="candidate-list" class="candidate-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="view-editorial">
+      <div class="section-intro"><div><span class="kicker">EDITORIAL ROOM</span><h2>编辑室</h2></div><p>逐项确认事实、观点与实践边界。所有创作门禁通过后，直接从这里确认简报并启动成稿链。</p></div>
+      <div class="editorial-layout">
+        <aside class="candidate-sidebar" id="editorial-candidates"></aside>
+        <form class="editorial-form" id="editorial-form">
+          <div id="editorial-empty" class="empty-state">先在选题池加入并选择一个候选。</div>
+          <div id="editorial-fields" hidden>
+            <input type="hidden" name="candidateId">
+            <div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
+            <section class="source-evidence" id="source-evidence">
+              <div><span class="kicker">SOURCE EVIDENCE</span><h4 id="source-evidence-title">原文尚未抓取</h4><p id="source-evidence-meta">AI 编辑会开始前会自动获取公开原文。</p></div>
+              <button type="button" class="outline-button" id="fetch-source">抓取 / 刷新原文</button>
+              <details id="source-evidence-details"><summary>查看来源摘录</summary><div id="source-evidence-excerpt"></div></details>
+            </section>
+            <section class="editorial-chat">
+              <div class="editorial-chat-head"><div><span class="kicker">AI EDITORIAL MEETING</span><h4>一次只讨论一个关键问题</h4></div><div class="editorial-chat-tools"><select id="editorial-provider" aria-label="编辑会模型"></select></div></div>
+              <div id="editorial-messages" class="editorial-messages"></div>
+              <div class="editorial-reply"><textarea id="editorial-answer" rows="3" placeholder="回答当前问题；首次进入时可以留空，让 AI 先提问"></textarea><button type="button" class="ink-button" id="send-editorial-answer">发送回答 / 让 AI 提问</button></div>
+              <small>AI 只整理明确回答并继续追问；不会把沉默、临时建议或模型推断写成作者决定。</small>
+            </section>
+            <div class="form-pair"><label>推荐角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
+            <label class="question-field">当前关键问题<input name="editor_question" placeholder="一次只问一个最能改变方向的问题"></label>
+            <div class="form-pair"><label>已确认公共事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>作者明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
+            <div class="form-pair"><label>已确认实践及证据<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界<textarea name="rejected_angles" rows="4"></textarea></label></div>
+            <div class="form-pair"><label>仍未解决问题<textarea name="open_questions" rows="3"></textarea></label><label>禁止写入<textarea name="forbidden_claims" rows="3"></textarea></label></div>
+            <div class="gate-strip"><label><input type="checkbox" name="experience_required"> 核心判断依赖亲身实践</label><label>下一动作<select name="next_action"><option>DISCUSS</option><option>WRITE_NOW</option><option>TEST_FIRST</option><option>RESEARCH_FIRST</option><option>DROP</option></select></label><span id="brief-state">DISCUSS</span></div>
+            <section class="editorial-production-gate" id="editorial-production-gate">
+              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
+              <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
+              <p id="editorial-production-hint">继续回答编辑问题，或在上方补齐缺失的决策。</p>
+              <div class="editorial-actions"><button type="submit" class="ghost-button">保存编辑决策</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
+            </section>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="view" id="view-editor">
+      <div class="section-intro"><div><span class="kicker">WRITING DESK</span><h2>文章编辑器</h2></div><p>编辑器只接受已锁定候选。草稿与终稿分别保存为 04-draft.md 和 09-FINAL.md，并实时计算可见字符。</p></div>
+      <div class="writing-toolbar">
+        <select id="writing-candidate" aria-label="文章候选"></select>
+        <input id="article-title" placeholder="文章标题">
+        <label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked> 草稿</label>
+        <label class="kind-toggle"><input type="radio" name="doc-kind" value="final"> 终稿</label>
+        <span id="char-count">0 / 2000</span>
+        <button class="primary-button" id="save-document">保存文稿</button>
+      </div>
+      <div class="ai-writing-bar">
+        <div><span class="kicker">MODEL ASSIST</span><b>对当前文稿单步改写</b></div>
+        <select id="draft-provider" aria-label="创作模型"></select>
+        <input id="draft-instructions" placeholder="本轮要求，例如：保留结构，把开头改得更直接">
+        <button class="outline-button" id="ai-draft">AI 生成 / 改写</button>
+        <small id="draft-context">事实、观点、禁写项不会被压缩</small>
+      </div>
+      <div class="writing-desk">
+        <textarea id="markdown-editor" spellcheck="false" placeholder="# 标题&#10;&#10;从这里开始写作……"></textarea>
+        <article id="markdown-preview" class="markdown-preview"><p>Markdown 预览</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="view-preview">
+      <div class="section-intro"><div><span class="kicker">PROOF & TYPESET</span><h2>排版预览</h2></div><p>只把真正生成的 article.ai.html 当作公众号排版结果；编辑器即时预览不会冒充门禁通过的正式 HTML。</p></div>
+      <div class="typeset-toolbar">
+        <select id="typeset-candidate" aria-label="待排版文章"></select>
+        <select id="typeset-provider" aria-label="排版设计模型"></select>
+        <button class="outline-button" id="run-local-typeset">生成 / 更新排版 HTML</button>
+        <button class="primary-button" id="copy-typeset-html" disabled>复制公众号富文本</button>
+        <small id="typeset-status">排版结果保留在本机；生成后可直接复制富文本并粘贴到公众号编辑器。</small>
+      </div>
+      <section class="image-stage" id="image-stage">
+        <div class="image-stage-head"><div><span class="kicker">IMAGE DESK</span><h3>配图工作台</h3><p id="image-stage-status">正在读取当前文章的配图计划…</p></div><button class="outline-button" id="plan-article-images">AI 规划必要配图</button></div>
+        <div class="image-slot-list" id="image-slot-list"></div>
+        <small class="image-stage-note">本地保存不会上传。只有点击某张素材的“上传 CDN”才会产生外部写入；来源和版权状态未明确时禁止上传。</small>
+      </section>
+      <div class="proof-layout">
+        <aside class="production-checklist" id="production-checklist"></aside>
+        <section class="phone-proof">
+          <div class="phone-bar"><span>WECHAT PROOF</span><button class="text-button" id="refresh-preview">刷新产物</button></div>
+          <div id="proof-empty" class="proof-empty">当前文章尚未生成 <code>article.ai.html</code><br><small>点击上方“生成 / 更新排版 HTML”</small></div>
+          <iframe id="proof-frame" title="公众号排版预览" hidden></iframe>
+        </section>
+        <aside class="delivery-panel"><span class="kicker">DELIVERY</span><h3>交付出口</h3><div id="delivery-links"></div><button class="ghost-button" id="preview-reindex">扫描排版产物</button></aside>
+      </div>
+    </section>
+
+    <section class="view" id="view-batches">
+      <div class="section-intro"><div><span class="kicker">DAILY EDITIONS</span><h2>每日批次</h2></div><p>一天一个编辑批次，采集、选题、成稿、排版都沿同一条时间线归档。</p></div>
+      <div class="ledger" id="batch-list"></div>
+    </section>
+
+    <section class="view" id="view-hotspots">
+      <div class="section-intro"><div><span class="kicker">THE MORGUE</span><h2>热点档案</h2></div><p>不是一次性热榜。按日期、来源和关键词，找回当时发生了什么。</p></div>
+      <form class="filter-bar" id="hotspot-filter">
+        <label class="search-field"><span>⌕</span><input name="q" placeholder="搜索公司、产品、人物或事件"></label>
+        <select name="source"><option value="">全部来源</option><option value="reddit">Reddit</option><option value="rsshub">RSSHub</option></select>
+        <input name="date" type="date">
+        <button class="ink-button">筛选档案</button>
+      </form>
+      <div class="archive-summary" id="archive-summary"></div>
+      <div class="story-list" id="hotspot-list"></div>
+    </section>
+
+    <section class="view" id="view-artifacts">
+      <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span><h2>产物柜</h2></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
+      <div class="cabinet-tools">
+        <div class="artifact-legend"><span>MD</span><span>JSON</span><span>HTML</span><span>URL</span></div>
+        <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
+      </div>
+      <div class="artifact-grid" id="artifact-list"></div>
+    </section>
+
+    <section class="view" id="view-system">
+      <div class="section-intro"><div><span class="kicker">COLLECTION CONTROL</span><h2>采集控制</h2></div><p>浏览器登录态与 RSSHub 生命周期由本地 Worker 管理，不经过前端。</p></div>
+      <div class="control-grid">
+        <article class="control-card reddit-card">
+          <div class="control-index">R/</div><span class="status-pill unknown" id="reddit-status">未检查</span>
+          <h3>Reddit · 专用 Chrome</h3>
+          <p>工作台通过 CDP 连接一个独立 Chrome 配置。首次登录后复用 Cookie，不读取你的日常浏览器资料。</p>
+          <ol><li>运行 <code>scripts/start-reddit-chrome.ps1</code></li><li>在新窗口登录 Reddit</li><li>以后保持窗口打开即可自动采集</li></ol>
+          <button class="outline-button" data-copy="powershell -File .\scripts\start-reddit-chrome.ps1">复制启动命令</button>
+        </article>
+        <article class="control-card rss-card">
+          <div class="control-index">RSS</div><span class="status-pill unknown" id="rsshub-status">未检查</span>
+          <h3>RSSHub · 按需生命周期</h3>
+          <p>Worker 先探测 1200 端口；未就绪才运行启动脚本。目标路由通过后采集，最终只停止本次由它启动的实例。</p>
+          <ol><li>根地址健康检查</li><li>启动脚本最多等待 180 秒</li><li>路由自动附加 <code>limit=30</code></li></ol>
+          <button class="outline-button" id="system-health">立即检查两项环境</button>
+        </article>
+      </div>
+      <section class="execution-note">
+        <span class="vertical-label">EXECUTION MODEL</span>
+        <div><b>01</b><h4>工作台入队</h4><p>建立批次与采集任务。</p></div><i>→</i>
+        <div><b>02</b><h4>本地 Worker</h4><p>调用 Chrome / PowerShell。</p></div><i>→</i>
+        <div><b>03</b><h4>SQLite 归档</h4><p>写入热点、日志和状态。</p></div><i>→</i>
+        <div><b>04</b><h4>技能产物</h4><p>索引 Markdown 与 HTML。</p></div>
+      </section>
+    </section>
+
+    <section class="view" id="view-sources">
+      <div class="section-intro"><div><span class="kicker">SOURCE REGISTER · LIVE CONFIG</span><h2>订阅源台账</h2></div><p>把 RSSHub 路由、X 账号和直连 RSS/Atom 放在同一张编辑台账里。变更会立即写入本地配置，下一次采集直接生效，无需手改 JSON。</p></div>
+      <div class="source-register-summary" id="subscription-summary"></div>
+      <div class="source-register-layout">
+        <form class="source-compose" id="subscription-form">
+          <div class="compose-stamp">ADD<br>SOURCE</div>
+          <span class="kicker">NEW SUBSCRIPTION</span>
+          <h3>增加一个情报入口</h3>
+          <label>来源类型
+            <select name="kind" id="subscription-kind">
+              <option value="direct">直连 RSS / Atom</option>
+              <option value="twitter">X 官方号 / 博主</option>
+              <option value="rsshub">RSSHub 路由</option>
+            </select>
+          </label>
+          <label id="subscription-value-label">订阅地址
+            <input name="value" id="subscription-value" type="url" required placeholder="https://example.com/feed.xml">
+          </label>
+          <label id="subscription-label-wrap">显示名称（可选）
+            <input name="label" id="subscription-label" placeholder="例如：机器之心">
+          </label>
+          <div class="source-compose-actions">
+            <button type="button" class="outline-button" id="test-subscription">先测试</button>
+            <button type="submit" class="primary-button">添加订阅</button>
+          </div>
+          <output id="subscription-test-result" class="subscription-test-result">尚未测试。直连 RSS 不调用大模型，也不产生模型费用。</output>
+        </form>
+        <section class="source-ledger-panel">
+          <div class="source-ledger-head">
+            <div><span class="kicker">ACTIVE INTELLIGENCE DESK</span><h3>当前订阅</h3></div>
+            <div class="source-filter-tabs" id="subscription-filters">
+              <button class="active" data-source-filter="all">全部</button>
+              <button data-source-filter="direct">直连</button>
+              <button data-source-filter="twitter">X</button>
+              <button data-source-filter="rsshub">RSSHub</button>
+            </div>
+          </div>
+          <div class="subscription-list" id="subscription-list"><div class="empty-state">正在读取订阅配置…</div></div>
+        </section>
+      </div>
+      <aside class="source-cost-note"><b>成本边界</b><span>读取公开 RSS/Atom 不会触发模型 API；成本主要是本机网络和存储。第三方 Feed 服务仍可能限流、停服或调整收费，因此采集器会隔离单源失败，不让它拖垮整批任务。</span></aside>
+    </section>
+
+    <section class="view" id="view-models">
+      <div class="section-intro"><div><span class="kicker">MODEL GATEWAY</span><h2>模型中心</h2></div><p>统一接入 DeepSeek、MiniMax 与 Kimi。API Key 只从服务端环境变量读取，浏览器只能看到“已配置/未配置”，不能读取密钥。</p></div>
+      <div class="model-layout">
+        <section>
+          <div class="model-grid" id="model-cards"></div>
+          <article class="context-card">
+            <div><span class="kicker">CONTEXT POLICY</span><h3>分层上下文压缩</h3></div>
+            <div class="context-flow"><span>事实 / 来源 / 作者确认<br><b>永久保留</b></span><i>＋</i><span>最近 8 轮<br><b>原文保留</b></span><i>＋</i><span>更早讨论与旧稿<br><b>滚动摘要</b></span></div>
+            <p>预算 = 模型上下文上限 − 最大输出 − 安全余量。摘要必须保留来源 URL、数字、专名、反证、禁写项和未决问题；压缩后仍超限时拒绝调用，不静默截断。</p>
+          </article>
+        </section>
+        <aside class="model-actions-panel">
+          <span class="kicker">ACTIVE ROUTE</span><h3>调用控制</h3>
+          <label>服务商<select id="model-provider"></select></label>
+          <button class="ghost-button" id="test-model">最小请求测试连接</button>
+          <hr>
+          <label>本次打标条数<input id="tag-limit" type="number" min="1" max="300" value="60"></label>
+          <button class="primary-button" id="ai-tag-batch">AI 打标当前批次</button>
+          <p class="fine-print">会把所选热点的标题、来源和链接发送给第三方模型并产生费用。系统会按模型输出上限每 4–10 条分组；若 JSON 被截断会继续拆分重试，通过结构校验后才写入数据库。</p>
+        </aside>
+      </div>
+      <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span id="call-summary"></span></div><div id="model-call-list"></div></section>
+    </section>
+  </main>
+
+  <dialog id="batch-dialog" class="modal">
+    <form method="dialog" id="batch-form">
+      <div class="modal-head"><div><span class="kicker">NEW EDITION</span><h2>建立每日批次</h2></div><button type="button" class="close-button" data-close-batch-dialog aria-label="关闭">×</button></div>
+      <label>日期<input name="date" type="date" required></label>
+      <label>批次名称<input name="title" placeholder="例如：周一 AI 与大厂动态"></label>
+      <label>今日备注<textarea name="note" rows="3" placeholder="今天特别关注什么？可留空"></textarea></label>
+      <div class="modal-actions"><button type="button" class="ghost-button" data-close-batch-dialog>取消</button><button type="submit" value="default" class="primary-button">建立批次</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="batch-drawer" class="drawer"><div id="batch-detail"></div></dialog>
+  <dialog id="production-job-dialog" class="modal job-modal">
+    <div class="modal-head"><div><span class="kicker">PRODUCTION RUN</span><h2 id="production-job-title">生产任务</h2></div><button type="button" class="close-button" id="close-production-job" aria-label="关闭">×</button></div>
+    <div class="job-console" id="production-job-console">等待任务…</div>
+    <p class="fine-print" id="production-job-note">可以关闭窗口，任务仍会在后台继续。</p>
+  </dialog>
+  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close">×</button><iframe title="产物预览"></iframe></dialog>
+  <div class="toast" id="toast"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

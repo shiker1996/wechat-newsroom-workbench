@@ -1,0 +1,35 @@
+# Node
+node_modules/
+*.log
+
+# Env & secrets
+.env
+.env.local
+config.local.json
+
+# Generated data
+data/workbench.db*
+data/backups/
+data/server-subscriptions-check*
+data/source-cache/
+
+# Generated articles
+articles/
+topics/
+
+# Chrome / browser profiles
+data/reddit-chrome-profile/
+
+# Temp / scratch scripts
+check_btick.mjs
+check_syntax2.mjs
+_*.mjs
+_*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
