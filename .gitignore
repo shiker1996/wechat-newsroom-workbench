@@ -6,6 +6,7 @@ node_modules/
 .env
 .env.local
 config.local.json
+account-context.json
 
 # Generated data
 data/workbench.db*
