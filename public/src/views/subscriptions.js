@@ -66,7 +66,6 @@ function renderSubscriptions() {
     dotHtml += "</div>";
     var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
-  }
   var allItems = state.subscriptions.items;
   var dotHtml = "<div class=\"health-dots\">";
   for(var di=0; di<allItems.length; di++){
