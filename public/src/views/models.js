@@ -34,7 +34,7 @@ async function loadModels() {
   }
 }
 async function testModel() {
-  const provider = document.getElementById("model-test-provider")?.value;
+  const provider = document.getElementById("model-provider")?.value;
   if (!provider) return toast("请选择要测试的服务商");
   const btn = document.getElementById("test-model");
   if (btn) { btn.disabled = true; btn.textContent = "测试中…"; }
