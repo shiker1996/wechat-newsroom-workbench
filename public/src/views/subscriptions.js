@@ -79,7 +79,7 @@ function renderSubscriptions() {
           ? `最近成功 · ${health.item_count} 条 · ${((Number(health.duration_ms) || 0) / 1000).toFixed(1)}s`
           : health ? `最近${health.status === "interrupted" ? "中断" : "失败"} · ${health.error || "未返回内容"}`
           : "尚无采集记录";
-        return `<article class="subscription-row ${item.enabled ? "" : "disabled"} ${hc === "bad" ? "has-error" : ""}" style="--row:${index}">
+        return `<article class="subscription-row health-${hc} ${item.enabled ? "" : "disabled"}" style="--row:${index}">
           <span class="subscription-kind ${escapeHtml(item.kind)}">${subscriptionTypeLabel(item.kind)}</span>
           <div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
           <label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>
