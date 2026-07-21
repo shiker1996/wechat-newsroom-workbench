@@ -52,7 +52,7 @@ function renderSubscriptions() {
   var maxDots = 50;
   if(total > 0){
     var dotHtml = "<div class=\"health-dots\">";
-    function addDots(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
+    var addDots=function(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
     var ratio = maxDots / total;
     var okDots = Math.round(oks * ratio) || (oks > 0 ? 1 : 0);
     var badDots = Math.round(bads * ratio) || (bads > 0 ? 1 : 0);
@@ -66,9 +66,7 @@ function renderSubscriptions() {
     dotHtml += "</div>";
     var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
-  var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
-  var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   var allItems = state.subscriptions.items;
   var dotHtml = "<div class=\"health-dots\">";
   for(var di=0; di<allItems.length; di++){
