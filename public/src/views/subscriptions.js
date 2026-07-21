@@ -1,4 +1,4 @@
-import { $, $$ } from "../core/dom.js";
+﻿import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast } from "../core/ui.js";
 import { state } from "../core/state.js";
@@ -61,9 +61,9 @@ function renderSubscriptions() {
     bar.appendChild(track);
     var labels = document.createElement("div");
     labels.className = "health-bar-labels";
-    if (okN){var s=document.createElement("span");s.className="ok";s.textContent=okN+"正常";labels.appendChild(s);}
-    if (badN){var s=document.createElement("span");s.className="bad";s.textContent=badN+"异常";labels.appendChild(s);}
-    if (idleN){var s=document.createElement("span");s.className="idle";s.textContent=idleN+"未采集";labels.appendChild(s);}
+    if(okN){var sOk=document.createElement("span");sOk.className="ok";sOk.textContent=okN+"正常";labels.appendChild(sOk);}
+    if(badN){var sBad=document.createElement("span");sBad.className="bad";sBad.textContent=badN+"异常";labels.appendChild(sBad);}
+    if(idleN){var sIdle=document.createElement("span");sIdle.className="idle";sIdle.textContent=idleN+"未采集";labels.appendChild(sIdle);}
     bar.appendChild(labels);
     document.getElementById("subscription-summary").appendChild(bar);
   }
