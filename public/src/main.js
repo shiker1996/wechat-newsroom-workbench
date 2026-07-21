@@ -80,6 +80,10 @@ async function onReady() {
   var current = document.querySelector(".nav-item.active")?.dataset.view || "dashboard";
   var bs = document.getElementById("batch-switcher");
   if (bs) bs.style.display = ["overview","topics","editorial","editor","preview","artifacts"].includes(current) ? "block" : "none";
+  // 非 legacy 视图：页面刷新时主动加载数据
+  if (!legacyViews.has(current) && viewModules[current]) {
+    try { var mod = await import(viewModules[current]); if (mod.default) mod.default(); } catch {}
+  }
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", onReady);
