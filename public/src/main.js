@@ -29,7 +29,14 @@ async function go(view) {
   // 旧系统回退视图：调用旧 go() 处理导航和数据加载
   if (legacyViews.has(view)) {
     const oldGo = window.__oldGo;
-    if (oldGo) { oldGo(view); return; }
+    if (oldGo) {
+      oldGo(view);
+      // dashboard 切换批次后刷新概览数据
+      if (view === "dashboard" && typeof window.loadOverview === "function") {
+        await window.loadOverview();
+      }
+      return;
+    }
   }
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === `view-${view}`));
