@@ -52,7 +52,7 @@ function renderSubscriptions() {
     dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + escapeHtml(allItems[di].label) + ": " + (h && h.status === "success" ? h.item_count + "条" : h ? h.error || "失败" : "未采集") + "\"></i>";
   }
   dotHtml += "</div>";
-  document.getElementById("subscription-summary").innerHTML += dotHtml;
+  var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   const items = state.subscriptions.items.filter(
     (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter
   );
