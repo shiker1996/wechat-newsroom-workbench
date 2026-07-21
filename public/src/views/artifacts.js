@@ -1,2 +1,30 @@
-﻿import { toast } from "../core/ui.js";
-export default function() { toast("视图正在迁移中…"); }
+import { $ } from "../core/dom.js";
+import { request } from "../core/http.js";
+import { escapeHtml, formatDate } from "../core/ui.js";
+import { state } from "../core/state.js";
+
+async function loadArtifacts() {
+  const batchId = state.activeBatchId || "";
+  const qs = batchId ? "?limit=300&batch_id=" + encodeURIComponent(batchId) : "?limit=300";
+  const [items, stats] = await Promise.all([
+    request("/api/artifacts" + qs),
+    request("/api/articles/stats").catch(() => null),
+  ]);
+  const statsEl = document.getElementById("article-stats");
+  if (stats && statsEl) {
+    statsEl.innerHTML = [
+      ["累计", stats.totalFinal, "篇已完结文章"],
+      ["本月", stats.thisMonth, "篇"],
+      ["本周", stats.thisWeek, "篇"],
+    ].map(([label, value, note]) => `<div class="article-stat"><strong>${value}</strong><span>${label}<br><small>${note}</small></span></div>`).join("");
+  }
+  const batchLabel = state.batches.find((b) => b.id === state.activeBatchId)?.batch_date || "全部批次";
+  const list = document.getElementById("artifact-list");
+  list.innerHTML = items.length
+    ? items.map((item) => {
+        const ext = item.name.split(".").pop().toUpperCase();
+        return `<article class="artifact-card" data-artifact="${item.id}"><span class="file-tab">${escapeHtml(ext)}</span><h3>${escapeHtml(item.kind)}</h3><p>${escapeHtml(item.name)}</p><footer><span>${Math.max(1, Math.round(item.size / 1024))} KB</span><time>${formatDate(item.modified_at)}</time></footer></article>`;
+      }).join("")
+    : `<div class="empty-state"><strong>${escapeHtml(batchLabel)}</strong> 下没有产物。尝试切换到其他批次或重新扫描工作区。</div>`;
+}
+export default loadArtifacts;
