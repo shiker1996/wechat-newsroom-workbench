@@ -66,15 +66,6 @@ function renderSubscriptions() {
     dotHtml += "</div>";
     var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
-  var allItems = state.subscriptions.items;
-  var dotHtml = "<div class=\"health-dots\">";
-  for(var di=0; di<allItems.length; di++){
-    var h=allItems[di].health;
-    var cls = h && h.status === "success" ? "ok" : h ? "bad" : "idle";
-    dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + escapeHtml(allItems[di].label) + ": " + (h && h.status === "success" ? h.item_count + "条" : h ? h.error || "失败" : "未采集") + "\"></i>";
-  }
-  dotHtml += "</div>";
-  var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   const items = state.subscriptions.items.filter(
     (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter
   );
