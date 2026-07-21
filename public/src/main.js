@@ -27,7 +27,7 @@ const titles = {
 async function go(view) {
   if (!(view in titles)) return;
   var bs = document.getElementById("batch-switcher");
-  if (bs) bs.style.display = ["overview","topics","editorial","editor","preview","artifacts"].includes(view) ? "" : "none";
+  if (bs) bs.style.display = ["overview","topics","editorial","editor","preview","artifacts"].includes(view) ? "block" : "none";
   // 旧系统回退视图：调用旧 go() 处理导航和数据加载
   if (legacyViews.has(view)) {
     const oldGo = window.__oldGo;
