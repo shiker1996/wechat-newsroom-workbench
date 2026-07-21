@@ -1,4 +1,4 @@
-import { $, $$ } from "../core/dom.js";
+﻿import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
@@ -61,16 +61,16 @@ async function loadWritingDesk() {
 async function loadSelectedDocument() {
   const candidateId = Number(document.getElementById("writing-candidate")?.value);
   const kind = selectedDocKind();
-  let document = null;
+  let docResult = null;
   try {
-    document = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${candidateId}&kind=${kind}`);
+    docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${candidateId}&kind=${kind}`);
   } catch {}
   const candidate = state.candidates.find((item) => item.id === candidateId);
   const titleEl = document.getElementById("article-title");
   const editor = document.getElementById("markdown-editor");
-  if (titleEl) titleEl.value = document?.title || candidate?.hotspot_title || "";
+  if (titleEl) titleEl.value = docResult?.title || candidate?.hotspot_title || "";
   if (editor) {
-    editor.value = document?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : "");
+    editor.value = docResult?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : "");
     renderMarkdown();
   }
 }
@@ -82,11 +82,11 @@ async function saveDocument() {
   const kind = selectedDocKind();
   if (kind === "final" && visibleChars(content) > 2000) return toast("终稿超过 2000 可见字符，暂不能保存为终稿");
   const title = document.getElementById("article-title")?.value || "";
-  const document = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents`, {
+  const docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents`, {
     method: "PUT",
     body: JSON.stringify({ candidateId, kind, title, content, status: kind === "final" ? "finalized" : "draft" }),
   });
-  toast(`已保存 ${document.file_path}`);
+  toast(`已保存 ${docResult.file_path}`);
   await loadWritingDesk();
 }
 

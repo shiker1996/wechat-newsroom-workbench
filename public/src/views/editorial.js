@@ -267,6 +267,8 @@ async function startEditorialProduction() {
   } catch (err) { toast(err.message); }
 }
 
+window.loadEditorialRoom = loadEditorialRoom;
+window.openEditorial = openEditorial;
 window.saveEditorial = saveEditorial;
 window.renderEditorialReadiness = renderEditorialReadiness;
 window.sendEditorialAnswer = sendEditorialAnswer;
