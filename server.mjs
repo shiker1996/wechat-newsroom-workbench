@@ -491,7 +491,7 @@ async function api(request, response, url) {
   }
   const documentsMatch = pathname.match(/^\/api\/batches\/([^/]+)\/documents$/);
   if (documentsMatch && request.method === 'GET') {
-    const batchId=decodeURIComponent(documentsMatch[1]); const cId=searchParams.get('candidateId'); const kind=searchParams.get('kind'); if(cId&&kind){const doc=store.getDocument(batchId,Number(cId),kind);return json(response,doc?200:404,doc||{error:'文档不存在'});} return json(response,200,store.listDocuments(batchId));
+    const batchId=decodeURIComponent(documentsMatch[1]); const cId=searchParams.get('candidateId'); const kind=searchParams.get('kind'); if(cId&&kind){var doc=store.getDocument(batchId,Number(cId),kind);if(!doc&&kind==='draft'){var arts=store.listArtifacts({batchId:batchId});var da=arts.find(function(a){return a.kind==='文章初稿'&&a.file_path&&a.file_path.toLowerCase().includes(cId.toLowerCase());});if(da&&require('fs').existsSync(da.file_path)){doc={title:da.name,content:require('fs').readFileSync(da.file_path,'utf-8')};}}return json(response,doc?200:404,doc||{error:'文档不存在'});} return json(response,200,store.listDocuments(batchId));
   }
   if (documentsMatch && request.method === 'PUT') {
     const batchId = decodeURIComponent(documentsMatch[1]);
