@@ -49,7 +49,7 @@ function renderSubscriptions() {
   var bads = allItems.filter(function(i){return i.health && i.health.status !== "success";}).length;
   var idles = allItems.filter(function(i){return !i.health;}).length;
   var total = oks + bads + idles;
-  var maxDots = 50;
+  var maxDots = 100;
   if(total > 0){
     var dotHtml = "<div class=\"health-dots\">";
     var addDots=function(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
