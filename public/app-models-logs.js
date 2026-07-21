@@ -41,7 +41,7 @@ async function openBatch(id, mode) {
     <section class="drawer-section"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
   </div>`;
   $('#batch-drawer').showModal();
-  if(mode==='archive'){$('.drawer-section',$('#batch-detail')).forEach(function(s){var h3=s.querySelector('h3');if(h3&&['采集今日热点','打标与热点研判','执行日志'].includes(h3.textContent))s.style.display='none';});}
+  if(mode==='archive'){var secs=document.getElementById('batch-detail').querySelectorAll('.drawer-section');secs.forEach(function(s){var h3=s.querySelector('h3');if(h3&&h3.textContent==='采集今日热点'||h3&&h3.textContent==='执行日志'){s.style.display='none';}else if(h3&&h3.textContent==='打标与热点研判'){var acts=s.querySelectorAll('.pipeline-actions,.pipeline-gate,.pipeline-error,#batch-ai-provider');acts.forEach(function(b){b.style.display='none';});}});}
 }
 
 async function startCollection() {
