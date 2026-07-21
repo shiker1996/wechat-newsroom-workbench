@@ -43,7 +43,7 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["X SIGNAL", summary.twitter, "官方与博主"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-        // 健康状态点阵（按比例采样，最多50个竖椭圆）
+          // 健康状态点阵（固定50个竖椭圆，按比例采样）
   var allItems = state.subscriptions.items;
   var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
   var bads = allItems.filter(function(i){return i.health && i.health.status !== "success";}).length;
@@ -53,12 +53,20 @@ function renderSubscriptions() {
   if(total > 0){
     var dotHtml = "<div class=\"health-dots\">";
     function addDots(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
-    var ratio = Math.min(1, maxDots / total);
-    addDots(Math.max(1, Math.round(oks * ratio)), "ok", oks + "个来源正常");
-    if(bads > 0) addDots(Math.max(1, Math.round(bads * ratio)), "bad", bads + "个来源异常");
-    if(idles > 0) addDots(Math.max(1, Math.round(idles * ratio)), "idle", idles + "个未采集");
+    var ratio = maxDots / total;
+    var okDots = Math.round(oks * ratio) || (oks > 0 ? 1 : 0);
+    var badDots = Math.round(bads * ratio) || (bads > 0 ? 1 : 0);
+    var idleDots = Math.round(idles * ratio) || (idles > 0 ? 1 : 0);
+    var sum = okDots + badDots + idleDots;
+    while(sum > maxDots){if(okDots > badDots && okDots > idleDots)okDots--;else if(badDots > idleDots)badDots--;else idleDots--;sum--;}
+    while(sum < maxDots){if(oks > bads && oks > idles)okDots++;else if(bads > idles)badDots++;else idleDots++;sum++;}
+    addDots(okDots, "ok", oks + "个来源正常");
+    if(bads > 0) addDots(badDots, "bad", bads + "个来源异常");
+    if(idles > 0) addDots(idleDots, "idle", idles + "个未采集");
     dotHtml += "</div>";
     var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
+  }
+  var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
   var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   var allItems = state.subscriptions.items;
