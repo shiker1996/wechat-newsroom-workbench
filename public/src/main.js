@@ -74,8 +74,15 @@ async function init() {
   } catch {}
 }
 
+async function onReady() {
+  await init();
+  // 初始化后根据当前视图设置 batch-switcher 显隐
+  var current = document.querySelector(".nav-item.active")?.dataset.view || "dashboard";
+  var bs = document.getElementById("batch-switcher");
+  if (bs) bs.style.display = ["overview","topics","editorial","editor","preview","artifacts"].includes(current) ? "block" : "none";
+}
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", onReady);
 } else {
-  init();
+  onReady();
 }
