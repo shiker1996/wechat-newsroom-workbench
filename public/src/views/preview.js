@@ -25,16 +25,28 @@ function imageCard(item) {
 }
 
 function renderImageWorkspace() {
-  const ws = state.imageWorkspace;
-  if (!ws) { document.getElementById("image-stage").innerHTML = '<div class="empty-state">尚未规划配图。</div>'; return; }
-  const stage = document.getElementById("image-stage");
-  if (!stage) return;
-  const planned = ws.images?.planned || [];
-  stage.innerHTML = planned.length
-    ? planned.map(imageCard).join("")
-    : '<div class="image-stage-empty">暂无配图规划。点击「AI 规划配图」生成占位。</div>';
-  const note = document.getElementById("image-stage-note");
-  if (note) note.textContent = "点击图片区域选择本地文件，选图后自动保存并上传 CDN。";
+  const data = state.imageWorkspace;
+  if (!data) return;
+  const status = document.getElementById('image-stage-status');
+  const button = document.getElementById('plan-article-images');
+  if (button) button.textContent = data.planned ? '重新检查必要配图' : 'AI 规划必要配图';
+  if (status) {
+    if (!data.planned) status.textContent = '尚未执行配图规划；正式排版前需要先确认是否存在必要图片。';
+    else if (!data.total) status.textContent = '配图规划完成：本文没有必须人工提供的来源图或资料图。';
+    else status.textContent = '配图就绪 ' + (data.ready||0) + ' / ' + data.total + ((data.unresolved||[]).length ? ' · 待处理 ' + (data.unresolved||[]).join('、') : ' · 可以进入正式排版');
+  }
+  const list = document.getElementById('image-slot-list');
+  if (list) {
+    list.innerHTML = data.items && data.items.length
+      ? data.items.map(imageCard).join('')
+      : '<div class="image-stage-empty">' + (data.planned ? '没有必要的人工配图，文章可直接排版。' : '点击“AI 规划必要配图”，系统只会为有证据或阅读价值的图片留位。') + '</div>';
+  }
+  var hasCandidate = Boolean(state.productionPreview?.candidates?.length);
+  var btn = document.getElementById('run-local-typeset');
+  if (btn) {
+    btn.disabled = !hasCandidate || !data.planned || (data.unresolved||[]).length > 0;
+    btn.title = !hasCandidate ? '请先运行完整成稿链' : !data.planned ? '请先点击「AI 规划必要配图」' : (data.unresolved||[]).length ? '以下图片待上传：' + (data.unresolved||[]).join('、') : '生成公众号排版 HTML';
+  }
 }
 
 function candidateArtifacts(candidate) {
@@ -53,15 +65,26 @@ function renderProductionCandidate(candidateId) {
   const candidate = pp.candidates.find((c) => c.id === Number(candidateId));
   if (!candidate) return;
   const artifacts = candidateArtifacts(candidate);
-  const htmlArtifact = artifacts.find((a) => a.name === "article.ai.html");
-  const finalArtifact = artifacts.find((a) => a.name === "09-FINAL.md");
-  const status = document.getElementById("typeset-status");
-  if (status) status.textContent = htmlArtifact ? `${candidate.candidate_id} 的排版 HTML 已就绪，可以直接复制到公众号编辑器。` : `${candidate.candidate_id || "当前文章"} 尚未生成排版 HTML。`;
-  const deliveries = artifacts.filter((a) => ["09-FINAL.md", "article.ai.html"].includes(a.name));
-  const dl = document.getElementById("delivery-links");
-  if (dl) dl.innerHTML = deliveries.length
-    ? deliveries.map((item) => `<div class="delivery-item"><small>${escapeHtml(item.kind)}</small><a href="/api/artifacts/${item.id}/content" target="_blank">${escapeHtml(item.name)}</a></div>`).join("")
-    : '<div class="empty-state">尚无可交付文件</div>';
+  const names = new Set(artifacts.map((a) => a.name));
+  const steps = [['article-brief.md','锁定文章简报'],['09-FINAL.md','文章终稿'],['magazine-design-tokens.json','杂志设计'],['article.ai.draft.html','HTML 初稿'],['article.ai.html','门禁后 HTML']];
+  const cl = document.getElementById('production-checklist');
+  if (cl) cl.innerHTML = '<span class="kicker">PIPELINE GATES</span><h3>生产门禁</h3>' + steps.map(([name,label]) => '<div class="production-step ' + (names.has(name)?'done':'') + '"><i></i><div><b>' + label + '</b><small>' + (names.has(name)?'已生成':'缺少 ' + name) + '</small></div></div>').join('');
+  const htmlArtifact = artifacts.find((a) => a.name === 'article.ai.html');
+  const proofEmpty = document.getElementById('proof-empty');
+  const proofFrame = document.getElementById('proof-frame');
+  if (proofEmpty) proofEmpty.hidden = Boolean(htmlArtifact);
+  if (proofFrame) proofFrame.hidden = !htmlArtifact;
+  if (proofFrame) proofFrame.src = htmlArtifact ? '/api/artifacts/' + htmlArtifact.id + '/content?v=' + encodeURIComponent(htmlArtifact.modified_at) : 'about:blank';
+  const copyBtn = document.getElementById('copy-typeset-html');
+  if (copyBtn) copyBtn.disabled = !htmlArtifact;
+  const status = document.getElementById('typeset-status');
+  if (status) {
+    status.classList.toggle('ready', Boolean(htmlArtifact));
+    status.textContent = htmlArtifact ? candidate.candidate_id + ' 的排版 HTML 已就绪，可以直接复制到公众号编辑器。' : (candidate.candidate_id || '当前文章') + ' 尚未生成排版 HTML。';
+  }
+  const deliveries = artifacts.filter((a) => ['09-FINAL.md','article.ai.html'].includes(a.name));
+  const dl = document.getElementById('delivery-links');
+  if (dl) dl.innerHTML = deliveries.length ? deliveries.map((item) => '<div class="delivery-item"><small>' + escapeHtml(item.kind) + '</small><a href="/api/artifacts/' + item.id + '/content" target="_blank">' + escapeHtml(item.name) + '</a></div>').join('') : '<div class="empty-state">尚无可交付文件</div>';
 }
 
 async function loadProductionPreview() {
@@ -97,9 +120,12 @@ async function loadProductionPreview() {
 }
 
 async function loadImageWorkspace(candidateId) {
+  const stage = document.getElementById('image-stage');
+  if (!candidateId) { state.imageWorkspace = null; if(stage)stage.hidden = true; document.getElementById('run-local-typeset') && (document.getElementById('run-local-typeset').disabled = true); return; }
+  if (stage) stage.hidden = false;
   try {
-    const ws = await request(`/api/candidates/${candidateId}/images`);
-    state.imageWorkspace = ws;
+    const ws = await request('/api/candidates/' + candidateId + '/images');
+    state.imageWorkspace = Object.assign({}, ws, {candidateId:candidateId});
     renderImageWorkspace();
   } catch { state.imageWorkspace = null; }
 }

@@ -14,7 +14,7 @@ const viewModules = {
 };
 
 // 回退到旧系统处理的视图（使用旧系统的全局函数 + ensureModule）
-const legacyViews = new Set(["dashboard", "batches", "preview"]);
+const legacyViews = new Set(["dashboard", "batches"]);
 
 const titles = {
   dashboard: "今日值班", batches: "每日批次", overview: "热点全景",
