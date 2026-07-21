@@ -41,6 +41,7 @@ async function openBatch(id, mode) {
     <section class="drawer-section"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
   </div>`;
   $('#batch-drawer').showModal();
+  if(mode==='archive'){$('.drawer-section',$('#batch-detail')).forEach(function(s){var h3=s.querySelector('h3');if(h3&&['采集今日热点','打标与热点研判','执行日志'].includes(h3.textContent))s.style.display='none';});}
 }
 
 async function startCollection() {
