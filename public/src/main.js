@@ -17,6 +17,7 @@ const viewModules = {
 const legacyLoaders = {
   dashboard: "loadOverview",
   batches: "loadBatches",
+  preview: "loadProductionPreview",
 };
 
 const titles = {
@@ -37,16 +38,15 @@ async function go(view) {
   if (modPath) {
     try {
       const mod = await import(modPath);
-      if (mod.default) await mod.default();
+      if (mod.default) { await mod.default(); return; }
     } catch (err) {
       console.error(`ESM 视图 ${view} 加载失败:`, err);
     }
-  } else {
-    // 回退到旧系统全局函数
-    const loader = legacyLoaders[view];
-    if (loader && typeof window[loader] === "function") {
-      try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
-    }
+  }
+  // 回退到旧系统全局函数
+  const loader = legacyLoaders[view];
+  if (loader && typeof window[loader] === "function") {
+    try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
   }
 }
 
