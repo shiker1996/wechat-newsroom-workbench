@@ -1,10 +1,4 @@
 // src/core/state.js — 共享状态
-export const state = {
-  overview: null, batches: [], currentBatch: null, activeBatchId: null,
-  candidates: [], documents: [], models: null, jobTimer: null,
-  atlas: null, atlasFilters: { scope: "全部", category: "全部", multi: false, query: "" },
-  atlasSelectedWord: null, productionPreview: null, imageWorkspace: null,
-  subscriptions: null, subscriptionFilter: "all",
-  calYear: null, calMonth: null, editorialCandidate: null,
-  rankingItems: null,
-};
+// 指向全局 state 对象（由 app-core.js 的 const state = {...} 创建）
+// 确保 ESM 视图和旧系统操作同一份数据
+export const state = typeof window !== "undefined" ? window.state : {};
