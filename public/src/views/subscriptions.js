@@ -43,28 +43,23 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["X SIGNAL", summary.twitter, "官方与博主"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-      // 健康状态点阵（按比例采样，最多50个）
+        // 健康状态点阵（按比例采样，最多50个竖椭圆）
   var allItems = state.subscriptions.items;
   var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
   var bads = allItems.filter(function(i){return i.health && i.health.status !== "success";}).length;
   var idles = allItems.filter(function(i){return !i.health;}).length;
   var total = oks + bads + idles;
   var maxDots = 50;
-  var dotHtml = "<div class=\"health-dots\">";
-  function addDots(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
-  if(total <= maxDots){
-    for(var di=0; di<allItems.length; di++){
-      var h=allItems[di].health;
-      var cls = h && h.status === "success" ? "ok" : h ? "bad" : "idle";
-      dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + escapeHtml(allItems[di].label) + ": " + (h && h.status === "success" ? h.item_count + "条" : h ? h.error || "失败" : "未采集") + "\"></i>";
-    }
-  }else{
-    var ratio = maxDots / total;
-    addDots(Math.round(oks * ratio) || 1, "ok", oks + "个来源正常");
-    addDots(Math.round(bads * ratio) || (bads>0?1:0), "bad", bads + "个来源异常");
-    addDots(Math.round(idles * ratio) || (idles>0?1:0), "idle", idles + "个未采集");
+  if(total > 0){
+    var dotHtml = "<div class=\"health-dots\">";
+    function addDots(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
+    var ratio = Math.min(1, maxDots / total);
+    addDots(Math.max(1, Math.round(oks * ratio)), "ok", oks + "个来源正常");
+    if(bads > 0) addDots(Math.max(1, Math.round(bads * ratio)), "bad", bads + "个来源异常");
+    if(idles > 0) addDots(Math.max(1, Math.round(idles * ratio)), "idle", idles + "个未采集");
+    dotHtml += "</div>";
+    var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   }
-  dotHtml += "</div>";
   var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
   var allItems = state.subscriptions.items;
   var dotHtml = "<div class=\"health-dots\">";
