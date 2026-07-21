@@ -31,17 +31,21 @@ async function go(view) {
     const oldGo = window.__oldGo;
     if (oldGo) {
       oldGo(view);
-      // dashboard 切换批次后刷新概览数据
       if (view === "dashboard" && typeof window.loadOverview === "function") {
         await window.loadOverview();
       }
       return;
     }
   }
+  // legacy 视图也隐藏 batch-switcher
+  if (bs) bs.hidden = true;
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === `view-${view}`));
   document.getElementById("page-title").textContent = titles[view];
   history.replaceState(null, "", `#${view}`);
+  // batch-switcher 只对需要批次上下文的页面可见
+  var bs = document.getElementById('batch-switcher');
+  if (bs) bs.hidden = !['overview','topics','editorial','editor','preview','artifacts'].includes(view);
   const modPath = viewModules[view];
   if (modPath && !legacyViews.has(view)) {
     try {
