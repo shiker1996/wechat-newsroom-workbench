@@ -172,6 +172,36 @@ async function api(request, response, url) {
     return json(response, 202, jobs.startCollection(decodeURIComponent(collectMatch[1]), sources));
   }
   const overviewMatch = pathname.match(/^\/api\/batches\/([^/]+)\/overview$/);
+  const rankingMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ranking$/);
+  if (rankingMatch && request.method === 'GET') {
+    const batchId = decodeURIComponent(rankingMatch[1]);
+    const batch = store.getBatch(batchId);
+    if (!batch) return json(response, 404, { error: '批次不存在' });
+    const items = batch.hotspots
+      .filter((item) => !item.is_stale)
+      .map((item) => {
+        const raw = (() => { try { return JSON.parse(item.raw_json || '{}'); } catch { return {}; } })();
+        const tags = raw.aiTags || {};
+        const preScores = tags.preScores || {};
+        const base = ['conflict','audience','informationGain','emotion','timeliness','impact','sourceReliability']
+          .reduce((s, k) => s + (preScores[k] || 0), 0);
+        const finalPreScore = base + (tags.categoryPreference || 0) + (tags.credibleScoop || 0) - (tags.saturationPenalty || 0);
+        return {
+          hotspotId: item.id, title: item.title, category: item.category, marketScope: item.market_scope,
+          riskLevel: tags.riskLevel || item.category, score: finalPreScore,
+          eliminationReason: raw.eliminationReason || '',
+          inPool: false
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+    // Mark items that are in the candidate pool
+    const candidates = store.listCandidates(batchId);
+    const inPoolIds = new Set(candidates.map((c) => c.hotspot_id));
+    for (const item of items) { if (inPoolIds.has(item.hotspotId)) item.inPool = true; }
+    return json(response, 200, items);
+  }
+
   if (overviewMatch && request.method === 'GET') {
     const batchId = decodeURIComponent(overviewMatch[1]);
     const batch = store.getBatch(batchId);

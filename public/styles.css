@@ -173,7 +173,17 @@ nav { padding-top: 20px; display: grid; gap: 2px; overflow-y: auto; overflow-x: 
 .event-cluster-card.hotword-refer .event-source-links .event-source-static b { font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap; }
 
 /* Topic pool hint */
-.topic-pool-hint { background:var(--bgelevated);border:1px dashed var(--line);border-radius:6px;padding:16px 20px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.5; }
+.ranking-panel { border-top:5px solid var(--yellow);margin-top:20px;padding:18px;background:rgba(251,249,242,.48); }
+.ranking-panel .workspace-head { margin-bottom:10px; }
+.ranking-list { display:none;max-height:480px;overflow:auto;border:1px solid var(--line);background:white; }
+.ranking-row { display:grid;grid-template-columns:36px 40px 1fr auto;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:11px; }
+.ranking-row:hover { background:rgba(251,249,242,.6); }
+.ranking-row.in-pool { opacity:.5; }
+.ranking-rank { font:800 12px var(--display);color:var(--muted);text-align:center; }
+.ranking-score { font:600 13px var(--display);text-align:center; }
+.ranking-title b { display:block;margin-bottom:2px; }
+.ranking-title span { display:block; }
+.ranking-actions { white-space:nowrap; }.topic-pool-hint { background:var(--bgelevated);border:1px dashed var(--line);border-radius:6px;padding:16px 20px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.5; }
 
 .hotword-index-card { background:var(--bgelevated);border:1px solid var(--line);border-left:3px solid var(--yellow);padding:14px 18px;margin-bottom:8px;border-radius:4px;cursor:pointer;transition:.15s ease; }
 
