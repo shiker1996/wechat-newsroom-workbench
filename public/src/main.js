@@ -17,7 +17,7 @@ const viewModules = {
 const legacyViews = new Set(["dashboard", "batches"]);
 
 const titles = {
-  dashboard: "今日值班", batches: "每日批次", overview: "热点全景",
+  dashboard: "今日值班", batches: "批次管理", overview: "热点全景",
   topics: "选题池", editorial: "编辑室", editor: "文章编辑器",
   preview: "排版预览", hotspots: "热点档案", artifacts: "产物柜",
   system: "采集控制", sources: "订阅源台账", models: "模型中心",
