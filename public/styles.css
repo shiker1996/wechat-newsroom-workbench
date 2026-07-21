@@ -36,7 +36,7 @@ nav { padding-top: 20px; display: grid; gap: 2px; overflow-y: auto; overflow-x: 
 .eyebrow, .kicker { color: var(--red); font-size: 10px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .topbar h1 { margin: 5px 0 0; font: 600 28px var(--display); }
 .top-actions { display: flex; align-items: center; gap: 12px; }
-.batch-switcher { max-width: 210px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); padding: 9px 5px; }
+.batch-switcher { display:none; max-width: 210px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); padding: 9px 5px; }
 .top-actions time { margin-right: 10px; color: var(--muted); font: italic 13px var(--display); }
 .primary-button, .ink-button, .ghost-button, .outline-button, .text-button { border: 0; padding: 11px 16px; transition: .18s ease; }
 .primary-button { background: var(--red); color: white; box-shadow: 3px 3px 0 var(--red-dark); }

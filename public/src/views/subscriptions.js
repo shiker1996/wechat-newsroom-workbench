@@ -43,6 +43,30 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["X SIGNAL", summary.twitter, "官方与博主"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
+  // 健康状态条
+  var subs = state.subscriptions.items;
+  var okN = subs.filter(function(i){return i.health && i.health.status === "success";}).length;
+  var badN = subs.filter(function(i){return i.health && i.health.status !== "success";}).length;
+  var idleN = subs.filter(function(i){return !i.health;}).length;
+  var ttl = okN + badN + idleN;
+  if (ttl > 0) {
+    function hp(n){return (n/ttl*100).toFixed(1)+"%";}
+    var bar = document.createElement("div");
+    bar.className = "health-bar";
+    var track = document.createElement("div");
+    track.className = "health-bar-track";
+    if (okN){var seg=document.createElement("i");seg.className="health-bar-ok";seg.style.width=hp(okN);seg.title=okN+"个来源最近成功";track.appendChild(seg);}
+    if (badN){var seg=document.createElement("i");seg.className="health-bar-bad";seg.style.width=hp(badN);seg.title=badN+"个来源最近失败";track.appendChild(seg);}
+    if (idleN){var seg=document.createElement("i");seg.className="health-bar-idle";seg.style.width=hp(idleN);seg.title=idleN+"个来源尚无采集记录";track.appendChild(seg);}
+    bar.appendChild(track);
+    var labels = document.createElement("div");
+    labels.className = "health-bar-labels";
+    if (okN){var s=document.createElement("span");s.className="ok";s.textContent=okN+"正常";labels.appendChild(s);}
+    if (badN){var s=document.createElement("span");s.className="bad";s.textContent=badN+"异常";labels.appendChild(s);}
+    if (idleN){var s=document.createElement("span");s.className="idle";s.textContent=idleN+"未采集";labels.appendChild(s);}
+    bar.appendChild(labels);
+    document.getElementById("subscription-summary").appendChild(bar);
+  }
   const items = state.subscriptions.items.filter(
     (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter
   );
