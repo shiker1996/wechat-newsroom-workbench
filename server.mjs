@@ -331,6 +331,15 @@ async function api(request, response, url) {
     const candidate = store.getCandidate(Number(editorialMatch[1]));
     return json(response, candidate ? 200 : 404, candidate?.editorial ?? { error: '候选不存在' });
   }
+
+  const docContentMatch=pathname.match(/^\/api\/documents\/(\d+)\/content$/);
+  if (docContentMatch && request.method === "GET") {
+    const doc = store.getDocumentContent(Number(docContentMatch[1]));
+    if (!doc) return json(response, 404, { error: "?????" });
+    response.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    return response.end(doc.content || doc.title || "");
+  }
+
   const editorialAiMatch=pathname.match(/^\/api\/candidates\/(\d+)\/ai\/editorial$/);
   if(editorialAiMatch&&request.method==='POST') {
     const input=await body(request); const answer=String(input.answer||'');
