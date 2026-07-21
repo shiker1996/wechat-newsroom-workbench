@@ -237,6 +237,11 @@ async function api(request, response, url) {
       return json(response, 500, { error: '生成失败：' + e.message });
     }
   }
+
+  const similarMatch=pathname.match(/^\/api\/candidates\/(\d+)\/similar$/);
+  if (similarMatch && request.method === 'GET') {
+    return json(response, 200, store.findSimilarArticles(Number(similarMatch[1])));
+  }
   const tagMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/tag$/);
   const manualMatch = pathname.match(/^\/api\/batches\/([^/]+)\/hotspots\/manual$/);
   if (manualMatch && request.method === 'POST') {
