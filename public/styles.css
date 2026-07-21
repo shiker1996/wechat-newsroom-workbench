@@ -203,11 +203,11 @@ nav { padding-top: 20px; display: grid; gap: 2px; overflow-y: auto; overflow-x: 
 .cal-header-row { display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);margin-bottom:1px; }
 .cal-header { padding:10px 8px;background:var(--ink);color:white;font:800 10px var(--body);letter-spacing:.1em;text-align:center; }
 .cal-week-row { display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line); }
-.cal-cell { min-height:110px;padding:6px;background:rgba(251,249,242,.58); }
+.cal-cell { min-height:110px;padding:6px;background:rgba(251,249,242,.58);min-width:0; }
 .cal-empty-cell { background:#f0ede4; }
 .cal-date-label { font-size:11px;font-weight:700;margin-bottom:4px; }
 .cal-today-dot { color:var(--red);font-size:8px;vertical-align:middle; }
-.cal-article { font-size:10px;padding:3px 4px;margin-bottom:2px;border-left:2px solid var(--red);background:rgba(255,255,255,.55);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cal-article { font-size:10px;padding:3px 4px;margin-bottom:2px;border-left:2px solid var(--red);background:rgba(255,255,255,.55);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;box-sizing:border-box; }
 .cal-article span:hover { color:var(--red); }
 
 /* Similar articles hint */
