@@ -313,20 +313,13 @@
         <p>按周浏览已完结文章。左键单击展开详情，日历同时还为编辑室提供跨批次历史覆盖提示。</p>
       </div>
       <div class="calendar-controls">
-        <button class="ghost-button" data-calendar-prev>‹ 上一周</button>
-        <span class="calendar-week-label" id="cal-week-label"></span>
-        <button class="ghost-button" data-calendar-next>下一周 ›</button>
+        <button class="ghost-button" data-cal-month-prev>‹ 上月</button>
+        <span class="calendar-month-label" id="cal-month-label"></span>
+        <button class="ghost-button" data-cal-month-next>下月 ›</button>
         <span class="muted" id="cal-count"></span>
+        <button class="ghost-button" id="cal-today-btn">今天</button>
       </div>
-      <div class="calendar-grid" id="cal-grid">
-        <div class="cal-col"><div class="cal-header">周一</div><div class="cal-day" data-day="1"></div></div>
-        <div class="cal-col"><div class="cal-header">周二</div><div class="cal-day" data-day="2"></div></div>
-        <div class="cal-col"><div class="cal-header">周三</div><div class="cal-day" data-day="3"></div></div>
-        <div class="cal-col"><div class="cal-header">周四</div><div class="cal-day" data-day="4"></div></div>
-        <div class="cal-col"><div class="cal-header">周五</div><div class="cal-day" data-day="5"></div></div>
-        <div class="cal-col"><div class="cal-header">周六</div><div class="cal-day" data-day="6"></div></div>
-        <div class="cal-col"><div class="cal-header">周日</div><div class="cal-day" data-day="0"></div></div>
-      </div>
+      <div class="calendar-grid" id="cal-grid"></div>
     </section>
     <section class="view" id="view-logs">
       <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>日志</h2></div>
