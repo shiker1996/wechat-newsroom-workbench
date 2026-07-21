@@ -1,4 +1,4 @@
-import { $, $$ } from "../core/dom.js";
+﻿import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
@@ -8,10 +8,10 @@ async function loadModels() {
   state.models = data;
   window.__models = data;
   if (!data.providers?.length) {
-    document.getElementById("model-grid").innerHTML = '<div class="empty-state">暂无已配置的模型服务商。请编辑 .env 文件后重启工作台。</div>';
+    document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无已配置的模型服务商。请编辑 .env 文件后重启工作台。</div>';
     return;
   }
-  const grid = document.getElementById("model-grid");
+  const grid = document.getElementById("model-cards");
   grid.innerHTML = data.providers
     .map((p) => {
       const ok = p.configured;

@@ -17,8 +17,7 @@ const viewModules = {
 const legacyLoaders = {
   dashboard: "loadOverview",
   batches: "loadBatches",
-  preview: "loadProductionPreview",
-  models: "loadModels",
+  
 };
 
 const titles = {
