@@ -1,4 +1,4 @@
-const $ = (selector, root = document) => root.querySelector(selector);
+﻿const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const state = { overview: null, batches: [], currentBatch: null, activeBatchId: null, candidates: [], documents: [], models: null, jobTimer: null,
   atlas:null, atlasFilters:{scope:'全部',category:'全部',multi:false,query:''}, atlasSelectedWord:null, productionPreview:null, imageWorkspace:null,
@@ -7,7 +7,7 @@ const stages = {
   collect: ['采集', 12], synthesis: ['研判', 32], editorial: ['编辑会', 48],
   drafting: ['成稿', 68], review: ['审稿', 82], typeset: ['排版', 92], preview: ['预览完成', 100],
 };
-const titles = { dashboard: '今日值班', batches: '每日批次', overview: '热点全景', topics: '选题池', editorial: '编辑室', editor: '文章编辑器', preview: '排版预览', hotspots: '热点档案', artifacts: '产物柜', system: '采集控制', sources: '订阅源台账', models: '模型中心' };
+const titles = { dashboard: '今日值班', batches: '每日批次', overview: '热点全景', topics: '选题池', editorial: '编辑室', editor: '文章编辑器', preview: '排版预览', hotspots: '热点档案', artifacts: '产物柜', system: '采集控制', sources: '订阅源台账', models: '模型中心', logs: '日志' };
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
@@ -49,6 +49,7 @@ function go(view) {
   if (view === 'artifacts') loadArtifacts();
   if (view === 'sources') loadSubscriptions();
   if (view === 'models') loadModels();
+  if (view === 'logs') loadLogs();
   history.replaceState(null, '', `#${view}`);
 }
 
@@ -132,11 +133,24 @@ async function loadHotspots(params = new URLSearchParams()) {
 }
 
 async function loadArtifacts() {
-  const items = await request('/api/artifacts?limit=300');
+  const batchId = state.activeBatchId || '';
+  const qs = batchId ? `?limit=300&batch_id=${encodeURIComponent(batchId)}` : '?limit=300';
+  const [items, stats] = await Promise.all([
+    request('/api/artifacts' + qs),
+    request('/api/articles/stats').catch(()=>null)
+  ]);
+  if (stats) {
+    $('#article-stats').innerHTML = [
+      ['累计', stats.totalFinal, '篇已完结文章'],
+      ['本月', stats.thisMonth, '篇'],
+      ['本周', stats.thisWeek, '篇'],
+    ].map(([label, value, note]) => `<div class="article-stat"><strong>${value}</strong><span>${label}<br><small>${note}</small></span></div>`).join('');
+  }
+  const batchLabel = activeBatch()?.batch_date || '全部批次';
   $('#artifact-list').innerHTML = items.length ? items.map((item) => {
     const ext = item.name.split('.').pop().toUpperCase();
     return `<article class="artifact-card" data-artifact="${item.id}"><span class="file-tab">${escapeHtml(ext)}</span><h3>${escapeHtml(item.kind)}</h3><p>${escapeHtml(item.name)}</p><footer><span>${Math.max(1, Math.round(item.size/1024))} KB</span><time>${formatDate(item.modified_at)}</time></footer></article>`;
-  }).join('') : '<div class="empty-state">没有发现产物。点击“重新扫描工作区”建立索引。</div>';
+  }).join('') : `<div class="empty-state"><strong>${escapeHtml(batchLabel)}</strong> 下没有产物。尝试切换到其他批次或重新扫描工作区。</div>`;
 }
 
 async function loadAtlas() {
@@ -220,8 +234,9 @@ function renderAtlas() {
     }
   }
 
-  // Build the hotword index — always show keyword cards with AI summaries as the primary view
+  // Build the hotword index — show keyword cards, prefer those with AI summaries
   let wordCards = wordSummaries.filter(w => w.summary);
+  if (!wordCards.length) wordCards = wordSummaries.slice(0, 20);
   // If a hotword is selected, only show the matching card
   if (selectedWord) { wordCards = wordCards.filter(w => w.name === selectedWord); }
   const indexHTML = wordCards.map(kw => {
@@ -246,7 +261,7 @@ function renderAtlas() {
         <h4>${escapeHtml(kw.name)}</h4>
         <span class="muted">${count} 个事件</span>
       </div>
-      <p>${escapeHtml(kw.summary)}</p>
+      <p>${kw.summary ? escapeHtml(kw.summary) : '<span class="muted">尚无 AI 综述。点击词云中的热词查看关联事件，或生成综述。</span>'}</p>
       ${eventRefs}
     </article>`;
   }).join('');
@@ -611,10 +626,21 @@ async function runTypeset(mode) {
 
 function selectedDocKind() { return $('input[name=doc-kind]:checked')?.value || 'draft'; }
 
-function loadSelectedDocument() {
+async function loadSelectedDocument() {
   const candidateId = Number($('#writing-candidate').value);
   const kind = selectedDocKind();
-  const document = state.documents.find((item) => item.candidate_row_id === candidateId && item.kind === kind);
+  let document = state.documents.find((item) => item.candidate_row_id === candidateId && item.kind === kind);
+  // 草稿未存入 documents 表时，从 artifacts 读取 04-draft.md
+  if (!document && kind === 'draft') {
+    try {
+      const artifacts = await request('/api/artifacts?limit=300');
+      const draftArtifact = artifacts.find((item) => item.kind === '文章初稿');
+      if (draftArtifact) {
+        const res = await request(`/api/artifacts/${draftArtifact.id}/content`);
+        if (res?.text) document = { title: '草稿', content: res.text };
+      }
+    } catch {}
+  }
   const candidate = state.candidates.find((item) => item.id === candidateId);
   $('#article-title').value = document?.title || candidate?.hotspot_title || '';
   $('#markdown-editor').value = document?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : '');
@@ -729,15 +755,16 @@ async function loadImageWorkspace(candidateId) {
 function imageCard(item) {
   const encoded = encodeURIComponent(item.id);
   const statusLabel = item.status === 'cdn' ? 'CDN 已就绪' : item.status === 'local' ? '本地待上传' : '等待供图';
-  const preview = item.localPath ? `<img src="/api/candidates/${state.imageWorkspace.candidateId}/images/${encoded}/local?v=${encodeURIComponent(item.updatedAt || '')}" alt="${escapeHtml(item.content)}">` : `<span>${escapeHtml(item.ratio)}<br>待供图</span>`;
+  const preview = item.localPath ? `<img src="/api/candidates/${state.imageWorkspace.candidateId}/images/${encoded}/local?v=${encodeURIComponent(item.updatedAt || '')}" alt="${escapeHtml(item.content)}">` : `<span>${escapeHtml(item.ratio)}<br>点击选择图片</span>`;
+  const hasImage = !!item.localPath;
   return `<article class="image-slot ${item.status === 'cdn' ? 'ready' : item.status === 'local' ? 'local' : ''}" data-image-id="${escapeHtml(item.id)}">
     <div class="image-slot-top"><span class="image-slot-id">${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span><span class="image-slot-status">${statusLabel}</span></div>
     <h4>${escapeHtml(item.content)}</h4>
-    <div class="image-slot-body"><div class="image-contact-sheet">${preview}</div><div class="image-slot-fields">
-      <input class="image-slot-file" data-image-file type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+    <div class="image-slot-body"><div class="image-contact-sheet" data-upload-image="${escapeHtml(item.id)}" style="cursor:pointer">${preview}
+      <input class="image-slot-file" data-image-file type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
     </div></div>
     <div class="image-slot-meta"><span>位置：${escapeHtml(item.position)}</span><span>比例：${escapeHtml(item.ratio)}</span><span>建议来源：${escapeHtml(item.suggestedSource)}</span></div>
-    <div class="image-slot-actions"><button class="ghost-button" data-save-image="${escapeHtml(item.id)}">保存本地素材</button><button class="ink-button" data-upload-image="${escapeHtml(item.id)}" ${item.localPath ? '' : 'disabled'}>${item.status === 'cdn' ? '重新上传 CDN' : '上传 CDN'}</button></div>
+    <div class="image-slot-actions">${hasImage ? `<span class="muted">${item.status === 'cdn' ? '已上传 CDN' : '本地已保存'}</span>` : ''}${item.status === 'cdn' ? `<button class="ghost-button" data-upload-image="${escapeHtml(item.id)}">重新上传</button>` : ''}</div>
     ${item.url ? `<a class="image-cdn-url" href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(item.url)}</a>` : ''}
   </article>`;
 }
@@ -770,20 +797,29 @@ function fileAsDataUrl(file) { return new Promise((resolve, reject) => { const r
 
 async function saveImageAsset(id) {
   const card = imageSlot(id); const file = $('[data-image-file]', card).files[0];
-  const payload = {};
-  if (file) Object.assign(payload, { fileName:file.name, mimeType:file.type, base64:await fileAsDataUrl(file) });
-  const method = file ? 'POST' : 'PUT';
-  await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method, body:JSON.stringify(payload) });
-  await loadImageWorkspace(state.imageWorkspace.candidateId); toast(file ? '本地图片已保存，尚未上传' : '图片来源与版权信息已保存');
+  if (!file) return toast('请先选择图片文件');
+  const payload = { fileName:file.name, mimeType:file.type, base64:await fileAsDataUrl(file) };
+  await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method:'POST', body:JSON.stringify(payload) });
+  await loadImageWorkspace(state.imageWorkspace.candidateId);
+  // 保存后自动上传 CDN
+  await uploadImageAsset(id);
 }
 
 async function uploadImageAsset(id) {
-  const card = imageSlot(id); const button = $('[data-upload-image]', card); button.disabled = true; button.textContent = '正在上传…';
+  const card = imageSlot(id); const fileInput = $('[data-image-file]', card); const file = fileInput.files[0];
+  if (!file) {
+    // 没有文件 → 打开文件选择器
+    fileInput.click();
+    return;
+  }
+  // 有新文件：保存本地 → 上传 CDN，一步完成
+  const button = $('[data-upload-image]', card); if (button) { button.disabled = true; button.textContent = '正在上传…'; }
   try {
-    await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify({}) });
+    const payload = { fileName:file.name, mimeType:file.type, base64:await fileAsDataUrl(file) };
+    await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method:'POST', body:JSON.stringify(payload) });
     await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}/cdn`, { method:'POST', body:'{}' });
     await loadImageWorkspace(state.imageWorkspace.candidateId); toast(`${id} 已上传 CDN`);
-  } finally { button.disabled = false; }
+  } finally { if (button) button.disabled = false; }
 }
 
 async function copyTypesetHtml() {
@@ -1001,6 +1037,30 @@ async function reindex() {
   loadArtifacts(); loadOverview();
 }
 
+async function loadLogs(logType) {
+  const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=150` : '?limit=150';
+  const logs = await request('/api/logs' + qs);
+  $('#log-count').textContent = `${logs.length} 条`;
+  const typeLbl = { ai: 'AI 任务', source: '数据采集', model: '模型调用' }[logType] || '全部';
+  $('#log-list').innerHTML = logs.length ? logs.map((item) => {
+    const ts = (item.ts || '').slice(0, 19).replace('T', ' ');
+    const statusClass = item.status === 'completed' || item.status === 'ok' || item.status === 'success' ? 'ok'
+      : item.status === 'failed' || item.status === 'error' ? 'bad'
+      : item.status === 'running' || item.status === 'testing' ? 'running' : 'idle';
+    const typeLabel = item.log_type === 'ai' ? 'AI'
+      : item.log_type === 'source' ? '采集'
+      : item.log_type === 'model' ? '模型' : item.log_type;
+    const subtypeLabel = item.subtype || '';
+    const batchInfo = item.batch_id ? `<span class="log-batch">${escapeHtml(item.batch_id)}</span>` : '';
+    const message = item.message || '';
+    return `<article class="log-entry ${statusClass}">
+      <div class="log-head"><span class="log-type-badge">${typeLabel}</span><time>${escapeHtml(ts)}</time>${batchInfo}<span class="log-status status-pill ${statusClass}">${escapeHtml(item.status)}</span></div>
+      <div class="log-body"><code>${escapeHtml(subtypeLabel)}</code><span>${escapeHtml(message.slice(0, 200))}</span></div>
+      ${item.provider ? `<div class="log-meta"><span>服务商：${escapeHtml(item.provider)}</span></div>` : ''}
+    </article>`;
+  }).join('') : '<div class="empty-state">暂无日志记录。</div>';
+}
+
 function bind() {
   $('#nav').addEventListener('click', (event) => { const item = event.target.closest('[data-view]'); if (item) go(item.dataset.view); });
   document.addEventListener('click', (event) => {
@@ -1033,7 +1093,6 @@ function bind() {
       const word=hotwordGenSummary.dataset.hotwordGenSummary;
       generateHotwordSummary(state.activeBatchId,word).then((result)=>{if(result?.summary){toast('热词综述已生成');state.atlasSelectedWord=word;loadOverview().then(()=>renderAtlas());}else{toast('生成失败');}}).catch((error)=>toast(error.message));
     }
-    const saveImageButton=event.target.closest('[data-save-image]'); if(saveImageButton) saveImageAsset(saveImageButton.dataset.saveImage).catch((error)=>toast(error.message));
     const uploadImageButton=event.target.closest('[data-upload-image]'); if(uploadImageButton) uploadImageAsset(uploadImageButton.dataset.uploadImage).catch((error)=>toast(error.message));
     const sourceTest=event.target.closest('[data-source-test]'); if(sourceTest) testSubscription({kind:sourceTest.dataset.kind,value:sourceTest.dataset.value},sourceTest).catch((error)=>toast(error.message));
     const sourceRemove=event.target.closest('[data-source-remove]'); if(sourceRemove) removeSubscription(sourceRemove).catch((error)=>toast(error.message));
@@ -1080,6 +1139,19 @@ function bind() {
   $('#copy-typeset-html').addEventListener('click', () => copyTypesetHtml().catch((error) => toast(error.message)));
   $('#close-production-job').addEventListener('click', () => $('#production-job-dialog').close());
   $('.preview-close').addEventListener('click', () => $('#artifact-dialog').close());
+  // 图片文件选择后自动上传
+  document.addEventListener('change', (event) => {
+    if (!event.target.matches('[data-image-file]')) return;
+    const card = event.target.closest('[data-image-id]');
+    if (!card) return;
+    uploadImageAsset(card.dataset.imageId).catch((error) => toast(error.message));
+  });
+  $('#log-type-filter').addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-log-type]');
+    if (!btn) return;
+    $$('[data-log-type]', $('#log-type-filter')).forEach(b => b.classList.toggle('active', b === btn));
+    loadLogs(btn.dataset.logType || undefined);
+  });
   window.addEventListener('hashchange', () => {
     const view = location.hash.slice(1);
     if (view in titles && !$('.nav-item.active')?.matches(`[data-view="${view}"]`)) go(view);

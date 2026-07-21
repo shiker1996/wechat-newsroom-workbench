@@ -27,6 +27,7 @@
       <button class="nav-item" data-view="system"><span>10</span>采集控制</button>
       <button class="nav-item" data-view="sources"><span>11</span>订阅源</button>
       <button class="nav-item" data-view="models"><span>12</span>模型中心</button>
+      <button class="nav-item" data-view="logs"><span>13</span>日志</button>
     </nav>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
@@ -206,6 +207,7 @@
       <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span><h2>产物柜</h2></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
       <div class="cabinet-tools">
         <div class="artifact-legend"><span>MD</span><span>JSON</span><span>HTML</span><span>URL</span></div>
+        <div class="article-stats" id="article-stats"></div>
         <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
       </div>
       <div class="artifact-grid" id="artifact-list"></div>
@@ -304,6 +306,22 @@
       </div>
       <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span id="call-summary"></span></div><div id="model-call-list"></div></section>
     </section>
+
+    <section class="view" id="view-logs">
+      <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>日志</h2></div>
+        <p>批次所有任务的执行记录。AI 任务按每次运行记录一条，模型调用累积到 2048 条后滚动清理。</p>
+      </div>
+      <div class="log-controls">
+        <div class="scope-tabs" id="log-type-filter" aria-label="日志类型">
+          <button class="active" data-log-type="">全部</button>
+          <button data-log-type="ai">AI 任务</button>
+          <button data-log-type="source">数据采集</button>
+          <button data-log-type="model">模型调用</button>
+        </div>
+        <span class="muted" id="log-count"></span>
+      </div>
+      <div id="log-list" class="log-list"></div>
+    </section>
   </main>
 
   <dialog id="batch-dialog" class="modal">
@@ -324,6 +342,6 @@
   </dialog>
   <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close">×</button><iframe title="产物预览"></iframe></dialog>
   <div class="toast" id="toast"></div>
-  <script type="module" src="/app.js"></script>
+  <script src="/app.min.js"></script>
 </body>
 </html>

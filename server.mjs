@@ -286,11 +286,12 @@ async function api(request, response, url) {
         let parsed;
         try { parsed = JSON.parse(result.content.trim().replace(/^\`\`\`(?:json)?\\s*/i, '').replace(/\\s*\`\`\`$/, '')); } catch { parsed = null; }
         if (parsed) {
+          const firstCategory = (composite.hotspots||[]).find(h => h.category)?.category || '';
           const card = {
             bScores: parsed.bScores || {},
             hProfile: parsed.hProfile || { historicalType: 'bigtech', fiveSenseCount: 0, fiveQuestionCount: 0, recommendationFit: 0, emotionTheme: 0, searchFriendly: 0 },
             angle: parsed.angle || '', thesis: parsed.thesis || '',
-            source: { title: composite.hotspot_title, category: '', riskLevel: '待评估', poolRole: '综合选题', hotspotId: null }
+            source: { title: composite.hotspot_title, category: firstCategory, riskLevel: '待评估', poolRole: '综合选题', hotspotId: null }
           };
           const scored = scoreCards([card], { items: [] });
           if (scored.length) {
@@ -502,10 +503,21 @@ async function api(request, response, url) {
     }));
   }
   if (request.method === 'GET' && pathname === '/api/artifacts') {
-    return json(response, 200, store.listArtifacts(Number(searchParams.get('limit') ?? 300)));
+    return json(response, 200, store.listArtifacts({
+      limit: Number(searchParams.get('limit') ?? 300),
+      batchId: searchParams.get('batch_id') || undefined
+    }));
   }
   if (request.method === 'POST' && pathname === '/api/artifacts/reindex') {
     return json(response, 200, { indexed: indexArtifacts(store, artifactRoots) });
+  }
+  if (request.method === 'GET' && pathname === '/api/articles/stats') {
+    return json(response, 200, store.articleStats());
+  }
+  if (request.method === 'GET' && pathname === '/api/logs') {
+    const limit = Math.min(Number(searchParams.get('limit') ?? 100), 500);
+    const logType = searchParams.get('type') || undefined;
+    return json(response, 200, store.listLogs({ limit, logType }));
   }
   const artifactMatch = pathname.match(/^\/api\/artifacts\/(\d+)\/content$/);
   if (artifactMatch && request.method === 'GET') {
