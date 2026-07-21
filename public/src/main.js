@@ -45,8 +45,14 @@ async function go(view) {
   }
   // 回退到旧系统全局函数
   const loader = legacyLoaders[view];
-  if (loader && typeof window[loader] === "function") {
-    try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
+  if (loader) {
+    // 先加载旧系统的按需模块
+    if (typeof window.ensureModule === "function") {
+      try { await window.ensureModule(view); } catch {}
+    }
+    if (typeof window[loader] === "function") {
+      try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
+    }
   }
 }
 
