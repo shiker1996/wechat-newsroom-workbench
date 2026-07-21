@@ -13,12 +13,8 @@ const viewModules = {
   calendar: "./views/calendar.js",
 };
 
-// 视图与其旧系统全局入口函数的映射
-const legacyLoaders = {
-  dashboard: "loadOverview",
-  batches: "loadBatches",
-  
-};
+// 回退到旧系统处理的视图（使用旧系统的全局函数 + ensureModule）
+const legacyViews = new Set(["dashboard", "batches", "preview"]);
 
 const titles = {
   dashboard: "今日值班", batches: "每日批次", overview: "热点全景",
@@ -30,33 +26,29 @@ const titles = {
 
 async function go(view) {
   if (!(view in titles)) return;
+  // 旧系统回退视图：调用旧 go() 处理导航和数据加载
+  if (legacyViews.has(view)) {
+    const oldGo = window.__oldGo;
+    if (oldGo) { oldGo(view); return; }
+  }
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === `view-${view}`));
   document.getElementById("page-title").textContent = titles[view];
   history.replaceState(null, "", `#${view}`);
   const modPath = viewModules[view];
-  if (modPath && !legacyLoaders[view]) {
+  if (modPath && !legacyViews.has(view)) {
     try {
       const mod = await import(modPath);
-      if (mod.default) { await mod.default(); return; }
+      if (mod.default) await mod.default();
     } catch (err) {
       console.error(`ESM 视图 ${view} 加载失败:`, err);
-    }
-  }
-  // 回退到旧系统全局函数
-  const loader = legacyLoaders[view];
-  if (loader) {
-    // 先加载旧系统的按需模块
-    if (typeof window.ensureModule === "function") {
-      try { await window.ensureModule(view); } catch {}
-    }
-    if (typeof window[loader] === "function") {
-      try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
     }
   }
 }
 
 async function init() {
+  // 保存旧 go() 引用，供 legacy 视图回退使用
+  window.__oldGo = window.go;
   window.go = go;
   window.toast = toast;
   window.request = request;
