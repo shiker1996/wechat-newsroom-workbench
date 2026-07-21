@@ -168,6 +168,7 @@ async function openProductionJob(id) {
   pollJob(id);
 }
 
+window.loadProductionPreview = loadProductionPreview;
 window.renderProductionCandidate = renderProductionCandidate;
 window.loadImageWorkspace = loadImageWorkspace;
 window.planArticleImages = planArticleImages;
