@@ -18,6 +18,7 @@ const legacyLoaders = {
   dashboard: "loadOverview",
   batches: "loadBatches",
   preview: "loadProductionPreview",
+  models: "loadModels",
 };
 
 const titles = {
@@ -35,7 +36,7 @@ async function go(view) {
   document.getElementById("page-title").textContent = titles[view];
   history.replaceState(null, "", `#${view}`);
   const modPath = viewModules[view];
-  if (modPath) {
+  if (modPath && !legacyLoaders[view]) {
     try {
       const mod = await import(modPath);
       if (mod.default) { await mod.default(); return; }
