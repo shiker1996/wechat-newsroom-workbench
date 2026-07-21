@@ -13,6 +13,12 @@ const viewModules = {
   calendar: "./views/calendar.js",
 };
 
+// 视图与其旧系统全局入口函数的映射
+const legacyLoaders = {
+  dashboard: "loadOverview",
+  batches: "loadBatches",
+};
+
 const titles = {
   dashboard: "今日值班", batches: "每日批次", overview: "热点全景",
   topics: "选题池", editorial: "编辑室", editor: "文章编辑器",
@@ -21,9 +27,8 @@ const titles = {
   logs: "日志", calendar: "内容日历",
 };
 
-// ESM 导航
 async function go(view) {
-  if (!viewModules[view]) return;
+  if (!(view in titles)) return;
   $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === `view-${view}`));
   document.getElementById("page-title").textContent = titles[view];
@@ -34,7 +39,13 @@ async function go(view) {
       const mod = await import(modPath);
       if (mod.default) await mod.default();
     } catch (err) {
-      console.error(`加载视图 ${view} 失败:`, err);
+      console.error(`ESM 视图 ${view} 加载失败:`, err);
+    }
+  } else {
+    // 回退到旧系统全局函数
+    const loader = legacyLoaders[view];
+    if (loader && typeof window[loader] === "function") {
+      try { await window[loader](); } catch (err) { console.error(`旧系统 ${loader} 调用失败:`, err); }
     }
   }
 }
