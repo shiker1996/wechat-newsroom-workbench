@@ -517,7 +517,14 @@ async function api(request, response, url) {
   if (request.method === 'POST' && pathname === '/api/artifacts/reindex') {
     return json(response, 200, { indexed: indexArtifacts(store, artifactRoots) });
   }
-  if (request.method === 'GET' && pathname === '/api/articles/stats') {
+  
+  if (request.method === 'GET' && pathname === '/api/articles') {
+    const week = searchParams.get('week') || undefined;
+    const month = searchParams.get('month') || undefined;
+    return json(response, 200, store.listFinalArticles({ week, month }));
+  }
+
+if (request.method === 'GET' && pathname === '/api/articles/stats') {
     return json(response, 200, store.articleStats());
   }
   if (request.method === 'GET' && pathname === '/api/logs') {

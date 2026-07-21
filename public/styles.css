@@ -195,6 +195,24 @@ nav { padding-top: 20px; display: grid; gap: 2px; overflow-y: auto; overflow-x: 
 .log-body span { color:var(--ink);line-height:1.5; }
 .log-meta { font-size:10px;color:var(--muted); }
 .log-status.status-pill { font-size:9px;padding:1px 6px; }
+
+/* Content calendar */
+.calendar-controls { display:flex;align-items:center;gap:16px;margin-bottom:18px; }
+.calendar-week-label { font:600 22px var(--display);flex:1; }
+.calendar-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line); }
+.cal-col { background:rgba(251,249,242,.58);min-height:180px;display:flex;flex-direction:column; }
+.cal-header { padding:10px 8px;background:var(--ink);color:white;font:800 10px var(--body);letter-spacing:.1em;text-align:center; }
+.cal-day { flex:1;padding:8px; }
+.cal-date-label { font-size:11px;font-weight:700;margin-bottom:6px; }
+.cal-article { font-size:10px;padding:4px 5px;margin-bottom:3px;border-left:2px solid var(--red);background:rgba(255,255,255,.55);line-height:1.4; }
+.cal-article span:hover { color:var(--red); }
+.cal-empty { color:var(--muted);font-size:10px;text-align:center;padding:14px 0; }
+
+/* Similar articles hint */
+.similar-hint { margin-top:8px;padding:8px 10px;font-size:10px;border-left:3px solid var(--yellow);background:rgba(238,196,70,.1); }
+.similar-hint b { display:block;margin-bottom:3px;color:var(--ink); }
+.similar-hint a { color:var(--red);cursor:pointer; }
+.similar-hint a:hover { text-decoration:underline; }
 .hotword-index-card:hover { border-left-color:var(--red);background:var(--paper-deep); }
 .hotword-index-card.hotword-index-active { border-left-color:var(--red);background:var(--paper-deep); }
 .hotword-index-head { display:flex;align-items:baseline;gap:10px;margin-bottom:4px; }

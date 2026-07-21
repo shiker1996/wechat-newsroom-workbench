@@ -28,6 +28,7 @@
       <button class="nav-item" data-view="sources"><span>11</span>订阅源</button>
       <button class="nav-item" data-view="models"><span>12</span>模型中心</button>
       <button class="nav-item" data-view="logs"><span>13</span>日志</button>
+      <button class="nav-item" data-view="calendar"><span>14</span>内容日历</button>
     </nav>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
@@ -109,7 +110,7 @@
           <div id="editorial-empty" class="empty-state">先在选题池加入并选择一个候选。</div>
           <div id="editorial-fields" hidden>
             <input type="hidden" name="candidateId">
-            <div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
+            <div class="similar-hint" id="similar-articles" hidden></div><div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
             <section class="source-evidence" id="source-evidence">
               <div><span class="kicker">SOURCE EVIDENCE</span><h4 id="source-evidence-title">原文尚未抓取</h4><p id="source-evidence-meta">AI 编辑会开始前会自动获取公开原文。</p></div>
               <button type="button" class="outline-button" id="fetch-source">抓取 / 刷新原文</button>
@@ -307,6 +308,26 @@
       <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span id="call-summary"></span></div><div id="model-call-list"></div></section>
     </section>
 
+    <section class="view" id="view-calendar">
+      <div class="section-intro"><div><span class="kicker">CONTENT CALENDAR</span><h2>内容日历</h2></div>
+        <p>按周浏览已完结文章。左键单击展开详情，日历同时还为编辑室提供跨批次历史覆盖提示。</p>
+      </div>
+      <div class="calendar-controls">
+        <button class="ghost-button" data-calendar-prev>‹ 上一周</button>
+        <span class="calendar-week-label" id="cal-week-label"></span>
+        <button class="ghost-button" data-calendar-next>下一周 ›</button>
+        <span class="muted" id="cal-count"></span>
+      </div>
+      <div class="calendar-grid" id="cal-grid">
+        <div class="cal-col"><div class="cal-header">周一</div><div class="cal-day" data-day="1"></div></div>
+        <div class="cal-col"><div class="cal-header">周二</div><div class="cal-day" data-day="2"></div></div>
+        <div class="cal-col"><div class="cal-header">周三</div><div class="cal-day" data-day="3"></div></div>
+        <div class="cal-col"><div class="cal-header">周四</div><div class="cal-day" data-day="4"></div></div>
+        <div class="cal-col"><div class="cal-header">周五</div><div class="cal-day" data-day="5"></div></div>
+        <div class="cal-col"><div class="cal-header">周六</div><div class="cal-day" data-day="6"></div></div>
+        <div class="cal-col"><div class="cal-header">周日</div><div class="cal-day" data-day="0"></div></div>
+      </div>
+    </section>
     <section class="view" id="view-logs">
       <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>日志</h2></div>
         <p>批次所有任务的执行记录。AI 任务按每次运行记录一条，模型调用累积到 2048 条后滚动清理。</p>
