@@ -43,30 +43,16 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["X SIGNAL", summary.twitter, "官方与博主"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-  // 健康状态条
-  var subs = state.subscriptions.items;
-  var okN = subs.filter(function(i){return i.health && i.health.status === "success";}).length;
-  var badN = subs.filter(function(i){return i.health && i.health.status !== "success";}).length;
-  var idleN = subs.filter(function(i){return !i.health;}).length;
-  var ttl = okN + badN + idleN;
-  if (ttl > 0) {
-    function hp(n){return (n/ttl*100).toFixed(1)+"%";}
-    var bar = document.createElement("div");
-    bar.className = "health-bar";
-    var track = document.createElement("div");
-    track.className = "health-bar-track";
-    if (okN){var seg=document.createElement("i");seg.className="health-bar-ok";seg.style.width=hp(okN);seg.title=okN+"个来源最近成功";track.appendChild(seg);}
-    if (badN){var seg=document.createElement("i");seg.className="health-bar-bad";seg.style.width=hp(badN);seg.title=badN+"个来源最近失败";track.appendChild(seg);}
-    if (idleN){var seg=document.createElement("i");seg.className="health-bar-idle";seg.style.width=hp(idleN);seg.title=idleN+"个来源尚无采集记录";track.appendChild(seg);}
-    bar.appendChild(track);
-    var labels = document.createElement("div");
-    labels.className = "health-bar-labels";
-    if(okN){var sOk=document.createElement("span");sOk.className="ok";sOk.textContent=okN+"正常";labels.appendChild(sOk);}
-    if(badN){var sBad=document.createElement("span");sBad.className="bad";sBad.textContent=badN+"异常";labels.appendChild(sBad);}
-    if(idleN){var sIdle=document.createElement("span");sIdle.className="idle";sIdle.textContent=idleN+"未采集";labels.appendChild(sIdle);}
-    bar.appendChild(labels);
-    document.getElementById("subscription-summary").appendChild(bar);
+    // 健康状态点阵
+  var allItems = state.subscriptions.items;
+  var dotHtml = "<div class=\"health-dots\">";
+  for(var di=0; di<allItems.length; di++){
+    var h=allItems[di].health;
+    var cls = h && h.status === "success" ? "ok" : h ? "bad" : "idle";
+    dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + escapeHtml(allItems[di].label) + ": " + (h && h.status === "success" ? h.item_count + "条" : h ? h.error || "失败" : "未采集") + "\"></i>";
   }
+  dotHtml += "</div>";
+  document.getElementById("subscription-summary").innerHTML += dotHtml;
   const items = state.subscriptions.items.filter(
     (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter
   );
@@ -81,7 +67,7 @@ function renderSubscriptions() {
           : "尚无采集记录";
         return `<article class="subscription-row health-${hc} ${item.enabled ? "" : "disabled"}" style="--row:${index}">
           <span class="subscription-kind ${escapeHtml(item.kind)}">${subscriptionTypeLabel(item.kind)}</span>
-          <div class="subscription-identity"><span class="health-badge ${hc}"></span><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
+          <div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
           <label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>
           <div class="subscription-actions"><button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">×</button></div>
         </article>`;
