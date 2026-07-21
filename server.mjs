@@ -238,6 +238,12 @@ async function api(request, response, url) {
     }
   }
   const tagMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/tag$/);
+  const manualMatch = pathname.match(/^\/api\/batches\/([^/]+)\/hotspots\/manual$/);
+  if (manualMatch && request.method === 'POST') {
+    const input = await body(request);
+    const hotspot = store.addManualHotspot(decodeURIComponent(manualMatch[1]), input);
+    return json(response, 201, hotspot);
+  }
   if (tagMatch && request.method === 'POST') {
     const input = await body(request);
     if (input.background === true) return json(response, 202, aiJobs.start({ batchId:decodeURIComponent(tagMatch[1]),

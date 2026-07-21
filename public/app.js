@@ -875,7 +875,7 @@ async function openBatch(id) {
   const latestAiRun = batch.ai_runs?.[0];
   $('#batch-detail').innerHTML = `<div class="drawer-inner">
     <header class="drawer-head"><div><span class="kicker">${escapeHtml(batch.batch_date)} · ${escapeHtml(stage)}</span><h2>${escapeHtml(batch.title)}</h2><p>${escapeHtml(batch.note || '暂无值班备注')}</p></div><button class="close-button" data-close-drawer>×</button></header>
-    <section class="drawer-section"><h3>采集今日热点</h3><p>可单独重跑失败源。每次执行都会保留来源状态和失败原因。</p><div class="check-row"><label><input type="checkbox" name="source" value="reddit" checked> Reddit</label><label><input type="checkbox" name="source" value="rsshub" checked> RSSHub</label></div><button class="primary-button" data-collect>开始采集</button></section>
+    <section class="drawer-section"><h3>采集今日热点</h3><p>可单独重跑失败源。每次执行都会保留来源状态和失败原因。</p><div class="check-row"><label><input type="checkbox" name="source" value="reddit" checked> Reddit</label><label><input type="checkbox" name="source" value="rsshub" checked> RSSHub</label></div><div style="display:flex;gap:8px"><button class="primary-button" data-collect>开始采集</button><button class="outline-button" data-manual-hotspot>+ 手动添加</button></div></section>
     <section class="drawer-section"><h3>来源记录</h3>${batch.sources.length ? batch.sources.map((item) => `<div class="source-row ${item.status}"><i></i><div><strong>${escapeHtml(item.source)}</strong><small>${escapeHtml(item.error || item.ended_at || '执行中')}</small></div><b>${item.item_count}</b></div>`).join('') : '<p class="story-meta">尚未运行采集。</p>'}</section>
     <section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与热点研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
       <div class="pipeline-steps"><div class="${batch.hotspots.length?'done':''}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale?` · ${batch.freshness.stale} 条旧闻归档`:''}</small></span></div><i>→</i><div class="${ai.tagged===ai.total&&ai.total?'done':ai.tagged?'active':''}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div class="${researchDone?'done':ai.latestResearch?.status==='running'?'active':''}"><b>03</b><span>热点研判<small>${researchDone?'已生成总榜':'8+2 / H·B·P·S·D·F'}</small></span></div></div>
@@ -1069,6 +1069,25 @@ function bind() {
     const batch = event.target.closest('[data-batch]'); if (batch) openBatch(batch.dataset.batch);
     if (event.target.closest('[data-close-drawer]')) $('#batch-drawer').close();
     if (event.target.closest('[data-collect]')) startCollection();
+    if (event.target.closest('[data-manual-hotspot]')) { $('#manual-hotspot-dialog').showModal(); }
+    if (event.target.closest('[data-close-manual-hotspot]')) { $('#manual-hotspot-dialog').close(); }
+    const submitManual=event.target.closest('[data-submit-manual-hotspot]');
+    if (submitManual) {
+      const form = submitManual.closest('form');
+      const data = Object.fromEntries(new FormData(form));
+      if (!data.title?.trim()) return toast('请输入标题');
+      const batchId = state.activeBatchId || state.currentBatch?.id;
+      if (!batchId) return toast('请先选择一个批次');
+      request(`/api/batches/${encodeURIComponent(batchId)}/hotspots/manual`, {
+        method: 'POST', body: JSON.stringify({ title: data.title, url: data.url, category: data.category, notes: data.notes })
+      }).then((hotspot) => {
+        toast(`已添加热点：${hotspot.title}`);
+        form.reset();
+        $('#manual-hotspot-dialog').close();
+        openBatch(batchId);
+        if ($('.nav-item.active')?.dataset.view === 'topics') loadTopicPool();
+      }).catch((error) => toast(error.message));
+    }
     if (event.target.closest('[data-ai-tag]')) startBatchAi('tag').catch((error)=>toast(error.message));
     if (event.target.closest('[data-ai-retag]')) startBatchAi('retag').catch((error)=>toast(error.message));
     if (event.target.closest('[data-ai-research]')) startBatchAi('research').catch((error)=>toast(error.message));

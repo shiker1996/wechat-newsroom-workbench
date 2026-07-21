@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -334,6 +334,28 @@
     </form>
   </dialog>
 
+  <dialog id="manual-hotspot-dialog" class="modal">
+    <form method="dialog">
+      <div class="modal-head"><button type="button" class="close-button" data-close-manual-hotspot aria-label="关闭">×</button></div>
+      <h2>添加热点</h2>
+      <p class="story-meta" style="margin-bottom:18px">手动补入一个不在采集源中的热点，直接进入当前批次。</p>
+      <label>标题 <span style="color:var(--red)">*</span><input name="title" required placeholder="热搜标题或事件名称"></label>
+      <label>链接 <input name="url" type="url" placeholder="https://example.com/article"></label>
+      <label>分类
+        <select name="category">
+          <option value="">自动分类</option>
+          <option value="🤖 AI/技术动态">🤖 AI/技术动态</option>
+          <option value="🏢 大厂/商业">🏢 大厂/商业</option>
+          <option value="🌐 社会/舆论">🌐 社会/舆论</option>
+          <option value="💼 职场/职业">💼 职场/职业</option>
+          <option value="📱 产品/消费">📱 产品/消费</option>
+          <option value="📚 行业/趋势">📚 行业/趋势</option>
+        </select>
+      </label>
+      <label>备注 <textarea name="notes" rows="3" placeholder="为什么补这条？打算从什么角度写？"></textarea></label>
+      <div class="modal-actions"><button type="button" class="ghost-button" data-close-manual-hotspot>取消</button><button class="primary-button" data-submit-manual-hotspot>添加并进入热点池</button></div>
+    </form>
+  </dialog>
   <dialog id="batch-drawer" class="drawer"><div id="batch-detail"></div></dialog>
   <dialog id="production-job-dialog" class="modal job-modal">
     <div class="modal-head"><div><span class="kicker">PRODUCTION RUN</span><h2 id="production-job-title">生产任务</h2></div><button type="button" class="close-button" id="close-production-job" aria-label="关闭">×</button></div>

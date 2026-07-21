@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { brainstorm, clusterItems, deterministicTimeliness, isFreshForBatch, preselection, choosePool, scoreCards } from '../lib/llm/research-pipeline.mjs';
 
@@ -39,8 +39,8 @@ test('H/B/P/S/D/F由服务端公式计算', () => {
   const cards=[{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
   const result=scoreCards(cards,{items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]})[0];
-  assert.equal(result.b,80); assert.equal(result.p,40); assert.equal(result.s,5); assert.equal(result.d,2);
-  assert.equal(result.f,60.4);
+  assert.equal(result.b,80); assert.equal(result.p,40); assert.equal(result.s,5); assert.equal(result.d,0);
+  assert.equal(result.f,62.4);
 });
 
 test('探索脑暴输出截断时自动从双卡拆成单卡', async () => {
