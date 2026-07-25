@@ -97,8 +97,7 @@
 
 ## 7. 网站抓取与事件总结升级
 
-> 状态：P0 已完成（2026-07-23）；P1/P2 等待模型与抓取额度充足后实施  
-> 当前优先级：P1/P2 中高，但不进入当前开发周期
+> 状态：P0 已完成（2026-07-23）；P1 启发式质量评分 + P2 抓取路由已完成（2026-07-25）；P2 事件内精选深抓待实施
 
 ### 当前问题
 
@@ -149,6 +148,8 @@
 - 不深抓全部报道：先全量轻抓和聚类，再为每个事件选择 2～3 个代表来源深抓；出现来源冲突时才追加。
 - 候选进入选题池后，再升级为完整事实基座。
 - 预计改动量：中到大。
+
+> 实施状态：抓取路由部分已完成（2026-07-25）。`lib/source-quality.mjs` 启发式评分（长度 40 + 段落 20 + 标题相关性 20，登录墙/错误页直接 5 分），纯规则不调模型；`lib/source-fetcher.mjs` 路由顺序：① twitter 热点直接用 RSS 摘要（推文即全文，fetch_method `rss-tweet`），长摘要视为可用正文（`rss-content`）；② GitHub 仓库 URL 走 API + README（`github-api`）；③ Python 本地抓取优先，质量分不足才升级 Firecrawl 并保留分高者，全失败时长摘要 `rss-summary-fallback` 兜底。每条来源记录附 `quality` 评分与 `evidence_level` 证据等级（hotspot_sources 表新增 `quality_json`/`evidence_level` 列）。四个路由阈值（升级分 55、免抓摘要 800 字、兜底摘要 200 字、README 最少 200 字）统一在 `config.local.json` 的 `sourceFetch` 段配置（默认值见 `lib/config.mjs`）；评分权重与拦截词表在 `lib/source-quality.mjs` 内。事件内精选深抓（每事件 2～3 个代表来源）尚未实施，验证与推进计划见 `docs/event-deep-fetch-and-fact-base-plan.md`。
 
 ### 验收标准
 

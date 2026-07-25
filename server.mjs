@@ -658,7 +658,7 @@ async function api(request, response, url) {
       // 日常批次事件候选可能尚未抓取来源，生成故事板前自动补抓
       if(!(eventAnalysis.analysis.sources||[]).some((item)=>item.status==='ok')){
         const hotspots=candidateEventGroups(candidate).flatMap((group)=>group.hotspots);
-        if(hotspots.length){try{await fetchCandidateSource({store,candidateId:candidate.id,root,force:false,hotspots});}catch{}}
+        if(hotspots.length){try{await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId:candidate.id,root,force:false,hotspots});}catch{}}
         eventAnalysis=resolveEventAnalysisFor(candidate);
       }
     }
@@ -763,7 +763,7 @@ async function api(request, response, url) {
     const notes = [];
     for (const group of groups) {
       try {
-        const r = await fetchCandidateSource({ store, candidateId: candidate.id, root, force: false, hotspots: group.hotspots });
+        const r = await fetchCandidateSource({ store, sourceFetch: config.sourceFetch, candidateId: candidate.id, root, force: false, hotspots: group.hotspots });
         notes.push(`已自动抓取「${group.title}」的原文：${r.ok}/${r.count} 个来源成功`);
       } catch (error) {
         notes.push(`「${group.title}」原文抓取失败：${error.message}`);
@@ -779,7 +779,7 @@ async function api(request, response, url) {
     const candidateId=Number(editorialAiMatch[1]); const candidate=store.getCandidate(candidateId);
     if(!candidate)return json(response,404,{error:'候选不存在'});
     const suppliedUrl=(answer.match(/https?:\/\/[^\s<>"']+/i)||[])[0]?.replace(/[，。；、)）\]]+$/,'');
-    if(suppliedUrl)await fetchCandidateSource({store,candidateId,root,force:true,urlOverride:suppliedUrl});
+    if(suppliedUrl)await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force:true,urlOverride:suppliedUrl});
     const result=await runEditorialTurn({gateway:models,store,candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000)});
     const fetchNote=await autoFetchEditorialEvents(candidate,result.fetchEvents);
     if(fetchNote)result.reply=[result.reply,fetchNote].filter(Boolean).join('\n\n');
@@ -794,7 +794,7 @@ async function api(request, response, url) {
     response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
     const send=(event)=>response.write(`${JSON.stringify(event)}\n`);
     try {
-      if(suppliedUrl)await fetchCandidateSource({store,candidateId,root,force:true,urlOverride:suppliedUrl});
+      if(suppliedUrl)await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force:true,urlOverride:suppliedUrl});
       const result=await runEditorialTurnStream({gateway:models,store,candidateId,provider:input.provider,answer,webSearch:true,events:candidateEventGroups(candidate,12000),onText:(text)=>send({type:'delta',text})});
       const fetchNote=await autoFetchEditorialEvents(candidate,result.fetchEvents);
       if(fetchNote)send({type:'delta',text:'\n\n'+fetchNote});
@@ -814,19 +814,19 @@ async function api(request, response, url) {
     if (input.hotspotId != null) {
       const hotspot=candidateEventGroups(candidate).flatMap((group)=>group.hotspots).find((h)=>h.id===Number(input.hotspotId));
       if(!hotspot)return json(response,404,{error:'该热点不属于本选题的关联事件'});
-      return json(response,200,await fetchCandidateSource({store,candidateId,root,force,hotspots:[hotspot]}));
+      return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:[hotspot]}));
     }
     if (input.eventId) {
       const group=candidateEventGroups(candidate).find((g)=>g.event_id===String(input.eventId));
       if(!group)return json(response,404,{error:'该事件不属于本选题'});
-      return json(response,200,await fetchCandidateSource({store,candidateId,root,force,hotspots:group.hotspots}));
+      return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:group.hotspots}));
     }
     const seen=new Set(); const all=[];
     for(const group of candidateEventGroups(candidate))for(const hotspot of group.hotspots) {
       if(!seen.has(hotspot.id)){seen.add(hotspot.id);all.push(hotspot);}
     }
-    if(all.length)return json(response,200,await fetchCandidateSource({store,candidateId,root,force,hotspots:all}));
-    return json(response,200,await fetchCandidateSource({store,candidateId,root,force}));
+    if(all.length)return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:all}));
+    return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force}));
   }
   if (editorialMatch && request.method === 'PUT') {
     const candidateId = Number(editorialMatch[1]);
