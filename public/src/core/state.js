@@ -1,4 +1,6 @@
-// src/core/state.js — 共享状态
-// 由 app-core.js 的 var state = {...} 创建，挂在 window 上
-// 确保 ESM 视图和旧系统操作同一份数据
-export const state = window.state;
+// src/core/state.js — 共享状态（前端双轨收敛后由本模块统一创建）
+export const state = {
+  overview: null, batches: [], currentBatch: null, activeBatchId: null, candidates: [], documents: [], models: null, jobTimer: null,
+  atlas: null, atlasFilters: { scope: '全部', multi: false, query: '' }, atlasSelectedWord: null, productionPreview: null, imageWorkspace: null,
+  subscriptions: null, subscriptionFilter: 'all',
+};

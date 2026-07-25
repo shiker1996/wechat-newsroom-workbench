@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterRecentItems, parseFeed } from '../collectors/rsshub.mjs';
+import { filterRecentItems, parseFeed, githubTrendingPeriod, normalizeGitHubTrendingItem } from '../collectors/rsshub.mjs';
 
 test('解析 RSS 与 CDATA', () => {
   const xml = `<rss><channel><item><guid>x1</guid><title><![CDATA[AI &amp; 开源]]></title><link>https://example.com/a</link><pubDate>Sun, 19 Jul 2026 08:00:00 GMT</pubDate></item></channel></rss>`;
@@ -23,3 +23,5 @@ test('解析 Atom link href', () => {
   const xml = `<feed><entry><id>a1</id><title>更新</title><link href="https://example.com/b"/><updated>2026-07-19T08:00:00Z</updated></entry></feed>`;
   assert.equal(parseFeed(xml, '/atom')[0].url, 'https://example.com/b');
 });
+
+test('GitHub Trending 路由规范化为统一仓库热点',()=>{assert.equal(githubTrendingPeriod('/github/trending/weekly/any?limit=30'),'weekly');const item=normalizeGitHubTrendingItem({title:'old',url:'https://github.com/OpenAI/codex',rank:3},'/github/trending/weekly/any');assert.equal(item.sourceGroup,'github');assert.equal(item.sourceType,'trending');assert.equal(item.sourceKey,'github:trending');assert.equal(item.repository,'OpenAI/codex');assert.deepEqual(item.periods,['weekly']);assert.equal(item.rank,3);});

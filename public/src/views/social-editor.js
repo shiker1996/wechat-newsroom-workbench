@@ -1,6 +1,6 @@
 import { state } from "../core/state.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions } from "../core/ui.js";
 
 let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
@@ -9,6 +9,25 @@ let selectedChannelMode='wechat';
 
 const CUSTOM_TYPE_LABELS={tutorial:'教程',list:'清单',opinion:'观点'};
 const CUSTOM_LEVEL_LABELS={author_experience:'作者体验',user_material:'用户素材',model_suggestion:'模型建议'};
+
+// 工具图文 / 自定义图文 / 事件图文三个导航入口共用本模块，以 currentMode 区分
+let currentMode='tools';
+function isCustomOutput(mode){return String(mode||'').includes('custom-cards');}
+function isEventOutput(mode){return String(mode||'').includes('event-cards');}
+function candidateMode(outputMode){return isCustomOutput(outputMode)?'custom':isEventOutput(outputMode)?'event':'tools';}
+const MODE_LAYOUT={
+  tools:{heading:'工具图文',intro:'AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。',empty:'图文选题池为空'},
+  custom:{heading:'自定义图文',intro:'从主题、要点和素材直接立项，AI 按来源等级规划卡片故事板。',empty:'还没有自定义图文，点击上方「创建自定义图文」开始'},
+  event:{heading:'事件图文',intro:'AI 根据事件卡与来源快照整理事实基座，规划事件卡片故事板。',empty:'还没有事件图文，可在热点全景将事件加入图文池'},
+};
+function applyModeLayout(){
+  const layout=MODE_LAYOUT[currentMode]||MODE_LAYOUT.tools;
+  document.getElementById('social-editor-heading').textContent=layout.heading;
+  document.getElementById('social-editor-intro').textContent=layout.intro;
+  document.getElementById('create-custom-social').hidden=currentMode!=='custom';
+  if(currentMode!=='custom')document.getElementById('custom-social-panel').hidden=true;
+  const scorePanel=document.querySelector('.social-score-panel');if(scorePanel)scorePanel.hidden=currentMode!=='tools';
+}
 
 function updateSocialTabControls(){const tabs=document.getElementById('social-editor-candidates');const previous=document.getElementById('social-tabs-previous');const next=document.getElementById('social-tabs-next');if(!tabs||!previous||!next)return;const max=Math.max(0,tabs.scrollWidth-tabs.clientWidth);previous.disabled=tabs.scrollLeft<=1;next.disabled=tabs.scrollLeft>=max-1;}
 function setupSocialTabNavigation(){const tabs=document.getElementById('social-editor-candidates');const strip=tabs?.closest('.social-candidate-tab-strip');if(!tabs||!strip||strip.dataset.navigationBound==='true')return;strip.dataset.navigationBound='true';strip.addEventListener('click',(event)=>{const arrow=event.target.closest('.candidate-tab-arrow');if(!arrow)return;tabs.scrollBy({left:(arrow.classList.contains('previous')?-1:1)*Math.max(220,tabs.clientWidth*.72),behavior:'smooth'});});tabs.addEventListener('scroll',updateSocialTabControls,{passive:true});window.addEventListener('resize',updateSocialTabControls,{passive:true});updateSocialTabControls();}
@@ -76,12 +95,12 @@ export async function openSocialEditor(id) {
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
   renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json);renderGate(data.gate);
-  document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
   if(!candidateId)return; const data=await request(`/api/candidates/${candidateId}/ai/card-editorial`,{method:'POST',body:'{}'});
-  if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json);renderGate(data.gate);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
+  if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
 function renderStoryboardLoading(message){document.getElementById("card-plan-preview").innerHTML=`<div class="storyboard-loading"><span class="storyboard-spinner"></span><div><b>${escapeHtml(message)}</b><small>${selectedContentType==='event'?'正在读取事实、主张、时间线和来源风险，请勿重复点击。':'正在读取 README、提取能力并规划逐页内容，请勿重复点击。'}</small></div></div>`;}
@@ -99,13 +118,20 @@ async function watchSocialJob(jobId,candidateId,button){
   }
 }
 
-async function loadSocialEditor() {
+async function loadSocialEditor(view) {
+  // 无参调用（如创建成功后刷新）保持当前模式，避免自定义/事件页被切回工具图文
+  if(view)currentMode=view==='social-custom'?'custom':view==='social-event'?'event':'tools';
+  applyModeLayout();
   setupSocialTabNavigation();
   const batch=state.batches.find((item)=>item.id===state.activeBatchId); if(!batch)return;
-  const candidates=await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=social_cards`); const nav=document.getElementById("social-editor-candidates");
-  nav.innerHTML=candidates.length?candidates.map((item)=>`<button type="button" class="social-editor-candidate" data-social-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)}</b><span>${escapeHtml(item.hotspot_title)}</span><em>${escapeHtml(item.repository_description||item.social_selection_reason||'暂无仓库描述')}</em><small>${escapeHtml(item.track_status||'pooled')}${item.social_selection_reason?` · ${escapeHtml(item.social_selection_reason)}`:''}</small></button>`).join(''):'<div class="empty-state">图文选题池为空</div>';
+  const all=await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=social_cards`);
+  const candidates=all.filter((item)=>candidateMode(item.output_mode)===currentMode);
+  const layout=MODE_LAYOUT[currentMode]||MODE_LAYOUT.tools;
+  const nav=document.getElementById("social-editor-candidates");
+  nav.innerHTML=candidates.length?candidates.map((item)=>{const modeLabel=isCustomOutput(item.output_mode)?(item.output_mode==='xiaohongshu-custom-cards'?'自定义 · 小红书':'自定义 · 公众号'):isEventOutput(item.output_mode)?'事件图文':'';return `<button type="button" class="social-editor-candidate" data-social-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)}</b><span>${escapeHtml(item.hotspot_title)}</span><em>${escapeHtml(modeLabel||item.repository_description||item.social_selection_reason||'暂无仓库描述')}</em><small>${escapeHtml(item.track_status||'pooled')}${item.social_selection_reason?` · ${escapeHtml(item.social_selection_reason)}`:''}</small></button>`;}).join(''):`<div class="empty-state">${layout.empty}</div>`;
   requestAnimationFrame(updateSocialTabControls);
-  if(candidates.length)await openSocialEditor(selectedId&&candidates.some((x)=>x.id===selectedId)?selectedId:candidates[0].id);
+  if(candidates.length){await openSocialEditor(selectedId&&candidates.some((x)=>x.id===selectedId)?selectedId:candidates[0].id);}
+  else{selectedId=null;document.getElementById("social-editor-fields").hidden=true;document.getElementById("social-editor-empty").hidden=false;}
 }
 
 function freshButton(id){const current=document.getElementById(id);if(!current)return null;const fresh=current.cloneNode(true);current.replaceWith(fresh);return fresh;}
@@ -115,6 +141,7 @@ if(!window.__socialEditorCandidateBound){window.__socialEditorCandidateBound=tru
 }
 if(!window.__socialDeliveryBound){window.__socialDeliveryBound=true;document.addEventListener('click',(event)=>{const image=event.target.closest('[data-social-image]');if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}const tab=event.target.closest('[data-social-proof]');if(tab){proofTab=tab.dataset.socialProof;renderProof();}});document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});}
 if(!window.__socialThemeBound){window.__socialThemeBound=true;document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});toast('视觉主题已保存，生成图文时生效');}catch(error){toast(error.message);}});}
+if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：已有故事板与新渠道页型不同，建议重新生成故事板':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
 const inspectButton=freshButton("inspect-repository");
 inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
@@ -125,13 +152,97 @@ generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const c
 window.openSocialEditor=openSocialEditor;
 
 // 创建自定义图文（待办 1+6：教程/清单/观点 × 公众号/小红书）
+// 对话式策划：AI 通过多轮对话把方案填进下方表单，表单始终可手改，创建仍走原有路由与门禁
 function bindCustomSocialForm(){
   const toggle=document.getElementById('create-custom-social'),panel=document.getElementById('custom-social-panel');
   if(!toggle||!panel||toggle.dataset.bound==='true')return;toggle.dataset.bound='true';
   const typeSelect=document.getElementById('custom-content-type');
   const syncTypeFields=()=>{const type=typeSelect.value;panel.querySelectorAll('[data-custom-only]').forEach((node)=>{node.hidden=node.dataset.customOnly!==type;});};
-  toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;syncTypeFields();});
+  const chat={history:[]};
+  const lines=(id)=>document.getElementById(id).value.split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+  const collectDraft=()=>({
+    content_type:typeSelect.value,channel:document.getElementById('custom-channel').value,
+    topic:document.getElementById('custom-topic').value.trim(),audience:document.getElementById('custom-audience').value.trim(),
+    scenario:document.getElementById('custom-scenario').value.trim(),thesis:document.getElementById('custom-thesis').value.trim(),
+    points:lines('custom-points'),steps:lines('custom-steps'),items:lines('custom-items'),materialUrls:lines('custom-materials'),
+    limitations:document.getElementById('custom-limitations').value.trim(),expected_pages:Number(document.getElementById('custom-expected-pages').value)||6,
+  });
+  const applyFormUpdates=(updates)=>{
+    if(!updates||typeof updates!=='object')return;
+    const set=(id,value)=>{if(value==null||value==='')return;const el=document.getElementById(id);if(el)el.value=value;};
+    const setLines=(id,value)=>{const text=Array.isArray(value)?value.join('\n'):String(value||'');if(text.trim())set(id,text);};
+    if(updates.content_type){set('custom-content-type',updates.content_type);syncTypeFields();}
+    set('custom-channel',updates.channel);
+    set('custom-topic',updates.topic);set('custom-audience',updates.audience);set('custom-scenario',updates.scenario);
+    set('custom-thesis',updates.thesis);set('custom-limitations',updates.limitations);
+    setLines('custom-points',updates.points);setLines('custom-steps',updates.steps);
+    setLines('custom-items',updates.items);setLines('custom-materials',updates.materialUrls);
+    if(updates.expected_pages)set('custom-expected-pages',updates.expected_pages);
+  };
+  async function sendCustomChat(){
+    const batch=state.batches.find((item)=>item.id===state.activeBatchId);
+    if(!batch){toast('请先选择批次');return;}
+    const input=document.getElementById('custom-chat-input');
+    const answer=input?.value?.trim()||'';
+    const button=document.getElementById('custom-chat-send');
+    const messages=document.getElementById('custom-chat-messages');
+    if(!messages||!button)return;
+    messages.querySelector('.editorial-chat-empty')?.remove();
+    if(answer)messages.insertAdjacentHTML('beforeend',`<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll('\n','<br>')}</p></div>`);
+    const sm=document.createElement('div');sm.className='editorial-message assistant streaming';sm.innerHTML='<b>AI 策划 · 实时回应</b><p></p>';messages.append(sm);messages.scrollTop=messages.scrollHeight;
+    const st=sm.querySelector('p');
+    button.disabled=true;button.textContent='AI 正在回应…';
+    try{
+      const response=await fetch(`/api/batches/${encodeURIComponent(batch.id)}/custom-social-chat/stream`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({provider:document.getElementById('custom-chat-provider')?.value||'',answer,draft:collectDraft(),history:chat.history})});
+      if(!response.ok){const d=await response.json().catch(()=>({}));throw new Error(d.error||`HTTP ${response.status}`);}
+      if(!response.body)throw new Error('浏览器未收到流式响应');
+      const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';let done=null;
+      const consume=(line)=>{
+        if(!line.trim())return;
+        const event=JSON.parse(line);
+        if(event.type==='delta'&&st)st.textContent+=event.text||'';
+        if(event.type==='error')throw new Error(event.error||'策划助手调用失败');
+        if(event.type==='done')done=event.data||{};
+        messages.scrollTop=messages.scrollHeight;
+      };
+      while(true){const{done:end,value}=await reader.read();if(end)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split(/\r?\n/);buffer=parts.pop()||'';for(const line of parts)consume(line);}
+      buffer+=decoder.decode();if(buffer.trim())consume(buffer);
+      if(!done)throw new Error('策划助手连接提前结束，请重试');
+      if(input)input.value='';
+      sm.classList.remove('streaming');
+      if(answer)chat.history.push({role:'user',content:answer});
+      if(done.reply)chat.history.push({role:'assistant',content:done.reply});
+      applyFormUpdates(done.formUpdates);
+      if(done.ready){const details=document.getElementById('custom-social-form-details');if(details)details.open=true;toast('方案已齐备，请检查下方表单后点击创建');}
+    }catch(error){
+      sm.classList.remove('streaming');sm.classList.add('failed');
+      if(st&&!st.textContent)st.textContent=`调用失败：${error.message}`;else toast(error.message);
+    }finally{button.disabled=false;button.textContent='发送';}
+  }
+  // 创建成功后重置面板：清空表单与对话，折叠表单区，下次打开是全新状态
+  const resetCustomPanel=()=>{
+    chat.history=[];
+    typeSelect.value='tutorial';syncTypeFields();
+    document.getElementById('custom-channel').value='wechat';
+    for(const id of ['custom-topic','custom-audience','custom-scenario','custom-thesis','custom-points','custom-steps','custom-items','custom-materials','custom-limitations','custom-chat-input']){const el=document.getElementById(id);if(el)el.value='';}
+    document.getElementById('custom-expected-pages').value='6';
+    const details=document.getElementById('custom-social-form-details');if(details)details.open=false;
+    const messages=document.getElementById('custom-chat-messages');
+    if(messages)messages.innerHTML='<div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div>';
+  };
+  toggle.addEventListener('click',()=>{
+    panel.hidden=!panel.hidden;syncTypeFields();
+    if(!panel.hidden){
+      const prov=document.getElementById('custom-chat-provider');
+      if(prov)prov.innerHTML=providerOptions(state.models?.providers?.find((p)=>p.configured)?.name||state.models?.defaultProvider||'');
+      chat.history=[];
+      const messages=document.getElementById('custom-chat-messages');
+      if(messages)messages.innerHTML='<div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div>';
+      sendCustomChat();
+    }
+  });
   typeSelect.addEventListener('change',syncTypeFields);
+  document.getElementById('custom-chat-send')?.addEventListener('click',sendCustomChat);
   document.getElementById('custom-social-cancel')?.addEventListener('click',()=>{panel.hidden=true;});
   document.getElementById('custom-social-submit')?.addEventListener('click',async()=>{
     const batch=state.batches.find((item)=>item.id===state.activeBatchId);
@@ -146,7 +257,7 @@ function bindCustomSocialForm(){
         items:document.getElementById('custom-items').value,materialUrls:document.getElementById('custom-materials').value,
         limitations:document.getElementById('custom-limitations').value,expected_pages:Number(document.getElementById('custom-expected-pages').value)||6,
       })});
-      panel.hidden=true;toast('自定义图文已创建');
+      panel.hidden=true;resetCustomPanel();toast('自定义图文已创建');
       await loadSocialEditor();
       if(data.candidate?.id)await openSocialEditor(data.candidate.id);
     }catch(error){toast(error.message);}

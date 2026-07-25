@@ -1,20 +1,47 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
 
+let bound = false;
+function bindEditorial() {
+  if (bound) return;
+  bound = true;
+  const form = document.getElementById("editorial-form");
+  form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message)));
+  form.addEventListener("input", renderEditorialReadiness);
+  form.addEventListener("change", renderEditorialReadiness);
+  document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message)));
+  document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
+  document.addEventListener("click", (event) => {
+    const editCandidate = event.target.closest("[data-edit-candidate]");
+    if (editCandidate) {
+      openEditorial(Number(editCandidate.dataset.editCandidate)).catch((error) => toast(error.message));
+    }
+  });
+}
+
 async function loadEditorialRoom(selectedId) {
+  setupEditorialGateNavigation();
+  setupCandidateTabNavigation();
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
   state.candidates = await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`);
   const sidebar = document.getElementById("editorial-candidates");
   if (!sidebar) return;
-  sidebar.innerHTML = state.candidates.length
-    ? state.candidates.map((item) =>
-        `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(item.brief_status || "DISCUSS")}</b><span>${escapeHtml(item.hotspot_title)}</span></button>`
-      ).join("")
+  // 与选题池同一成稿线：默认只展示 F≥55 的候选，选题池的"显示全部"开关同样生效
+  const hiddenCount = state.topicShowAll ? 0 : state.candidates.filter((item) => item.f_score != null && Number(item.f_score) < 55).length;
+  const visibleCandidates = state.topicShowAll ? state.candidates : state.candidates.filter((item) => item.f_score == null || Number(item.f_score) >= 55);
+  sidebar.innerHTML = visibleCandidates.length
+    ? visibleCandidates.map((item) => {
+        // 与选题池口径一致：综合候选展示组标题，单热点候选优先展示事件摘要
+        const label = !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
+        return `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(item.brief_status || "DISCUSS")}</b><span>${escapeHtml(label)}</span></button>`;
+      }).join("")
     : '<div class="empty-state">选题池为空</div>';
-  if (state.candidates.length) await openEditorial(selectedId || state.candidates[0].id);
+  if (hiddenCount) sidebar.innerHTML += `<div class="editorial-hidden-note">已隐藏 ${hiddenCount} 条低于成稿线（F<55）的候选，可在选题池打开"显示全部"</div>`;
+  requestAnimationFrame(updateCandidateTabControls);
+  if (visibleCandidates.length) await openEditorial(selectedId || visibleCandidates[0].id);
   else {
     const empty = document.getElementById("editorial-empty");
     const fields = document.getElementById("editorial-fields");
@@ -23,10 +50,61 @@ async function loadEditorialRoom(selectedId) {
   }
 }
 
+function updateCandidateTabControls() {
+  const sidebar = document.getElementById("editorial-candidates");
+  const previous = document.getElementById("candidate-tabs-previous");
+  const next = document.getElementById("candidate-tabs-next");
+  if (!sidebar || !previous || !next) return;
+  const maxScroll = Math.max(0, sidebar.scrollWidth - sidebar.clientWidth);
+  previous.disabled = sidebar.scrollLeft <= 1;
+  next.disabled = sidebar.scrollLeft >= maxScroll - 1;
+}
+
+function setupCandidateTabNavigation() {
+  const sidebar = document.getElementById("editorial-candidates");
+  const strip = sidebar?.closest(".candidate-tab-strip");
+  if (!sidebar || !strip || strip.dataset.navigationBound === "true") return;
+  strip.dataset.navigationBound = "true";
+  strip.addEventListener("click", (event) => {
+    const arrow = event.target.closest(".candidate-tab-arrow");
+    if (!arrow) return;
+    const direction = arrow.classList.contains("previous") ? -1 : 1;
+    sidebar.scrollBy({ left: direction * Math.max(220, sidebar.clientWidth * 0.72), behavior: "smooth" });
+  });
+  sidebar.addEventListener("scroll", updateCandidateTabControls, { passive: true });
+  window.addEventListener("resize", updateCandidateTabControls, { passive: true });
+  updateCandidateTabControls();
+}
+
+function setupEditorialGateNavigation() {
+  const checks = document.getElementById("editorial-gate-checks");
+  if (!checks || checks.dataset.navigationBound === "true") return;
+  checks.dataset.navigationBound = "true";
+  checks.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-gate-field]");
+    if (!target || target.classList.contains("done")) return;
+    const details = document.getElementById("editorial-decision-details");
+    if (details) details.open = true;
+    const field = document.getElementById("editorial-form")?.elements[target.dataset.gateField];
+    if (!field) return;
+    requestAnimationFrame(() => {
+      field.scrollIntoView({ behavior: "smooth", block: "center" });
+      field.focus({ preventScroll: true });
+    });
+  });
+}
+
 async function openEditorial(id) {
   try { state.models = await request("/api/models"); } catch {}
   const candidate = await request(`/api/candidates/${id}`);
-  $$(".editorial-candidate").forEach((item) => item.classList.toggle("active", Number(item.dataset.editCandidate) === Number(id)));
+  let activeCandidateTab = null;
+  $$(".editorial-candidate").forEach((item) => {
+    const active = Number(item.dataset.editCandidate) === Number(id);
+    item.classList.toggle("active", active);
+    if (active) activeCandidateTab = item;
+  });
+  activeCandidateTab?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+  requestAnimationFrame(updateCandidateTabControls);
   const empty = document.getElementById("editorial-empty");
   const fields = document.getElementById("editorial-fields");
   if (empty) empty.hidden = true;
@@ -46,7 +124,7 @@ async function openEditorial(id) {
   const cid = document.getElementById("editorial-candidate-id");
   if (cid) cid.textContent = candidate.candidate_id;
   const title = document.getElementById("editorial-hotspot-title");
-  if (title) title.textContent = candidate.hotspot_title;
+  if (title) title.textContent = !candidate.composite && candidate.event_card?.conclusion ? candidate.event_card.conclusion : candidate.hotspot_title;
   const badge = document.getElementById("editorial-composite-badge");
   if (badge) badge.hidden = !candidate.composite;
   const briefState = document.getElementById("brief-state");
@@ -56,25 +134,9 @@ async function openEditorial(id) {
     const preferred = state.models?.providers?.find((p) => p.configured)?.name || state.models?.defaultProvider || "";
     provEl.innerHTML = providerOptions(preferred);
   }
-  // Source evidence
-  const se = document.getElementById("source-evidence");
-  if (se) {
-    const source = candidate.source_document;
-    const ok = source?.status === "ok";
-    const partial = source?.status === "partial";
-    se.className = `source-evidence ${ok ? "ready" : partial ? "partial" : source ? "failed" : "missing"}`;
-    const titleEl = document.getElementById("source-evidence-title");
-    if (titleEl) {
-      const method = source?.fetch_method === "firecrawl-mcp" ? "Firecrawl MCP" : source?.fetch_method === "python" ? "Python" : "来源抓取";
-      titleEl.textContent = ok ? `${method} · 已抓取 ${source.content_chars} 字` : partial ? `${method} · 仅取得部分内容 ${source.content_chars} 字` : source ? `${method}失败 · ${source.error || "未知原因"}` : "原文尚未抓取";
-    }
-    const meta = document.getElementById("source-evidence-meta");
-    if (meta) meta.textContent = source ? `${source.title || candidate.hotspot_title}${source.author ? ` · ${source.author}` : ""}${source.published_at ? ` · ${source.published_at}` : ""}` : "AI 编辑会开始前会自动获取公开原文。";
-    const excerpt = document.getElementById("source-evidence-excerpt");
-    if (excerpt) excerpt.innerHTML = source?.content ? `<p>${escapeHtml(source.content.slice(0, 1600))}</p>` : (source?.description ? `<p>${escapeHtml(source.description)}</p>` : "暂无可展示的来源摘录。");
-    const details = document.getElementById("source-evidence-details");
-    if (details) details.hidden = !source;
-  }
+  // 事件卡与原文：选题与事件一对多，原文绑定在事件下，逐事件渲染
+  const events = candidate.events || [];
+  renderEventCards(events);
   // Messages
   const messages = document.getElementById("editorial-messages");
   if (messages) {
@@ -86,6 +148,38 @@ async function openEditorial(id) {
   state.editorialCandidate = candidate;
   renderEditorialReadiness();
   loadSimilarArticles(id);
+}
+
+function renderEventCards(events) {
+  const panel = document.getElementById("event-card-panel");
+  const list = document.getElementById("event-cards-list");
+  if (!panel || !list) return;
+  if (!events.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const heading = document.getElementById("event-cards-heading");
+  if (heading) heading.textContent = `${events.length} 个关联事件`;
+  const fill = (items, renderItem) => Array.isArray(items) && items.length
+    ? items.map(renderItem).join("")
+    : '<li class="muted">暂无</li>';
+  list.innerHTML = events.map((event, index) => {
+    const card = event.card;
+    const sources = (event.hotspots || []).map((h) => {
+      const doc = h.sourceDoc;
+      const status = doc ? doc.status : "missing";
+      const label = status === "ok" ? `已抓取 ${doc.content_chars} 字` : status === "partial" ? `部分内容 ${doc.content_chars} 字` : doc ? `失败：${doc.error || "未知原因"}` : "未抓取";
+      return `<li class="event-source ${escapeHtml(status)}"><div class="event-source-row"><span>${escapeHtml(h.title || "来源")}</span><small>${escapeHtml(h.source || "")} · ${escapeHtml(label)}</small></div>${doc?.content ? `<details class="event-source-excerpt"><summary>查看摘录</summary><p>${escapeHtml(String(doc.content).slice(0, 800))}</p></details>` : ""}</li>`;
+    }).join("");
+    return `<div class="event-card-item">
+      <div class="event-card-item-head"><h4>${escapeHtml(event.title || "")}</h4></div>
+      ${card ? `<p class="event-card-conclusion">${escapeHtml(card.conclusion || "")}</p>
+      <details open><summary>已确认事实</summary><ul>${fill(card.confirmed_facts, (fact) => `<li>${escapeHtml(fact)}</li>`)}</ul></details>
+      <details><summary>来源增量</summary><ul>${fill(card.source_increment, (item) => `<li><b>${escapeHtml(item.source || "来源")}</b>${escapeHtml(item.adds || "")}</li>`)}</ul></details>
+      <details><summary>来源分歧</summary><ul>${fill(card.disagreements, (item) => `<li>${escapeHtml(typeof item === "string" ? item : JSON.stringify(item))}</li>`)}</ul></details>
+      <details><summary>待核内容</summary><ul>${fill(card.unverified, (item) => `<li>${escapeHtml(item)}</li>`)}</ul></details>`
+      : '<p class="muted">事件卡尚未生成，可在批次中执行打标后自动生成。</p>'}
+      <details><summary>事件来源（${(event.hotspots || []).length}）</summary><ul class="event-source-list">${sources}</ul></details>
+    </div>`;
+  }).join("");
 }
 
 async function loadSimilarArticles(id) {
@@ -109,11 +203,11 @@ function renderEditorialReadiness() {
   if (!form) return;
   const text = (name) => form.elements[name]?.value?.trim() || "";
   const checks = [
-    { label: "锁定命题", ok: Boolean(text("thesis")) },
-    { label: "事实基座", ok: Boolean(text("confirmed_facts")) },
-    { label: "未决问题清零", ok: !text("open_questions") },
-    { label: "可以立即写作", ok: text("next_action") === "WRITE_NOW" },
-    { label: "实践证据", ok: !form.elements.experience_required?.checked || Boolean(text("confirmed_experiences")) },
+    { label: "锁定命题", field: "thesis", ok: Boolean(text("thesis")) },
+    { label: "事实基座", field: "confirmed_facts", ok: Boolean(text("confirmed_facts")) },
+    { label: "未决问题清零", field: "open_questions", ok: !text("open_questions") },
+    { label: "可以立即写作", field: "next_action", ok: text("next_action") === "WRITE_NOW" },
+    { label: "实践证据", field: "confirmed_experiences", ok: !form.elements.experience_required?.checked || Boolean(text("confirmed_experiences")) },
   ];
   const passed = checks.filter((c) => c.ok).length;
   const ready = passed === checks.length;
@@ -122,7 +216,7 @@ function renderEditorialReadiness() {
   const count = document.getElementById("editorial-gate-count");
   if (count) count.textContent = `${passed} / ${checks.length}`;
   const list = document.getElementById("editorial-gate-checks");
-  if (list) list.innerHTML = checks.map((c) => `<span class="editorial-gate-check ${c.ok ? "done" : ""}">${escapeHtml(c.label)}</span>`).join("");
+  if (list) list.innerHTML = checks.map((c) => `<button type="button" class="editorial-gate-check ${c.ok ? "done" : ""}" data-gate-field="${c.field}"${c.ok ? " disabled" : ""}>${escapeHtml(c.label)}</button>`).join("");
   const title = document.getElementById("editorial-production-title");
   if (title) title.textContent = ready ? "编辑决策已完整，可以进入成稿" : "尚未达到成稿条件";
   const hint = document.getElementById("editorial-production-hint");
@@ -222,20 +316,6 @@ async function saveEditorial(event) {
   toast("编辑决策已保存");
 }
 
-async function fetchEditorialSource() {
-  const form = document.getElementById("editorial-form");
-  if (!form) return;
-  const candidateId = Number(form.elements.candidateId.value);
-  if (!candidateId) return;
-  const btn = document.getElementById("fetch-source");
-  if (btn) { btn.disabled = true; btn.textContent = "正在抓取原文…"; }
-  try {
-    const source = await request(`/api/candidates/${candidateId}/source`, { method: "POST", body: JSON.stringify({ force: true }) });
-    await openEditorial(candidateId);
-    toast(source.status === "ok" ? `已抓取 ${source.content_chars} 字原文` : `原文抓取未完整：${source.error}`);
-  } finally { if (btn) { btn.disabled = false; btn.textContent = "抓取 / 刷新原文"; } }
-}
-
 async function startEditorialProduction() {
   const form = document.getElementById("editorial-form");
   if (!form) return;
@@ -267,13 +347,10 @@ async function startEditorialProduction() {
   } catch (err) { toast(err.message); }
 }
 
+// main.js 与 topics.js 的跨视图跳转依赖该桥接
 window.loadEditorialRoom = loadEditorialRoom;
-window.openEditorial = openEditorial;
-window.saveEditorial = saveEditorial;
-window.renderEditorialReadiness = renderEditorialReadiness;
-window.sendEditorialAnswer = sendEditorialAnswer;
-window.fetchEditorialSource = fetchEditorialSource;
-window.persistEditorialForm = persistEditorialForm;
-window.startEditorialProduction = startEditorialProduction;
 
-export default loadEditorialRoom;
+export default async function loadEditorialRoomView(selectedId) {
+  bindEditorial();
+  return loadEditorialRoom(selectedId);
+}

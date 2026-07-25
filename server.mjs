@@ -23,6 +23,8 @@ import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
 import { inspectRepository, repositoryFactMarkdown } from './lib/repository-inspector.mjs';
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/custom-fact-builder.mjs';
+import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
+import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/zip-bundle.mjs';
 import { getGitHubApiHealth } from './lib/github-api.mjs';
@@ -93,8 +95,8 @@ function candidateRepositoryUrl(candidate) {
 
 function socialContentType(candidate) {
   const mode=candidate?.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
-  if(mode==='wechat-event-cards')return 'event';
-  if(mode==='wechat-custom-cards'||mode==='xiaohongshu-custom-cards')return 'custom';
+  if(mode.includes('event-cards'))return 'event';
+  if(mode.includes('custom-cards'))return 'custom';
   return 'repository';
 }
 // 渠道与内容形态都编码在 candidate_tracks.output_mode：xiaohongshu-* 走小红书渲染分支，其余走公众号
@@ -387,32 +389,14 @@ async function api(request, response, url) {
 
   // 选题与事件为一对多：候选的关联热点分属哪些事件，哪些事件就是本选题的关联事件；
   // 原文绑定在事件下：每个事件携带其全部热点的原文抓取快照。contentLimit 控制快照正文截断。
+  // 实现已下沉到 lib/event-fact-base.mjs，供事件图文事实基座在管线侧复用
   function candidateEventGroups(candidate, contentLimit = 2000) {
-    const batch = store.getBatch(candidate.batch_id);
-    if (!batch) return [];
-    const eligible = batch.hotspots.filter((item) => isFreshForBatch(item, batch.batch_date, batchMaxAgeHours(batch)));
-    let cardMap = new Map();
-    try {
-      const cardFile = path.join(batchWorkdir(batch), 'sources', 'event-cards.json');
-      if (fs.existsSync(cardFile)) cardMap = new Map((JSON.parse(fs.readFileSync(cardFile, 'utf8'))?.items || []).map((item) => [item.event_id, item]));
-    } catch {}
-    const wanted = new Set(candidate.composite ? store.candidateHotspots(candidate.id).map((h) => h.id) : [candidate.hotspot_id]);
-    const groups = [];
-    for (const event of clusterItems(eligible)) {
-      if (!event.articles.some((article) => wanted.has(article.hotspot_id))) continue;
-      groups.push({
-        event_id: event.event_id,
-        title: event.representative_title,
-        card: cardMap.get(event.event_id) || null,
-        hotspots: event.articles.map((article) => {
-          const doc = store.getHotspotSource(article.hotspot_id);
-          return { id: article.hotspot_id, title: article.title, url: article.url, source: article.source, time: article.time,
-            representative: wanted.has(article.hotspot_id),
-            sourceDoc: doc ? { ...doc, content: String(doc.content || '').slice(0, contentLimit) } : null };
-        }),
-      });
-    }
-    return groups;
+    return eventGroupsForCandidate({ store, workspaceRoot: config.workspaceRoot, candidate, contentLimit, defaultMaxAgeHours: config.rsshub.maxAgeHours });
+  }
+
+  // 事件图文统一取数：突发批次用突发分析，日常批次（热点全景加入图文池）用事件卡合成
+  function resolveEventAnalysisFor(candidate) {
+    return resolveEventAnalysis({ store, workspaceRoot: config.workspaceRoot, candidate, defaultMaxAgeHours: config.rsshub.maxAgeHours });
   }
 
   function candidateEventCard(candidate) {
@@ -495,6 +479,11 @@ async function api(request, response, url) {
     const input = await body(request);
     if (!Array.isArray(input.hotspotIds) || input.hotspotIds.length < 2) return json(response, 400, { error: '综合选题至少需要 2 个热点' });
     const composite = store.createCompositeCandidate(batchId, input.hotspotIds, input);
+    // 图文池分流：含 GitHub 仓库的综合候选走工具图文（默认 wechat-tool-cards），纯新闻事件走事件图文
+    if ((Array.isArray(input.tracks) ? input.tracks : []).includes('social_cards') && composite && !candidateRepositoryUrl(composite)) {
+      store.updateCandidateTrack(composite.id, 'social_cards', { output_mode: 'wechat-event-cards' });
+      store.saveCardEditorial(composite.id, { ...store.getCardEditorial(composite.id), output_mode: 'wechat-event-cards' });
+    }
     // Auto-score composite candidate via brainstrom-light
     try {
       if (composite && models) {
@@ -534,6 +523,28 @@ async function api(request, response, url) {
       }
     } catch (e) { /* auto-scoring best-effort */ }
     return json(response, 201, store.getCandidate(composite.id));
+  }
+  // 自定义图文创建前的对话式策划（无状态：草稿与历史由前端全量传入，仅返回表单更新）
+  const customSocialChatMatch = pathname.match(/^\/api\/batches\/([^/]+)\/custom-social-chat\/stream$/);
+  if (customSocialChatMatch && request.method === 'POST') {
+    const batchId = decodeURIComponent(customSocialChatMatch[1]);
+    if (!store.getBatch(batchId)) return json(response, 404, { error: '批次不存在' });
+    const input = await body(request);
+    response.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no', 'connection': 'keep-alive' });
+    const send = (event) => response.write(`${JSON.stringify(event)}\n`);
+    try {
+      const result = await runCustomSocialChatStream({
+        gateway: models, store, provider: input.provider, batchId,
+        draft: input.draft && typeof input.draft === 'object' ? input.draft : {},
+        history: Array.isArray(input.history) ? input.history.slice(-40) : [],
+        answer: String(input.answer || ''),
+        onText: (text) => send({ type: 'delta', text }),
+      });
+      send({ type: 'done', data: { reply: result.reply, formUpdates: result.formUpdates, ready: result.ready, usage: result.usage, model: result.model } });
+    } catch (error) {
+      send({ type: 'error', error: error.message });
+    }
+    response.end(); return true;
   }
   // 创建自定义图文候选（待办 1+6：非仓库类图文，首批教程/清单/观点，渠道编码进 output_mode）
   const customSocialMatch = pathname.match(/^\/api\/batches\/([^/]+)\/custom-social-candidates$/);
@@ -606,7 +617,7 @@ async function api(request, response, url) {
     const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
     if(!candidate)return json(response,404,{error:'候选不存在'});
     const editorial=store.getCardEditorial(candidate.id); const facts=store.getRepositoryFactSheet(candidate.id); const score=store.getSocialScore(candidate.id);
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?store.getBreakingAnalysis(candidate.batch_id):null;
+    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
     return json(response,200,{candidate,editorial,facts,score,contentType,channelMode:socialChannelMode(candidate),eventAnalysis,gate});
   }
@@ -614,30 +625,65 @@ async function api(request, response, url) {
     const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
     if(!candidate)return json(response,404,{error:'候选不存在'});
     const editorial=store.saveCardEditorial(candidate.id,await body(request)); const facts=store.getRepositoryFactSheet(candidate.id);
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?store.getBreakingAnalysis(candidate.batch_id):null;
+    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis)});
+  }
+  // 渠道切换：只换 output_mode 的渠道前缀（wechat-* ↔ xiaohongshu-*），类型部分不动，轨道与卡片决策同步
+  const cardChannelMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-channel$/);
+  if (cardChannelMatch && request.method === 'POST') {
+    const candidate=store.getCandidate(Number(cardChannelMatch[1]));
+    if(!candidate)return json(response,404,{error:'候选不存在'});
+    const input=await body(request);
+    const channel=String(input.channel||'').trim();
+    if(!['wechat','xiaohongshu'].includes(channel))return json(response,400,{error:'channel 必须是 wechat 或 xiaohongshu'});
+    const track=candidate.tracks?.find((item)=>item.track==='social_cards');
+    const currentMode=track?.output_mode||store.getCardEditorial(candidate.id).output_mode||'wechat-tool-cards';
+    const typeSuffix=String(currentMode).replace(/^(wechat|xiaohongshu)-/,'');
+    const nextMode=`${channel}-${typeSuffix}`;
+    if(nextMode!==currentMode){
+      store.updateCandidateTrack(candidate.id,'social_cards',{output_mode:nextMode});
+      store.saveCardEditorial(candidate.id,{...store.getCardEditorial(candidate.id),output_mode:nextMode});
+    }
+    const updated=store.getCandidate(candidate.id);
+    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(JSON.parse(store.getCardEditorial(candidate.id).card_plan_json||'[]').length),candidate:updated});
   }
   const cardEditorialAiMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/card-editorial$/);
   if (cardEditorialAiMatch && request.method === 'POST') {
     const candidate=store.getCandidate(Number(cardEditorialAiMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
-    const contentType=socialContentType(candidate),facts=store.getRepositoryFactSheet(candidate.id),eventAnalysis=contentType==='event'?store.getBreakingAnalysis(candidate.batch_id):null;
+    const contentType=socialContentType(candidate),facts=store.getRepositoryFactSheet(candidate.id);
+    let eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     if(contentType==='repository'&&!facts?.data?.sourceUrl)return json(response,409,{error:'请先完成仓库事实核验'});
-    if(contentType==='event'&&!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'请先完成突发事实分析'});
+    if(contentType==='event'){
+      if(!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该事件尚无事件卡，请先在热点全景运行事件研判'});
+      // 日常批次事件候选可能尚未抓取来源，生成故事板前自动补抓
+      if(!(eventAnalysis.analysis.sources||[]).some((item)=>item.status==='ok')){
+        const hotspots=candidateEventGroups(candidate).flatMap((group)=>group.hotspots);
+        if(hotspots.length){try{await fetchCandidateSource({store,candidateId:candidate.id,root,force:false,hotspots});}catch{}}
+        eventAnalysis=resolveEventAnalysisFor(candidate);
+      }
+    }
     if(contentType==='custom'&&facts?.data?.kind!=='custom')return json(response,409,{error:'请先填写自定义事实基座'});
     const input=await body(request); const current=store.getCardEditorial(candidate.id); const providerConfig=models.config.providers[input.provider||models.config.defaultProvider];
     try {
       const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:'xiaohongshu-article-generator'});
       if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
+      // 小红书渠道开放数据卡/对比卡/步骤卡/时间卡/场景卡/亮点卡版式，公众号维持基础块
+      const xhsChannel=socialChannelMode(candidate)==='xiaohongshu';
+      const cardBlockTypes=xhsChannel?'text|list|note|stats|compare|steps|timeline|scenes|highlight':'text|list|note';
+      const repoBlockTypes=xhsChannel?'text|list|code|note|stats|compare|steps|timeline|scenes|highlight':'text|list|code|note';
       const eventSystem=`${socialSkill.prompt}\n\n## 当前运行阶段：突发事实基座到事件卡片故事板
 只依据已确认事实、带来源的未核实主张、时间线和来源审计规划卡片。不得把 claims 写成事实；每个关键事实就近写明“来源 N”，未核实内容必须使用“声称/据其发布/尚未获独立证实”等边界表达。
-返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"事件内容定位","must_highlight":"","must_disclose":"来源和未核实边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|what-happened|timeline|evidence|positions|impact|risk|ending","title":"具体页标题","goal":"用一句话概括本页实际呈现的要点或结论，不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'该主张仅来自单一社交媒体账号，尚未获独立证实。'、'三方回应否认了核心指控。'","evidence":["来源 N 支持的内容"],"content_blocks":[{"type":"text|list|note","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。封面只呈现已支持的核心冲突；至少一页说明事实边界；若存在多方回应则单独成页；结尾不得诱导网暴。`;
+返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"事件内容定位","must_highlight":"","must_disclose":"来源和未核实边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|what-happened|timeline|evidence|positions|impact|risk|ending","title":"具体页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'该主张仅来自单一社交媒体账号，尚未获独立证实。'、'三方回应否认了核心指控。'","evidence":["来源 N 支持的内容"],"content_blocks":[{"type":"${cardBlockTypes}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。封面只呈现已支持的核心冲突；至少一页说明事实边界；若存在多方回应则单独成页；结尾不得诱导网暴。`;
       const repositorySystem=`${socialSkill.prompt}\n\n## 当前运行阶段：README 到卡片故事板
-只依据已核验仓库事实和 README 生成图文决策，不得虚构体验、效果、性能、价格、权限或数字。故事板必须让读者明确回答：它是什么、解决什么具体问题、核心功能如何工作、怎样开始、适合谁、有什么限制。禁止用 GitHub topics 代替功能解释。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"","must_highlight":"","must_disclose":"","getting_started":"","forbidden_claims":"","recommended_pages":4到7,"card_plan":[{"kind":"cover|problem|capability|quickstart|scenario|limitation|ending","title":"具体、有信息量的页标题","goal":"用一句话概括本页实际呈现的要点或结论，不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'复制命令即可安装该组件，无需额外配置。'、'相比手动实现，这个库把底层样板代码封装成一条链式 API。'","evidence":["直接支持内容的 README 或仓库事实"],"content_blocks":[{"type":"text|list|code|note","title":"可选小标题","content":"文字，或 list 类型使用换行分隔；单块不超过 160 字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。每页 2–4 个内容块，能力页必须写出 README 中的具体能力和工作方式，快速上手页保留真实命令，限制页明确未核验项。must_disclose 必须说明“基于项目文档整理，未实际运行”以及未知权限、网络和成熟度。`;
+只依据已核验仓库事实和 README 生成图文决策，不得虚构体验、效果、性能、价格、权限或数字。故事板必须让读者明确回答：它是什么、解决什么具体问题、核心功能如何工作、怎样开始、适合谁、有什么限制。禁止用 GitHub topics 代替功能解释。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"","must_highlight":"","must_disclose":"","getting_started":"","forbidden_claims":"","recommended_pages":4到7,"card_plan":[{"kind":"cover|problem|capability|quickstart|scenario|limitation|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'复制命令即可安装该组件，无需额外配置。'、'相比手动实现，这个库把底层样板代码封装成一条链式 API。'","evidence":["直接支持内容的 README 或仓库事实"],"content_blocks":[{"type":"${repoBlockTypes}","title":"可选小标题","content":"文字，或 list 类型使用换行分隔；单块不超过 160 字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。每页 2–4 个内容块，能力页必须写出 README 中的具体能力和工作方式，快速上手页保留真实命令，限制页明确未核验项。must_disclose 必须说明“基于项目文档整理，未实际运行”以及未知权限、网络和成熟度。`;
       const customSystem=`${socialSkill.prompt}\n\n## 当前运行阶段：自定义事实基座到卡片故事板
-只依据自定义事实基座规划卡片，不得虚构体验、效果、数字或收益。体验真实性三来源等级是硬约束：source_level=author_experience 的要点可以写成第一人称亲历；user_material 必须保留来源归属；model_suggestion 只能表述为建议或参考，禁止写成亲测、效果或收益。按内容类型组织故事线：教程（cover→场景与痛点→step 分步页→注意事项→ending）；清单（cover→筛选标准→item 条目页→边界→ending）；观点（cover→核心论点→highlight 论据页→反方与边界→ending）。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"内容定位","must_highlight":"","must_disclose":"来源等级与体验边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|highlight|step|item|boundary|ending","title":"具体、有信息量的页标题","goal":"用一句话概括本页实际呈现的要点或结论，不要写成学习目标。错误示例：'读者能...'、'本页旨在...'；正确示例：'三步完成配置，第二步最容易漏。'","evidence":["事实基座中支持本页的要点，标注来源等级"],"content_blocks":[{"type":"text|list|note","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。至少一页说明事实边界与限制（boundary）；model_suggestion 要点不得单独成页充当卖点。must_disclose 必须写明体验性表述来自作者确认、建议性内容未实测。`;
+只依据自定义事实基座规划卡片，不得虚构体验、效果、数字或收益。体验真实性三来源等级是硬约束：source_level=author_experience 的要点可以写成第一人称亲历；user_material 必须保留来源归属；model_suggestion 只能表述为建议或参考，禁止写成亲测、效果或收益。按内容类型组织故事线：教程（cover→场景与痛点→step 分步页→注意事项→ending）；清单（cover→筛选标准→item 条目页→边界→ending）；观点（cover→核心论点→highlight 论据页→反方与边界→ending）。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"内容定位","must_highlight":"","must_disclose":"来源等级与体验边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|highlight|step|item|boundary|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'本页旨在...'；正确示例：'三步完成配置，第二步最容易漏。'","evidence":["事实基座中支持本页的要点，标注来源等级"],"content_blocks":[{"type":"${cardBlockTypes}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。至少一页说明事实边界与限制（boundary）；model_suggestion 要点不得单独成页充当卖点。must_disclose 必须写明体验性表述来自作者确认、建议性内容未实测。`;
       const storyboardSystem=contentType==='event'?eventSystem:contentType==='custom'?customSystem:repositorySystem;
+      const storyboardChannelDirective=socialChannelMode(candidate)==='xiaohongshu'
+        ?'\n小红书渠道要求：页型与公众号一致（375×667），每页 2–4 个内容块；封面钩子更口语化、带好奇心；结尾页引导收藏与评论互动。除 text/list/note 外，内容块的 type 还可以使用以下版式：stats 数据卡（items:[{"num":"数字","label":"含义"}]，2–4 个，数字必须来自事实基座）、compare 对比卡（headers:["列名"],rows:[["单元格"]]，用于多方立场或产品对比）、steps 步骤卡（items:[{"title":"步骤名","content":"简述"}]，用于教程分步）、timeline 时间卡（items:[{"time":"时间","title":"事件","content":"简述"}]，用于事件时间线）、scenes 场景卡（items:[{"title":"场景","content":"简述"}]，2–3 个横排）、highlight 亮点卡（title+content，用于本页核心卖点）。使用这些版式时内容必须写入 items/headers/rows 字段，不要写入块的 content 字段。按内容选择合适版式，不要整篇都是纯文本块。'
+        :'\n公众号渠道要求：页面为 9:16 长页，每页 2–4 个内容块；标题偏信息密度，结尾页引导收藏与转发。';
       const result=await models.complete({provider:input.provider,purpose:'social-card-editorial',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(6000,providerConfig.maxOutputTokens),messages:[
-        {role:'system',protected:true,content:storyboardSystem},
+        {role:'system',protected:true,content:storyboardSystem+storyboardChannelDirective},
         {role:'user',protected:true,content:JSON.stringify(contentType==='event'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,event_analysis:eventAnalysis.analysis}:contentType==='custom'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,custom_facts:facts.data}:{topic:candidate.hotspot_title,channel_mode:current.output_mode,repository_facts:facts.data})}
       ]});
       const parsed=JSON.parse(result.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));
@@ -654,7 +700,7 @@ async function api(request, response, url) {
         must_disclose:asText(parsed.must_disclose,current.must_disclose),getting_started:asText(parsed.getting_started,current.getting_started),
         forbidden_claims:asText(parsed.forbidden_claims,current.forbidden_claims),
         recommended_pages:Math.max(4,Math.min(maxPages,Number(parsed.recommended_pages)||cardPlan.length||6)),card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
-      const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis); return json(response,200,{editorial,gate,cardPlan,contentType});
+      const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis); return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis});
     } catch(error) { return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
   }
   const repositoryInspectMatch = pathname.match(/^\/api\/candidates\/(\d+)\/repository\/inspect$/);
@@ -681,7 +727,7 @@ async function api(request, response, url) {
   if (cardLockMatch && request.method === 'POST') {
     const candidate=store.getCandidate(Number(cardLockMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
     const editorial=store.getCardEditorial(candidate.id),facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
-    const gate=socialCardGate(candidate,contentType,facts,editorial,contentType==='event'?store.getBreakingAnalysis(candidate.batch_id):null);
+    const gate=socialCardGate(candidate,contentType,facts,editorial,contentType==='event'?resolveEventAnalysisFor(candidate):null);
     if(!gate.ready)return json(response,409,{error:`CARD GATE 未通过：${gate.issues.join('；')}`,gate});
     store.saveCardEditorial(candidate.id,{...editorial,status:'LOCKED'});
     store.updateCandidateTrack(candidate.id,'social_cards',{status:'locked',locked_at:new Date().toISOString()});

@@ -37,3 +37,11 @@ test('删除订阅时同步清理禁用记录', () => {
     assert.deepEqual(config.rsshub.disabledRoutes, []);
   } finally { fs.rmSync(root, { recursive:true, force:true }); }
 });
+
+test('订阅台账把 GitHub Search 作为只读采集入口展示',()=>{
+  const result=listSubscriptions({rsshub:{routes:['/github/trending/daily/any?limit=30'],disabledRoutes:[],directFeeds:[]},githubDiscovery:{enabled:true,createdWithinDays:30,minStars:1000}},[]);
+  const search=result.items.find((item)=>item.value==='github:search');
+  assert.equal(search.kind,'github');
+  assert.equal(search.managed,true);
+  assert.equal(result.summary.github,2);
+});

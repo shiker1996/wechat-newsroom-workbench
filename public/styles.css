@@ -340,7 +340,7 @@ nav { padding-top: 20px; display: grid; gap: 2px; overflow-y: auto; overflow-x: 
 .candidate-board { width:100%; }
 .score-strip.social-fit-strip { grid-template-columns:repeat(9,1fr); }
 .score-strip.social-fit-strip span:last-child { color:white;background:var(--ink); }
-.social-theme-picker{display:grid;gap:6px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.08em}.social-theme-picker select{min-width:150px;padding:9px 30px 9px 10px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);font:600 12px var(--display)}
+.social-picker-group{display:flex;gap:14px;align-items:end}.social-theme-picker{display:grid;gap:6px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.08em}.social-theme-picker select{min-width:150px;padding:9px 30px 9px 10px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);font:600 12px var(--display)}
 
 /* Artifact preview owns scrolling inside the iframe. */
 #artifact-dialog { padding:0;overflow:hidden; }

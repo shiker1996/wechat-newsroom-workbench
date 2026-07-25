@@ -1,20 +1,60 @@
-﻿import { $, $$ } from "../core/dom.js";
+import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
 
+let markdownRenderer;
+let ignoredScrollTarget = null;
+
+function getMarkdownRenderer() {
+  if (markdownRenderer) return markdownRenderer;
+  if (typeof window.markdownit !== "function") return null;
+
+  markdownRenderer = window.markdownit({
+    html: false,
+    linkify: true,
+    breaks: false,
+    typographer: false,
+  });
+  const defaultLinkOpen = markdownRenderer.renderer.rules.link_open
+    || ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+  markdownRenderer.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    tokens[idx].attrSet("target", "_blank");
+    tokens[idx].attrSet("rel", "noopener noreferrer");
+    return defaultLinkOpen(tokens, idx, options, env, self);
+  };
+  return markdownRenderer;
+}
+
 function markdownHtml(text) {
-  if (!text) return "";
-  return text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/\n/g, "<br>");
+  if (!text.trim()) return '<p class="markdown-empty">在左侧输入 Markdown，预览会实时显示在这里。</p>';
+  const renderer = getMarkdownRenderer();
+  if (renderer) return renderer.render(text);
+  return `<pre><code>${escapeHtml(text)}</code></pre>`;
+}
+
+function scrollProgress(element) {
+  const distance = element.scrollHeight - element.clientHeight;
+  return distance > 0 ? element.scrollTop / distance : 0;
+}
+
+function syncScroll(source, target) {
+  if (ignoredScrollTarget === source) return;
+  const targetDistance = target.scrollHeight - target.clientHeight;
+  ignoredScrollTarget = target;
+  target.scrollTop = scrollProgress(source) * Math.max(0, targetDistance);
+  requestAnimationFrame(() => {
+    if (ignoredScrollTarget === target) ignoredScrollTarget = null;
+  });
+}
+
+function setupSynchronizedScrolling() {
+  const editor = document.getElementById("markdown-editor");
+  const preview = document.getElementById("markdown-preview");
+  if (!editor || !preview || editor.dataset.scrollSyncBound === "true") return;
+  editor.dataset.scrollSyncBound = "true";
+  editor.addEventListener("scroll", () => syncScroll(editor, preview), { passive: true });
+  preview.addEventListener("scroll", () => syncScroll(preview, editor), { passive: true });
 }
 
 function visibleChars(markdown) {
@@ -26,6 +66,7 @@ function renderMarkdown() {
   const preview = document.getElementById("markdown-preview");
   if (!editor || !preview) return;
   preview.innerHTML = markdownHtml(editor.value);
+  requestAnimationFrame(() => syncScroll(editor, preview));
   const count = visibleChars(editor.value);
   const cc = document.getElementById("char-count");
   if (cc) cc.textContent = count + " / 2000";
@@ -37,6 +78,10 @@ function selectedDocKind() {
 }
 
 async function loadWritingDesk() {
+  setupSynchronizedScrolling();
+  await ensureModelOptions();
+  const draftProv = document.getElementById("draft-provider");
+  if (draftProv && state.models) draftProv.innerHTML = providerOptions(state.models.providers.find((p) => p.configured)?.name || state.models.defaultProvider);
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
   const [candidates, documents] = await Promise.all([
@@ -118,18 +163,6 @@ async function aiDraft() {
   finally { if (button) { button.disabled = false; button.textContent = "AI 起草"; } }
 }
 
-async function aiTagBatch() {
-  const provider = document.getElementById("batch-ai-provider")?.value || document.getElementById("model-provider")?.value || state.models?.defaultProvider;
-  if (!provider) return toast("请先在模型中心配置至少一个服务商");
-  const force = confirm("重新打标将覆盖本批次全部已有语义标注，是否继续？");
-  try {
-    const result = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/tag`, {
-      method: "POST", body: JSON.stringify({ provider, background: true, force }),
-    });
-    toast(force ? "重新打标已启动" : "打标任务已启动");
-    if (result?.id) pollJob(result.id);
-  } catch (err) { toast(err.message); }
-}
 
 async function pollJob(id) {
   clearTimeout(state.jobTimer);
@@ -149,25 +182,43 @@ async function pollJob(id) {
   } catch (err) { toast(err.message); }
 }
 
-async function runTypeset(mode) {
+async function runTypeset() {
   const candidateId = Number(document.getElementById("typeset-candidate")?.value);
   if (!candidateId) return toast("请先选择一个候选");
   const provider = document.getElementById("typeset-provider")?.value || state.models?.defaultProvider;
   try {
     const result = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/typeset`, {
-      method: "POST", body: JSON.stringify({ provider, candidateId, mode: mode || "local" }),
+      method: "POST", body: JSON.stringify({ provider, candidateId }),
     });
     toast("排版任务已启动");
     if (result?.id) pollJob(result.id);
   } catch (err) { toast(err.message); }
 }
 
-// Expose for event handlers
-window.renderMarkdown = renderMarkdown;
+// batch-drawer 的成稿完成跳转依赖该桥接
 window.loadSelectedDocument = loadSelectedDocument;
-window.saveDocument = saveDocument;
-window.aiDraft = aiDraft;
-window.aiTagBatch = aiTagBatch;
-window.runTypeset = runTypeset;
 
-export default loadWritingDesk;
+let bound = false;
+function bindEditor() {
+  if (bound) return;
+  bound = true;
+  document.getElementById("writing-candidate").addEventListener("change", () => loadSelectedDocument().catch((error) => toast(error.message)));
+  $$("input[name=doc-kind]").forEach((item) => item.addEventListener("change", () => loadSelectedDocument().catch((error) => toast(error.message))));
+  document.getElementById("markdown-editor").addEventListener("input", renderMarkdown);
+  document.getElementById("article-title").addEventListener("input", () => {
+    const content = document.getElementById("markdown-editor").value;
+    if (content.startsWith("# ")) {
+      const sep = content.indexOf("\n");
+      document.getElementById("markdown-editor").value = "# " + document.getElementById("article-title").value + (sep >= 0 ? content.slice(sep) : "\n\n");
+    }
+    renderMarkdown();
+  });
+  document.getElementById("save-document").addEventListener("click", () => saveDocument().catch((error) => toast(error.message)));
+  document.getElementById("ai-draft").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => aiDraft().catch((error) => toast(error.message))));
+}
+
+export default async function loadWritingDeskView() {
+  bindEditor();
+  return loadWritingDesk();
+}
+export { runTypeset };

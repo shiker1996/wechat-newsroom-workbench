@@ -22,3 +22,13 @@ export function providerOptions(selected) {
     `<option value="${escapeHtml(item.name)}" ${item.name === selected ? "selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.model)}${item.configured ? "" : "（未配置）"}</option>`
   ).join("");
 }
+
+// 包装一个异步操作，让按钮显示加载状态（原 app-core.js withLoading）
+export async function withLoading(button, label, fn) {
+  if (!button) return fn();
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = label;
+  try { return await fn(); }
+  finally { button.disabled = false; button.textContent = original; }
+}

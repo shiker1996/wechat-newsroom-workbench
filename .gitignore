@@ -35,15 +35,6 @@ Thumbs.db
 __pycache__/
 *.pyc
 
-# 前端源码分拆模块
-# 前端源码分拆模块
-public/app-core.js
-public/app-bind.js
-public/app-overview.js
-public/app-pool-editorial.js
-public/app-models-logs.js
-public/app-editor-production.js
-public/app-original.js
 
 # 外部项目 / 临时文件
 RSSHub/

@@ -81,5 +81,62 @@ test('自定义图文渲染使用独立标签体系与品牌行', () => {
   const xhs=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'xiaohongshu'});
   assert.match(xhs,/小红书 · 教程/);
   assert.match(xhs,/data-channel="xiaohongshu"/);
-  assert.match(xhs,/body\[data-channel="xiaohongshu"\] \.page\{height:500px\}/);
+  assert.match(xhs,/\.page\{width:375px;height:667px/);
+  assert.doesNotMatch(xhs,/height:500px/);
+});
+
+test('小红书渠道渲染数据卡、对比卡、步骤卡、时间卡、场景卡、亮点卡版式', () => {
+  const pages=[{kind:'content',title:'版式页一',goal:'目标',content_blocks:[
+    {type:'stats',title:'关键数字',items:[{num:'2.8万亿',label:'参数规模'},{num:'100万',label:'上下文'}]},
+    {type:'compare',title:'对比',headers:['维度','K3','GPT-5.6'],rows:[['上下文','100万','40万'],['协议','MIT','闭源']]},
+    {type:'steps',title:'上手',items:[{title:'安装',content:'复制命令'},{title:'运行',content:'执行脚本'}]},
+  ]},{kind:'content',title:'版式页二',goal:'目标',content_blocks:[
+    {type:'timeline',title:'进展',items:[{time:'7月16日',title:'发布',content:'K3 发布'},{time:'7月27日',title:'开源',content:'预计开源'}]},
+    {type:'scenes',title:'场景',items:[{title:'写作',content:'长文润色'},{title:'编程',content:'代码补全'}]},
+    {type:'highlight',title:'核心亮点',content:'开源协议宽松，可商用'},
+  ]}];
+  const html=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'xiaohongshu'});
+  assert.match(html,/<div class="stat"><b>2\.8万亿<\/b><span data-text-role="auxiliary">参数规模<\/span><\/div>/);
+  assert.match(html,/<th data-text-role="auxiliary">K3<\/th>/);
+  assert.match(html,/<td>MIT<\/td>/);
+  assert.match(html,/<div class="step"><b>1<\/b>/);
+  assert.match(html,/class="tl-time" data-text-role="auxiliary">7月16日/);
+  assert.match(html,/<div class="scene"><h3>写作<\/h3>/);
+  assert.match(html,/highlight-block/);
+  assert.match(html,/开源协议宽松，可商用/);
+});
+
+test('新版式块缺少 items 时退化为列表或文本块', () => {
+  const pages=[{kind:'content',title:'兜底页',goal:'目标',content_blocks:[
+    {type:'timeline',title:'关键节点',content:'7月16日：发布\n7月27日：开源',items:[],headers:[],rows:[]},
+    {type:'stats',title:'数字',content:'无结构化数据',items:[],headers:[],rows:[]},
+  ]}];
+  const html=renderStoryboardHtml({topic:'主题',pages,contentType:'event',sourceLabel:'事件专题',channelMode:'xiaohongshu'});
+  assert.doesNotMatch(html,/timeline-block/);
+  assert.doesNotMatch(html,/stats-block/);
+  assert.match(html,/<li>7月16日：发布<\/li>/);
+  assert.match(html,/无结构化数据/);
+});
+
+test('list 块支持 items 字符串数组兜底', () => {
+  const pages=[{kind:'content',title:'列表页',goal:'目标',content_blocks:[
+    {type:'list',title:'各方立场',content:'',items:['甲方：指控','乙方：否认'],headers:[],rows:[]},
+  ]}];
+  const html=renderStoryboardHtml({topic:'主题',pages,contentType:'event',sourceLabel:'事件专题',channelMode:'xiaohongshu'});
+  assert.match(html,/<li>甲方：指控<\/li>/);
+  assert.match(html,/<li>乙方：否认<\/li>/);
+});
+
+test('工具与事件图文在小红书渠道下使用小红书品牌行', () => {
+  const pages=[{kind:'cover',title:'封面',goal:'目标'},{kind:'ending',title:'结尾',goal:'收尾'}];
+  const toolWechat=renderStoryboardHtml({topic:'主题',repository:'acme/tool',pages,contentType:'repository',channelMode:'wechat'});
+  assert.match(toolWechat,/OPEN SOURCE \/ acme\/tool/);
+  const toolXhs=renderStoryboardHtml({topic:'主题',repository:'acme/tool',pages,contentType:'repository',channelMode:'xiaohongshu'});
+  assert.match(toolXhs,/小红书 · acme\/tool/);
+  assert.match(toolXhs,/data-channel="xiaohongshu"/);
+  const eventWechat=renderStoryboardHtml({topic:'主题',pages,contentType:'event',sourceLabel:'事件专题',channelMode:'wechat'});
+  assert.match(eventWechat,/EVENT DESK \/ 事件专题/);
+  const eventXhs=renderStoryboardHtml({topic:'主题',pages,contentType:'event',sourceLabel:'事件专题',channelMode:'xiaohongshu'});
+  assert.match(eventXhs,/小红书 · 事件专题/);
+  assert.match(eventXhs,/data-channel="xiaohongshu"/);
 });

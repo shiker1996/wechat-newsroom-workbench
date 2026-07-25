@@ -1,17 +1,20 @@
-﻿{
-    "name":  "wechat-newsroom-workbench",
-    "version":  "0.1.0",
-    "private":  true,
-    "type":  "module",
-    "description":  "本地优先的公众号热点、成稿与排版工作台",
-    "scripts":  {
-                    "start":  "node --disable-warning=ExperimentalWarning server.mjs",
-                    "dev":  "node --disable-warning=ExperimentalWarning --watch server.mjs",
-                    "test":  "node --disable-warning=ExperimentalWarning --test",
-                    "build":  "node scripts/build.mjs",
-                    "build:watch":  "node --watch scripts/build.mjs"
-                },
-    "engines":  {
-                    "node":  "\u003e=24"
-                }
+{
+    "name": "wechat-newsroom-workbench",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "本地优先的公众号热点、成稿与排版工作台",
+    "scripts": {
+        "start": "node --disable-warning=ExperimentalWarning server.mjs",
+        "dev": "node --disable-warning=ExperimentalWarning --watch --watch-path=server.mjs --watch-path=lib server.mjs",
+        "test": "node --disable-warning=ExperimentalWarning --test test/**/*.test.mjs",
+        "build": "node scripts/build.mjs",
+        "build:watch": "node --watch scripts/build.mjs"
+    },
+    "engines": {
+        "node": ">=24"
+    },
+    "dependencies": {
+        "markdown-it": "^14.1.0"
+    }
 }

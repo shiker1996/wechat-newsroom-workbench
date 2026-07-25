@@ -14,6 +14,28 @@ test('热点全景按事件覆盖聚合且报道数守恒', () => {
   const atlas=buildHotspotAtlas({clusters,totalArticles:3,taggedCount:3});
   assert.equal(atlas.eventCount,2); assert.equal(atlas.sourceCount,2); assert.equal(atlas.multiSourceCount,1);
   assert.deepEqual(atlas.scopes,{国内:1,全球性:0,国外:1}); assert.equal(atlas.events[0].event_id,'E0001');
-  assert.equal(atlas.events[0].risk_level,'中'); assert.equal(atlas.keywords.some((item)=>item.name==='AI'),false);
+  assert.equal(atlas.events[0].risk_level,'中'); assert.equal('keywords' in atlas,false);
   assert.equal(atlas.gate.valid,true); assert.equal(atlas.gate.reportSum,3);
+});
+
+test('事件关系图连接事件与维度节点，孤立主体不建维度节点', () => {
+  const parts = (who, actionType, extra = {}) => ({ who, what:`${actionType}某事`, actionType, labels:{ who }, ...extra });
+  const clusters=[1,2,3,4].map((n)=>({
+    event_id:`E000${n}`,representative_title:`事件${n}`,market_scope:'国内',china_relevance_score:8,china_relevance_reason:'相关',
+    topic_category:'🤖 AI/技术动态',keywords:[],source_count:1,report_count:1,cluster_confidence:'low',latest_time:'2026-07-19T10:00:00Z',
+    articles:[{category_id:`G${n}`,source:'rsshub',title:`报道${n}`,risk_level:'低',hotspot_id:n}],
+    tags:{ eventParts: n<=2 ? parts('openai', n===1?'发布':'争议回应') : parts(`solo${n}`, '发布') },
+  }));
+  const atlas=buildHotspotAtlas({clusters,totalArticles:4,taggedCount:4});
+  const { nodes, edges } = atlas.graph;
+  assert.equal(nodes.filter((node)=>node.type==='event').length, 4);
+  const whoNodes = nodes.filter((node)=>node.type==='who');
+  assert.equal(whoNodes.length, 1);
+  assert.equal(whoNodes[0].id, 'who:openai');
+  assert.ok(whoNodes[0].score > 0);
+  assert.equal(edges.filter((edge)=>edge.to==='who:openai').length, 2);
+  for (const edge of edges) {
+    assert.ok(nodes.some((node)=>node.id===edge.from), `边起点缺失 ${edge.from}`);
+    assert.ok(nodes.some((node)=>node.id===edge.to), `边终点缺失 ${edge.to}`);
+  }
 });

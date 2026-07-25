@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { discoverGitHubRepositories } from './github-discovery.mjs';
 
 function decodeXml(value = '') {
   return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -45,9 +46,12 @@ export function parseFeed(xml, route) {
     title: field(block, ['title']) ?? '无标题',
     url: field(block, ['link']) ?? block.match(/<link[^>]+href=["']([^"']+)/i)?.[1] ?? null,
     publishedAt: normalizeDate(field(block, ['pubDate', 'published', 'updated'])),
-    route,
+    summary:field(block,['description','summary','content'])||'',githubRepositories:[...new Set([...block.matchAll(/https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/gi)].map((match)=>match[0].replace(/[),.;]+$/,'')))],route, rank:index+1,
   }));
 }
+
+export function githubTrendingPeriod(route){return String(route).match(/^\/github\/trending\/(daily|weekly|monthly)\//i)?.[1]?.toLowerCase()||null;}
+export function normalizeGitHubTrendingItem(item,route){const period=githubTrendingPeriod(route);if(!period)return item;let url;try{url=new URL(item.url);}catch{return item;}if(url.hostname.toLowerCase()!=='github.com')return item;const parts=url.pathname.split('/').filter(Boolean).slice(0,2);if(parts.length<2)return item;const repository=`${parts[0]}/${parts[1].replace(/\.git$/i,'')}`;const labels={daily:'Daily',weekly:'Weekly',monthly:'Monthly'};return {...item,id:`github:${repository.toLowerCase()}`,title:repository,url:`https://github.com/${repository}`,sourceGroup:'github',sourceType:'trending',sourceKey:'github:trending',sourceName:`GitHub Trending · ${labels[period]}`,repository,period,periods:[period],rank:item.rank||null};}
 
 async function probe(url, timeoutMs = 5000) {
   try {
@@ -83,7 +87,7 @@ async function assertPublicFeedUrl(value) {
   return url;
 }
 
-export async function fetchDirectFeed(value, timeoutMs = 30000) {
+export async function fetchDirectFeed(value, timeoutMs = 60000) {
   let url = await assertPublicFeedUrl(value);
   for (let redirect = 0; redirect <= 4; redirect += 1) {
     const response = await fetch(url, {
@@ -155,7 +159,9 @@ function runPowerShell(scriptPath, args = [], timeoutMs = 190000) {
 export async function ensureStarted(config, onProgress) {
   if (await probe(config.baseUrl)) return false;
   onProgress('RSSHub 未运行，正在启动本地服务');
-  await runPowerShell(config.startScript, ['-MaxRetries', '1'], config.startupTimeoutMs + 10000);
+  const port=String(new URL(config.baseUrl).port||1200);
+  await runPowerShell(config.startScript, ['-RsshubDir',config.rootDir,'-PidFile',config.pidFile,'-Port',port,'-StartupTimeoutSeconds',String(Math.ceil(config.startupTimeoutMs/1000))], config.startupTimeoutMs + 10000);
+  onProgress('RSSHub 进程已拉起，正在等待健康检查');
   const deadline = Date.now() + config.startupTimeoutMs;
   while (Date.now() < deadline) {
     if (await probe(config.baseUrl)) return true;
@@ -170,6 +176,11 @@ function titleOfFeed(xml, fallback) {
 
 function withoutLimit(value) {
   return String(value).replace(/([?&])limit=\d+(?:&|$)/i, '$1').replace(/[?&]$/, '');
+}
+
+export function collectionScopeAllows(scope, target) {
+  const group=target?.kind==='route'&&githubTrendingPeriod(String(target.value))?'github':'rsshub';
+  return !scope||scope==='all'||scope===group;
 }
 
 async function mapConcurrent(items, limit, worker) {
@@ -187,11 +198,11 @@ export async function collectRssHub(config, onProgress = () => {}, onSourceResul
     const disabled = new Set(config.disabledRoutes ?? []);
     const activeRoutes = (config.routes ?? []).filter((route) => !disabled.has(route));
     const activeFeeds = (config.directFeeds ?? []).filter((feed) => feed && feed.enabled !== false && feed.url);
-    if (activeRoutes.length) startedHere = await ensureStarted(config, onProgress);
     const targets=[
       ...activeRoutes.map((value)=>({kind:'route',value})),
       ...activeFeeds.map((value)=>({kind:'direct',value})),
-    ];
+    ].filter((target)=>collectionScopeAllows(config.collectionScope,target));
+    if (targets.some((target)=>target.kind==='route')) startedHere = await ensureStarted(config, onProgress);
     const results=await mapConcurrent(targets,Number(config.concurrency||5),async(target)=>{
       const startedAt=new Date().toISOString(); const started=Date.now();
       let sourceType='rsshub',sourceKey='',sourceName='',items=[];
@@ -202,13 +213,24 @@ export async function collectRssHub(config, onProgress = () => {}, onSourceResul
           const identity=withoutLimit(configuredRoute); sourceType=/^\/twitter\/user\//i.test(identity)?'twitter':'rsshub';
           sourceKey=`${sourceType}:${identity}`; sourceName=identity;
           onProgress(`正在读取 RSSHub ${route}`);
-          const response=await fetch(new URL(route,config.baseUrl),{signal:AbortSignal.timeout(30000)});
+          // 抓取型路由（anthropic、readhub、latepost 等）需要 RSSHub 回源抓上游页面，
+          // 冷缓存时经常超过 30s：超时放宽到 90s，超时后自动重试一次（此时 RSSHub 缓存通常已预热）。
+          const routeTimeoutMs = Number(config.routeTimeoutMs) || 90000;
+          let response;
+          try {
+            response = await fetch(new URL(route, config.baseUrl), { signal: AbortSignal.timeout(routeTimeoutMs) });
+          } catch (error) {
+            if (!/aborted|timeout/i.test(String(error?.message || error))) throw error;
+            onProgress(`${identity} 首次读取超时，重试一次`);
+            response = await fetch(new URL(route, config.baseUrl), { signal: AbortSignal.timeout(routeTimeoutMs) });
+          }
           if(!response.ok)throw new Error(`${route} 返回 HTTP ${response.status}`);
           const xml=await response.text(); sourceName=titleOfFeed(xml,identity);
-          const filtered=filterRecentItems(parseFeed(xml,route).slice(0,30),config); items=filtered.kept;
+          const filtered=filterRecentItems(parseFeed(xml,route).slice(0,30),config); items=filtered.kept.map((item)=>normalizeGitHubTrendingItem(item,identity));
           if(filtered.stale.length)onProgress(`${sourceName} 已忽略 ${filtered.stale.length} 条过期或未来时间异常内容`);
           if(filtered.undated.length)onProgress(`${sourceName} 有 ${filtered.undated.length} 条缺少有效发布时间`);
-          items=items.map((item)=>({...item,sourceKey,sourceType,sourceName}));
+          const trendingPeriod=githubTrendingPeriod(identity);if(trendingPeriod){sourceType='trending';sourceKey=`github:trending:${trendingPeriod}`;sourceName=`GitHub Trending · ${trendingPeriod[0].toUpperCase()+trendingPeriod.slice(1)}`;}
+          items=items.map((item)=>trendingPeriod?item:({...item,sourceKey,sourceType,sourceName}));
         } else {
           const feedConfig=target.value; sourceType='direct';sourceKey=`direct:${feedConfig.url}`;sourceName=feedConfig.label||feedConfig.url;
           onProgress(`正在读取直连 RSS ${sourceName}`);
@@ -218,22 +240,24 @@ export async function collectRssHub(config, onProgress = () => {}, onSourceResul
           if(filtered.undated.length)onProgress(`${sourceName} 有 ${filtered.undated.length} 条缺少有效发布时间`);
           items=items.map((item)=>({...item,route:feedConfig.url,feedLabel:sourceName,sourceKey,sourceType,sourceName}));
         }
-        onSourceResult({sourceGroup:'rsshub',sourceType,sourceKey,sourceName,status:'success',itemCount:items.length,durationMs:Date.now()-started,startedAt,endedAt:new Date().toISOString()});
+        onSourceResult({sourceGroup:githubTrendingPeriod(String(target.value))?'github':'rsshub',sourceType,sourceKey,sourceName,status:'success',itemCount:items.length,durationMs:Date.now()-started,startedAt,endedAt:new Date().toISOString()});
         return {ok:true,items};
       } catch(error) {
         onProgress(`${sourceName||sourceKey||'RSS 来源'} 读取失败，已跳过：${error.message}`);
-        onSourceResult({sourceGroup:'rsshub',sourceType,sourceKey:sourceKey||`${sourceType}:${String(target.value?.url||target.value)}`,sourceName:sourceName||String(target.value?.label||target.value?.url||target.value),status:'failed',itemCount:0,durationMs:Date.now()-started,error:error.message,startedAt,endedAt:new Date().toISOString()});
+        onSourceResult({sourceGroup:githubTrendingPeriod(String(target.value))?'github':'rsshub',sourceType,sourceKey:sourceKey||`${sourceType}:${String(target.value?.url||target.value)}`,sourceName:sourceName||String(target.value?.label||target.value?.url||target.value),status:'failed',itemCount:0,durationMs:Date.now()-started,error:error.message,startedAt,endedAt:new Date().toISOString()});
         return {ok:false,items:[]};
       }
     });
     const successfulSources=results.filter((result)=>result.ok).length;
-    const allItems=results.flatMap((result)=>result.items);
-    if ((activeRoutes.length || activeFeeds.length) && successfulSources === 0) throw new Error('所有 RSS 来源均未返回有效条目');
-    return allItems;
+    const rawItems=results.flatMap((result)=>result.items);const github=new Map();const allItems=[];for(const item of rawItems){if(item.sourceGroup!=='github'){allItems.push(item);continue;}const key=item.repository.toLowerCase();const existing=github.get(key);if(!existing){github.set(key,item);continue;}existing.periods=[...new Set([...(existing.periods||[]),...(item.periods||[])])];existing.periodRanks={...(existing.periodRanks||{[existing.period]:existing.rank}),[item.period]:item.rank};existing.sourceName=`GitHub Trending · ${existing.periods.map((period)=>period[0].toUpperCase()+period.slice(1)).join(' / ')}`;}allItems.push(...github.values().map((item)=>({...item,periodRanks:item.periodRanks||{[item.period]:item.rank}})));
+    if (targets.length && successfulSources === 0) throw new Error('所有 RSS 来源均未返回有效条目');
+    const discovery=config.collectionScope==='rsshub'?{...(config.githubDiscovery||{}),enabled:false}:config.githubDiscovery||{};
+    return await discoverGitHubRepositories(allItems,discovery,onProgress,onSourceResult);
   } finally {
     if (startedHere && !config.keepAlive) {
       onProgress('采集完成，正在停止本次启动的 RSSHub');
-      try { await runPowerShell(config.stopScript, [], 30000); } catch (error) {
+      const port=String(new URL(config.baseUrl).port||1200);
+      try { await runPowerShell(config.stopScript, ['-PidFile',config.pidFile,'-Port',port], 30000); } catch (error) {
         onProgress(`RSSHub 停止失败，需要人工检查：${error.message}`);
       }
     }

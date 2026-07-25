@@ -1,10 +1,10 @@
-﻿import { $, $$ } from "../core/dom.js";
+import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 function subscriptionTypeLabel(kind) {
-  return { direct: "DIRECT", twitter: "X / TWITTER", rsshub: "RSSHUB" }[kind] || kind;
+  return { direct: "DIRECT", twitter: "X / TWITTER", rsshub: "RSSHUB", github:"GITHUB" }[kind] || kind;
 }
 function updateSubscriptionComposer() {
   const kind = document.getElementById("subscription-kind").value;
@@ -41,8 +41,9 @@ function renderSubscriptions() {
   const s = document.getElementById("subscription-summary");
   s.innerHTML = [
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
-    ["DIRECT", summary.direct, "直连 Feed"], ["X SIGNAL", summary.twitter, "官方与博主"],
+    ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github||0, "Trending / Search"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
+  renderHealthTimeline(state.subscriptions.history || []);
           // 健康状态点阵（固定50个竖椭圆，按比例采样）
   var allItems = state.subscriptions.items;
   var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
@@ -81,14 +82,42 @@ function renderSubscriptions() {
         return `<article class="subscription-row health-${hc} ${item.enabled ? "" : "disabled"}" style="--row:${index}">
           <span class="subscription-kind ${escapeHtml(item.kind)}">${subscriptionTypeLabel(item.kind)}</span>
           <div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
-          <label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>
-          <div class="subscription-actions"><button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">×</button></div>
+          ${item.managed?'<span class="story-meta">系统采集入口</span>':`<label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>`}
+          <div class="subscription-actions">${item.managed?'<span class="story-meta">随 GitHub 采集执行</span>':`<button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">×</button>`}</div>
         </article>`;
       }).join("")
     : '<div class="empty-state">这个分类下还没有订阅源。</div>';
 }
+function renderHealthTimeline(rows) {
+  const node = document.getElementById("subscription-health");
+  if (!node) return;
+  const days = [...new Set(rows.map((r) => String(r.ended_at || r.started_at || "").slice(0, 10)).filter(Boolean))].sort().slice(-14);
+  if (!days.length) { node.innerHTML = '<div class="empty-state">尚无来源历史记录。</div>'; return; }
+  const groups = new Map();
+  for (const row of rows) {
+    const key = row.source_name || row.source_key;
+    if (!groups.has(key)) groups.set(key, new Map());
+    const day = String(row.ended_at || row.started_at || "").slice(0, 10);
+    if (!groups.get(key).has(day)) groups.get(key).set(day, row);
+  }
+  const dayHead = days.map((d) => `<span title="${d}">${escapeHtml(d.slice(5))}</span>`).join("");
+  const body = [...groups.entries()].map(([name, byDay]) => {
+    const cells = days.map((day) => {
+      const item = byDay.get(day);
+      const cls = !item ? "idle" : item.status === "success" ? "ok" : "bad";
+      const title = item ? `${item.status} · ${item.item_count || 0} 条${item.error ? ` · ${item.error}` : ""}` : "未采集";
+      return `<i class="health-history-cell ${cls}" title="${escapeHtml(`${day} · ${title}`)}"></i>`;
+    }).join("");
+    return `<div class="health-history-row"><b title="${escapeHtml(name)}">${escapeHtml(name)}</b><span>${cells}</span></div>`;
+  }).join("");
+  node.innerHTML = `<div class="health-history"><div class="health-history-head"><b>来源健康 · 最近 ${days.length} 天</b><span>${dayHead}</span></div>${body}</div>`;
+}
 async function loadSubscriptions() {
-  state.subscriptions = await request("/api/subscriptions");
+  const [subscriptions, history] = await Promise.all([
+    request("/api/subscriptions"),
+    request("/api/subscriptions/health-history?days=14").catch(() => []),
+  ]);
+  state.subscriptions = { ...subscriptions, history };
   renderSubscriptions();
 }
 async function testSubscription(payload, button) {
@@ -132,14 +161,34 @@ async function removeSubscription(button) {
   toast("订阅已删除");
 }
 
-// Expose for event handlers (called from app-bind.js)
-window.subscriptionTypeLabel = subscriptionTypeLabel;
-window.updateSubscriptionComposer = updateSubscriptionComposer;
-window.renderSubscriptions = renderSubscriptions;
-window.subscriptionFormPayload = subscriptionFormPayload;
-window.testSubscription = testSubscription;
-window.addSubscriptionFromForm = addSubscriptionFromForm;
-window.toggleSubscription = toggleSubscription;
-window.removeSubscription = removeSubscription;
 
-export default loadSubscriptions;
+let bound = false;
+function bindSubscriptions() {
+  if (bound) return;
+  bound = true;
+  document.getElementById("subscription-kind").addEventListener("change", updateSubscriptionComposer);
+  document.getElementById("subscription-form").addEventListener("submit", (event) => addSubscriptionFromForm(event).catch((error) => toast(error.message)));
+  document.getElementById("test-subscription").addEventListener("click", (event) => testSubscription(subscriptionFormPayload(), event.currentTarget).catch((error) => toast(error.message)));
+  document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-source-toggle]")) {
+      toggleSubscription(event.target).catch((error) => { event.target.checked = !event.target.checked; toast(error.message); });
+    }
+  });
+  document.addEventListener("click", (event) => {
+    const sourceTest = event.target.closest("[data-source-test]");
+    if (sourceTest) testSubscription({ kind: sourceTest.dataset.kind, value: sourceTest.dataset.value }, sourceTest).catch((error) => toast(error.message));
+    const sourceRemove = event.target.closest("[data-source-remove]");
+    if (sourceRemove) removeSubscription(sourceRemove).catch((error) => toast(error.message));
+    const sourceFilter = event.target.closest("[data-source-filter]");
+    if (sourceFilter) {
+      state.subscriptionFilter = sourceFilter.dataset.sourceFilter;
+      $$("[data-source-filter]").forEach((item) => item.classList.toggle("active", item === sourceFilter));
+      renderSubscriptions();
+    }
+  });
+}
+
+export default async function loadSubscriptionsView() {
+  bindSubscriptions();
+  return loadSubscriptions();
+}

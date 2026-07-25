@@ -1,6 +1,16 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, formatDate } from "../core/ui.js";
+import { escapeHtml, formatDate, toast } from "../core/ui.js";
+
+let bound = false;
+function bindHotspots() {
+  if (bound) return;
+  bound = true;
+  document.getElementById("hotspot-filter").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadHotspots(new URLSearchParams(new FormData(event.currentTarget))).catch((error) => toast(error.message));
+  });
+}
 
 async function loadHotspots(params) {
   if (!params) params = new URLSearchParams();
@@ -21,4 +31,7 @@ async function loadHotspots(params) {
       }).join("")
     : '<div class="empty-state">没有匹配热点</div>';
 }
-export default loadHotspots;
+export default async function loadHotspotsView(params) {
+  bindHotspots();
+  return loadHotspots(params);
+}

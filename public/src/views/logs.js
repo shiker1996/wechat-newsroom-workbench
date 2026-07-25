@@ -1,6 +1,18 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml } from "../core/ui.js";
+import { escapeHtml, toast } from "../core/ui.js";
+
+let bound = false;
+function bindLogs() {
+  if (bound) return;
+  bound = true;
+  document.getElementById("log-type-filter").addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-log-type]");
+    if (!btn) return;
+    $$("[data-log-type]", document.getElementById("log-type-filter")).forEach((b) => b.classList.toggle("active", b === btn));
+    loadLogs(btn.dataset.logType || undefined).catch((error) => toast(error.message));
+  });
+}
 
 async function loadLogs(logType) {
   const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=150` : "?limit=150";
@@ -19,4 +31,7 @@ async function loadLogs(logType) {
       }).join("")
     : '<div class="empty-state">暂无日志记录。</div>';
 }
-export default loadLogs;
+export default async function loadLogsView() {
+  bindLogs();
+  return loadLogs();
+}

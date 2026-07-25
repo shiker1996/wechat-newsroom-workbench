@@ -94,7 +94,13 @@
 
 ### POST /api/batches/:id/candidates/composite
 创建综合选题 { hotspotIds, title, poolRole }
+tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-cards（工具图文）；纯新闻事件 → wechat-event-cards（事件图文，事实基座由事件卡+来源快照合成，见 lib/event-fact-base.mjs）
 → 热点全景（事件卡片 → 创建综合选题）
+
+### POST /api/batches/:id/custom-social-chat/stream
+自定义图文对话式策划（NDJSON 流）{ provider, answer, draft, history }
+无状态：创建前没有候选记录，草稿与对话历史由前端每轮全量传入；AI 返回 { assistantReply, formUpdates, ready }，前端据此回填创建表单
+→ 图文编辑室（创建自定义图文面板 · AI 策划助手）
 
 ### POST /api/batches/:id/custom-social-candidates
 创建自定义图文候选 { content_type: tutorial|list|opinion, channel: wechat|xiaohongshu, topic, audience, scenario, thesis, points, steps, items, materialUrls, limitations, expected_pages }

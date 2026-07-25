@@ -1,7 +1,42 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { reindex } from "./artifacts.js";
+import { pollJob } from "./batch-drawer.js";
+import { runTypeset } from "./editor.js";
+
+let bound = false;
+function bindPreview() {
+  if (bound) return;
+  bound = true;
+  document.getElementById("typeset-candidate").addEventListener("change", (event) => {
+    const id = Number(event.target.value);
+    renderProductionCandidate(id);
+    loadImageWorkspace(id).catch((error) => toast(error.message));
+  });
+  document.getElementById("refresh-preview").addEventListener("click", () => loadProductionPreview().catch((error) => toast(error.message)));
+  document.getElementById("preview-reindex").addEventListener("click", async (event) => {
+    await withLoading(event.currentTarget, "正在扫描…", () => reindex().catch((error) => toast(error.message)));
+    await loadProductionPreview().catch((error) => toast(error.message));
+  });
+  document.getElementById("plan-article-images").addEventListener("click", (event) => withLoading(event.currentTarget, "正在分析…", () => planArticleImages().catch((error) => toast(error.message))));
+  document.getElementById("run-local-typeset").addEventListener("click", (event) => withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message))));
+  document.getElementById("copy-typeset-html").addEventListener("click", (event) => withLoading(event.currentTarget, "正在复制…", () => copyTypesetHtml().catch((error) => toast(error.message))));
+  document.addEventListener("click", (event) => {
+    const uploadImageButton = event.target.closest("[data-upload-image]");
+    if (uploadImageButton && !event.target.matches("[data-image-file]")) {
+      uploadImageAsset(uploadImageButton.dataset.uploadImage).catch((error) => toast(error.message));
+    }
+  });
+  // 图片文件选择后自动上传
+  document.addEventListener("change", (event) => {
+    if (!event.target.matches("[data-image-file]")) return;
+    const card = event.target.closest("[data-image-id]");
+    if (!card) return;
+    uploadImageAsset(card.dataset.imageId).catch((error) => toast(error.message));
+  });
+}
 
 function imageSlot(id) { return document.querySelector(`[data-image-id="${CSS.escape(id)}"]`); }
 
@@ -74,7 +109,7 @@ function renderProductionCandidate(candidateId) {
   const proofFrame = document.getElementById('proof-frame');
   if (proofEmpty) proofEmpty.hidden = Boolean(htmlArtifact);
   if (proofFrame) proofFrame.hidden = !htmlArtifact;
-  if (proofFrame) proofFrame.src = htmlArtifact ? '/api/artifacts/' + htmlArtifact.id + '/content?v=' + encodeURIComponent(htmlArtifact.modified_at) : 'about:blank';
+  if (proofFrame) proofFrame.src = htmlArtifact ? '/api/artifacts/' + htmlArtifact.id + '/content?preview=phone&v=' + encodeURIComponent(htmlArtifact.modified_at) : 'about:blank';
   const copyBtn = document.getElementById('copy-typeset-html');
   if (copyBtn) copyBtn.disabled = !htmlArtifact;
   const status = document.getElementById('typeset-status');
@@ -158,15 +193,17 @@ async function uploadImageAsset(id) {
   const fileInput = card.querySelector("[data-image-file]");
   const file = fileInput?.files?.[0];
   if (!file) { fileInput?.click(); return; }
-  const btn = card.querySelector("[data-upload-image]");
-  if (btn) { btn.disabled = true; btn.textContent = "正在上传…"; }
+  const status = card.querySelector(".image-slot-status");
+  if (status) status.textContent = "正在上传…";
   try {
     const payload = { fileName: file.name, mimeType: file.type, base64: await fileAsDataUrl(file) };
     await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify(payload) });
     await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}/cdn`, { method: "POST", body: "{}" });
     await loadImageWorkspace(state.imageWorkspace.candidateId);
     toast(`${id} 已上传 CDN`);
-  } finally { if (btn) btn.disabled = false; }
+  } finally {
+    if (status?.isConnected) status.textContent = "上传结束";
+  }
 }
 
 function fileAsDataUrl(file) {
@@ -179,12 +216,31 @@ function fileAsDataUrl(file) {
 }
 
 async function copyTypesetHtml() {
-  const html = document.getElementById("typeset-html")?.textContent;
-  if (!html) return toast("没有可复制的排版 HTML");
+  const frame = document.getElementById("proof-frame");
+  if (!frame || frame.hidden || !frame.src || frame.src === "about:blank") return toast("没有可复制的排版 HTML");
   try {
-    await navigator.clipboard.writeText(html);
+    const response = await fetch(frame.src, { credentials:"same-origin", cache:"no-store" });
+    if (!response.ok) throw new Error(`读取排版 HTML 失败：HTTP ${response.status}`);
+    const html = await response.text();
+    if (!html.trim()) throw new Error("排版 HTML 为空");
+    const plain = new DOMParser().parseFromString(html, "text/html").body?.innerText || "";
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type:"text/html" }),
+        "text/plain": new Blob([plain], { type:"text/plain" }),
+      })]);
+    } else {
+      const body = frame.contentDocument?.body;
+      if (!body) throw new Error("浏览器不支持富文本剪贴板");
+      const range = document.createRange();
+      range.selectNodeContents(body);
+      const selection = window.getSelection();
+      selection.removeAllRanges(); selection.addRange(range);
+      if (!document.execCommand("copy")) throw new Error("浏览器拒绝复制");
+      selection.removeAllRanges();
+    }
     toast("公众号富文本已复制，直接粘贴到公众号编辑器即可");
-  } catch { toast("复制失败，请手动选中内容后复制"); }
+  } catch (error) { toast(`复制失败：${error.message}`); }
 }
 
 async function openProductionJob(id) {
@@ -194,11 +250,11 @@ async function openProductionJob(id) {
   pollJob(id);
 }
 
-window.loadProductionPreview = loadProductionPreview;
+// batch-drawer 的排版完成跳转依赖这两个桥接
 window.renderProductionCandidate = renderProductionCandidate;
 window.loadImageWorkspace = loadImageWorkspace;
-window.planArticleImages = planArticleImages;
-window.copyTypesetHtml = copyTypesetHtml;
-window.openProductionJob = openProductionJob;
 
-export default loadProductionPreview;
+export default async function loadProductionPreviewView() {
+  bindPreview();
+  return loadProductionPreview();
+}

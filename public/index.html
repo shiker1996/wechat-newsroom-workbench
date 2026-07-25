@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260723-social-history-coverage-1">
+  <link rel="stylesheet" href="/styles.css?v=20260725-channel-select-1">
 </head>
 <body>
   <div class="paper-noise"></div>
@@ -27,14 +27,16 @@
       <button class="nav-item" data-view="preview"><span>08</span>公众号排版</button>
       <span class="nav-group-label">图文生产</span>
       <button class="nav-item" data-view="social-topics"><span>09</span>图文选题池</button>
-      <button class="nav-item" data-view="social-editor"><span>10</span>图文编辑室</button>
+      <button class="nav-item" data-view="social-editor"><span>10</span>工具图文</button>
+      <button class="nav-item" data-view="social-custom"><span>11</span>自定义图文</button>
+      <button class="nav-item" data-view="social-event"><span>12</span>事件图文</button>
       <span class="nav-group-label">系统</span>
-      <button class="nav-item" data-view="artifacts"><span>11</span>产物中心</button>
-      <button class="nav-item" data-view="models"><span>12</span>模型中心</button>
-      <button class="nav-item" data-view="logs"><span>13</span>任务日志</button>
-      <button class="nav-item" data-view="system"><span>14</span>采集控制</button>
-      <button class="nav-item" data-view="hotspots"><span>15</span>热点档案</button>
-      <button class="nav-item" data-view="calendar"><span>16</span>内容日历</button>
+      <button class="nav-item" data-view="artifacts"><span>13</span>产物中心</button>
+      <button class="nav-item" data-view="models"><span>14</span>模型中心</button>
+      <button class="nav-item" data-view="logs"><span>15</span>任务日志</button>
+      <button class="nav-item" data-view="system"><span>16</span>采集控制</button>
+      <button class="nav-item" data-view="hotspots"><span>17</span>热点档案</button>
+      <button class="nav-item" data-view="calendar"><span>18</span>内容日历</button>
     </nav>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
@@ -127,9 +129,18 @@
     </section>
 
     <section class="view" id="view-social-editor">
-      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2>图文编辑室</h2></div><p>AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><button type="button" class="outline-button" id="create-custom-social">创建自定义图文</button></div>
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2 id="social-editor-heading">工具图文</h2></div><p id="social-editor-intro">AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><button type="button" class="outline-button" id="create-custom-social" hidden>创建自定义图文</button></div>
       <div id="custom-social-panel" class="repository-facts-panel custom-social-panel" hidden>
         <div class="workspace-head"><div><span class="kicker">CUSTOM CONTENT</span><h3>创建自定义图文（教程 / 清单 / 观点）</h3></div></div>
+        <section class="editorial-chat custom-social-chat">
+          <div class="editorial-chat-head"><div><span class="kicker">AI PLANNER</span><h4>对话策划：AI 帮你把想法填成完整方案</h4></div><div class="editorial-chat-tools"><select id="custom-chat-provider" aria-label="策划助手模型"></select></div></div>
+          <div id="custom-chat-messages" class="editorial-messages"><div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div></div>
+          <div class="editorial-reply"><textarea id="custom-chat-input" rows="2" placeholder="回答 AI 的问题；也可以直接描述想做的主题、类型和渠道"></textarea><button type="button" class="ink-button" id="custom-chat-send">发送</button></div>
+          <small>AI 填写的只是草稿，创建前可在下方表单随时修改；【建议】级内容成稿时只能写成建议口吻。</small>
+        </section>
+        <details class="editorial-decision-details custom-social-form-details" id="custom-social-form-details">
+          <summary><span><b>方案表单</b><small>AI 策划会自动填充 · 复核或手改时展开</small></span><span class="decision-detail-state">收起 / 展开</span></summary>
+          <div class="editorial-decision-body">
         <div class="custom-social-grid">
           <label>内容类型<select id="custom-content-type"><option value="tutorial">教程</option><option value="list">清单</option><option value="opinion">观点</option></select></label>
           <label>发布渠道<select id="custom-channel"><option value="wechat">微信公众号</option><option value="xiaohongshu">小红书</option></select></label>
@@ -144,6 +155,8 @@
         <label class="custom-social-block" data-custom-only="list">清单条目（每行一条，至少 3 条）<textarea id="custom-items" rows="3"></textarea></label>
         <label class="custom-social-block">素材链接（每行一个 URL，创建时抓取，全部成功才能通过门禁）<textarea id="custom-materials" rows="2" placeholder="https://…"></textarea></label>
         <label class="custom-social-block">限制说明<textarea id="custom-limitations" rows="2" placeholder="可选：适用范围、未验证内容等"></textarea></label>
+          </div>
+        </details>
         <div class="editorial-actions"><button type="button" class="primary-button" id="custom-social-submit">创建并进入图文编辑室</button><button type="button" class="text-button" id="custom-social-cancel">取消</button></div>
       </div>
       <div class="social-editor-layout">
@@ -158,7 +171,7 @@
             <div class="similar-hint" id="similar-social-cards" hidden></div><header class="social-editor-title"><span id="social-editor-code" class="kicker"></span><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></header>
             <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3></div><div><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
             <section class="social-score-panel"><div><span class="kicker">SOCIAL FIT SCORE</span><strong id="social-fit-score">—</strong></div><div id="social-score-parts"></div></section>
-            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><div class="social-picker-group"><label class="social-theme-picker">渠道<select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
             <section class="card-gate-panel"><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成图文</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
           </div>

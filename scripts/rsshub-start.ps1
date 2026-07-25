@@ -1,77 +1,61 @@
-# rsshub-start.ps1 - Start RSSHub in dev mode
-param([int]$MaxRetries = 1)
+param(
+    [string]$RsshubDir = "",
+    [string]$PidFile = "",
+    [int]$Port = 1200,
+    [int]$StartupTimeoutSeconds = 90
+)
 
 $ErrorActionPreference = "Stop"
-$rsshubDir = "E:\Documents\write-assistant\RSSHub"
-$pidFile = "$env:USERPROFILE\.openclaw\workspace\rsshub.pid"
-$port = 1200
+$projectRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($RsshubDir)) { $RsshubDir = Join-Path $projectRoot "RSSHub" }
+if ([string]::IsNullOrWhiteSpace($PidFile)) { $PidFile = Join-Path $projectRoot "data\rsshub.pid" }
+$RsshubDir = [System.IO.Path]::GetFullPath($RsshubDir)
+$PidFile = [System.IO.Path]::GetFullPath($PidFile)
 
-# Check if already running
-$existing = netstat -ano | Select-String "0.0.0.0:${port} "
-if ($existing) {
-    Write-Output "RSSHub already running on port ${port}"
-    # Verify routes
-    $resp = try { Invoke-WebRequest -Uri "http://localhost:${port}/huxiu/article?limit=3" -TimeoutSec 10 -UseBasicParsing } catch { $null }
-    if ($resp -and $resp.StatusCode -eq 200) {
-        Write-Output "Route check passed"
+if (-not (Test-Path -LiteralPath $RsshubDir -PathType Container)) { throw "RSSHub directory does not exist: $RsshubDir" }
+$entryFile = Join-Path $RsshubDir "lib\index.ts"
+$tsxCli = Join-Path $RsshubDir "node_modules\tsx\dist\cli.mjs"
+if (-not (Test-Path -LiteralPath $entryFile -PathType Leaf)) { throw "RSSHub source entry does not exist: $entryFile" }
+if (-not (Test-Path -LiteralPath $tsxCli -PathType Leaf)) { throw "RSSHub local tsx runtime does not exist: $tsxCli. Run npm install in the RSSHub directory." }
+$node = Get-Command node.exe -ErrorAction Stop
+
+function Test-Rsshub {
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/" -UseBasicParsing -TimeoutSec 3
+        return $response.StatusCode -ge 200 -and $response.StatusCode -lt 500
+    } catch { return $false }
+}
+
+if (Test-Rsshub) {
+    Write-Output "RSSHub is already healthy on port $Port"
+    exit 0
+}
+
+$pidDirectory = Split-Path -Parent $PidFile
+if (-not (Test-Path -LiteralPath $pidDirectory)) { New-Item -ItemType Directory -Path $pidDirectory -Force | Out-Null }
+$logDirectory = Join-Path $projectRoot "logs\rsshub"
+if (-not (Test-Path -LiteralPath $logDirectory)) { New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null }
+$stdout = Join-Path $logDirectory "rsshub.log"
+$stderr = Join-Path $logDirectory "rsshub.error.log"
+
+$arguments = "`"$tsxCli`" `"$entryFile`""
+$process = Start-Process -WindowStyle Hidden -FilePath $node.Source -ArgumentList $arguments -WorkingDirectory $RsshubDir -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+$process.Id | Set-Content -LiteralPath $PidFile -Encoding ascii
+Write-Output "RSSHub process started (PID: $($process.Id)); waiting for port $Port"
+
+$deadline = (Get-Date).AddSeconds([Math]::Max(10, $StartupTimeoutSeconds))
+while ((Get-Date) -lt $deadline) {
+    if ($process.HasExited) {
+        $detail = if (Test-Path -LiteralPath $stderr) { (Get-Content -LiteralPath $stderr -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
+        throw "RSSHub exited before becoming healthy (code $($process.ExitCode)). $detail"
+    }
+    if (Test-Rsshub) {
+        Write-Output "RSSHub is healthy on port $Port (PID: $($process.Id))"
         exit 0
     }
-    Write-Output "Route check failed, restarting..."
-    # Kill existing
-    $pidLine = $existing | Select-String "LISTENING" | ForEach-Object { $_.ToString().Trim().Split()[-1] }
-    if ($pidLine) { Stop-Process -Id $pidLine -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Seconds 2
+    Start-Sleep -Milliseconds 750
 }
 
-# Start in background
-$logFile = "$rsshubDir\logs\rsshub-dev.log"
-if (-not (Test-Path (Split-Path $logFile -Parent))) { New-Item -ItemType Directory -Path (Split-Path $logFile -Parent) -Force | Out-Null }
-
-$process = Start-Process -FilePath "npx.cmd" -ArgumentList "tsx lib/index.ts" -WorkingDirectory $rsshubDir -NoNewWindow -PassThru -RedirectStandardOutput $logFile -RedirectStandardError "${logFile}.err"
-$process.Id | Out-File -FilePath $pidFile -Encoding ascii
-
-# Wait for startup
-$maxWait = 60  # seconds
-$waited = 0
-$ready = $false
-while ($waited -lt $maxWait) {
-    Start-Sleep -Seconds 2
-    $waited += 2
-    $resp = try { Invoke-WebRequest -Uri "http://localhost:${port}/" -TimeoutSec 5 -UseBasicParsing } catch { $null }
-    if ($resp -and $resp.StatusCode -eq 200) {
-        Write-Output "RSSHub started in ${waited}s (PID: $($process.Id))"
-        $ready = $true
-        break
-    }
-}
-
-if (-not $ready) {
-    Write-Error "RSSHub failed to start within ${maxWait}s"
-    $retry = 0
-    while ($retry -lt $MaxRetries) {
-        Write-Output "Retry $($retry+1)..."
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
-        $process = Start-Process -FilePath "npx.cmd" -ArgumentList "tsx lib/index.ts" -WorkingDirectory $rsshubDir -NoNewWindow -PassThru -RedirectStandardOutput $logFile -RedirectStandardError "${logFile}.err"
-        $process.Id | Out-File -FilePath $pidFile -Encoding ascii
-        $waited = 0
-        while ($waited -lt $maxWait) {
-            Start-Sleep -Seconds 2; $waited += 2
-            $resp = try { Invoke-WebRequest -Uri "http://localhost:${port}/" -TimeoutSec 5 -UseBasicParsing } catch { $null }
-            if ($resp -and $resp.StatusCode -eq 200) { Write-Output "Started on retry $($retry+1)"; $ready = $true; break }
-        }
-        if ($ready) { break }
-        $retry++
-    }
-    if (-not $ready) { Write-Error "RSSHub failed after all retries"; exit 1 }
-}
-
-# Verify key routes
-Write-Output "Verifying routes..."
-$routes = @("latepost", "huxiu/article", "solidot", "readhub", "jiemian/lists/65", "techcrunch/news", "infoq/recommend", "anthropic/news")
-$ok = 0; $failed = 0
-foreach ($route in $routes) {
-    $r = try { Invoke-WebRequest -Uri "http://localhost:${port}/${route}?limit=3" -TimeoutSec 15 -UseBasicParsing } catch { $null }
-    if ($r -and $r.StatusCode -eq 200) { $ok++ } else { $failed++ }
-}
-Write-Output "Routes verified: ${ok} ok, ${failed} failed"
+Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+$detail = if (Test-Path -LiteralPath $stderr) { (Get-Content -LiteralPath $stderr -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
+throw "RSSHub did not become healthy within $StartupTimeoutSeconds seconds. $detail"

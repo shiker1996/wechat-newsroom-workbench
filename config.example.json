@@ -1,6 +1,6 @@
 {
   "port": 4317,
-  "workspaceRoot": "E:\\Documents\\write-assistant",
+  "workspaceRoot": ".",
   "contentRoots": [],
   "reddit": {
     "cdpUrl": "http://127.0.0.1:9222",
@@ -10,8 +10,10 @@
   },
   "rsshub": {
     "baseUrl": "http://127.0.0.1:1200",
-    "startScript": "C:\\Users\\Administrator\\.openclaw\\workspace\\rsshub-start.ps1",
-    "stopScript": "C:\\Users\\Administrator\\.openclaw\\workspace\\rsshub-stop.ps1",
+    "rootDir": "RSSHub",
+    "startScript": "scripts/rsshub-start.ps1",
+    "stopScript": "scripts/rsshub-stop.ps1",
+    "pidFile": "data/rsshub.pid",
     "startupTimeoutMs": 180000,
     "keepAlive": false,
     "maxAgeHours": 168,

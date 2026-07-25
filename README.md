@@ -59,11 +59,11 @@ npm start
 
 每日批次抽屉提供完整的采集后流水线：
 
-1. `开始/继续打标`：只处理尚未完成完整语义标注的热点。
-2. `重新打标全部`：用当前模型覆盖本批全部语义标注，适合修改提示词或更换模型后重跑。
-3. `生成/重新执行热点研判`：在全量打标完成后生成事件聚类、核心 8 条 + 黑马 2 条、候补 3 条、探索脑暴和 H/B/P/S/D/F 临时总榜，并自动写入选题池。
+1. `开始/继续打标`：只处理尚未完成完整语义标注的热点。打标完成后立即生成事件事实卡（可复用，缺失自动补生成）。
+2. `重新打标全部`：用当前模型覆盖本批全部语义标注并重建事件卡，适合修改提示词或更换模型后重跑。
+3. `生成/重新执行事件研判`：在全量打标完成后生成事件聚类、核心 8 条 + 黑马 2 条、候补 3 条、探索脑暴和 H/B/P/S/D/F 临时总榜，并自动写入选题池。事件打分会获得所属议题热度的小额加成（多事件议题中的事件不至于整体沉没）；覆盖多个事件的热词还会自动生成"议题综合"候选（综合选题，去重幂等），与事件候选同池竞争。
 
-热点研判生成 `sources/phase-G-output.json`、`sources/event-clusters.json`、`sources/preselection-ranking.json`、`sources/account-context-snapshot.md`、`hotspot-overview.html`、`editorial-agenda.md` 和 `topics-ranked.md`。合规风险只标记不删除；临时包装不代表作者立场，仍需在编辑室锁定简报后才能成稿。
+事件研判生成 `sources/phase-G-output.json`、`sources/event-clusters.json`、`sources/event-cards.json`、`sources/preselection-ranking.json`、`sources/account-context-snapshot.md`、`hotspot-overview.html`、`editorial-agenda.md` 和 `topics-ranked.md`。事件卡为每个事件沉淀结论、已确认事实、来源增量、分歧、时间线、待核内容和可写角度，按小批次并发生成（可用 `llm.providers.*.eventCardChunkSize` / `eventCardConcurrency` 覆盖，默认 3 个事件一批、并发 4）；热词综述以事件卡为依据生成，覆盖范围过大的泛词只用于筛选。合规风险只标记不删除；临时包装不代表作者立场，仍需在编辑室锁定简报后才能成稿。
 
 上下文超过安全预算时，工作台保留事实、来源、作者确认、编辑决策和禁写项，保留最近对话原文，只压缩更早的讨论与旧稿。压缩后仍超限会明确报错，不会静默截断。热点打标按小批次调用；某批结构缺项或 JSON 截断时，只拆分重试缺失项目，已成功结果不会重复计费。
 
@@ -108,7 +108,7 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 工作台遵守现有技能的生命周期约定：
 
 1. 先检查 `http://127.0.0.1:1200/`。
-2. 若不可用，运行 `C:\Users\Administrator\.openclaw\workspace\rsshub-start.ps1 -MaxRetries 1`。
+2. 若不可用，在项目根目录运行 `powershell -ExecutionPolicy Bypass -File scripts/rsshub-start.ps1`。
 3. 给冷启动最多 180 秒。
 4. 每个目标路由都限制 `limit=30`，默认最多 5 个来源并发读取，逐路由隔离并保留错误。
 5. 采集结束后，仅当 RSSHub 是本次任务启动的才运行停止脚本。

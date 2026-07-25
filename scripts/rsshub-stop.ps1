@@ -1,15 +1,30 @@
-# rsshub-stop.ps1
-$pidFile = "E:\Documents\write-assistant\rsshub.pid"
-if (Test-Path $pidFile) {
-    $pidStr = Get-Content $pidFile -Raw -ErrorAction SilentlyContinue
-    if ($pidStr) {
-        $rssPid = [int]$pidStr.Trim()
-        Stop-Process -Id $rssPid -Force -ErrorAction SilentlyContinue
-        Write-Output "Stopped RSSHub (PID: $rssPid)"
+param(
+    [string]$PidFile = "",
+    [int]$Port = 1200
+)
+
+$projectRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($PidFile)) { $PidFile = Join-Path $projectRoot "data\rsshub.pid" }
+$PidFile = [System.IO.Path]::GetFullPath($PidFile)
+$stopped = $false
+
+if (Test-Path -LiteralPath $PidFile -PathType Leaf) {
+    $stored = (Get-Content -LiteralPath $PidFile -Raw -ErrorAction SilentlyContinue).Trim()
+    if ($stored -match '^\d+$') {
+        & taskkill.exe /PID $stored /T /F 2>$null | Out-Null
+        Write-Output "Stopped RSSHub process tree rooted at PID $stored"
+        $stopped = $true
     }
-    Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Output "No PID file found, checking port 1200..."
-    $proc = netstat -ano | Select-String "0.0.0.0:1200 " | ForEach-Object { $_.ToString().Trim().Split()[-1] }
-    if ($proc) { Stop-Process -Id $proc -Force -ErrorAction SilentlyContinue; Write-Output "Stopped process on port 1200" }
+    Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+}
+
+if (-not $stopped) {
+    $line = netstat -ano | Select-String "LISTENING\s+\d+$" | Where-Object { $_.ToString() -match "(?:127\.0\.0\.1|0\.0\.0\.0|\[::\]):$Port\s" } | Select-Object -First 1
+    if ($line) {
+        $processId = [int]($line.ToString().Trim().Split()[-1])
+        & taskkill.exe /PID $processId /T /F 2>$null | Out-Null
+        Write-Output "Stopped process $processId listening on port $Port"
+    } else {
+        Write-Output "RSSHub is not running on port $Port"
+    }
 }
