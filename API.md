@@ -1,0 +1,290 @@
+# API 接口文档
+
+## 概览
+
+| 页面（视图） | 加载模块 |
+|---|---|
+| 今日值班 (dashboard) | app-core.js（首屏） |
+| 每日批次 (batches) | app-overview.js（首屏） |
+| 热点全景 (overview) | app-overview.js + app-pool-editorial.js |
+| 选题池 (topics) | app-pool-editorial.js（按需） |
+| 编辑室 (editorial) | app-pool-editorial.js（按需） |
+| 文章编辑器 (editor) | app-editor-production.js（按需） |
+| 排版预览 (preview) | app-editor-production.js（按需） |
+| 热点档案 (hotspots) | app-overview.js（首屏） |
+| 产物柜 (artifacts) | app-overview.js（首屏） |
+| 采集控制 (system) | app-models-logs.js（首屏） |
+| 订阅源 (sources) | app-models-logs.js（首屏） |
+| 模型中心 (models) | app-models-logs.js（首屏） |
+| 日志 (logs) | app-models-logs.js（首屏） |
+| 内容日历 (calendar) | app-models-logs.js（首屏） |
+
+---
+
+## 批次管理
+
+### GET /api/overview
+首页概览数据（批次总数、热点总数、产物总数、最新批次、来源健康）
+→ 今日值班
+
+### GET /api/batches
+批次列表
+→ 今日值班、每日批次
+
+### POST /api/batches
+创建新批次 { date, title, note }
+→ 每日批次（新建对话框）
+
+### GET /api/batches/:id
+单批次详情（含热点列表、来源记录、产物、AI 运行状态）
+→ 每日批次（抽屉面板）
+
+### PATCH /api/batches/:id
+更新批次 { title, status, stage, note }
+→ 每日批次
+
+---
+
+## 采集
+
+### POST /api/batches/:id/collect
+启动采集 { sources: ['reddit','rsshub'], maxAgeHours?: 24|48|72|120|168 }
+传入 maxAgeHours 时持久化为批次时间窗口，采集过滤与事件研判新鲜度共用；缺省保持批次原值或全局默认 168
+→ 每日批次（抽屉面板）
+
+---
+
+## 打标与研判
+
+### POST /api/batches/:id/ai/tag
+语义打标 { provider, force, background }
+→ 每日批次（抽屉面板）
+
+### POST /api/batches/:id/ai/research
+热点研判（聚类、8+2 预选、脑暴）
+→ 每日批次（抽屉面板）
+
+### GET /api/batches/:id/overview
+热点全景数据（事件聚类、热词）
+→ 热点全景
+
+### POST /api/batches/:id/hotword-summary/:word
+生成单热词综述
+→ 热点全景
+
+---
+
+## 热点
+
+### GET /api/hotspots
+热点档案查询 ?q=&source=&date=
+→ 热点档案
+
+---
+
+## 选题池
+
+### GET /api/batches/:id/candidates
+候选列表（含评分 pool_role, brief_status）
+→ 选题池、编辑室、文章编辑器
+
+### POST /api/batches/:id/candidates
+加入候选 { hotspotIds: [...] }
+→ 选题池
+
+### POST /api/batches/:id/candidates/composite
+创建综合选题 { hotspotIds, title, poolRole }
+→ 热点全景（事件卡片 → 创建综合选题）
+
+### POST /api/batches/:id/custom-social-candidates
+创建自定义图文候选 { content_type: tutorial|list|opinion, channel: wechat|xiaohongshu, topic, audience, scenario, thesis, points, steps, items, materialUrls, limitations, expected_pages }
+要点按行解析，【体验】/【素材】/【建议】前缀标注来源等级；素材链接创建时抓取；轨道 output_mode 写入 wechat-custom-cards 或 xiaohongshu-custom-cards
+→ 图文编辑室（创建自定义图文）
+
+### DELETE /api/candidates/:id
+移除候选
+→ 选题池
+
+---
+
+## 编辑室
+
+### GET /api/candidates/:id
+候选详情（含 editorial, messages, source_document）
+→ 编辑室
+
+### PATCH /api/candidates/:id
+更新候选 { angle, thesis }
+→ 编辑室（表单保存）
+
+### GET /api/candidates/:id/editorial
+编辑决策数据
+→ 编辑室
+
+### PUT /api/candidates/:id/editorial
+保存编辑决策 { confirmed_facts, author_opinions, ... }
+→ 编辑室（表单保存）
+
+### POST /api/candidates/:id/ai/editorial
+编辑会 AI 调用（旧，非流式）{ provider, answer }
+→ 编辑室（废弃，保留兼容）
+
+### POST /api/candidates/:id/ai/editorial/stream
+编辑会 AI 流式调用 { provider, answer } → ndjson
+→ 编辑室
+
+### POST /api/candidates/:id/lock
+锁定简报（写入 article-brief.md）
+→ 编辑室（确认简报）
+
+### POST /api/candidates/:id/source
+抓取候选原文 { force }
+→ 编辑室
+
+### GET /api/candidates/:id/similar
+查询相似历史文章（基于 eventKey + 标题匹配）
+→ 编辑室（历史覆盖提示）
+
+---
+
+## 成稿
+
+### POST /api/candidates/:id/ai/draft
+AI 起草（单步）{ provider, instructions, existingDraft }
+→ 文章编辑器
+
+### POST /api/candidates/:id/ai/article
+完整成稿链（规划 → 初稿 → 去 AI → 审稿 → SEO → 终稿）
+→ 文章编辑器
+
+### POST /api/batches/:id/ai/typeset
+排版 { provider, candidateId, mode }
+→ 排版预览
+
+---
+
+## 文档（编辑器）
+
+### GET /api/batches/:id/documents
+批次全部文档列表，?candidateId=&kind= 时按候选+类型查单篇
+→ 文章编辑器（加载全部 / 加载草稿或终稿）
+
+### PUT /api/batches/:id/documents
+保存文档 { candidateId, kind, title, content, status }
+→ 文章编辑器（保存按钮）
+
+---
+
+## 配图
+
+### GET /api/candidates/:id/images
+配图工作区数据（占位列表、本地/CDN 状态）
+→ 排版预览
+
+### POST /api/candidates/:id/images/plan
+AI 规划配图占位
+→ 排版预览
+
+### POST /api/candidates/:id/images/:imageId
+保存本地图片 { fileName, mimeType, base64 }
+→ 排版预览
+
+### GET /api/candidates/:id/images/:imageId/local
+本地图片预览（返回图片文件）
+→ 排版预览
+
+### POST /api/candidates/:id/images/:imageId/cdn
+上传到 CDN
+→ 排版预览
+
+---
+
+## 产物柜
+
+### GET /api/artifacts
+产物列表 ?limit=&batch_id=
+→ 产物柜
+
+### POST /api/artifacts/reindex
+重新扫描工作区，建立产物索引
+→ 产物柜
+
+### GET /api/artifacts/:id/content
+产物内容预览（返回文件流）
+→ 产物柜（点击卡片）
+
+---
+
+## 内容日历
+
+### GET /api/articles
+已完结文章列表 ?week=&month=
+→ 内容日历
+
+### GET /api/articles/stats
+文章统计（累计/本月/本周、按周分布、按类型分布）
+→ 产物柜
+
+### GET /api/documents/:id/content
+文档正文（返回 text/plain）
+→ 内容日历（点击文章标题）、编辑室（历史覆盖提示点击）
+
+---
+
+## 模型
+
+### GET /api/models
+模型服务商列表 + 最近调用记录
+→ 模型中心
+
+### POST /api/models/test
+测试模型连接 { provider }
+→ 模型中心
+
+---
+
+## 订阅源
+
+### GET /api/subscriptions
+订阅源列表（含最近采集健康状态）
+→ 订阅源台账
+
+### POST /api/subscriptions
+添加订阅 { kind, value, label }
+→ 订阅源台账
+
+### PATCH /api/subscriptions
+更新订阅 { kind, value, enabled }
+→ 订阅源台账
+
+### DELETE /api/subscriptions
+删除订阅 { kind, value }
+→ 订阅源台账
+
+### POST /api/subscriptions/test
+测试订阅连接 { kind, value }
+→ 订阅源台账
+
+---
+
+## 系统
+
+### GET /api/system/health
+采集环境检查（Reddit CDP 状态、RSSHub 状态）
+→ 采集控制
+
+---
+
+## 任务
+
+### GET /api/jobs/:id
+后台任务实时状态（采集、打标、研判、成稿、排版）
+→ 各页面（弹窗轮询）
+
+---
+
+## 日志
+
+### GET /api/logs
+审计日志 ?type=ai|source|model&limit=
+→ 日志

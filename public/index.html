@@ -1,11 +1,11 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260723-social-history-coverage-1">
 </head>
 <body>
   <div class="paper-noise"></div>
@@ -15,20 +15,26 @@
       <div><strong>见字</strong><small>NEWSROOM OS</small></div>
     </div>
     <nav id="nav">
-      <button class="nav-item active" data-view="dashboard"><span>01</span>今日值班</button>
-      <button class="nav-item" data-view="batches"><span>02</span>批次归档</button>
+      <span class="nav-group-label">内容发现</span>
+      <button class="nav-item active" data-view="dashboard"><span>01</span>工作台总览</button>
+      <button class="nav-item" data-view="batches"><span>02</span>批次管理</button>
       <button class="nav-item" data-view="overview"><span>03</span>热点全景</button>
-      <button class="nav-item" data-view="topics"><span>04</span>选题池</button>
-      <button class="nav-item" data-view="editorial"><span>05</span>编辑室</button>
-      <button class="nav-item" data-view="editor"><span>06</span>文章编辑器</button>
-      <button class="nav-item" data-view="preview"><span>07</span>排版预览</button>
-      <button class="nav-item" data-view="hotspots"><span>08</span>热点档案</button>
-      <button class="nav-item" data-view="artifacts"><span>09</span>产物柜</button>
-      <button class="nav-item" data-view="system"><span>10</span>采集控制</button>
-      <button class="nav-item" data-view="sources"><span>11</span>订阅源</button>
+      <button class="nav-item" data-view="sources"><span>04</span>采集源</button>
+      <span class="nav-group-label">文章生产</span>
+      <button class="nav-item" data-view="topics"><span>05</span>文章选题池</button>
+      <button class="nav-item" data-view="editorial"><span>06</span>文章编辑室</button>
+      <button class="nav-item" data-view="editor"><span>07</span>文章编辑器</button>
+      <button class="nav-item" data-view="preview"><span>08</span>公众号排版</button>
+      <span class="nav-group-label">图文生产</span>
+      <button class="nav-item" data-view="social-topics"><span>09</span>图文选题池</button>
+      <button class="nav-item" data-view="social-editor"><span>10</span>图文编辑室</button>
+      <span class="nav-group-label">系统</span>
+      <button class="nav-item" data-view="artifacts"><span>11</span>产物中心</button>
       <button class="nav-item" data-view="models"><span>12</span>模型中心</button>
-      <button class="nav-item" data-view="logs"><span>13</span>日志</button>
-      <button class="nav-item" data-view="calendar"><span>14</span>内容日历</button>
+      <button class="nav-item" data-view="logs"><span>13</span>任务日志</button>
+      <button class="nav-item" data-view="system"><span>14</span>采集控制</button>
+      <button class="nav-item" data-view="hotspots"><span>15</span>热点档案</button>
+      <button class="nav-item" data-view="calendar"><span>16</span>内容日历</button>
     </nav>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
@@ -43,6 +49,7 @@
         <select id="batch-switcher" class="batch-switcher" aria-label="当前批次"></select>
         <time id="clock"></time>
         <button class="ghost-button" id="health-button">检查采集环境</button>
+        <button class="ghost-button" id="new-breaking-button">⚡ 突发热点</button>
         <button class="primary-button" id="new-batch-button">＋ 新建今日批次</button>
       </div>
     </header>
@@ -76,26 +83,24 @@
 
     <section class="view" id="view-overview">
       <div class="section-intro"><div><span class="kicker">HOTSPOT ATLAS · SEMANTIC EDITION</span><h2>热点全景</h2></div><p>用打标后的事件语义观察媒体覆盖结构、国内关联和议题集中度；来源数与报道数分开计算，不把跨平台热度相加。</p></div>
-      <div class="atlas-notice"><b>覆盖结构 ≠ 舆情热度</b><span id="atlas-mode">等待批次数据</span></div>
-      <div class="atlas-metrics" id="atlas-metrics"></div>
+      <div class="atlas-notice"><b>覆盖结构 ≠ 舆情热度</b></div>
       <div class="atlas-controls" id="atlas-controls">
         <div class="scope-tabs" aria-label="地区筛选"><button class="active" data-atlas-scope="全部">全部</button><button data-atlas-scope="国内">国内</button><button data-atlas-scope="全球性">全球性</button><button data-atlas-scope="国外">国外</button></div>
-        <select id="atlas-category" aria-label="分类筛选"><option value="全部">全部分类</option></select>
         <label class="atlas-multi"><input id="atlas-multisource" type="checkbox"> 只看多源报道</label>
         <label class="atlas-search"><span>⌕</span><input id="atlas-query" placeholder="搜索事件、关键词或来源"></label>
       </div>
       <div class="atlas-grid atlas-semantic-grid">
         <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
-        <section class="panel atlas-cloud-panel"><div class="panel-head"><div><span class="kicker">HOTWORD CLOUD</span><h3>热词词云</h3></div><small>点击热词查看跨事件综述，可直接创建综合选题</small></div><div id="keyword-cloud" class="keyword-cloud"></div></section>
+        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-lenses"><button class="active" data-graph-lens="who">主体</button><button data-graph-lens="what">对比</button><button data-graph-lens="where">场合</button></div></div><div id="event-graph" class="event-graph"></div></section>
       </div>
-      <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>事件归纳 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+      <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
     </section>
 
     <section class="view" id="view-topics">
-      <div class="section-intro"><div><span class="kicker">PITCH DESK</span><h2>选题池</h2></div><p>热点全景中的事件归纳卡片可直接创建综合选题进入此池。技能生成评分产物后，这里承接核心8条、黑马2条和 H/B/P/S/D/F 评分体系。</p></div>
+      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span><h2>文章选题池</h2></div><p>承接适合公众号长文的候选，继续使用 H/B/P/S/D/F 评分，并进入文章编辑室、成稿和排版链路。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
-          <div class="workspace-head"><div><span class="kicker">SHORTLIST</span><h3>编辑候选</h3></div><span id="candidate-count">0 条</span></div>
+          <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
           <div class="topic-pool-hint">选题请在「热点全景」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
           <div id="candidate-list" class="candidate-list"></div>
         </section>
@@ -106,38 +111,103 @@
       </div>
     </section>
 
+    <section class="view" id="view-social-topics">
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD PITCH DESK</span><h2>图文选题池</h2></div><p>承接适合工具卡和社交图文的候选。P0 先完成独立入池与状态管理，事实门禁和图文生成将在后续阶段接入。</p></div>
+      <div class="topic-workspace">
+        <section class="candidate-board">
+          <div class="workspace-head"><div><span class="kicker">SOCIAL SHORTLIST</span><h3>图文候选</h3></div><span id="social-candidate-count">0 条</span></div>
+          <div class="topic-pool-hint">图文候选由独立 Social Fit 研判产生；可从下方 AI 图文预选意见手动补入，不与文章选题池互转。</div>
+          <div id="social-candidate-list" class="candidate-list"></div>
+        </section>
+      </div>
+      <div class="ranking-panel" id="social-ranking-panel" hidden>
+        <div class="workspace-head"><div><span class="kicker">AI SOCIAL PRESELECT</span><h3>AI 图文预选意见</h3></div><button class="ghost-button" id="toggle-social-ranking">展开</button></div>
+        <div id="social-ranking-list" class="ranking-list"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-social-editor">
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2>图文编辑室</h2></div><p>AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><button type="button" class="outline-button" id="create-custom-social">创建自定义图文</button></div>
+      <div id="custom-social-panel" class="repository-facts-panel custom-social-panel" hidden>
+        <div class="workspace-head"><div><span class="kicker">CUSTOM CONTENT</span><h3>创建自定义图文（教程 / 清单 / 观点）</h3></div></div>
+        <div class="custom-social-grid">
+          <label>内容类型<select id="custom-content-type"><option value="tutorial">教程</option><option value="list">清单</option><option value="opinion">观点</option></select></label>
+          <label>发布渠道<select id="custom-channel"><option value="wechat">微信公众号</option><option value="xiaohongshu">小红书</option></select></label>
+          <label>主题<input id="custom-topic" type="text" placeholder="例如：三步把笔记同步到云端"></label>
+          <label>目标受众<input id="custom-audience" type="text" placeholder="例如：刚开始整理笔记的职场人"></label>
+          <label>使用场景<input id="custom-scenario" type="text" placeholder="可选"></label>
+          <label data-custom-only="opinion">核心观点<input id="custom-thesis" type="text" placeholder="观点类必填"></label>
+          <label>期望页数<input id="custom-expected-pages" type="number" min="4" max="10" value="6"></label>
+        </div>
+        <label class="custom-social-block">核心要点（每行一条，至少 3 条；用【体验】/【素材】/【建议】前缀标注来源等级，默认【建议】，行尾可附来源 URL）<textarea id="custom-points" rows="4" placeholder="【体验】我每周用这个方法整理一次笔记&#10;【素材】官方文档支持端到端加密 https://example.com/docs&#10;【建议】可以从每周一次的频率开始"></textarea></label>
+        <label class="custom-social-block" data-custom-only="tutorial">教程步骤（每行一步，至少 2 步）<textarea id="custom-steps" rows="3"></textarea></label>
+        <label class="custom-social-block" data-custom-only="list">清单条目（每行一条，至少 3 条）<textarea id="custom-items" rows="3"></textarea></label>
+        <label class="custom-social-block">素材链接（每行一个 URL，创建时抓取，全部成功才能通过门禁）<textarea id="custom-materials" rows="2" placeholder="https://…"></textarea></label>
+        <label class="custom-social-block">限制说明<textarea id="custom-limitations" rows="2" placeholder="可选：适用范围、未验证内容等"></textarea></label>
+        <div class="editorial-actions"><button type="button" class="primary-button" id="custom-social-submit">创建并进入图文编辑室</button><button type="button" class="text-button" id="custom-social-cancel">取消</button></div>
+      </div>
+      <div class="social-editor-layout">
+        <div class="candidate-tab-strip social-candidate-tab-strip">
+          <button type="button" class="candidate-tab-arrow previous" id="social-tabs-previous" aria-label="向左查看更多图文候选">‹</button>
+          <nav id="social-editor-candidates" class="social-editor-candidates" aria-label="图文候选题"></nav>
+          <button type="button" class="candidate-tab-arrow next" id="social-tabs-next" aria-label="向右查看更多图文候选">›</button>
+        </div>
+        <div id="social-editor-form" class="social-editor-form">
+          <div id="social-editor-empty" class="empty-state">请先在图文选题池选择候选。</div>
+          <div id="social-editor-fields" hidden>
+            <div class="similar-hint" id="similar-social-cards" hidden></div><header class="social-editor-title"><span id="social-editor-code" class="kicker"></span><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></header>
+            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3></div><div><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
+            <section class="social-score-panel"><div><span class="kicker">SOCIAL FIT SCORE</span><strong id="social-fit-score">—</strong></div><div id="social-score-parts"></div></section>
+            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="card-gate-panel"><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成图文</button></div></section>
+            <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="view" id="view-editorial">
       <div class="section-intro"><div><span class="kicker">EDITORIAL ROOM</span><h2>编辑室</h2></div><p>逐项确认事实、观点与实践边界。所有创作门禁通过后，直接从这里确认简报并启动成稿链。</p></div>
       <div class="editorial-layout">
-        <aside class="candidate-sidebar" id="editorial-candidates"></aside>
+        <div class="candidate-tab-strip">
+          <button type="button" class="candidate-tab-arrow previous" id="candidate-tabs-previous" aria-label="向左查看更多候选题">‹</button>
+          <nav class="candidate-sidebar" id="editorial-candidates" aria-label="编辑候选题"></nav>
+          <button type="button" class="candidate-tab-arrow next" id="candidate-tabs-next" aria-label="向右查看更多候选题">›</button>
+        </div>
         <form class="editorial-form" id="editorial-form">
           <div id="editorial-empty" class="empty-state">先在选题池加入并选择一个候选。</div>
           <div id="editorial-fields" hidden>
             <input type="hidden" name="candidateId">
             <div class="similar-hint" id="similar-articles" hidden></div><div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
-            <section class="source-evidence" id="source-evidence">
-              <div><span class="kicker">SOURCE EVIDENCE</span><h4 id="source-evidence-title">原文尚未抓取</h4><p id="source-evidence-meta">AI 编辑会开始前会自动获取公开原文。</p></div>
-              <button type="button" class="outline-button" id="fetch-source">抓取 / 刷新原文</button>
-              <details id="source-evidence-details"><summary>查看来源摘录</summary><div id="source-evidence-excerpt"></div></details>
-            </section>
+            <div class="editorial-focus-grid">
             <section class="editorial-chat">
               <div class="editorial-chat-head"><div><span class="kicker">AI EDITORIAL MEETING</span><h4>一次只讨论一个关键问题</h4></div><div class="editorial-chat-tools"><select id="editorial-provider" aria-label="编辑会模型"></select></div></div>
               <div id="editorial-messages" class="editorial-messages"></div>
               <div class="editorial-reply"><textarea id="editorial-answer" rows="3" placeholder="回答当前问题；首次进入时可以留空，让 AI 先提问"></textarea><button type="button" class="ink-button" id="send-editorial-answer">发送回答 / 让 AI 提问</button></div>
               <small>AI 只整理明确回答并继续追问；不会把沉默、临时建议或模型推断写成作者决定。</small>
             </section>
+            <section class="event-card-panel" id="event-card-panel" hidden>
+              <div><span class="kicker">EVENT CARDS</span><h4 id="event-cards-heading">关联事件</h4><p>选题与事件为一对多 · 事实采纳与原文抓取由 AI 编辑按需自动完成</p></div>
+              <div id="event-cards-list"></div>
+            </section>
+            <section class="editorial-production-gate" id="editorial-production-gate">
+              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
+              <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
+              <p id="editorial-production-hint">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
+              <div class="editorial-actions"><button type="submit" class="ghost-button">保存编辑决策</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
+            </section>
+            </div>
+            <details class="editorial-decision-details" id="editorial-decision-details">
+              <summary><span><b>决策底稿</b><small>AI 编辑会自动整理 · 仅在复核或手工修订时展开</small></span><span class="decision-detail-state">查看全部字段</span></summary>
+              <div class="editorial-decision-body">
             <div class="form-pair"><label>推荐角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
             <label class="question-field">当前关键问题<input name="editor_question" placeholder="一次只问一个最能改变方向的问题"></label>
             <div class="form-pair"><label>已确认公共事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>作者明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
             <div class="form-pair"><label>已确认实践及证据<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界<textarea name="rejected_angles" rows="4"></textarea></label></div>
             <div class="form-pair"><label>仍未解决问题<textarea name="open_questions" rows="3"></textarea></label><label>禁止写入<textarea name="forbidden_claims" rows="3"></textarea></label></div>
             <div class="gate-strip"><label><input type="checkbox" name="experience_required"> 核心判断依赖亲身实践</label><label>下一动作<select name="next_action"><option>DISCUSS</option><option>WRITE_NOW</option><option>TEST_FIRST</option><option>RESEARCH_FIRST</option><option>DROP</option></select></label><span id="brief-state">DISCUSS</span></div>
-            <section class="editorial-production-gate" id="editorial-production-gate">
-              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
-              <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
-              <p id="editorial-production-hint">继续回答编辑问题，或在上方补齐缺失的决策。</p>
-              <div class="editorial-actions"><button type="submit" class="ghost-button">保存编辑决策</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
-            </section>
+              </div>
+            </details>
           </div>
         </form>
       </div>
@@ -200,7 +270,7 @@
       <div class="section-intro"><div><span class="kicker">THE MORGUE</span><h2>热点档案</h2></div><p>不是一次性热榜。按日期、来源和关键词，找回当时发生了什么。</p></div>
       <form class="filter-bar" id="hotspot-filter">
         <label class="search-field"><span>⌕</span><input name="q" placeholder="搜索公司、产品、人物或事件"></label>
-        <select name="source"><option value="">全部来源</option><option value="reddit">Reddit</option><option value="rsshub">RSSHub</option></select>
+        <select name="source"><option value="">全部来源</option><option value="reddit">Reddit</option><option value="rsshub">RSSHub</option><option value="github">GitHub</option></select>
         <input name="date" type="date">
         <button class="ink-button">筛选档案</button>
       </form>
@@ -233,7 +303,13 @@
           <h3>RSSHub · 按需生命周期</h3>
           <p>Worker 先探测 1200 端口；未就绪才运行启动脚本。目标路由通过后采集，最终只停止本次由它启动的实例。</p>
           <ol><li>根地址健康检查</li><li>启动脚本最多等待 180 秒</li><li>路由自动附加 <code>limit=30</code></li></ol>
-          <button class="outline-button" id="system-health">立即检查两项环境</button>
+          <button class="outline-button" id="system-health">立即检查三项环境</button>
+        </article>
+        <article class="control-card github-card">
+          <div class="control-index">GH</div><span class="status-pill unknown" id="github-status">尚未请求</span>
+          <h3>GitHub · 发现与事实增强</h3>
+          <p>Trending 由 RSSHub 提供日榜、周榜和月榜；README、License 与 Release 使用带 ETag 缓存的 GitHub REST API。</p>
+          <div class="github-quota" id="github-quota">配额将在首次仓库核验后显示。</div>
         </article>
       </div>
       <section class="execution-note">
@@ -281,6 +357,7 @@
               <button data-source-filter="direct">直连</button>
               <button data-source-filter="twitter">X</button>
               <button data-source-filter="rsshub">RSSHub</button>
+              <button data-source-filter="github">GitHub</button>
             </div>
           </div>
           <div class="subscription-list" id="subscription-list"><div class="empty-state">正在读取订阅配置…</div></div>
@@ -353,26 +430,15 @@
     </form>
   </dialog>
 
-  <dialog id="manual-hotspot-dialog" class="modal">
-    <form method="dialog">
-      <div class="modal-head"><button type="button" class="close-button" data-close-manual-hotspot aria-label="关闭">×</button></div>
-      <h2>添加热点</h2>
-      <p class="story-meta" style="margin-bottom:18px">手动补入一个不在采集源中的热点，直接进入当前批次。</p>
-      <label>标题 <span style="color:var(--red)">*</span><input name="title" required placeholder="热搜标题或事件名称"></label>
-      <label>链接 <input name="url" type="url" placeholder="https://example.com/article"></label>
-      <label>分类
-        <select name="category">
-          <option value="">自动分类</option>
-          <option value="🤖 AI/技术动态">🤖 AI/技术动态</option>
-          <option value="🏢 大厂/商业">🏢 大厂/商业</option>
-          <option value="🌐 社会/舆论">🌐 社会/舆论</option>
-          <option value="💼 职场/职业">💼 职场/职业</option>
-          <option value="📱 产品/消费">📱 产品/消费</option>
-          <option value="📚 行业/趋势">📚 行业/趋势</option>
-        </select>
-      </label>
-      <label>备注 <textarea name="notes" rows="3" placeholder="为什么补这条？打算从什么角度写？"></textarea></label>
-      <div class="modal-actions"><button type="button" class="ghost-button" data-close-manual-hotspot>取消</button><button class="primary-button" data-submit-manual-hotspot>添加并进入热点池</button></div>
+  <dialog id="breaking-batch-dialog" class="modal">
+    <form id="breaking-batch-form">
+      <div class="modal-head"><div><span class="kicker">BREAKING NEWS FAST LANE</span><h2>新建突发专题</h2></div><button type="button" class="close-button" data-close-breaking-dialog aria-label="关闭">×</button></div>
+      <p class="story-meta" style="margin-bottom:18px">为一个明确事件建立隔离批次，不与每日热点进行 8+2 竞争。</p>
+      <label>事件标题 <span style="color:var(--red)">*</span><input name="title" required placeholder="一句话说明发生了什么"></label>
+      <label>素材链接 <span style="color:var(--red)">*</span><textarea name="urls" rows="5" required placeholder="每行一个链接，可同时提供原帖、公告和报道"></textarea></label>
+      <label>补充背景或作者观点<textarea name="note" rows="3" placeholder="可留空；这里不会被当作已核实事实"></textarea></label>
+      <fieldset class="breaking-track-choice"><legend>评估与生产方向</legend><label><input type="checkbox" name="requestedTrack" value="article" checked> 公众号文章</label><label><input type="checkbox" name="requestedTrack" value="social_cards" checked> 社交图文</label></fieldset>
+      <div class="modal-actions"><button type="button" class="ghost-button" data-close-breaking-dialog>取消</button><button type="submit" class="primary-button">建立突发专题</button></div>
     </form>
   </dialog>
   <dialog id="batch-drawer" class="drawer"><div id="batch-detail"></div></dialog>
@@ -383,10 +449,7 @@
   </dialog>
   <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close">×</button><iframe title="产物预览"></iframe></dialog>
   <div class="toast" id="toast"></div>
-  <script src="/app-core.js"></script>
-  <script src="/app-overview.js"></script>
-  <script src="/app-models-logs.js"></script>
-  <script src="/app-bind.js"></script>
+  <script src="/vendor/markdown-it.min.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
