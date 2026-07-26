@@ -13,6 +13,8 @@ data/workbench.db*
 data/backups/
 data/server-subscriptions-check*
 data/source-cache/
+data/github-cache/
+data/rsshub.pid
 
 # Generated articles
 articles/
