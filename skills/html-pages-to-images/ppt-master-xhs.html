@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ppt-master 小红书贴图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .page {
+    width: 375px;
+    height: 667px;
+    position: relative;
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+  }
+
+  /* === 通用组件 === */
+  .page-number {
+    position: absolute;
+    bottom: 18px;
+    right: 24px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 0.5px;
+  }
+
+  /* ======== Page 1: 封面 ======== */
+  .cover {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 28px;
+    text-align: center;
+  }
+
+  .cover .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(251, 146, 60, 0.15);
+    border: 1px solid rgba(251, 146, 60, 0.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    margin-bottom: 28px;
+  }
+
+  .cover .badge span {
+    color: #fb923c;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .cover .badge .dot {
+    width: 6px; height: 6px;
+    background: #fb923c;
+    border-radius: 50%;
+  }
+
+  .cover h1 {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1.35;
+    margin-bottom: 10px;
+  }
+
+  .cover h1 .hl {
+    background: linear-gradient(135deg, #fb923c, #f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cover .sub {
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+    max-width: 300px;
+  }
+
+  .cover .stats {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 32px;
+  }
+
+  .cover .stats .s-item {
+    text-align: center;
+  }
+
+  .cover .stats .s-item .num {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .cover .stats .s-item .num small {
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .cover .stats .s-item .lbl {
+    color: rgba(255,255,255,0.35);
+    font-size: 10px;
+    margin-top: 3px;
+  }
+
+  .cover .tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cover .tags .t {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 3px 10px;
+    color: rgba(255,255,255,0.4);
+    font-size: 10px;
+  }
+
+  /* ======== Page 2: 痛点共鸣 ======== */
+  .pain {
+    background: #0f172a;
+    padding: 36px 28px 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pain .label {
+    color: #fb923c;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  .pain h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 22px;
+  }
+
+  .pain .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .pain .card .icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .pain .card .ct {
+    flex: 1;
+  }
+
+  .pain .card .ct .tt {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .pain .card .ct .desc {
+    color: rgba(255,255,255,0.45);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* ======== Page 3: 核心亮点 ======== */
+  .features {
+    background: #0f172a;
+    padding: 36px 28px 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .features .label {
+    color: #fb923c;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  .features h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 20px;
+  }
+
+  .features .grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .features .grid .item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .features .grid .item .ic {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .features .grid .item .ic-1 { background: rgba(251,146,60,.15); }
+  .features .grid .item .ic-2 { background: rgba(99,102,241,.15); }
+  .features .grid .item .ic-3 { background: rgba(34,197,94,.15); }
+  .features .grid .item .ic-4 { background: rgba(236,72,153,.15); }
+  .features .grid .item .ic-5 { background: rgba(103,232,249,.15); }
+
+  .features .grid .item .txt { flex: 1; }
+
+  .features .grid .item .txt .nm {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .features .grid .item .txt .ds {
+    color: rgba(255,255,255,0.4);
+    font-size: 11px;
+    margin-top: 1px;
+    line-height: 1.4;
+  }
+
+  /* ======== Page 4: 对比（上下布局） ======== */
+  .compare {
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    padding: 30px 28px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .compare .label {
+    color: #fb923c;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+
+  .compare h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 14px;
+  }
+
+  .compare .c-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .compare .c-stack .cc {
+    flex: 1;
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .compare .c-stack .cc-old {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .compare .c-stack .cc-old .cc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .compare .c-stack .cc-old .cc-header .cc-icon {
+    width: 24px;
+    height: 24px;
+    background: rgba(248, 113, 113, 0.12);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .compare .c-stack .cc-old .cc-header .cc-name {
+    color: rgba(255,255,255,0.55);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .compare .c-stack .cc-old .cc-header .cc-badge {
+    margin-left: auto;
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 5px;
+  }
+
+  .compare .c-stack .cc-old .cc-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+    flex: 1;
+    align-content: center;
+  }
+
+  .compare .c-stack .cc-old .cc-items .b {
+    color: rgba(255,255,255,0.35);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1.5;
+  }
+
+  .compare .c-stack .cc-old .cc-items .b .bx { color: #f87171; font-size: 9px; flex-shrink: 0; }
+
+  .compare .c-stack .cc-new {
+    background: rgba(251, 146, 60, 0.07);
+    border: 1px solid rgba(251, 146, 60, 0.2);
+  }
+
+  .compare .c-stack .cc-new .cc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .compare .c-stack .cc-new .cc-header .cc-icon {
+    width: 24px;
+    height: 24px;
+    background: rgba(74, 222, 128, 0.12);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .compare .c-stack .cc-new .cc-header .cc-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .compare .c-stack .cc-new .cc-header .cc-badge {
+    margin-left: auto;
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 5px;
+  }
+
+  .compare .c-stack .cc-new .cc-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+    flex: 1;
+    align-content: center;
+  }
+
+  .compare .c-stack .cc-new .cc-items .g {
+    color: rgba(255,255,255,0.5);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1.5;
+  }
+
+  .compare .c-stack .cc-new .cc-items .g .gx { color: #4ade80; font-size: 9px; flex-shrink: 0; }
+
+  .compare .c-stack .cc-new .cc-summary {
+    margin-top: auto;
+    color: rgba(251, 146, 60, 0.6);
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+    padding-top: 4px;
+    border-top: 1px solid rgba(251, 146, 60, 0.08);
+  }
+
+  /* ======== Page 5: 快速上手指南 ======== */
+  .howto {
+    background: #0f172a;
+    padding: 36px 28px 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .howto .label {
+    color: #fb923c;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  .howto h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 20px;
+  }
+
+  .howto .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .howto .steps .st {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .howto .steps .st .num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(251, 146, 60, 0.15);
+    color: #fb923c;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .howto .steps .st .sc {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .howto .steps .st .sc .tt {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .howto .steps .st .sc .ds {
+    color: rgba(255,255,255,0.4);
+    font-size: 11px;
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .howto .steps .st .sc .ds code {
+    background: rgba(251,146,60,0.1);
+    color: #fb923c;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+
+  /* ======== Page 6: 互动尾页 ======== */
+  .end {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 28px;
+    text-align: center;
+  }
+
+  .end .heart {
+    font-size: 40px;
+    margin-bottom: 14px;
+  }
+
+  .end h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 16px;
+  }
+
+  .end .question {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .end .question .q-label {
+    color: rgba(255,255,255,0.35);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .end .question .q-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .end .question .q-options .opt {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: rgba(255,255,255,0.55);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .end .question .q-options .opt span { color: #fb923c; font-weight: 600; }
+  .end .question .q-options .opt .hl2 { color: #a78bfa; font-weight: 600; }
+
+  .end .footer {
+    color: rgba(255,255,255,0.2);
+    font-size: 10px;
+    margin-top: 6px;
+  }
+
+  .end .footer a { color: rgba(251,146,60,0.5); text-decoration: none; }
+
+  .page-number { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Page 1: 封面 -->
+<div class="page cover" data-page-number="01">
+  <div class="badge">
+    <span class="dot"></span>
+    <span>今日推荐</span>
+  </div>
+  <h1>🔥AI生成PPT<br>居然真的能<span class="hl">编辑</span>！</h1>
+  <div class="sub">hugohe3/ppt-master — 33K⭐ 开源，原生形状+动画+旁白，告别虚假PPT</div>
+  <div class="stats">
+    <div class="s-item">
+      <div class="num">33<span class="num"><small>K</small></span></div>
+      <div class="lbl">⭐ GitHub</div>
+    </div>
+    <div class="s-item">
+      <div class="num">🔥</div>
+      <div class="lbl">开源免费</div>
+    </div>
+    <div class="s-item">
+      <div class="num">MIT</div>
+      <div class="lbl">随便用</div>
+    </div>
+  </div>
+  <div class="tags">
+    <span class="t">⚡ AI PPT生成</span>
+    <span class="t">🎨 原生可编辑</span>
+    <span class="t">🔊 语音旁白</span>
+    <span class="t">🆓 完全免费</span>
+  </div>
+</div>
+
+<!-- Page 2: 痛点 -->
+<div class="page pain" data-page-number="02">
+  <div class="label">😩 你也有这些痛点吧</div>
+  <h2>AI生成的PPT<br>都不能编辑，是真的烦</h2>
+  <div class="card">
+    <div class="icon">🗑️</div>
+    <div class="ct">
+      <div class="tt">Gamma/AiPPT 导出=图片</div>
+      <div class="desc">只能看不能改，要调整布局得重新生成</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="icon">🔄</div>
+    <div class="ct">
+      <div class="tt">改一个字要重做</div>
+      <div class="desc">文字错了没法直接编辑，撤回整套流程</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="icon">💸</div>
+    <div class="ct">
+      <div class="tt">免费的有限制</div>
+      <div class="desc">好用的要充会员，月费比咖啡还贵</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="icon">🐌</div>
+    <div class="ct">
+      <div class="tt">生成速度慢</div>
+      <div class="desc">等半天出来还不好用，改也没法改</div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 3: 亮点 -->
+<div class="page features" data-page-number="03">
+  <div class="label">✨ ppt-master 有多强</div>
+  <h2>33K⭐的开源宝藏<br>5个你无法拒绝的理由</h2>
+  <div class="grid">
+    <div class="item">
+      <div class="ic ic-1">📄</div>
+      <div class="txt">
+        <div class="nm">原生 .pptx 输出</div>
+        <div class="ds">不是截图不是图片，是真的 PowerPoint 文件</div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ic ic-2">🎨</div>
+      <div class="txt">
+        <div class="nm">原生形状 + 组件</div>
+        <div class="ds">文本框、形状、箭头都能在 PPT 里直接点选编辑</div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ic ic-3">🎬</div>
+      <div class="txt">
+        <div class="nm">动画 + 过渡效果</div>
+        <div class="ds">自带平滑动画和页面过渡，不用手动加</div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ic ic-4">🔊</div>
+      <div class="txt">
+        <div class="nm">语音旁白</div>
+        <div class="ds">AI 自动生成语音配音，适合演示视频</div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ic ic-5">🆓</div>
+      <div class="txt">
+        <div class="nm">完全开源 MIT</div>
+        <div class="ds">0费用，随便用，甚至可以商用</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 4: 对比（上下布局） -->
+<div class="page compare" data-page-number="04">
+  <div class="label">⚔️ 一图看懂差距</div>
+  <h2>跟其他AI PPT工具<br>到底差在哪？</h2>
+  <div class="c-stack">
+    <div class="cc cc-old">
+      <div class="cc-header">
+        <div class="cc-icon">🗑️</div>
+        <div class="cc-name">Gamma / AiPPT / 其他在线工具</div>
+        <div class="cc-badge">别选它</div>
+      </div>
+      <div class="cc-items">
+        <div class="b"><span class="bx">✗</span> 导出后是图片，不可编辑</div>
+        <div class="b"><span class="bx">✗</span> 免费版有功能/次数限制</div>
+        <div class="b"><span class="bx">✗</span> 必须联网才能用</div>
+        <div class="b"><span class="bx">✗</span> 数据上传到云端服务器</div>
+        <div class="b"><span class="bx">✗</span> 调整排版要重新生成</div>
+        <div class="b"><span class="bx">✗</span> 没法加旁白和动画</div>
+      </div>
+    </div>
+    <div class="cc cc-new">
+      <div class="cc-header">
+        <div class="cc-icon">🎯</div>
+        <div class="cc-name">ppt-master（开源）</div>
+        <div class="cc-badge">推荐</div>
+      </div>
+      <div class="cc-items">
+        <div class="g"><span class="gx">✓</span> 原生 .pptx 格式，双击可编辑</div>
+        <div class="g"><span class="gx">✓</span> MIT 开源，完全免费</div>
+        <div class="g"><span class="gx">✓</span> 本地运行，数据不出机器</div>
+        <div class="g"><span class="gx">✓</span> 自动生成平滑动画+过渡</div>
+        <div class="g"><span class="gx">✓</span> AI 配音旁白，一键出视频</div>
+        <div class="g"><span class="gx">✓</span> 支持 OpenAI / Claude / DeepSeek</div>
+      </div>
+      <div class="cc-summary">→ 能真正交付、双击可编辑的 .pptx 文件</div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 5: 快速上手 -->
+<div class="page howto" data-page-number="05">
+  <div class="label">🚀 3分钟上手</div>
+  <h2>小白也能跑的<br>快速上手指南</h2>
+  <div class="steps">
+    <div class="st">
+      <div class="num">1</div>
+      <div class="sc">
+        <div class="tt">安装</div>
+        <div class="ds"><code>git clone</code> + <code>pip install -r requirements.txt</code></div>
+      </div>
+    </div>
+    <div class="st">
+      <div class="num">2</div>
+      <div class="sc">
+        <div class="tt">配置 API Key</div>
+        <div class="ds">支持 OpenAI / Claude / DeepSeek，填 Key 就能用</div>
+      </div>
+    </div>
+    <div class="st">
+      <div class="num">3</div>
+      <div class="sc">
+        <div class="tt">一句话生成PPT</div>
+        <div class="ds">输入主题或上传文档，AI 自动生成完整 .pptx</div>
+      </div>
+    </div>
+    <div class="st">
+      <div class="num">4</div>
+      <div class="sc">
+        <div class="tt">下载 + 编辑</div>
+        <div class="ds">拿到原生 PPTX，用 PowerPoint / WPS 随便改</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 6: 互动 -->
+<div class="page end" data-page-number="06">
+  <div class="heart">🤖</div>
+  <h2>你还在手动做PPT吗？<br>评论区聊聊</h2>
+  <div class="question">
+    <div class="q-label">💬 你现在用什么做PPT？</div>
+    <div class="q-options">
+      <div class="opt"><span>A.</span> 手动硬做，从零排版</div>
+      <div class="opt"><span>B.</span> 用 Gamma / AiPPT 类工具</div>
+      <div class="opt"><span>C.</span> 已经用上 ppt-master</div>
+      <div class="opt"><span>D.</span> <span class="hl2">我只是来白嫖开源的👀</span></div>
+    </div>
+  </div>
+  <div class="footer">
+    🔗 github.com/hugohe3/ppt-master<br>
+    收藏🌟 下次做PPT不愁
+  </div>
+</div>
+
+</body>
+</html>

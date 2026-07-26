@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { evaluateEventCardGate } from '../lib/social-card-gate.mjs';
-import { renderStoryboardHtml } from '../lib/social-card-pipeline.mjs';
-import { Store } from '../lib/store.mjs';
+import { evaluateEventCardGate } from '../lib/domain/social-card-gate.mjs';
+import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
+import { Store } from '../lib/core/store.mjs';
 import { routeBreakingAnalysis } from '../lib/llm/breaking-analysis-pipeline.mjs';
 
 test('事件图文门禁要求事实边界、来源审计和故事板',()=>{

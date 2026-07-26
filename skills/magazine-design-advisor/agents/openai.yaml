@@ -1,0 +1,4 @@
+interface:
+  display_name: "公众号杂志风设计顾问"
+  short_description: "为公众号文章生成设计方案和机器可读设计 tokens"
+  default_prompt: "使用 $magazine-design-advisor 为这篇公众号文章制定可实现的视觉方案。"

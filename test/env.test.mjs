@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseEnv } from '../lib/env.mjs';
+import { parseEnv } from '../lib/core/env.mjs';
 
 test('解析 dotenv 常见写法且不误读注释', () => {
   assert.deepEqual(parseEnv(`

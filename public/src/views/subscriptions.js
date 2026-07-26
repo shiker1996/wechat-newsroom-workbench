@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast } from "../core/ui.js";
+import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 function subscriptionTypeLabel(kind) {
@@ -43,7 +43,6 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github||0, "Trending / Search"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-  renderHealthTimeline(state.subscriptions.history || []);
           // 健康状态点阵（固定50个竖椭圆，按比例采样）
   var allItems = state.subscriptions.items;
   var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
@@ -83,41 +82,13 @@ function renderSubscriptions() {
           <span class="subscription-kind ${escapeHtml(item.kind)}">${subscriptionTypeLabel(item.kind)}</span>
           <div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
           ${item.managed?'<span class="story-meta">系统采集入口</span>':`<label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>`}
-          <div class="subscription-actions">${item.managed?'<span class="story-meta">随 GitHub 采集执行</span>':`<button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">×</button>`}</div>
+          <div class="subscription-actions">${item.managed?'<span class="story-meta">随 GitHub 采集执行</span>':`<button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}" aria-label="删除订阅源：${escapeHtml(item.label)}">×</button>`}</div>
         </article>`;
       }).join("")
     : '<div class="empty-state">这个分类下还没有订阅源。</div>';
 }
-function renderHealthTimeline(rows) {
-  const node = document.getElementById("subscription-health");
-  if (!node) return;
-  const days = [...new Set(rows.map((r) => String(r.ended_at || r.started_at || "").slice(0, 10)).filter(Boolean))].sort().slice(-14);
-  if (!days.length) { node.innerHTML = '<div class="empty-state">尚无来源历史记录。</div>'; return; }
-  const groups = new Map();
-  for (const row of rows) {
-    const key = row.source_name || row.source_key;
-    if (!groups.has(key)) groups.set(key, new Map());
-    const day = String(row.ended_at || row.started_at || "").slice(0, 10);
-    if (!groups.get(key).has(day)) groups.get(key).set(day, row);
-  }
-  const dayHead = days.map((d) => `<span title="${d}">${escapeHtml(d.slice(5))}</span>`).join("");
-  const body = [...groups.entries()].map(([name, byDay]) => {
-    const cells = days.map((day) => {
-      const item = byDay.get(day);
-      const cls = !item ? "idle" : item.status === "success" ? "ok" : "bad";
-      const title = item ? `${item.status} · ${item.item_count || 0} 条${item.error ? ` · ${item.error}` : ""}` : "未采集";
-      return `<i class="health-history-cell ${cls}" title="${escapeHtml(`${day} · ${title}`)}"></i>`;
-    }).join("");
-    return `<div class="health-history-row"><b title="${escapeHtml(name)}">${escapeHtml(name)}</b><span>${cells}</span></div>`;
-  }).join("");
-  node.innerHTML = `<div class="health-history"><div class="health-history-head"><b>来源健康 · 最近 ${days.length} 天</b><span>${dayHead}</span></div>${body}</div>`;
-}
 async function loadSubscriptions() {
-  const [subscriptions, history] = await Promise.all([
-    request("/api/subscriptions"),
-    request("/api/subscriptions/health-history?days=14").catch(() => []),
-  ]);
-  state.subscriptions = { ...subscriptions, history };
+  state.subscriptions = await request("/api/subscriptions");
   renderSubscriptions();
 }
 async function testSubscription(payload, button) {
@@ -153,7 +124,7 @@ async function toggleSubscription(input) {
   toast(input.checked ? "订阅已启用" : "订阅已暂停");
 }
 async function removeSubscription(button) {
-  if (!confirm(`确定删除订阅"${button.dataset.value}"吗？`)) return;
+  if (!await confirmAction(`确定删除订阅"${button.dataset.value}"吗？`, { confirmText: "删除" })) return;
   state.subscriptions = await request("/api/subscriptions", {
     method: "DELETE", body: JSON.stringify({ kind: button.dataset.kind, value: button.dataset.value }),
   });

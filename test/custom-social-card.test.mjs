@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCustomCardGate, CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS } from '../lib/social-card-gate.mjs';
-import { buildCustomFactSheet, customFactMarkdown, parsePointLine, customSourceUrl } from '../lib/custom-fact-builder.mjs';
-import { renderStoryboardHtml } from '../lib/social-card-pipeline.mjs';
+import { evaluateCustomCardGate, CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS } from '../lib/domain/social-card-gate.mjs';
+import { buildCustomFactSheet, customFactMarkdown, parsePointLine, customSourceUrl } from '../lib/domain/custom-fact-builder.mjs';
+import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
 
 const okEditorial={must_disclose:'体验来自作者确认',forbidden_claims:'不得夸大效果',target_reader:'职场新人',pain_point:'整理效率低',recommended_pages:6};
 const okFact={kind:'custom',content_type:'tutorial',topic:'三步同步笔记',thesis:'',points:[

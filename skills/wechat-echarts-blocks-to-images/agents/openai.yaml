@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECharts 围栏转图片"
+  short_description: "安全渲染 Markdown 中的显式 ECharts 配置围栏"
+  default_prompt: "使用 $wechat-echarts-blocks-to-images 将文章里的 ECharts 围栏转成图片。"

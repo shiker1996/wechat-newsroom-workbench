@@ -1,0 +1,4 @@
+interface:
+  display_name: "中文标题生成器"
+  short_description: "生成准确、有传播力且搜索友好的中文标题"
+  default_prompt: "使用 $title-generator 为这篇内容生成并筛选标题。"

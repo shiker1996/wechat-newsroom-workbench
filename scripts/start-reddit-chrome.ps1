@@ -28,6 +28,14 @@ if ($ValidateOnly) {
 }
 
 New-Item -ItemType Directory -Force -Path $profilePath | Out-Null
+try {
+  $ready = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 2
+  if ($ready.webSocketDebuggerUrl) {
+    Start-Process "https://old.reddit.com/r/programming/hot/"
+    Write-Host "Reddit Chrome is already running. CDP port: $Port"
+    exit 0
+  }
+} catch {}
 Start-Process -FilePath $chromePath -ArgumentList @(
   "--remote-debugging-port=$Port",
   "--user-data-dir=$profilePath",

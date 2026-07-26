@@ -1,7 +1,7 @@
 import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, confirmAction } from "../core/ui.js";
 import loadOverview, { stages, renderBatchSwitcher, localDate } from "./dashboard.js";
 
 export function openNewBatch() {
@@ -61,18 +61,28 @@ export async function openBatch(id, mode) {
   renderBatchSwitcher();
   state.currentBatch = batch;
   const [stage] = stages[batch.stage] ?? [batch.stage];
+  const lifecycle=batch.lifecycle_status||"active";
+  const statusLabel = { active:"进行中", completed:"已完成", archived:"已归档" }[lifecycle];
   const ai = batch.ai_status || { tagged: 0, total: batch.hotspots.length, latestResearch: null };
   const preferred = state.models.providers.find((item) => item.configured)?.name || state.models.defaultProvider;
   const researchDone = ai.latestResearch?.status === "completed";
+  const autoRunning = ai.latestResearch?.type === "auto" && ai.latestResearch?.status === "running";
   const cards = batch.event_cards || { count: 0, total: 0 };
   const cardsReady = cards.total > 0 && cards.count >= cards.total;
   const latestAiRun = batch.ai_runs?.[0];
+  const pipelinePrimaryAction = researchDone
+    ? `<button class="primary-button" data-view-research>查看研判结果 →</button>`
+    : ai.tagged < ai.total || !ai.total
+      ? `<button class="primary-button" data-ai-tag ${!batch.hotspots.length ? "disabled" : ""}>${ai.tagged ? `继续打标（还差 ${ai.total - ai.tagged} 条）` : "开始打标"}</button>`
+      : !cardsReady
+        ? `<button class="primary-button" data-ai-event-cards>${cards.count ? "继续生成事件卡" : "生成事件卡"}</button>`
+        : `<button class="primary-button" data-ai-research>开始事件研判</button>`;
   const isBreaking = batch.batch_type === "breaking";
   let breakingAnalysis = null;
   if (isBreaking) { try { breakingAnalysis = await request(`/api/batches/${encodeURIComponent(id)}/breaking-analysis`); } catch {} }
   const materialLinks = (batch.hotspots || []).flatMap((item) => item.materials || []);
   const intakeSection = isBreaking
-    ? `<section class="drawer-section breaking-intake-section"><div class="pipeline-heading"><div><span class="kicker">BREAKING INTAKE</span><h3>突发专题素材</h3></div><span class="composite-badge">独立批次</span></div><p>该事件不参与每日热点的 8+2 竞争；研判后按创建时选择的方向进入文章池或图文池。</p><div class="breaking-material-list">${materialLinks.map((item, index) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer"><b>${String(index + 1).padStart(2, "0")}</b><span>${escapeHtml(item.title || item.url)}</span><em class="material-status ${escapeHtml(item.status || "pending")}">${item.status === "ok" ? "已抓取" : item.status === "error" ? "抓取失败" : "待抓取"}</em></a>`).join("")}</div><details class="breaking-add-material"><summary>补充更多素材链接</summary><textarea id="breaking-more-materials" rows="3" placeholder="每行一个链接"></textarea><button class="outline-button" data-breaking-add-material>添加素材</button></details></section>`
+    ? `<section class="drawer-section breaking-intake-section"><div class="pipeline-heading"><div><span class="kicker">BREAKING INTAKE</span><h3>突发专题素材</h3></div><span class="composite-badge">独立批次</span></div><p>该事件不参与每日热点的“核心 8 条 + 黑马 2 条”竞争；研判后按创建时选择的方向进入文章池或图文池。</p><div class="breaking-material-list">${materialLinks.map((item, index) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer"><b>${String(index + 1).padStart(2, "0")}</b><span>${escapeHtml(item.title || item.url)}</span><em class="material-status ${escapeHtml(item.status || "pending")}">${item.status === "ok" ? "已抓取" : item.status === "error" ? "抓取失败" : "待抓取"}</em></a>`).join("")}</div><details class="breaking-add-material"><summary>补充更多素材链接</summary><textarea id="breaking-more-materials" rows="3" placeholder="每行一个链接"></textarea><button class="outline-button" data-breaking-add-material>添加素材</button></details></section>`
     : `<section class="drawer-section"><h3>采集今日热点</h3><p>按业务来源独立执行与记账；GitHub 包含 Trending、增长发现及热点提及仓库。采集完成后将自动进入语义打标与事件研判，无需逐节点击。</p><div class="check-row"><label><input type="checkbox" name="source" value="reddit" checked> Reddit</label><label><input type="checkbox" name="source" value="rsshub" checked> RSSHub</label><label><input type="checkbox" name="source" value="github" checked> GitHub</label></div><div class="check-row"><label>时间范围 <select id="collect-max-age">${[24, 48, 72, 120, 168].map((hours) => `<option value="${hours}"${(Number(batch.max_age_hours) || 24) === hours ? " selected" : ""}>${hours / 24} 天</option>`).join("")}</select></label></div><div style="display:flex;gap:8px"><button class="primary-button" data-collect>一键采集并研判</button></div></section>`;
   const analysis = breakingAnalysis?.analysis;
   const recommendationLabel = { recommend: "建议入池", conditional: "补充材料后可入池", hold: "建议暂缓" };
@@ -93,14 +103,20 @@ export async function openBatch(id, mode) {
     ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
   </section>` : "";
   const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
-      <div class="pipeline-steps"><div class="${batch.hotspots.length ? "done" : "active"}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div class="${ai.tagged === ai.total && ai.total ? "done" : ai.tagged ? "active" : ""}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div class="${cardsReady ? "done" : cards.count ? "active" : ""}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div class="${researchDone ? "done" : ai.latestResearch?.status === "running" ? "active" : ""}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "8+2 / H·B·P·S·D·F"}</small></span></div></div>
+      <div class="pipeline-steps"><div data-pipeline-step="collect" class="${batch.hotspots.length ? "done" : "active"}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${ai.tagged === ai.total && ai.total ? "done" : ai.tagged || autoRunning ? "active" : ""}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${cardsReady ? "done" : cards.count || (autoRunning && ai.total > 0 && ai.tagged >= ai.total) ? "active" : ""}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${researchDone ? "done" : (ai.latestResearch?.type === "research" && ai.latestResearch?.status === "running") || (autoRunning && cardsReady) ? "active" : ""}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
       <p>打标覆盖全量热点，生成事件语义指纹、地区、风险和预评估证据；研判随后完成全量聚类、核心 8 + 黑马 2、探索脑暴与临时复排。</p>
-      <div class="pipeline-actions"><button class="primary-button" data-ai-tag ${!batch.hotspots.length ? "disabled" : ""}>${ai.tagged ? "继续打标" : "开始打标"}</button><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards ${!ai.tagged ? "disabled" : ""}>${cards.count ? "重新生成事件卡" : "生成事件卡"}</button><button class="ink-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>${researchDone ? "重新执行事件研判" : "生成事件研判"}</button></div>
+      <div class="pipeline-actions"><div class="pipeline-next"><small>当前下一步</small>${pipelinePrimaryAction}</div><details class="pipeline-retry-menu"><summary>高级操作</summary><div><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards ${!ai.tagged ? "disabled" : ""}>重新生成事件卡</button><button class="ghost-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>重新执行事件研判</button></div></details></div>
       ${ai.tagged < ai.total && ai.total ? `<small class="pipeline-gate">还差 ${ai.total - ai.tagged} 条完整语义标注，完成后才能进入事件研判。</small>` : ""}
       ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
     </section>` : "";
+  const lifecycleActions = lifecycle === "archived"
+    ? '<button class="outline-button" data-batch-lifecycle="active">重新打开批次</button>'
+    : lifecycle === "completed"
+      ? '<button class="ghost-button" data-batch-lifecycle="active">重新打开</button><button class="primary-button" data-batch-lifecycle="archived">归档批次</button>'
+      : '<button class="primary-button" data-batch-lifecycle="completed">标记完成</button>';
   $("#batch-detail").innerHTML = `<div class="drawer-inner">
-    <header class="drawer-head"><div><span class="kicker">${escapeHtml(batch.batch_date)} · ${escapeHtml(stage)}</span><h2>${escapeHtml(batch.title)}</h2><p>${escapeHtml(batch.note || "暂无值班备注")}</p></div><button class="close-button" data-close-drawer>×</button></header>
+    <header class="drawer-head"><div><span class="kicker">${escapeHtml(batch.batch_date)} · ${escapeHtml(stage)}</span><h2>${escapeHtml(batch.title)}</h2><p>${escapeHtml(batch.note || "暂无值班备注")}</p></div><button class="close-button" data-close-drawer aria-label="关闭批次详情">×</button></header>
+    <section class="drawer-section batch-lifecycle"><div><span class="kicker">BATCH STATUS</span><h3>批次状态 · ${escapeHtml(statusLabel)}</h3><p>${lifecycle === "archived" ? "该批次已归档，仅保留历史查询与产物追溯。" : lifecycle === "completed" ? "生产工作已结束，可确认归档或重新打开。" : "完成当天生产后标记完成，确认无后续修改再归档。"}</p></div><div class="batch-lifecycle-actions">${lifecycleActions}</div></section>
     ${intakeSection}
     <section class="drawer-section"><h3>来源记录</h3>${batch.sources.length ? batch.sources.map((item) => `<div class="source-row ${item.status}"><i></i><div><strong>${escapeHtml(item.source)}</strong><small>${escapeHtml(item.error || item.ended_at || "执行中")}</small></div><b>${item.item_count}</b></div>`).join("") : '<p class="story-meta">尚未运行采集。</p>'}</section>
     ${breakingAnalysisSection}${regularAiSection}
@@ -120,21 +136,77 @@ export async function openBatch(id, mode) {
   }
 }
 
+async function updateBatchLifecycle(lifecycleStatus) {
+  const batch=state.currentBatch;
+  if(!batch)return;
+  const actionLabel={completed:"标记完成",archived:"归档",active:"重新打开"}[lifecycleStatus]||"更新";
+  if(lifecycleStatus==="archived"&&!await confirmAction("归档后，该批次将不再出现在当前批次选择器中，但数据和产物仍可在批次管理中查询。",{confirmText:"确认归档"}))return;
+  const updated=await request(`/api/batches/${encodeURIComponent(batch.id)}`,{method:"PATCH",body:JSON.stringify({lifecycleStatus})});
+  state.currentBatch=updated;
+  if(["completed","archived"].includes(lifecycleStatus)&&state.activeBatchId===batch.id)state.activeBatchId="";
+  $("#batch-drawer").close();
+  toast(`批次已${actionLabel}`);
+  const currentView=document.querySelector(".nav-item.active")?.dataset.view;
+  if(currentView==="batches")await window.go("batches");
+  else await loadOverview();
+}
+
+// 任务启动后把控制台滚动到可见位置，避免日志输出在抽屉最底部被埋
+function showJobConsole(message) {
+  const consoleNode = $("#job-console");
+  if (!consoleNode) return;
+  consoleNode.textContent = message;
+  consoleNode.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function setPipelineStep(name, status, detail) {
+  const step = document.querySelector(`[data-pipeline-step="${name}"]`);
+  if (!step) return;
+  step.classList.remove("active", "done");
+  if (status) step.classList.add(status);
+  const small = step.querySelector("small");
+  if (small && detail != null) small.textContent = detail;
+}
+
+async function refreshPipelineSteps(job) {
+  const batchId = job.batchId || job.batch_id;
+  if (!batchId || !document.querySelector(".pipeline-steps")) return;
+  const batch = await request(`/api/batches/${encodeURIComponent(batchId)}`);
+  state.currentBatch = batch;
+  const ai = batch.ai_status || { tagged: 0, total: batch.hotspots.length, latestResearch: null };
+  const cards = batch.event_cards || { count: 0, total: 0 };
+  const collectRunning = job.type === "collect" && job.status === "running";
+  const autoRunning = job.type === "auto" && job.status === "running";
+  const collected = !collectRunning && batch.hotspots.length > 0;
+  const tagged = ai.total > 0 && ai.tagged >= ai.total;
+  const cardsReady = cards.total > 0 && cards.count >= cards.total;
+  const researchDone = ai.latestResearch?.status === "completed";
+
+  setPipelineStep("collect", collectRunning ? "active" : collected ? "done" : "",
+    `${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}`);
+  setPipelineStep("tag", tagged ? "done" : (ai.tagged > 0 || autoRunning) ? "active" : "", `${ai.tagged} / ${ai.total}`);
+  setPipelineStep("event-cards", cardsReady ? "done" : (cards.count > 0 || (autoRunning && tagged)) ? "active" : "", `${cards.count} / ${cards.total}`);
+  setPipelineStep("research", researchDone ? "done" : (autoRunning && cardsReady) || ai.latestResearch?.status === "running" ? "active" : "",
+    researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分");
+}
+
 export async function startCollection() {
   const sources = $$("input[name=source]:checked", $("#batch-detail")).map((item) => item.value);
   if (!sources.length) return toast("至少选择一个数据源");
   const job = await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/collect`, { method: "POST", body: JSON.stringify({ sources, maxAgeHours: Number($("#collect-max-age")?.value) || undefined }) });
-  $("#job-console").textContent = "任务已入队…";
+  showJobConsole("任务已入队…");
   pollJob(job.id);
 }
 
 export async function startBatchAi(type) {
   const provider = $("#batch-ai-provider")?.value;
   if (!provider) return toast("请先在模型中心配置服务商");
+  // 重打会覆盖全部已有语义标注，先确认（此前无防呆，与模型中心同操作不同待遇）
+  if (type === "retag" && !await confirmAction("重新打标将覆盖本批次全部已有语义标注，是否继续？", { confirmText: "重新打标" })) return;
   const path = type === "research" ? "research" : type === "event-cards" ? "event-cards" : "tag";
   const payload = { provider, background: true, force: type === "retag" || (type === "event-cards" && state.currentBatch?.event_cards?.count > 0) };
   const job = await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/ai/${path}`, { method: "POST", body: JSON.stringify(payload) });
-  $("#job-console").textContent = type === "research" ? "事件研判任务已入队…" : type === "event-cards" ? "事件卡任务已入队…" : "语义打标任务已入队…";
+  showJobConsole(type === "research" ? "事件研判任务已入队…" : type === "event-cards" ? "事件卡任务已入队…" : "语义打标任务已入队…");
   pollJob(job.id);
 }
 
@@ -142,7 +214,7 @@ export async function startBreakingAnalysis() {
   const provider = $("#batch-ai-provider")?.value;
   if (!provider) return toast("请先在模型中心配置服务商");
   const job = await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/ai/breaking-analysis`, { method: "POST", body: JSON.stringify({ provider }) });
-  $("#job-console").textContent = "突发素材分析任务已入队…";
+  showJobConsole("突发素材分析任务已入队…");
   pollJob(job.id);
 }
 
@@ -173,6 +245,7 @@ export async function pollJob(id) {
       const consoleNode = $(selector); if (!consoleNode) return;
       consoleNode.textContent = output; consoleNode.scrollTop = consoleNode.scrollHeight;
     });
+    await refreshPipelineSteps(job).catch(() => {});
     if (job.status === "running") {
       state.jobTimer = setTimeout(() => pollJob(id), 1200);
       return;
@@ -226,12 +299,22 @@ export function bindBatchDrawer() {
     if (event.target.closest("[data-ai-retag]")) startBatchAi("retag").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-event-cards]")) startBatchAi("event-cards").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-research]")) startBatchAi("research").catch((error) => toast(error.message));
+    if (event.target.closest("[data-view-research]")) {
+      $("#batch-drawer").close();
+      window.go("topics");
+    }
     if (event.target.closest("[data-breaking-analyze]")) startBreakingAnalysis().catch((error) => toast(error.message));
     if (event.target.closest("[data-breaking-route]")) confirmBreakingRoute().catch((error) => toast(error.message));
     if (event.target.closest("[data-breaking-add-material]")) addBreakingMaterials().catch((error) => toast(error.message));
+    const lifecycleButton=event.target.closest("[data-batch-lifecycle]");
+    if(lifecycleButton)updateBatchLifecycle(lifecycleButton.dataset.batchLifecycle).catch((error)=>toast(error.message));
   });
   $("#new-batch-button").addEventListener("click", openNewBatch);
   $("#dashboard-new").addEventListener("click", openNewBatch);
+  $("#dashboard-primary-action").addEventListener("click", () => {
+    if (state.overview?.latest) openBatch(state.overview.latest.id);
+    else openNewBatch();
+  });
   $("#new-breaking-button").addEventListener("click", openBreakingBatch);
   $("#breaking-batch-form").addEventListener("submit", createBreakingBatch);
   $("#batch-form").addEventListener("submit", createBatch);

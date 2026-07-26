@@ -4,6 +4,36 @@ import { request } from "../core/http.js";
 import { escapeHtml, toast, withLoading } from "../core/ui.js";
 
 let bound = false;
+const graphView = { scale: 1, x: 0, y: 0, dragging: false, pointerX: 0, pointerY: 0 };
+let graphAutoFocusPending = true;
+
+function applyGraphTransform() {
+  const content = document.getElementById("event-graph-content");
+  if (!content) return;
+  content.setAttribute("transform", `translate(${graphView.x} ${graphView.y}) scale(${graphView.scale})`);
+  const reset = document.querySelector('[data-graph-zoom="reset"]');
+  if (reset) reset.textContent = `${Math.round(graphView.scale * 100)}%`;
+}
+
+function zoomGraph(factor, clientX, clientY) {
+  const svg = document.querySelector(".event-graph-svg");
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const pointX = ((clientX ?? rect.left + rect.width / 2) - rect.left) * ((Number(svg.dataset.width) || rect.width) / rect.width);
+  const pointY = ((clientY ?? rect.top + rect.height / 2) - rect.top) * (500 / rect.height);
+  const next = Math.max(0.45, Math.min(2.5, graphView.scale * factor));
+  graphView.x = pointX - ((pointX - graphView.x) * next) / graphView.scale;
+  graphView.y = pointY - ((pointY - graphView.y) * next) / graphView.scale;
+  graphView.scale = next;
+  applyGraphTransform();
+}
+
+function resetGraphView({ autoFocus = false } = {}) {
+  graphView.scale = 1; graphView.x = 0; graphView.y = 0;
+  graphAutoFocusPending = autoFocus;
+  applyGraphTransform();
+}
+
 function bindAtlas() {
   if (bound) return;
   bound = true;
@@ -19,15 +49,27 @@ function bindAtlas() {
     const scopeButton = event.target.closest("[data-atlas-scope]");
     if (scopeButton && state.atlas) {
       state.atlasFilters.scope = scopeButton.dataset.atlasScope;
-      $$("[data-atlas-scope]").forEach((button) => button.classList.toggle("active", button === scopeButton));
+      $$("[data-atlas-scope]").forEach((button) => {
+        button.classList.toggle("active", button === scopeButton);
+        button.setAttribute("aria-pressed", String(button === scopeButton));
+      });
       renderAtlas();
     }
     const lensButton = event.target.closest("[data-graph-lens]");
     if (lensButton && state.atlas) {
       state.atlasGraphLens = lensButton.dataset.graphLens;
       state.atlasSelectedDimension = null;
-      $$("[data-graph-lens]").forEach((button) => button.classList.toggle("active", button === lensButton));
+      resetGraphView({ autoFocus: true });
+      $$("[data-graph-lens]").forEach((button) => {
+        button.classList.toggle("active", button === lensButton);
+        button.setAttribute("aria-pressed", String(button === lensButton));
+      });
       renderAtlas();
+    }
+    const zoomButton = event.target.closest("[data-graph-zoom]");
+    if (zoomButton) {
+      if (zoomButton.dataset.graphZoom === "reset") resetGraphView();
+      else zoomGraph(zoomButton.dataset.graphZoom === "in" ? 1.2 : 1 / 1.2);
     }
     const graphNode = event.target.closest("[data-graph-node]");
     if (graphNode && state.atlas) {
@@ -53,10 +95,38 @@ function bindAtlas() {
       const tracks = String(dimensionPool.dataset.dimensionTracks || "article").split(",").filter(Boolean);
       withLoading(dimensionPool, "合成中…", () => createCompositeFromDimension(state.activeBatchId, nodeId, tracks)).catch((error) => toast(error.message));
     }
+    const collectButton=event.target.closest("[data-atlas-collect]");
+    if(collectButton&&state.activeBatchId){
+      import("./batch-drawer.js").then(({openBatch})=>openBatch(state.activeBatchId)).catch((error)=>toast(error.message));
+    }
   });
+  const graph = document.getElementById("event-graph");
+  graph.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoomGraph(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+  }, { passive: false });
+  graph.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("[data-graph-node]")) return;
+    graphView.dragging = true; graphView.pointerX = event.clientX; graphView.pointerY = event.clientY;
+    graph.classList.add("is-panning");
+    graph.setPointerCapture(event.pointerId);
+  });
+  graph.addEventListener("pointermove", (event) => {
+    if (!graphView.dragging) return;
+    const svg = graph.querySelector("svg");
+    const rect = svg?.getBoundingClientRect();
+    if (!rect) return;
+    graphView.x += (event.clientX - graphView.pointerX) * ((Number(svg.dataset.width) || rect.width) / rect.width);
+    graphView.y += (event.clientY - graphView.pointerY) * (500 / rect.height);
+    graphView.pointerX = event.clientX; graphView.pointerY = event.clientY;
+    applyGraphTransform();
+  });
+  const stopPanning = () => { graphView.dragging = false; graph.classList.remove("is-panning"); };
+  graph.addEventListener("pointerup", stopPanning);
+  graph.addEventListener("pointercancel", stopPanning);
 }
 
-const LENS_LABELS = { who: "主体", what: "对比", where: "场合" };
+const LENS_LABELS = { who: "主体", what: "动作", where: "场合" };
 const DIMENSION_ROLES = { who: "主体动态", what: "横向对比", where: "场合盘点" };
 const LENS_COLORS = { who: "#355f55", what: "#7a5c2e", where: "#6b4a7d" };
 
@@ -115,6 +185,7 @@ async function loadAtlas() {
   if (!batch) return toast("请先选择一个批次");
   try {
     state.atlas = await request(`/api/batches/${encodeURIComponent(batch.id)}/overview`);
+    resetGraphView({ autoFocus: true });
     renderAtlas();
   } catch (err) { toast("加载热点全景失败: " + err.message); }
 }
@@ -128,20 +199,30 @@ function renderGraph() {
     return;
   }
   const lens = activeLens();
-  const dimNodes = graph.nodes.filter((node) => node.type === lens);
+  const dimNodes = graph.nodes
+    .filter((node) => node.type === lens)
+    .sort((a, b) => (b.score || 0) - (a.score || 0) || String(a.label).localeCompare(String(b.label), "zh-CN"));
   if (!dimNodes.length) {
     container.innerHTML = `<div class="empty-state">当前批次没有「${LENS_LABELS[lens]}」维度的分组。该维度依赖打标扩展字段，重新打标后可补齐。</div>`;
     return;
   }
   const lensEdges = graph.edges.filter((edge) => edge.to.startsWith(`${lens}:`));
   const connectedEventIds = new Set(lensEdges.map((edge) => edge.from));
-  const eventNodes = graph.nodes.filter((node) => node.type === "event" && connectedEventIds.has(node.id));
+  const dimensionOrder = new Map(dimNodes.map((node, index) => [node.id, index]));
+  const eventOrder = new Map();
+  lensEdges.forEach((edge) => eventOrder.set(edge.from, Math.min(eventOrder.get(edge.from) ?? Infinity, dimensionOrder.get(edge.to) ?? Infinity)));
+  const eventNodes = graph.nodes
+    .filter((node) => node.type === "event" && connectedEventIds.has(node.id))
+    .sort((a, b) => (eventOrder.get(a.id) ?? Infinity) - (eventOrder.get(b.id) ?? Infinity)
+      || (b.reportCount || 0) - (a.reportCount || 0)
+      || String(a.title).localeCompare(String(b.title), "zh-CN"));
   const width = Math.max(container.clientWidth || 0, 480);
   const rowHeight = 44;
-  const height = Math.max(300, Math.max(dimNodes.length, eventNodes.length) * rowHeight + 60);
+  const viewportHeight = 500;
+  const contentHeight = Math.max(360, Math.max(dimNodes.length, eventNodes.length) * rowHeight + 60);
   const dimX = Math.min(190, width * 0.28);
   const eventX = Math.max(width - 230, width * 0.66);
-  const spread = (count) => (count <= 1 ? [height / 2] : Array.from({ length: count }, (_, i) => 40 + (i * (height - 80)) / (count - 1)));
+  const spread = (count) => (count <= 1 ? [contentHeight / 2] : Array.from({ length: count }, (_, i) => 40 + (i * (contentHeight - 80)) / (count - 1)));
   const dimY = spread(dimNodes.length);
   const eventY = spread(eventNodes.length);
   const maxScore = Math.max(...dimNodes.map((node) => node.score || 1), 1);
@@ -177,14 +258,26 @@ function renderGraph() {
     const label = summary || title;
     const isConnected = selected && selectedEventIds.has(node.id);
     const tooltip = summary ? `${summary}\n代表报道：${title}（${node.reportCount || 1} 条报道）` : `${title}（${node.reportCount || 1} 条报道）`;
-    return `<g class="graph-node graph-event${isConnected ? " graph-event-active" : ""}${selected && !isConnected ? " graph-dimmed" : ""}">
+    const isFocus = node.priorityRank === Math.min(...eventNodes.map((item)=>Number(item.priorityRank??Infinity)));
+    return `<g class="graph-node graph-event${isFocus ? " graph-event-focus" : ""}${isConnected ? " graph-event-active" : ""}${selected && !isConnected ? " graph-dimmed" : ""}">
       <title>${escapeHtml(tooltip)}</title>
       <rect x="${pos.x - pos.r - 6}" y="${pos.y - 12}" width="${pos.r * 2 + 190}" height="24" fill="#000" fill-opacity="0" pointer-events="all"></rect>
       <circle cx="${pos.x}" cy="${pos.y}" r="${pos.r}" fill="${isConnected ? "#e44b3f" : "#8fa9bd"}"></circle>
       <text x="${pos.x + pos.r + 6}" y="${pos.y + 3}" class="graph-label graph-event-label${isConnected ? " graph-event-label-active" : ""}">${escapeHtml(label.length > 16 ? label.slice(0, 15) + "…" : label)}</text>
     </g>`;
   }).join("");
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" class="event-graph-svg" role="img" aria-label="事件关系图">${edgePaths}${eventSvg}${dimSvg}</svg>`;
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${viewportHeight}" data-width="${width}" class="event-graph-svg" role="img" aria-label="按${LENS_LABELS[lens]}排序的事件关系图"><g id="event-graph-content">${edgePaths}${eventSvg}${dimSvg}</g></svg><span class="graph-pan-hint">滚轮缩放 · 拖动画布</span>`;
+  if(graphAutoFocusPending&&eventNodes.length){
+    const focusNode=[...eventNodes].sort((a,b)=>Number(a.priorityRank??Infinity)-Number(b.priorityRank??Infinity))[0];
+    const focusPosition=positions.get(focusNode.id);
+    if(focusPosition){
+      graphView.scale=1.22;
+      graphView.x=width*.58-focusPosition.x*graphView.scale;
+      graphView.y=viewportHeight*.46-focusPosition.y*graphView.scale;
+    }
+    graphAutoFocusPending=false;
+  }
+  applyGraphTransform();
 }
 
 function renderDimensionCards() {
@@ -220,6 +313,16 @@ function renderAtlas() {
   const atlas = state.atlas;
   if (!atlas) return;
   const events = atlasEvents();
+  const stageEmpty=document.getElementById("atlas-stage-empty");
+  const noBatchData=Number(atlas.eventCount||0)===0;
+  if(stageEmpty)stageEmpty.hidden=!noBatchData;
+  [
+    document.querySelector("#view-overview .atlas-notice"),
+    document.getElementById("atlas-controls"),
+    document.querySelector("#view-overview .atlas-semantic-grid"),
+    document.querySelector("#view-overview .atlas-table"),
+  ].forEach((section)=>{if(section)section.hidden=noBatchData;});
+  if(noBatchData)return;
   document.getElementById("atlas-filter-count").textContent = `显示 ${events.length} / ${atlas.eventCount} 个事件`;
 
   const scopeTotal = Math.max(1, events.length);
@@ -253,20 +356,29 @@ async function createCompositeFromEvent(batchId, eventId, eventTitle, tracks = [
   const title = prompt("综合选题名称（可选，默认以事件标题命名）：", eventTitle || event.representative_title) || event.representative_title;
   const hotspotIds = event.hotspot_ids || [];
   if (!hotspotIds.length) return toast("该事件簇没有关联的热点");
+  let message;
   if (hotspotIds.length === 1) {
     await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, {
       method: "POST", body: JSON.stringify({ hotspotIds, tracks }),
     });
-    toast(`已加入选题池：${event.representative_title}`);
+    message = `已加入选题池：${event.representative_title}`;
   } else {
     const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
       method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "综合选题", tracks }),
     });
-    toast(`已从事件簇创建综合选题：${candidate.candidate_id}`);
+    message = `已从事件簇创建综合选题：${candidate.candidate_id}`;
   }
+  offerPoolExit(tracks, message);
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
   if (document.querySelector(".nav-item.active")?.dataset.view === "overview") await loadAtlas();
+}
+
+// 创建成功后给出可跳转的出口，避免"成功了但不知道去哪看"的死路
+function offerPoolExit(tracks, message) {
+  const target = tracks.includes("social_cards") ? "social-topics" : "topics";
+  const label = target === "topics" ? "文章选题池" : "图文选题池";
+  if (window.confirm(`${message}\n\n是否前往${label}查看？`)) window.go(target);
 }
 
 async function createCompositeFromDimension(batchId, nodeId, tracks = ['article']) {
@@ -279,7 +391,7 @@ async function createCompositeFromDimension(batchId, nodeId, tracks = ['article'
   const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
     method: "POST", body: JSON.stringify({ hotspotIds, title: node.label, poolRole: DIMENSION_ROLES[node.type] || "维度选题", tracks }),
   });
-  toast(`已创建${LENS_LABELS[node.type]}维度选题：${candidate.candidate_id}（${hotspotIds.length} 条报道）`);
+  offerPoolExit(tracks, `已创建${LENS_LABELS[node.type]}维度选题：${candidate.candidate_id}（${hotspotIds.length} 条报道）`);
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
 }

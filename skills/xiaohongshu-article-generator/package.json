@@ -1,0 +1,24 @@
+{
+  "name": "xiaohongshu-article-generator",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "小红书图文生成与浏览器实测布局审计",
+  "main": "scripts/layout-audit.mjs",
+  "scripts": {
+    "audit": "node scripts/layout-audit.mjs"
+  },
+  "keywords": [
+    "xiaohongshu",
+    "article",
+    "generator",
+    "openclaw",
+    "skill"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  },
+  "peerDependencies": {
+    "html-pages-to-images": "file:../html-pages-to-images"
+  }
+}

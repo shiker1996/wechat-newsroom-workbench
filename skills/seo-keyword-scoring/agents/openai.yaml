@@ -1,0 +1,4 @@
+interface:
+  display_name: "中文关键词搜索信号"
+  short_description: "比较百度和 360 搜索联想并扩展相关关键词"
+  default_prompt: "使用 $seo-keyword-scoring 比较这些中文关键词的搜索联想信号。"

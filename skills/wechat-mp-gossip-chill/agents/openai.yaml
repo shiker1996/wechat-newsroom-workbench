@@ -1,0 +1,4 @@
+interface:
+  display_name: "公众号轻松职场趣闻"
+  short_description: "用克制、口语化的方式写大厂和职场趣闻"
+  default_prompt: "使用 $wechat-mp-gossip-chill 把这些已核验素材写成轻松职场趣闻。"

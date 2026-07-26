@@ -1,0 +1,4 @@
+interface:
+  display_name: "文章手动配图占位"
+  short_description: "为来源图、资料图和参考图插入结构化占位"
+  default_prompt: "使用 $article-image-placeholders 为这篇文章标记需要手动提供的图片。"

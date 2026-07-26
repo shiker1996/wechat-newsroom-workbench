@@ -1,0 +1,4 @@
+interface:
+  display_name: "又拍云图片上传"
+  short_description: "经用户授权后把本地图片上传并返回 HTTPS URL"
+  default_prompt: "使用 $upyun-upload-image 将这张图片上传到已配置的又拍云存储。"

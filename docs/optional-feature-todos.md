@@ -149,7 +149,7 @@
 - 候选进入选题池后，再升级为完整事实基座。
 - 预计改动量：中到大。
 
-> 实施状态：抓取路由部分已完成（2026-07-25）。`lib/source-quality.mjs` 启发式评分（长度 40 + 段落 20 + 标题相关性 20，登录墙/错误页直接 5 分），纯规则不调模型；`lib/source-fetcher.mjs` 路由顺序：① twitter 热点直接用 RSS 摘要（推文即全文，fetch_method `rss-tweet`），长摘要视为可用正文（`rss-content`）；② GitHub 仓库 URL 走 API + README（`github-api`）；③ Python 本地抓取优先，质量分不足才升级 Firecrawl 并保留分高者，全失败时长摘要 `rss-summary-fallback` 兜底。每条来源记录附 `quality` 评分与 `evidence_level` 证据等级（hotspot_sources 表新增 `quality_json`/`evidence_level` 列）。四个路由阈值（升级分 55、免抓摘要 800 字、兜底摘要 200 字、README 最少 200 字）统一在 `config.local.json` 的 `sourceFetch` 段配置（默认值见 `lib/config.mjs`）；评分权重与拦截词表在 `lib/source-quality.mjs` 内。事件内精选深抓（每事件 2～3 个代表来源）尚未实施，验证与推进计划见 `docs/event-deep-fetch-and-fact-base-plan.md`。
+> 实施状态：抓取路由部分已完成（2026-07-25）。`lib/domain/source-quality.mjs` 启发式评分（长度 40 + 段落 20 + 标题相关性 20，登录墙/错误页直接 5 分），纯规则不调模型；`lib/integrations/source-fetcher.mjs` 路由顺序：① twitter 热点直接用 RSS 摘要（推文即全文，fetch_method `rss-tweet`），长摘要视为可用正文（`rss-content`）；② GitHub 仓库 URL 走 API + README（`github-api`）；③ Python 本地抓取优先，质量分不足才升级 Firecrawl 并保留分高者，全失败时长摘要 `rss-summary-fallback` 兜底。每条来源记录附 `quality` 评分与 `evidence_level` 证据等级（hotspot_sources 表新增 `quality_json`/`evidence_level` 列）。四个路由阈值（升级分 55、免抓摘要 800 字、兜底摘要 200 字、README 最少 200 字）统一在 `config.local.json` 的 `sourceFetch` 段配置（默认值见 `lib/core/config.mjs`）；评分权重与拦截词表在 `lib/domain/source-quality.mjs` 内。事件内精选深抓（每事件 2～3 个代表来源）尚未实施，验证与推进计划见 `docs/event-deep-fetch-and-fact-base-plan.md`。
 
 ### 验收标准
 
@@ -215,7 +215,7 @@
 
 ### 遗留说明
 
-- 同日多批次共享工作目录：已按批次 ID 隔离（2026-07-25 完成）。topics/articles/social-cards 目录一律以批次 ID 命名、旧日期目录回退兼容（`lib/workspace-paths.mjs`）；产物索引优先按完整批次 ID 归属，避免同日串档（`lib/artifact-indexer.mjs`）；无候选的批次级文稿目录同步隔离；store 迁移回填同时识别 ID 命名目录。事件卡进度此前已按"无打标事件则不计入"修复。
+- 同日多批次共享工作目录：已按批次 ID 隔离（2026-07-25 完成）。topics/articles/social-cards 目录一律以批次 ID 命名、旧日期目录回退兼容（`lib/core/workspace-paths.mjs`）；产物索引优先按完整批次 ID 归属，避免同日串档（`lib/artifacts/artifact-indexer.mjs`）；无候选的批次级文稿目录同步隔离；store 迁移回填同时识别 ID 命名目录。事件卡进度此前已按"无打标事件则不计入"修复。
 - 本日工作未覆盖待办 1/3/4/5/6 与 7-P1/P2，优先级维持原评估。
 
 ## 10. 前端双轨收敛（UX 交互重构前置项）

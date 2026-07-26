@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast } from "../core/ui.js";
+import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 function activeTrack() {
@@ -15,6 +15,12 @@ function trackElements(track) {
 
 const DRAFT_SCORE_THRESHOLD = 55;
 function isDraftEligible(item) { return item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD; }
+const articleScoreLabels = { h: "历史 H", b: "潜力 B", p: "匹配 P", s: "饱和 S", d: "修正 D", f: "总分 F" };
+const editorialStatusLabels = {
+  DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
+  DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判",
+};
+function statusLabel(value) { return editorialStatusLabels[String(value || "")] || String(value || "待处理"); }
 
 function renderCandidates(candidates, track = activeTrack()) {
   const elements = trackElements(track);
@@ -47,8 +53,8 @@ function renderCandidates(candidates, track = activeTrack()) {
         const socialTarget = isCustom ? "social-custom" : isEvent ? "social-event" : "social-editor";
         const socialLabel = isCustom ? "自定义" : isEvent ? "事件" : "工具";
         const primaryAction = track === "article"
-          ? `<button class="text-button" data-editorial-id="${item.id}">进入文章编辑室 →</button>`
-          : `<button class="text-button" data-social-editor-id="${item.id}" data-social-target="${socialTarget}">进入${socialLabel}图文编辑室 →</button>`;
+          ? `<button class="ink-button candidate-primary-action" data-editorial-id="${item.id}">进入文章编辑室 →</button>`
+          : `<button class="ink-button candidate-primary-action" data-social-editor-id="${item.id}" data-social-target="${socialTarget}">进入${socialLabel}图文编辑室 →</button>`;
         const social=item.social_score?.score||{};
         const socialParts=[['工具',social.toolClarity],['场景',social.scenarioValue],['演示',social.demonstrability],['拆页',social.visualPotential],['收藏',social.saveSearchValue],['来源',social.sourceCompleteness],['事实扣',social.factGapPenalty],['权限扣',social.permissionRiskPenalty],['FIT',social.finalScore]];
         const socialChannel = String(item.output_mode||"").startsWith("xiaohongshu") ? "小红书" : "公众号";
@@ -59,7 +65,7 @@ function renderCandidates(candidates, track = activeTrack()) {
             : isEvent
               ? `<div class="score-strip"><span>类型<b>事件图文</b></span><span>渠道<b>${socialChannel}</b></span></div>`
               : `<div class="score-strip social-fit-strip">${socialParts.map(([label,value])=>`<span>${label}<b>${value==null?'—':Number(value).toFixed(Number(value)%1?1:0)}</b></span>`).join('')}</div>`)
-          : `<div class="score-strip">${["h", "b", "p", "s", "d", "f"].map((k) => `<span>${k.toUpperCase()}<b>${item[k + "_score"] == null ? "—" : Number(item[k + "_score"]).toFixed(item[k + "_score"] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
+          : `<div class="score-strip article-score-strip">${["h", "b", "p", "s", "d", "f"].map((k) => `<span title="${articleScoreLabels[k]}">${articleScoreLabels[k]}<b>${item[k + "_score"] == null ? "—" : Number(item[k + "_score"]).toFixed(item[k + "_score"] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
         // 综合候选（维度组）展示组标题（如"腾讯近期动态"），单热点候选优先展示事件摘要，与编辑室口径一致
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
         const dimensionLabel = { who: "主体", what: "对比", where: "场合" }[item.dimension] || "";
@@ -71,7 +77,7 @@ function renderCandidates(candidates, track = activeTrack()) {
           <div class="candidate-meta"><span>${escapeHtml(item.track_pool_role || item.pool_role)}</span><span>${item.composite ? `多源综合${item.hotspot_count ? ` · ${item.hotspot_count}条报道` : ""}` : escapeHtml(item.source_name || item.source_group || item.source)}</span><span>风险 ${escapeHtml(item.risk_level)}</span></div>
           ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map(escapeHtml).join("」「")}」共享事件素材</p>` : ""}
           ${scoreStrip}
-          <div class="candidate-actions"><span class="status-pill">${escapeHtml(track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled"))}</span>${primaryAction}<button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></div>
+          <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster">${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
         </article>`;
         return card;
       }).join("")
@@ -157,7 +163,7 @@ if (!window.__candidateTrackActionsBound) {
     const remove = event.target.closest("[data-remove-track]");
     if (remove) {
       const label = remove.dataset.removeTrack === "social_cards" ? "图文池" : "文章池";
-      if (!confirm(`确认只从${label}移出？另一个池及候选主体不会删除。`)) return;
+      if (!await confirmAction(`确认只从${label}移出？另一个池及候选主体不会删除。`, { confirmText: "移出" })) return;
       try {
         await request(`/api/candidates/${Number(remove.dataset.candidateId)}/tracks/${encodeURIComponent(remove.dataset.removeTrack)}`, { method: "DELETE" });
         toast(`已移出${label}`);
@@ -185,7 +191,7 @@ if (!window.__candidateTrackActionsBound) {
     const removeCandidate = event.target.closest("[data-remove-candidate]");
     if (removeCandidate) {
       const id = Number(removeCandidate.dataset.removeCandidate);
-      if (!confirm("确认移除此候选？")) return;
+      if (!await confirmAction("确认移除此候选？", { confirmText: "移除" })) return;
       try {
         await request(`/api/candidates/${id}`, { method: "DELETE" });
         toast("已移除");

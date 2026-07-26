@@ -74,17 +74,17 @@
 
 ### 现状
 
-- `lib/repository-inspector.mjs:47` 对非 GitHub URL 直接抛错；候选仓库地址只认热点 URL 为 github.com（`server.mjs:88-91`）。非仓库图文当前完全走不通。
-- 手工候选入口 `store.addManualHotspot`（`lib/store.mjs:562-580`）已存在，但仅突发专题使用，server 没有暴露路由。
-- HTML 由 `renderStoryboardHtml()`（`lib/social-card-pipeline.mjs:43-72`）程序化渲染，14 套主题 CSS 硬编码；`channel_mode` 不进渲染函数，`output_mode='xiaohongshu'` 目前零代码分支。
-- CARD GATE：`lib/social-card-gate.mjs`（仓库型 10 项、事件型 8 项），无自定义内容类型。
+- `lib/integrations/repository-inspector.mjs:47` 对非 GitHub URL 直接抛错；候选仓库地址只认热点 URL 为 github.com（`server.mjs:88-91`）。非仓库图文当前完全走不通。
+- 手工候选入口 `store.addManualHotspot`（`lib/core/store.mjs:562-580`）已存在，但仅突发专题使用，server 没有暴露路由。
+- HTML 由 `renderStoryboardHtml()`（`lib/llm/social-card-pipeline.mjs:43-72`）程序化渲染，14 套主题 CSS 硬编码；`channel_mode` 不进渲染函数，`output_mode='xiaohongshu'` 目前零代码分支。
+- CARD GATE：`lib/domain/social-card-gate.mjs`（仓库型 10 项、事件型 8 项），无自定义内容类型。
 - 故事板 prompt 内联在 `server.mjs:498-502`，只有仓库型和事件型两套。
 
 ### 改动清单
 
 1. 入口：图文选题池增加"创建自定义图文"，新增 server 路由（创建手工候选或直接建候选 + social_cards 轨道），与仓库候选在 UI 上明确区分。
-2. 事实基座：新增 `lib/custom-fact-builder.mjs`（或并入 repository-inspector 分流），支持填写主题、目标受众、使用场景、核心观点、素材链接、作者体验、限制说明和期望页数；素材 URL 走 `lib/source-fetcher.mjs` 抓取后纳入事实基座。复用 `repository_fact_sheets` 表或新增自定义事实表（设计时定）。
-3. 内容类型化：种草、生活、教程、清单、经验、观点各有独立故事板契约与 GATE 检查项（`lib/social-card-gate.mjs` 扩展）；`server.mjs:498-502` 增加类型化故事板 prompt。
+2. 事实基座：新增 `lib/domain/custom-fact-builder.mjs`（或并入 repository-inspector 分流），支持填写主题、目标受众、使用场景、核心观点、素材链接、作者体验、限制说明和期望页数；素材 URL 走 `lib/integrations/source-fetcher.mjs` 抓取后纳入事实基座。复用 `repository_fact_sheets` 表或新增自定义事实表（设计时定）。
+3. 内容类型化：种草、生活、教程、清单、经验、观点各有独立故事板契约与 GATE 检查项（`lib/domain/social-card-gate.mjs` 扩展）；`server.mjs:498-502` 增加类型化故事板 prompt。
 4. 体验真实性边界：事实基座中明确区分"作者真实体验""用户提供素材""模型建议"三个来源等级；GATE 禁止模型虚构亲测、效果或收益；种草和生活类增加广告、功效表述边界检查。
 5. 小红书渠道：`renderStoryboardHtml` 引入 `channel_mode` 分支（页型、页脚、标签页结构）；`skills/xiaohongshu-article-generator/references/` 补小红书专属 reference（现只有 wechat 两个）；图文编辑室暴露 output_mode 选择。
 6. 继续复用现有视觉主题、逐页 HTML、布局审计、PNG 截图、配套文案和 ZIP 交付能力，不新建执行器。
@@ -101,13 +101,13 @@
 ### 现状
 
 - 无任何页级操作：唯一重跑手段是整组"重新生成图文"，按契约重跑全部 6 阶段并覆盖同目录全部文件。
-- AI 任务互斥为批次级（`lib/ai-job-manager.mjs:17-21`），页级重绘会被同批次其他任务阻塞，反之亦然。
+- AI 任务互斥为批次级（`lib/llm/ai-job-manager.mjs:17-21`），页级重绘会被同批次其他任务阻塞，反之亦然。
 
 ### 改动清单
 
-1. `lib/social-card-pipeline.mjs`：把 `runSocialCardPipeline` 拆出可重入阶段函数，支持 `startFrom` 与 `pageNumbers` 参数；`validateDelivery` 与阶段顺序强校验适配部分重跑。
+1. `lib/llm/social-card-pipeline.mjs`：把 `runSocialCardPipeline` 拆出可重入阶段函数，支持 `startFrom` 与 `pageNumbers` 参数；`validateDelivery` 与阶段顺序强校验适配部分重跑。
 2. `skills/html-pages-to-images/lib/convert-pages.js`：支持只截指定页（当前全量 `.page`）。
-3. `lib/ai-job-manager.mjs`：互斥键改为 `batchId + candidateId + type`，并发数保持 1（不实施多任务并行）。
+3. `lib/llm/ai-job-manager.mjs`：互斥键改为 `batchId + candidateId + type`，并发数保持 1（不实施多任务并行）。
 4. `server.mjs:548-553` 附近新增页级重绘路由；`public/src/views/social-editor.js` 画廊每页加"重绘此页"。
 5. 一致性保障：单页修改走"改 card-plan 单页 → 重渲染该页 HTML → 整份 HTML 全量布局审计 → 只重截变更页 PNG"，保证页间叙事与视觉一致性不被单页操作破坏；若单页改动导致相邻页审计失败，明确报错而不是静默通过。
 

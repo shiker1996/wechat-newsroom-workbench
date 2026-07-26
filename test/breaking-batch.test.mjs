@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/store.mjs';
-import { indexArtifacts } from '../lib/artifact-indexer.mjs';
-import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from '../lib/workspace-paths.mjs';
+import { Store } from '../lib/core/store.mjs';
+import { indexArtifacts } from '../lib/artifacts/artifact-indexer.mjs';
+import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from '../lib/core/workspace-paths.mjs';
 
 test('突发热点创建独立批次并保存多个素材链接', () => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'breaking-batch-'));

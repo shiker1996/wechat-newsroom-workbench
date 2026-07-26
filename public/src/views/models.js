@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let bound = false;
@@ -63,13 +63,14 @@ async function aiTagBatch() {
   const provider = document.getElementById("model-provider")?.value || state.models?.defaultProvider;
   if (!provider) return toast("请先在模型中心配置至少一个服务商");
   if (!state.activeBatchId) return toast("请先选择一个批次");
-  const force = confirm("重新打标将覆盖本批次全部已有语义标注，是否继续？");
+  // 确认=强制覆盖重打；取消=中止操作（此前取消会变成"非强制继续"，语义被篡改）
+  if (!await confirmAction("重新打标将覆盖本批次全部已有语义标注，是否继续？", { confirmText: "重新打标" })) return;
   const limit = Number(document.getElementById("tag-limit")?.value) || undefined;
   try {
     await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/tag`, {
-      method: "POST", body: JSON.stringify({ provider, background: true, force, limit }),
+      method: "POST", body: JSON.stringify({ provider, background: true, force: true, limit }),
     });
-    toast(force ? "重新打标已启动" : "打标任务已启动");
+    toast("重新打标已启动");
   } catch (err) { toast(err.message); }
 }
 export default async function loadModelsView() {

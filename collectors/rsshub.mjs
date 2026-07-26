@@ -170,6 +170,11 @@ export async function ensureStarted(config, onProgress) {
   throw new Error('RSSHub 启动后未通过根地址健康检查');
 }
 
+export async function stopRssHub(config) {
+  const port = String(new URL(config.baseUrl).port || 1200);
+  return runPowerShell(config.stopScript, ['-PidFile', config.pidFile, '-Port', port], 30000);
+}
+
 function titleOfFeed(xml, fallback) {
   return field(xml.match(/<channel\b[\s\S]*?<\/channel>|<feed\b[\s\S]*?<\/feed>/i)?.[0] ?? xml, ['title']) || fallback;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/store.mjs';
+import { Store } from '../lib/core/store.mjs';
 import { mapBreakingArticleScore, normalizeScore, routeBreakingAnalysis } from '../lib/llm/breaking-analysis-pipeline.mjs';
 
 function createStore(){

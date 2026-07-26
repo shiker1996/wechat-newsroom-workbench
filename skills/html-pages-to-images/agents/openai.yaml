@@ -1,0 +1,4 @@
+interface:
+  display_name: "HTML 元素批量截图"
+  short_description: "将可信 HTML 中匹配选择器的元素逐一截图为 PNG"
+  default_prompt: "使用 $html-pages-to-images 将这个 HTML 中的指定元素批量截图。"

@@ -6,6 +6,11 @@ let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
 let selectedContentType='repository';
 let selectedChannelMode='wechat';
+let currentCardPlan=[];
+let currentLayoutDecisions=[];
+
+const CARD_LAYOUT_LABELS={auto:'自动推荐',poster:'海报大字',editorial:'杂志分栏',data:'数据报告',checklist:'卡片清单',steps:'教程步骤',minimal:'极简留白'};
+const CARD_LAYOUT_STATUS={recommended:'自动推荐',manual:'手动指定',group:'整组指定',fallback:'自动降级'};
 
 const CUSTOM_TYPE_LABELS={tutorial:'教程',list:'清单',opinion:'观点'};
 const CUSTOM_LEVEL_LABELS={author_experience:'作者体验',user_material:'用户素材',model_suggestion:'模型建议'};
@@ -16,9 +21,9 @@ function isCustomOutput(mode){return String(mode||'').includes('custom-cards');}
 function isEventOutput(mode){return String(mode||'').includes('event-cards');}
 function candidateMode(outputMode){return isCustomOutput(outputMode)?'custom':isEventOutput(outputMode)?'event':'tools';}
 const MODE_LAYOUT={
-  tools:{heading:'工具图文',intro:'AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。',empty:'图文选题池为空'},
-  custom:{heading:'自定义图文',intro:'从主题、要点和素材直接立项，AI 按来源等级规划卡片故事板。',empty:'还没有自定义图文，点击上方「创建自定义图文」开始'},
-  event:{heading:'事件图文',intro:'AI 根据事件卡与来源快照整理事实基座，规划事件卡片故事板。',empty:'还没有事件图文，可在热点全景将事件加入图文池'},
+  tools:{heading:'工具图文',intro:'AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。',empty:'当前批次没有工具图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
+  custom:{heading:'自定义图文',intro:'从主题、要点和素材直接立项，AI 按来源等级规划卡片故事板。',empty:'当前批次没有自定义图文，请点击上方「创建自定义图文」添加。'},
+  event:{heading:'事件图文',intro:'AI 根据事件卡与来源快照整理事实基座，规划事件卡片故事板。',empty:'当前批次没有事件图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
 };
 function applyModeLayout(){
   const layout=MODE_LAYOUT[currentMode]||MODE_LAYOUT.tools;
@@ -26,6 +31,8 @@ function applyModeLayout(){
   document.getElementById('social-editor-intro').textContent=layout.intro;
   document.getElementById('create-custom-social').hidden=currentMode!=='custom';
   if(currentMode!=='custom')document.getElementById('custom-social-panel').hidden=true;
+  const empty=document.getElementById('social-editor-empty');
+  if(empty)empty.innerHTML=layout.empty;
   const scorePanel=document.querySelector('.social-score-panel');if(scorePanel)scorePanel.hidden=currentMode!=='tools';
 }
 
@@ -34,7 +41,7 @@ function setupSocialTabNavigation(){const tabs=document.getElementById('social-e
 
 function renderDeliveryImage(){if(!delivery?.images?.length)return;deliveryIndex=(deliveryIndex+delivery.images.length)%delivery.images.length;const image=delivery.images[deliveryIndex];document.getElementById('social-gallery-image').src=`${image.url}?s=${image.size}`;document.getElementById('social-gallery-counter').textContent=`${deliveryIndex+1} / ${delivery.images.length}`;document.getElementById('social-download-image').href=image.downloadUrl;document.getElementById('social-gallery-film').querySelectorAll('button').forEach((button,index)=>button.classList.toggle('active',index===deliveryIndex));}
 function renderProof(){if(!delivery)return;const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2)};document.getElementById('social-proof-content').textContent=values[proofTab];document.querySelectorAll('[data-social-proof]').forEach((button)=>button.classList.toggle('active',button.dataset.socialProof===proofTab));}
-async function loadDelivery(candidateId=selectedId){if(!candidateId)return;const data=await request(`/api/candidates/${candidateId}/social-cards`);if(candidateId!==selectedId)return;delivery=data;const panel=document.getElementById('social-delivery');panel.hidden=!data.ready;if(!data.ready)return;deliveryIndex=0;document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;document.getElementById('social-open-html').href=data.htmlUrl;document.getElementById('social-download-all').href=data.bundleUrl;document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');renderDeliveryImage();renderProof();}
+async function loadDelivery(candidateId=selectedId){if(!candidateId)return;const data=await request(`/api/candidates/${candidateId}/social-cards`);if(candidateId!==selectedId)return;delivery=data;const panel=document.getElementById('social-delivery');panel.hidden=!data.ready;if(!data.ready)return;deliveryIndex=0;document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;document.getElementById('social-open-html').href=data.htmlUrl;document.getElementById('social-download-all').href=data.bundleUrl;document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}" aria-label="查看第 ${index+1} 张图文"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');renderDeliveryImage();renderProof();}
 
 function renderGate(gate) {
   document.getElementById("card-ready-title").textContent=gate.ready?"故事板已就绪":selectedContentType==='event'?"请先生成事件故事板":selectedContentType==='custom'?"请先完善自定义事实基座":"请先分析仓库生成故事板";
@@ -75,9 +82,21 @@ function renderScore(score) {
 
 async function loadSimilarSocialCards(candidateId){const container=document.getElementById('similar-social-cards');if(!container)return;container.hidden=true;container.innerHTML='';try{const items=await request(`/api/candidates/${candidateId}/similar-social`);if(candidateId!==selectedId||!items.length)return;container.innerHTML=`<b>历史图文覆盖</b>${items.map((item)=>`<div><span data-cal-social="${item.candidateRowId}" title="打开历史图文">${escapeHtml(item.title||item.candidateId)}</span> <small>${escapeHtml(item.batchDate||'')} · ${escapeHtml(item.reason||'相似内容')}</small></div>`).join('')}`;container.hidden=false;}catch{container.hidden=true;}}
 
-function renderCardPlan(value) {
+function renderCardPlan(value,decisions=currentLayoutDecisions) {
   let plan=[];try{plan=Array.isArray(value)?value:JSON.parse(value||'[]');}catch{}
-  document.getElementById("card-plan-preview").innerHTML=plan.length?plan.map((page,index)=>`<article><b>${index+1}</b><div><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p></div></article>`).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`;
+  currentCardPlan=plan;currentLayoutDecisions=Array.isArray(decisions)?decisions:[];
+  const options=(selected)=>Object.entries(CARD_LAYOUT_LABELS).map(([value,label])=>`<option value="${value}"${value===selected?' selected':''}>${label}</option>`).join('');
+  const structuredTypes=new Set(['stats','compare','steps','timeline','scenes']);
+  const blockEditor=(block,blockIndex)=>{
+    const structured=structuredTypes.has(block.type);
+    const payload=structured?JSON.stringify({items:block.items||[],headers:block.headers||[],rows:block.rows||[]},null,2):String(block.content||'');
+    return `<fieldset class="storyboard-block-editor" data-storyboard-block="${blockIndex}"><legend>内容块 ${blockIndex+1} · ${escapeHtml(block.type||'text')}</legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title||'')}"></label><label>${structured?'结构化内容（JSON）':'正文'}<textarea data-storyboard-block-content data-structured="${structured?'true':'false'}" rows="${structured?6:3}">${escapeHtml(payload)}</textarea></label></fieldset>`;
+  };
+  document.getElementById("card-plan-preview").innerHTML=plan.length?plan.map((page,index)=>{
+    const decision=currentLayoutDecisions[index]||{layout:page.layout_style||'auto',source:page.layout_style&&page.layout_style!=='auto'?'manual':'recommended',reason:''};
+    const selected=page.layout_style||'auto';
+    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control"><label>页面版式<select data-card-page-layout="${index+1}">${options(selected)}</select></label><span class="layout-status ${escapeHtml(decision.source||'recommended')}">${escapeHtml(CARD_LAYOUT_STATUS[decision.source]||'自动推荐')} · ${escapeHtml(CARD_LAYOUT_LABELS[decision.layout]||decision.layout||'')}</span>${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
+  }).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`;
 }
 
 export async function openSocialEditor(id) {
@@ -91,16 +110,19 @@ export async function openSocialEditor(id) {
   document.querySelector('.social-editor-candidate.active')?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});updateSocialTabControls();
   document.getElementById('social-facts-kicker').textContent=selectedContentType==='event'?'EVENT FACT BASE':selectedContentType==='custom'?'CUSTOM FACT BASE':'REPOSITORY FACTS';
   document.getElementById('social-facts-title').textContent=selectedContentType==='event'?'突发事件事实基座':selectedContentType==='custom'?`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`:'仓库事实基座';
+  const channelPicker=document.getElementById('social-channel')?.closest('label');
+  const factsActions=document.getElementById('social-facts-title')?.closest('.workspace-head')?.querySelector(':scope>div:last-child');
+  if(channelPicker&&factsActions&&!factsActions.contains(channelPicker))factsActions.prepend(channelPicker);
   const inspect=document.getElementById('inspect-repository'),reanalyze=document.getElementById('analyze-card-editorial');
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
-  renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
   if(!candidateId)return; const data=await request(`/api/candidates/${candidateId}/ai/card-editorial`,{method:'POST',body:'{}'});
-  if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
+  if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
 function renderStoryboardLoading(message){document.getElementById("card-plan-preview").innerHTML=`<div class="storyboard-loading"><span class="storyboard-spinner"></span><div><b>${escapeHtml(message)}</b><small>${selectedContentType==='event'?'正在读取事实、主张、时间线和来源风险，请勿重复点击。':'正在读取 README、提取能力并规划逐页内容，请勿重复点击。'}</small></div></div>`;}
@@ -113,7 +135,8 @@ async function runStoryboard({inspect=false}={}){
 
 async function watchSocialJob(jobId,candidateId,button){
   while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);if(candidateId===selectedId)button.textContent=job.status==='running'?(job.progress||'图文任务执行中…'):'生成图文';if(job.status==='running')continue;
-    if(candidateId===selectedId){button.disabled=false;button.textContent=job.status==='completed'?'重新生成图文':'生成图文';}
+    // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
+    button.disabled=false;button.textContent=job.status==='completed'?'重新生成图文':'生成图文';
     if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else toast(`图文生成失败${job.error?`：${job.error}`:''}`);return;
   }
 }
@@ -131,7 +154,7 @@ async function loadSocialEditor(view) {
   nav.innerHTML=candidates.length?candidates.map((item)=>{const modeLabel=isCustomOutput(item.output_mode)?(item.output_mode==='xiaohongshu-custom-cards'?'自定义 · 小红书':'自定义 · 公众号'):isEventOutput(item.output_mode)?'事件图文':'';return `<button type="button" class="social-editor-candidate" data-social-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)}</b><span>${escapeHtml(item.hotspot_title)}</span><em>${escapeHtml(modeLabel||item.repository_description||item.social_selection_reason||'暂无仓库描述')}</em><small>${escapeHtml(item.track_status||'pooled')}${item.social_selection_reason?` · ${escapeHtml(item.social_selection_reason)}`:''}</small></button>`;}).join(''):`<div class="empty-state">${layout.empty}</div>`;
   requestAnimationFrame(updateSocialTabControls);
   if(candidates.length){await openSocialEditor(selectedId&&candidates.some((x)=>x.id===selectedId)?selectedId:candidates[0].id);}
-  else{selectedId=null;document.getElementById("social-editor-fields").hidden=true;document.getElementById("social-editor-empty").hidden=false;}
+  else{selectedId=null;document.getElementById("social-editor-fields").hidden=true;const empty=document.getElementById("social-editor-empty");empty.innerHTML=layout.empty;empty.hidden=false;}
 }
 
 function freshButton(id){const current=document.getElementById(id);if(!current)return null;const fresh=current.cloneNode(true);current.replaceWith(fresh);return fresh;}
@@ -139,15 +162,55 @@ function freshButton(id){const current=document.getElementById(id);if(!current)r
 if(!window.__socialEditorCandidateBound){window.__socialEditorCandidateBound=true;
   document.addEventListener("click",async(event)=>{const candidate=event.target.closest("[data-social-candidate]");if(candidate)await openSocialEditor(Number(candidate.dataset.socialCandidate));});
 }
+if(!window.__socialPageLayoutBound){window.__socialPageLayoutBound=true;
+  document.addEventListener('change',async(event)=>{
+    const select=event.target.closest('[data-card-page-layout]');if(!select||!selectedId)return;
+    const page=Number(select.dataset.cardPageLayout);select.disabled=true;
+    try{
+      const data=await request(`/api/candidates/${selectedId}/card-pages/${page}/layout`,{method:'PUT',body:JSON.stringify({layout_style:select.value})});
+      renderCardPlan(data.cardPlan,data.layoutDecisions);
+      toast('逐页版式已保存，重新生成图文时统一生效');
+    }catch(error){toast(error.message);renderCardPlan(currentCardPlan,currentLayoutDecisions);}
+  });
+}
+if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
+  document.addEventListener('click',async(event)=>{
+    const button=event.target.closest('[data-save-storyboard-page]');if(!button||!selectedId)return;
+    const pageNumber=Number(button.dataset.saveStoryboardPage),article=button.closest('[data-card-page]');
+    const source=currentCardPlan[pageNumber-1];if(!source||!article)return;
+    const contentBlocks=[];
+    try{
+      article.querySelectorAll('[data-storyboard-block]').forEach((node,index)=>{
+        const original=source.content_blocks?.[index]||{type:'text'};
+        const field=node.querySelector('[data-storyboard-block-content]');
+        const block={...original,title:node.querySelector('[data-storyboard-block-title]')?.value.trim()||''};
+        if(field?.dataset.structured==='true')Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
+        else block.content=field?.value.trim()||'';
+        contentBlocks.push(block);
+      });
+    }catch{toast('结构化内容必须是有效 JSON');return;}
+    const originalText=button.textContent;button.disabled=true;button.textContent='保存中…';
+    try{
+      const data=await request(`/api/candidates/${selectedId}/card-pages/${pageNumber}`,{method:'PUT',body:JSON.stringify({
+        title:article.querySelector('[data-storyboard-title]')?.value||'',
+        goal:article.querySelector('[data-storyboard-goal]')?.value||'',
+        content_blocks:contentBlocks,
+      })});
+      renderCardPlan(data.cardPlan,data.layoutDecisions);renderGate(data.gate);
+      toast('本页故事板已保存；生成图文时会整组重新渲染');
+    }catch(error){toast(error.message);button.disabled=false;button.textContent=originalText;}
+  });
+}
 if(!window.__socialDeliveryBound){window.__socialDeliveryBound=true;document.addEventListener('click',(event)=>{const image=event.target.closest('[data-social-image]');if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}const tab=event.target.closest('[data-social-proof]');if(tab){proofTab=tab.dataset.socialProof;renderProof();}});document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});}
 if(!window.__socialThemeBound){window.__socialThemeBound=true;document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});toast('视觉主题已保存，生成图文时生效');}catch(error){toast(error.message);}});}
-if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：已有故事板与新渠道页型不同，建议重新生成故事板':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
+if(!window.__socialLayoutBound){window.__socialLayoutBound=true;document.getElementById('social-layout-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');}catch(error){toast(error.message);}});}
+if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;renderCardPlan(currentCardPlan,data.layoutDecisions);if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
 const inspectButton=freshButton("inspect-repository");
 inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");
-generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const candidateId=selectedId;generateButton.disabled=true;generateButton.textContent="正在启动…";try{const job=await request(`/api/candidates/${candidateId}/ai/social-card`,{method:'POST',body:'{}'});generateButton.textContent="图文任务执行中…";toast("图文生成任务已启动，可在任务日志查看进度");watchSocialJob(job.id,candidateId,generateButton).catch((error)=>{if(candidateId===selectedId){generateButton.disabled=false;generateButton.textContent="生成图文";}toast(error.message);});}catch(error){toast(error.message);generateButton.disabled=false;generateButton.textContent="生成图文";}});
+generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const candidateId=selectedId;generateButton.disabled=true;generateButton.textContent="正在启动…";try{const job=await request(`/api/candidates/${candidateId}/ai/social-card`,{method:'POST',body:'{}'});generateButton.textContent="图文任务执行中…";toast("图文生成任务已启动，可在任务日志查看进度");watchSocialJob(job.id,candidateId,generateButton).catch((error)=>{generateButton.disabled=false;generateButton.textContent="生成图文";toast(error.message);});}catch(error){toast(error.message);generateButton.disabled=false;generateButton.textContent="生成图文";}});
 
 window.openSocialEditor=openSocialEditor;
 

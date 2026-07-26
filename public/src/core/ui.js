@@ -32,3 +32,30 @@ export async function withLoading(button, label, fn) {
   try { return await fn(); }
   finally { button.disabled = false; button.textContent = original; }
 }
+
+// 统一确认对话框：覆盖、删除等危险操作都走这里，返回 Promise<boolean>
+// 取消（含 Esc）一律视为放弃操作，不再被赋予"以非强制模式继续"之类的第二语义
+export function confirmAction(message, { confirmText = "确认执行" } = {}) {
+  const dialog = document.getElementById("confirm-dialog");
+  if (!dialog) return Promise.resolve(window.confirm(message));
+  return new Promise((resolve) => {
+    dialog.querySelector(".confirm-message").textContent = message;
+    const ok = dialog.querySelector("[data-confirm-ok]");
+    const cancel = dialog.querySelector("[data-confirm-cancel]");
+    ok.textContent = confirmText;
+    const done = (value) => {
+      ok.removeEventListener("click", onOk);
+      cancel.removeEventListener("click", onCancel);
+      dialog.removeEventListener("cancel", onCancelNative);
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const onOk = () => done(true);
+    const onCancel = () => done(false);
+    const onCancelNative = (event) => { event.preventDefault(); done(false); };
+    ok.addEventListener("click", onOk);
+    cancel.addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancelNative);
+    dialog.showModal();
+  });
+}

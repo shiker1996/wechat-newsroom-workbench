@@ -1,7 +1,7 @@
 # 事件精选深抓与事实基座升级：验证与推进计划
 
 > 创建：2026-07-25。承接 `optional-feature-todos.md` 待办 7 的剩余项（P2 事件内精选深抓）。
-> 前置已完成：P0 事件卡、P1 启发式质量评分（`lib/source-quality.mjs`）、P2 抓取路由（`lib/source-fetcher.mjs`，阈值见 `config.local.json` 的 `sourceFetch` 段）。
+> 前置已完成：P0 事件卡、P1 启发式质量评分（`lib/domain/source-quality.mjs`）、P2 抓取路由（`lib/integrations/source-fetcher.mjs`，阈值见 `config.local.json` 的 `sourceFetch` 段）。
 
 ## 背景与判断
 

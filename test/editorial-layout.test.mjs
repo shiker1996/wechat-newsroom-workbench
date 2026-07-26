@@ -21,10 +21,12 @@ test("未通过的成稿门禁可定位到决策底稿字段", () => {
   assert.match(source, /field\.scrollIntoView/);
 });
 
-test("成稿门禁显示在全宽对话区下方", () => {
-  assert.match(styles, /\.editorial-focus-grid\s*\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
-  assert.match(styles, /\.editorial-focus-grid \.editorial-production-gate\s*\{[^}]*position:static[^}]*grid-row:2/);
-  assert.match(styles, /\.editorial-focus-grid \.editorial-chat\s*\{[^}]*grid-row:1/);
+test("编辑工作区固定高度且成稿门禁横跨双栏持续可见", () => {
+  assert.match(styles, /\.editorial-focus-grid\s*\{[^}]*grid-template-columns:minmax\(0,7fr\) minmax\(0,5fr\)[^}]*grid-template-rows:minmax\(0,1fr\) auto[^}]*height:clamp\(620px,calc\(100vh - 250px\),820px\)/);
+  assert.match(styles, /\.editorial-focus-grid \.editorial-production-gate\s*\{[^}]*grid-row:2[^}]*grid-column:1\/-1/);
+  assert.match(styles, /\.editorial-focus-grid \.editorial-chat\s*\{[^}]*grid-row:1[^}]*min-height:0/);
+  assert.match(styles, /\.editorial-focus-grid \.event-card-panel #event-cards-list\s*\{[^}]*overflow:auto/);
+  assert.match(html, /id="editorial-production-hint" aria-live="polite"/);
 });
 
 test("编辑会中的超长链接不会撑宽消息区", () => {
@@ -45,4 +47,12 @@ test("候选题 Tab 使用两端箭头平滑滚动并隐藏原生滚动条", () 
   assert.match(source, /sidebar\.scrollBy\(\{[^}]*behavior:\s*"smooth"/);
   assert.match(source, /previous\.disabled = sidebar\.scrollLeft <= 1/);
   assert.match(source, /next\.disabled = sidebar\.scrollLeft >= maxScroll - 1/);
+});
+
+test("编辑室区分加载、空池和低于成稿线三种状态", () => {
+  assert.match(html, /id="editorial-loading"[^>]*role="status"/);
+  assert.match(html, /id="editorial-empty" class="empty-state" hidden/);
+  assert.match(source, /当前批次还没有文章候选/);
+  assert.match(source, /均低于成稿线/);
+  assert.match(source, /const requested = visibleCandidates\.find/);
 });

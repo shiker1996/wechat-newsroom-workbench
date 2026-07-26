@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260725-channel-select-1">
+  <link rel="stylesheet" href="/styles.css?v=20260726-accessibility">
 </head>
 <body>
   <div class="paper-noise"></div>
@@ -15,38 +15,59 @@
       <div><strong>见字</strong><small>NEWSROOM OS</small></div>
     </div>
     <nav id="nav">
-      <span class="nav-group-label">内容发现</span>
-      <button class="nav-item active" data-view="dashboard"><span>01</span>工作台总览</button>
-      <button class="nav-item" data-view="batches"><span>02</span>批次管理</button>
-      <button class="nav-item" data-view="overview"><span>03</span>热点全景</button>
-      <button class="nav-item" data-view="sources"><span>04</span>采集源</button>
-      <span class="nav-group-label">文章生产</span>
-      <button class="nav-item" data-view="topics"><span>05</span>文章选题池</button>
-      <button class="nav-item" data-view="editorial"><span>06</span>文章编辑室</button>
-      <button class="nav-item" data-view="editor"><span>07</span>文章编辑器</button>
-      <button class="nav-item" data-view="preview"><span>08</span>公众号排版</button>
-      <span class="nav-group-label">图文生产</span>
-      <button class="nav-item" data-view="social-topics"><span>09</span>图文选题池</button>
-      <button class="nav-item" data-view="social-editor"><span>10</span>工具图文</button>
-      <button class="nav-item" data-view="social-custom"><span>11</span>自定义图文</button>
-      <button class="nav-item" data-view="social-event"><span>12</span>事件图文</button>
-      <span class="nav-group-label">系统</span>
-      <button class="nav-item" data-view="artifacts"><span>13</span>产物中心</button>
-      <button class="nav-item" data-view="models"><span>14</span>模型中心</button>
-      <button class="nav-item" data-view="logs"><span>15</span>任务日志</button>
-      <button class="nav-item" data-view="system"><span>16</span>采集控制</button>
-      <button class="nav-item" data-view="hotspots"><span>17</span>热点档案</button>
-      <button class="nav-item" data-view="calendar"><span>18</span>内容日历</button>
+      <details class="nav-group" data-nav-group="today" open>
+        <summary><span>01</span><b>今日工作</b><small>总览 · 批次 · 日历</small></summary>
+        <div class="nav-group-items">
+          <button class="nav-item active" data-view="dashboard" aria-current="page"><span>01</span>工作台总览</button>
+          <button class="nav-item" data-view="batches"><span>02</span>批次管理</button>
+          <button class="nav-item" data-view="calendar"><span>18</span>内容日历</button>
+        </div>
+      </details>
+      <details class="nav-group" data-nav-group="discovery">
+        <summary><span>02</span><b>发现与研判</b><small>采集 · 全景 · 档案</small></summary>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="overview"><span>03</span>热点全景</button>
+          <button class="nav-item" data-view="sources"><span>04</span>采集源</button>
+          <button class="nav-item" data-view="hotspots"><span>05</span>热点档案</button>
+        </div>
+      </details>
+      <details class="nav-group" data-nav-group="article">
+        <summary><span>03</span><b>文章生产</b><small>选题 · 编辑 · 成稿</small></summary>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="topics"><span>06</span>文章选题池</button>
+          <button class="nav-item" data-view="editorial"><span>07</span>文章编辑室</button>
+          <button class="nav-item" data-view="editor"><span>08</span>文章编辑器</button>
+          <button class="nav-item" data-view="preview"><span>09</span>公众号排版</button>
+        </div>
+      </details>
+      <details class="nav-group" data-nav-group="social">
+        <summary><span>04</span><b>图文生产</b><small>选题 · 三类图文</small></summary>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="social-topics"><span>10</span>图文选题池</button>
+          <button class="nav-item" data-view="social-editor"><span>11</span>工具图文</button>
+          <button class="nav-item" data-view="social-custom"><span>12</span>自定义图文</button>
+          <button class="nav-item" data-view="social-event"><span>13</span>事件图文</button>
+        </div>
+      </details>
+      <details class="nav-group" data-nav-group="system">
+        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 日志</small></summary>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="artifacts"><span>14</span>产物中心</button>
+          <button class="nav-item" data-view="models"><span>15</span>模型中心</button>
+          <button class="nav-item" data-view="logs"><span>16</span>任务日志</button>
+        </div>
+      </details>
     </nav>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
       <div><b>LOCAL FIRST</b><small>数据留在本机</small></div>
     </div>
+    <button class="nav-utility" data-view="system"><span class="nav-utility-mark">⚙</span><span><b>运行与配置</b><small>服务 · 环境 · 备份</small></span><i id="nav-runtime-indicator">●</i></button>
   </aside>
 
   <main class="shell">
     <header class="topbar">
-      <div><span class="eyebrow">编辑工作台</span><h1 id="page-title">今日值班</h1></div>
+      <div><span class="eyebrow">编辑工作台</span><h1 id="page-title">工作台总览</h1></div>
       <div class="top-actions">
         <select id="batch-switcher" class="batch-switcher" aria-label="当前批次"></select>
         <time id="clock"></time>
@@ -60,10 +81,11 @@
       <div class="lead-grid">
         <article class="dispatch-card reveal">
           <div class="dispatch-top"><span>DAILY DISPATCH</span><time id="today-label"></time></div>
-          <h2>今天，<em>写什么？</em></h2>
-          <p>从热点采集、编辑判断到排版复制，每一步都有记录，每一份材料都能回头找到。</p>
+          <h2>今天，<em>推进哪一步？</em></h2>
+          <p id="dashboard-brief">正在读取当前批次和待办状态。</p>
           <div class="dispatch-actions">
-            <button class="ink-button" id="dashboard-new">开始今天的选题 →</button>
+            <button class="ink-button" id="dashboard-primary-action">查看当前批次 →</button>
+            <button class="text-button" id="dashboard-new">新建今日批次</button>
             <button class="text-button" data-go="hotspots">翻看历史热点</button>
           </div>
           <div class="edition-mark"><b id="edition-number">000</b><span>累计热点<br>ARCHIVED</span></div>
@@ -71,9 +93,20 @@
         <section class="metric-grid reveal delay-1" id="metrics"></section>
       </div>
 
+      <section class="attention-board reveal delay-1" aria-labelledby="attention-heading">
+        <div class="attention-head"><div><span class="kicker">TODAY'S DESK</span><h3 id="attention-heading">今日值班信号</h3></div><small>点击卡片直接处理</small></div>
+        <div class="attention-grid" id="dashboard-attention"></div>
+      </section>
+
+      <section class="efficiency-board reveal delay-2" aria-labelledby="efficiency-heading">
+        <div class="attention-head"><div><span class="kicker">PRODUCTION FEEDBACK</span><h3 id="efficiency-heading">内部生产效率</h3></div><small>基于当前批次真实运行记录</small></div>
+        <div class="efficiency-grid" id="dashboard-efficiency"></div>
+        <p class="efficiency-insight" id="efficiency-insight"></p>
+      </section>
+
       <div class="desk-grid">
         <section class="panel reveal delay-2">
-          <div class="panel-head"><div><span class="kicker">CURRENT EDITION</span><h3>最近批次</h3></div><button class="text-button" data-go="batches">全部批次</button></div>
+          <div class="panel-head"><div><span class="kicker">ACTIVE EDITION</span><h3>当前进行中批次</h3></div><button class="text-button" data-go="batches">全部批次</button></div>
           <div id="latest-batch" class="empty-state">还没有批次，先建立今天的编辑任务。</div>
         </section>
         <section class="panel source-panel reveal delay-3">
@@ -85,25 +118,32 @@
 
     <section class="view" id="view-overview">
       <div class="section-intro"><div><span class="kicker">HOTSPOT ATLAS · SEMANTIC EDITION</span><h2>热点全景</h2></div><p>用打标后的事件语义观察媒体覆盖结构、国内关联和议题集中度；来源数与报道数分开计算，不把跨平台热度相加。</p></div>
+      <section class="atlas-stage-empty" id="atlas-stage-empty" hidden>
+        <span class="kicker">NO EVENT DATA</span>
+        <h3>当前批次还没有可分析的事件</h3>
+        <p>完成采集、语义打标和事件研判后，这里会统一展示覆盖结构、事件关系和维度选题。</p>
+        <button type="button" class="primary-button" data-atlas-collect>打开批次开始采集研判</button>
+      </section>
       <div class="atlas-notice"><b>覆盖结构 ≠ 舆情热度</b></div>
       <div class="atlas-controls" id="atlas-controls">
-        <div class="scope-tabs" aria-label="地区筛选"><button class="active" data-atlas-scope="全部">全部</button><button data-atlas-scope="国内">国内</button><button data-atlas-scope="全球性">全球性</button><button data-atlas-scope="国外">国外</button></div>
+        <div class="scope-tabs" aria-label="地区筛选"><button class="active" data-atlas-scope="全部" aria-pressed="true">全部</button><button data-atlas-scope="国内" aria-pressed="false">国内</button><button data-atlas-scope="全球性" aria-pressed="false">全球性</button><button data-atlas-scope="国外" aria-pressed="false">国外</button></div>
         <label class="atlas-multi"><input id="atlas-multisource" type="checkbox"> 只看多源报道</label>
         <label class="atlas-search"><span>⌕</span><input id="atlas-query" placeholder="搜索事件、关键词或来源"></label>
       </div>
       <div class="atlas-grid atlas-semantic-grid">
         <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
-        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-lenses"><button class="active" data-graph-lens="who">主体</button><button data-graph-lens="what">对比</button><button data-graph-lens="where">场合</button></div></div><div id="event-graph" class="event-graph"></div></section>
+        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" aria-label="关系排序维度"><button class="active" data-graph-lens="who" aria-pressed="true">主体</button><button data-graph-lens="what" aria-pressed="false">动作</button><button data-graph-lens="where" aria-pressed="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
       </div>
       <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
     </section>
 
     <section class="view" id="view-topics">
-      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span><h2>文章选题池</h2></div><p>承接适合公众号长文的候选，继续使用 H/B/P/S/D/F 评分，并进入文章编辑室、成稿和排版链路。</p></div>
+      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span><h2>文章选题池</h2></div><p>比较候选的历史表现、成稿潜力、账号匹配与同题竞争，选择值得进入编辑会的文章方向。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
-          <div class="topic-pool-hint">选题请在「热点全景」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
+          <div class="topic-pool-hint">选题请在「<a href="#overview">热点全景</a>」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
+          <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>历史表现 H</b>相似题材的历史传播信号</span><span><b>成稿潜力 B</b>角度、情绪、标题、受众与事实支撑</span><span><b>账号匹配 P</b>与账号内容方向及独家素材的匹配度</span><span><b>同题饱和 S</b>市场中同类内容的竞争扣分</span><span><b>竞争修正 D</b>额外竞争因素校正</span><span><b>综合成稿分 F</b>最终排序依据，低于 55 默认隐藏</span></div><small>公式：F = H × 60% + B × 25% + P × 15% − S；缩写仅用于与研判报告对照。</small></details>
           <div id="candidate-list" class="candidate-list"></div>
         </section>
       </div>
@@ -166,12 +206,12 @@
           <button type="button" class="candidate-tab-arrow next" id="social-tabs-next" aria-label="向右查看更多图文候选">›</button>
         </div>
         <div id="social-editor-form" class="social-editor-form">
-          <div id="social-editor-empty" class="empty-state">请先在图文选题池选择候选。</div>
+          <div id="social-editor-empty" class="empty-state">当前批次没有对应图文候选。<a href="#overview">前往热点全景添加选题</a></div>
           <div id="social-editor-fields" hidden>
             <div class="similar-hint" id="similar-social-cards" hidden></div><header class="social-editor-title"><span id="social-editor-code" class="kicker"></span><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></header>
             <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3></div><div><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
             <section class="social-score-panel"><div><span class="kicker">SOCIAL FIT SCORE</span><strong id="social-fit-score">—</strong></div><div id="social-score-parts"></div></section>
-            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><div class="social-picker-group"><label class="social-theme-picker">渠道<select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><div class="social-picker-group"><label class="social-theme-picker">渠道<select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker">版式<select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
             <section class="card-gate-panel"><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成图文</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
           </div>
@@ -188,7 +228,8 @@
           <button type="button" class="candidate-tab-arrow next" id="candidate-tabs-next" aria-label="向右查看更多候选题">›</button>
         </div>
         <form class="editorial-form" id="editorial-form">
-          <div id="editorial-empty" class="empty-state">先在选题池加入并选择一个候选。</div>
+          <div id="editorial-loading" class="editorial-loading" role="status">正在读取文章候选与编辑决策…</div>
+          <div id="editorial-empty" class="empty-state" hidden></div>
           <div id="editorial-fields" hidden>
             <input type="hidden" name="candidateId">
             <div class="similar-hint" id="similar-articles" hidden></div><div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
@@ -203,11 +244,11 @@
               <div><span class="kicker">EVENT CARDS</span><h4 id="event-cards-heading">关联事件</h4><p>选题与事件为一对多 · 事实采纳与原文抓取由 AI 编辑按需自动完成</p></div>
               <div id="event-cards-list"></div>
             </section>
-            <section class="editorial-production-gate" id="editorial-production-gate">
+            <section class="editorial-production-gate" id="editorial-production-gate" aria-label="成稿条件">
               <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
               <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
-              <p id="editorial-production-hint">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
-              <div class="editorial-actions"><button type="submit" class="ghost-button">保存编辑决策</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
+              <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
+              <div class="editorial-actions"><button type="submit" class="ghost-button">保存当前进度</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
             </section>
             </div>
             <details class="editorial-decision-details" id="editorial-decision-details">
@@ -218,7 +259,7 @@
             <div class="form-pair"><label>已确认公共事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>作者明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
             <div class="form-pair"><label>已确认实践及证据<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界<textarea name="rejected_angles" rows="4"></textarea></label></div>
             <div class="form-pair"><label>仍未解决问题<textarea name="open_questions" rows="3"></textarea></label><label>禁止写入<textarea name="forbidden_claims" rows="3"></textarea></label></div>
-            <div class="gate-strip"><label><input type="checkbox" name="experience_required"> 核心判断依赖亲身实践</label><label>下一动作<select name="next_action"><option>DISCUSS</option><option>WRITE_NOW</option><option>TEST_FIRST</option><option>RESEARCH_FIRST</option><option>DROP</option></select></label><span id="brief-state">DISCUSS</span></div>
+            <div class="gate-strip"><label><input type="checkbox" name="experience_required"> 核心判断依赖亲身实践</label><label>下一动作<select name="next_action"><option value="DISCUSS">继续讨论</option><option value="WRITE_NOW">可以成稿</option><option value="TEST_FIRST">先做实践验证</option><option value="RESEARCH_FIRST">先补充事实</option><option value="DROP">暂不推进</option></select></label><span id="brief-state">讨论中</span></div>
               </div>
             </details>
           </div>
@@ -234,6 +275,9 @@
         <label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked> 草稿</label>
         <label class="kind-toggle"><input type="radio" name="doc-kind" value="final"> 终稿</label>
         <span id="char-count">0 / 2000</span>
+        <span id="document-save-state" class="document-save-state saved" role="status" aria-live="polite">已保存</span>
+        <button class="ghost-button" id="document-find" title="查找替换（Ctrl/⌘+F）">查找替换</button>
+        <button class="ghost-button" id="document-history">版本历史</button>
         <button class="primary-button" id="save-document">保存文稿</button>
       </div>
       <div class="ai-writing-bar">
@@ -243,14 +287,38 @@
         <button class="outline-button" id="ai-draft">AI 生成 / 改写</button>
         <small id="draft-context">事实、观点、禁写项不会被压缩</small>
       </div>
+      <div class="markdown-toolbar" role="toolbar" aria-label="Markdown 格式工具">
+        <span>MARKDOWN</span>
+        <button type="button" data-markdown-command="heading" title="二级标题">H2</button>
+        <button type="button" data-markdown-command="bold" title="加粗（Ctrl/⌘+B）"><b>B</b></button>
+        <button type="button" data-markdown-command="quote" title="引用">引用</button>
+        <button type="button" data-markdown-command="unordered-list" title="无序列表">列表</button>
+        <button type="button" data-markdown-command="ordered-list" title="有序列表">编号</button>
+        <button type="button" data-markdown-command="link" title="插入链接（Ctrl/⌘+K）">链接</button>
+        <i></i>
+        <button type="button" data-markdown-command="undo" title="撤销（Ctrl/⌘+Z）">撤销</button>
+        <button type="button" data-markdown-command="redo" title="重做（Ctrl/⌘+Shift+Z）">重做</button>
+        <button type="button" id="editor-preflight" class="preflight-trigger" title="汇总保存状态、写作目标、质量与终稿门禁">发布检查 <b id="preflight-status-count">0</b></button>
+        <button type="button" id="editor-quality-check" title="检查文稿结构与可读性">质量检查 <b id="quality-issue-count">0</b></button>
+        <button type="button" id="editor-outline-toggle" aria-pressed="true" title="显示或隐藏文章大纲">大纲</button>
+        <button type="button" id="editor-focus-mode" aria-pressed="false" title="进入专注模式">专注模式</button>
+      </div>
+      <div class="writing-stats" id="writing-stats" aria-label="写作统计">
+        <span><b id="stat-chars">0</b><small>可见字数</small></span>
+        <span><b id="stat-paragraphs">0</b><small>有效段落</small></span>
+        <span><b id="stat-reading-time">0 分钟</b><small>预计阅读</small></span>
+        <span><b id="stat-sections">尚无章节</b><small>章节完整度</small></span>
+        <span class="writing-goal-stat"><b id="stat-goal">0%</b><small id="stat-goal-label">目标 1,500 字</small><button type="button" id="writing-goal-open">设置</button></span>
+      </div>
       <div class="writing-desk">
         <textarea id="markdown-editor" spellcheck="false" placeholder="# 标题&#10;&#10;从这里开始写作……"></textarea>
         <article id="markdown-preview" class="markdown-preview"><p>Markdown 预览</p></article>
+        <aside id="document-outline" class="document-outline" aria-label="文章大纲"><div><span>ARTICLE OUTLINE</span><b>文章大纲</b></div><nav id="document-outline-list"></nav></aside>
       </div>
     </section>
 
     <section class="view" id="view-preview">
-      <div class="section-intro"><div><span class="kicker">PROOF & TYPESET</span><h2>排版预览</h2></div><p>只把真正生成的 article.ai.html 当作公众号排版结果；编辑器即时预览不会冒充门禁通过的正式 HTML。</p></div>
+      <div class="section-intro"><div><span class="kicker">PROOF & TYPESET</span><h2>公众号排版</h2></div><p>只把真正生成的 article.ai.html 当作公众号排版结果；编辑器即时预览不会冒充门禁通过的正式 HTML。</p></div>
       <div class="typeset-toolbar">
         <select id="typeset-candidate" aria-label="待排版文章"></select>
         <select id="typeset-provider" aria-label="排版设计模型"></select>
@@ -275,7 +343,17 @@
     </section>
 
     <section class="view" id="view-batches">
-      <div class="section-intro"><div><span class="kicker">BATCH ARCHIVE</span><h2>批次归档</h2></div><p>查看所有历史批次的概览、来源记录和产物。</p></div>
+      <div class="section-intro"><div><span class="kicker">BATCH ARCHIVE</span><h2>批次管理</h2></div><p>查看所有历史批次的概览、来源记录和产物。</p></div>
+      <div class="batch-ledger-controls">
+        <label class="search-field"><span>⌕</span><input id="batch-search" type="search" placeholder="搜索批次标题或值班备注"></label>
+        <div class="scope-tabs" id="batch-lifecycle-filter" aria-label="批次状态筛选">
+          <button type="button" class="active" data-batch-filter="all">全部</button>
+          <button type="button" data-batch-filter="active">进行中</button>
+          <button type="button" data-batch-filter="completed">已完成待归档</button>
+          <button type="button" data-batch-filter="archived">已归档</button>
+        </div>
+        <span class="muted" id="batch-result-count"></span>
+      </div>
       <div class="ledger" id="batch-list"></div>
     </section>
 
@@ -292,7 +370,7 @@
     </section>
 
     <section class="view" id="view-artifacts">
-      <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span><h2>产物柜</h2></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
+      <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span><h2>产物中心</h2></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
       <div class="cabinet-tools">
         <div class="artifact-legend"><span>MD</span><span>JSON</span><span>HTML</span><span>URL</span></div>
         <div class="article-stats" id="article-stats"></div>
@@ -302,40 +380,65 @@
     </section>
 
     <section class="view" id="view-system">
-      <div class="section-intro"><div><span class="kicker">COLLECTION CONTROL</span><h2>采集控制</h2></div><p>浏览器登录态与 RSSHub 生命周期由本地 Worker 管理，不经过前端。</p></div>
+      <div class="section-intro system-intro"><div><span class="kicker">LOCAL OPERATIONS</span><h2>运行与配置中心</h2></div><p>先确认采集依赖是否在线，再处理凭据和本机参数。敏感值只在服务端保存，页面不会读取密钥原文。<small class="system-last-checked" id="system-last-checked">尚未检查</small></p></div>
+      <div class="runtime-commandbar"><div><span class="pulse-dot"></span><b>本机运行台</b><small>服务状态、配置和备份都留在当前设备</small></div><button class="ink-button" id="system-health">检查全部服务</button></div>
       <div class="control-grid">
         <article class="control-card reddit-card">
           <div class="control-index">R/</div><span class="status-pill unknown" id="reddit-status">未检查</span>
           <h3>Reddit · 专用 Chrome</h3>
           <p>工作台通过 CDP 连接一个独立 Chrome 配置。首次登录后复用 Cookie，不读取你的日常浏览器资料。</p>
-          <ol><li>运行 <code>scripts/start-reddit-chrome.ps1</code></li><li>在新窗口登录 Reddit</li><li>以后保持窗口打开即可自动采集</li></ol>
-          <button class="outline-button" data-copy="powershell -File .\scripts\start-reddit-chrome.ps1">复制启动命令</button>
+          <ol><li>点击启动专用 Chrome</li><li>在新窗口登录 Reddit</li><li>以后复用独立登录状态</li></ol>
+          <div class="runtime-actions"><button class="outline-button" data-runtime-service="reddit" data-runtime-action="start">启动</button><button class="text-button" data-runtime-service="reddit" data-runtime-action="stop">停止</button></div>
+          <button class="text-button control-retry" data-health-target="reddit">重新检查 Reddit</button>
         </article>
         <article class="control-card rss-card">
           <div class="control-index">RSS</div><span class="status-pill unknown" id="rsshub-status">未检查</span>
           <h3>RSSHub · 按需生命周期</h3>
           <p>Worker 先探测 1200 端口；未就绪才运行启动脚本。目标路由通过后采集，最终只停止本次由它启动的实例。</p>
           <ol><li>根地址健康检查</li><li>启动脚本最多等待 180 秒</li><li>路由自动附加 <code>limit=30</code></li></ol>
-          <button class="outline-button" id="system-health">立即检查三项环境</button>
+          <div class="runtime-actions"><button class="outline-button" data-runtime-service="rsshub" data-runtime-action="start">启动</button><button class="text-button" data-runtime-service="rsshub" data-runtime-action="restart">重启</button><button class="text-button" data-runtime-service="rsshub" data-runtime-action="stop">停止</button></div>
+          <button class="text-button control-retry" data-health-target="rsshub">只重试 RSSHub</button>
         </article>
         <article class="control-card github-card">
           <div class="control-index">GH</div><span class="status-pill unknown" id="github-status">尚未请求</span>
           <h3>GitHub · 发现与事实增强</h3>
           <p>Trending 由 RSSHub 提供日榜、周榜和月榜；README、License 与 Release 使用带 ETag 缓存的 GitHub REST API。</p>
           <div class="github-quota" id="github-quota">配额将在首次仓库核验后显示。</div>
+          <button class="text-button control-retry" data-health-target="github">刷新 GitHub 状态</button>
         </article>
       </div>
-      <section class="execution-note">
-        <span class="vertical-label">EXECUTION MODEL</span>
-        <div><b>01</b><h4>工作台入队</h4><p>建立批次与采集任务。</p></div><i>→</i>
-        <div><b>02</b><h4>本地 Worker</h4><p>调用 Chrome / PowerShell。</p></div><i>→</i>
-        <div><b>03</b><h4>SQLite 归档</h4><p>写入热点、日志和状态。</p></div><i>→</i>
-        <div><b>04</b><h4>技能产物</h4><p>索引 Markdown 与 HTML。</p></div>
-      </section>
+      <div class="system-workspace">
+        <section class="runtime-config-panel">
+          <div class="runtime-config-head"><div><span class="kicker">ENVIRONMENT DESK</span><h3>本机配置</h3></div><p>留空保持现值；勾选“清除”才会移除配置。</p></div>
+          <div class="runtime-path-strip" id="runtime-paths"><span>正在读取路径配置…</span></div>
+          <div class="config-tabbar" role="tablist" aria-label="配置文件">
+            <button type="button" class="active" role="tab" aria-selected="true" aria-controls="config-panel-app" data-config-tab="app"><span>01</span><b>工作台配置</b><small>模型 · 抓取 · 图片 · 运行</small></button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-rsshub" data-config-tab="rsshub"><span>02</span><b>RSSHub KV</b><small>平台 Token · 代理 · 扩展变量</small></button>
+          </div>
+          <div class="config-panel active" id="config-panel-app" role="tabpanel" data-config-panel="app">
+            <div class="config-panel-heading"><div><span class="kicker">WORKBENCH.ENV</span><h4>工作台服务</h4></div><p>按用途展开需要修改的配置组。</p></div>
+            <div id="app-env-fields" class="env-field-list"></div>
+          </div>
+          <div class="config-panel" id="config-panel-rsshub" role="tabpanel" data-config-panel="rsshub" hidden>
+            <div class="config-panel-heading"><div><span class="kicker">RSSHUB/.ENV</span><h4>RSSHub 环境</h4></div><p>已有值不会回显，修改后重启 RSSHub 生效。</p></div>
+            <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div>
+          </div>
+          <div class="runtime-save-row"><span id="runtime-config-status">尚未修改 · 部分进程参数需重启后生效</span><button class="primary-button" id="save-runtime-settings">保存配置</button></div>
+        </section>
+        <aside class="maintenance-panel">
+          <div class="maintenance-number">BK</div><span class="kicker">LOCAL RECOVERY</span><h3>备份与恢复</h3>
+          <p>备份数据库和非敏感配置，并在恢复前校验大小与 SHA-256。密钥、依赖和缓存不会进入备份。</p>
+          <div class="maintenance-rule"><b>建议时机</b><span>批量采集前</span><span>模型迁移前</span><span>重要编辑前</span></div>
+          <button class="outline-button" id="download-backup">下载完整备份</button>
+          <label class="backup-picker">选择备份包<input id="backup-file" type="file" accept=".zip,application/zip"></label>
+          <div id="backup-validation" class="backup-validation" role="status">尚未选择备份包</div>
+          <button class="ink-button" id="restore-backup" disabled>恢复已校验备份</button>
+        </aside>
+      </div>
     </section>
 
     <section class="view" id="view-sources">
-      <div class="section-intro"><div><span class="kicker">SOURCE REGISTER · LIVE CONFIG</span><h2>订阅源台账</h2></div><p>把 RSSHub 路由、X 账号和直连 RSS/Atom 放在同一张编辑台账里。变更会立即写入本地配置，下一次采集直接生效，无需手改 JSON。</p></div>
+      <div class="section-intro"><div><span class="kicker">SOURCE REGISTER · LIVE CONFIG</span><h2>采集源</h2></div><p>把 RSSHub 路由、X 账号和直连 RSS/Atom 放在同一张编辑台账里。变更会立即写入本地配置，下一次采集直接生效，无需手改 JSON。</p></div>
       <div class="source-register-summary" id="subscription-summary"></div>
       <div class="source-health-dots" id="subscription-health"></div>
       <div class="source-register-layout">
@@ -414,10 +517,10 @@
         <span class="muted" id="cal-count"></span>
         <button class="ghost-button" id="cal-today-btn">今天</button>
       </div>
-      <div class="calendar-grid" id="cal-grid"></div>
+      <div class="calendar-scroll"><div class="calendar-grid" id="cal-grid"></div></div>
     </section>
     <section class="view" id="view-logs">
-      <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>日志</h2></div>
+      <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>任务日志</h2></div>
         <p>批次所有任务的执行记录。AI 任务按每次运行记录一条，模型调用累积到 2048 条后滚动清理。</p>
       </div>
       <div class="log-controls">
@@ -460,8 +563,14 @@
     <div class="job-console" id="production-job-console">等待任务…</div>
     <p class="fine-print" id="production-job-note">可以关闭窗口，任务仍会在后台继续。</p>
   </dialog>
-  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close">×</button><iframe title="产物预览"></iframe></dialog>
-  <div class="toast" id="toast"></div>
+  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><iframe title="产物预览"></iframe></dialog>
+  <dialog id="confirm-dialog" class="modal"><div class="confirm-body"><h2>确认操作</h2><p class="confirm-message"></p><div class="modal-actions"><button type="button" class="ghost-button" data-confirm-cancel>取消</button><button type="button" class="ink-button" data-confirm-ok>确认执行</button></div></div></dialog>
+  <dialog id="revision-dialog" class="modal revision-dialog"><div class="modal-head"><div><span class="kicker">DOCUMENT HISTORY</span><h2>版本历史</h2></div><button class="close-button" data-close-revisions aria-label="关闭">×</button></div><div class="revision-layout"><div id="revision-list" class="revision-list"></div><div class="revision-preview"><div id="revision-summary" class="muted">选择一个版本查看差异</div><pre id="revision-diff" class="revision-diff"></pre><button class="ink-button" id="restore-revision" disabled>恢复此版本</button></div></div></dialog>
+  <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>
+  <dialog id="writing-goal-dialog" class="modal"><form id="writing-goal-form"><div class="modal-head"><div><span class="kicker">WRITING TARGET</span><h2>设置写作目标</h2></div><button type="button" class="close-button" data-close-writing-goal aria-label="关闭">×</button></div><label>目标可见字数<input id="writing-goal-input" type="number" min="200" max="10000" step="100" required></label><p class="fine-print">目标仅用于进度反馈；草稿和终稿可以分别设置，不改变保存与终稿门禁规则。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-writing-goal>取消</button><button type="submit" class="ink-button">保存目标</button></div></form></dialog>
+  <dialog id="preflight-dialog" class="modal preflight-dialog"><div class="preflight-dialog-body"><div class="modal-head"><div><span class="kicker">PUBLISH READINESS</span><h2>发布前检查</h2></div><button type="button" class="close-button" data-close-preflight aria-label="关闭">×</button></div><div class="preflight-hero"><b id="preflight-title">正在检查当前文稿</b><span id="preflight-summary"></span></div><div id="preflight-list" class="preflight-list"></div><p class="fine-print">检查结果仅用于发布前确认，不会自动修改正文，也不会影响草稿自动保存。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-preflight>稍后处理</button><button type="button" class="ink-button" id="preflight-primary">查看待处理项</button></div></div></dialog>
+  <dialog id="quality-dialog" class="modal quality-dialog"><div class="quality-dialog-body"><div class="modal-head"><div><span class="kicker">QUALITY REVIEW</span><h2>文稿质量检查</h2></div><button type="button" class="close-button" data-close-quality aria-label="关闭">×</button></div><p id="quality-summary" class="quality-summary"></p><div id="quality-issue-list" class="quality-issue-list"></div><div class="modal-actions"><button type="button" class="ink-button" data-close-quality>完成检查</button></div></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="/vendor/markdown-it.min.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>

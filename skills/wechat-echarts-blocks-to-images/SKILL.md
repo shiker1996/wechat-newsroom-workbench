@@ -1,0 +1,23 @@
+---
+name: wechat-echarts-blocks-to-images
+description: 将 Markdown 当前工作文件中的显式 ECharts 配置围栏渲染为 PNG 并替换为图片引用。适用于公众号数据图表转图或由 wechat-article-typeset 在 Mermaid 和内联模块之后串行处理 images.md 工作文件；不处理 Mermaid、普通代码块或内联模块，未经授权不得上传图片。
+---
+
+# ECharts 围栏转图片
+
+只处理语言标记为 `echarts` 的围栏。配置必须解析为 JSON 或该技能明确支持的安全对象格式；不要执行来源不明的任意 JavaScript。
+
+## 流程
+
+1. 从当前 Markdown 工作文件提取 ECharts 围栏。
+2. 验证配置、数据长度、标题和坐标轴标签。
+3. 为图表生成自包含 HTML，并设置完成标志。
+4. 使用 `html-pages-to-images` 等待图表完成后截图。
+5. 用本地 PNG 路径替换围栏；预览模式经授权后可换成 HTTPS URL。
+6. 写临时输出，验证后更新同一工作文件。
+
+没有围栏时原样保留并报告 `converted: 0`。单图失败时保留对应围栏和错误信息，不得用空白图片替换。
+
+## 门禁
+
+确认成功围栏数与图片数一致、图片尺寸非零、坐标文字未明显裁切、其它正文和已处理图片未变化、没有静默上传。

@@ -20,25 +20,56 @@ const viewSectionAliases = { "social-custom": "view-social-editor", "social-even
 
 const jobNoticeState = new Map();
 let jobNoticeTimer = null;
-const moduleVersion = "20260725-channel-select-2";
+// 浏览器前进/后退触发 go 时不重复压栈
+let navigatingFromHistory = false;
+const moduleVersion = "20260726-task-nav";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
   topics: "文章选题池", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "文章编辑室", editor: "文章编辑器",
   preview: "公众号排版", hotspots: "热点档案", artifacts: "产物中心",
-  system: "采集控制", sources: "采集源", models: "模型中心",
+  system: "运行与配置中心", sources: "采集源", models: "模型中心",
   logs: "任务日志", calendar: "内容日历",
 };
 
 async function go(view) {
   if (!(view in titles)) return;
+  if(view!=="editor")document.body.classList.remove("editor-focus");
+  const previousView = document.querySelector(".nav-item.active")?.dataset.view;
+  const isViewChange = previousView !== view;
   var bs = document.getElementById("batch-switcher");
   if (bs) bs.style.display = ["overview","topics","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","artifacts"].includes(view) ? "block" : "none";
-  $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  let activeNavItem = null;
+  $$(".nav-item").forEach((item) => {
+    const active = item.dataset.view === view;
+    item.classList.toggle("active", active);
+    if (active) {
+      item.setAttribute("aria-current", "page");
+      activeNavItem = item;
+    } else item.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".nav-utility").forEach((item)=>{
+    const active=item.dataset.view===view;item.classList.toggle("active",active);
+    if(active){item.setAttribute("aria-current","page");activeNavItem=item;}else item.removeAttribute("aria-current");
+  });
+  // 桌面端侧栏是单开任务阶段：当前页面所属阶段始终可见，其余阶段收起。
+  $$(".nav-group").forEach((group) => { group.open = Boolean(activeNavItem && group.contains(activeNavItem)); });
   const sectionId = viewSectionAliases[view] ? viewSectionAliases[view] : `view-${view}`;
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === sectionId));
   document.getElementById("page-title").textContent = titles[view];
-  history.replaceState(null, "", `#${view}`);
+  const activeSection=document.getElementById(sectionId);
+  const intro=activeSection?.querySelector(":scope > .section-intro");
+  const introTitle=intro?.querySelector("h2");
+  if(intro)intro.classList.toggle("section-intro-title-redundant",introTitle?.textContent.trim()===titles[view]);
+  // 主视图共享同一个文档滚动容器。进入新视图时必须从页面顶部开始，
+  // 但批次切换等“刷新当前视图”的操作仍保留用户正在查看的位置。
+  if (isViewChange) {
+    const scroller = document.scrollingElement || document.documentElement;
+    scroller.scrollTop = 0;
+    scroller.scrollLeft = 0;
+  }
+  // 保留浏览器前进/后退能力；hash 相同（如批次切换重载当前视图）不重复压栈
+  if (!navigatingFromHistory && location.hash !== `#${view}`) history.pushState(null, "", `#${view}`);
 
   const modPath = viewModules[view];
   if (modPath) {
@@ -76,6 +107,7 @@ function bindGlobal() {
     const item = event.target.closest("[data-view]"); if (item) go(item.dataset.view);
   });
   document.addEventListener("click", (event) => {
+    const utilityView = event.target.closest(".nav-utility[data-view]"); if (utilityView) go(utilityView.dataset.view);
     const goButton = event.target.closest("[data-go]"); if (goButton) go(goButton.dataset.go);
     if (event.target.closest("[data-close-batch-dialog]")) document.getElementById("batch-dialog").close();
     if (event.target.closest("[data-close-drawer]")) document.getElementById("batch-drawer").close();
@@ -97,7 +129,10 @@ function bindGlobal() {
   });
   window.addEventListener("hashchange", () => {
     const view = location.hash.slice(1);
-    if (view in titles && !document.querySelector(".nav-item.active")?.matches(`[data-view="${view}"]`)) go(view);
+    if (view in titles && !document.querySelector(".nav-item.active")?.matches(`[data-view="${view}"]`)) {
+      navigatingFromHistory = true;
+      go(view).finally(() => { navigatingFromHistory = false; });
+    }
   });
 }
 

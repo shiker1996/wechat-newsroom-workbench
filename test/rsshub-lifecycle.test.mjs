@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../lib/config.mjs';
+import { loadConfig } from '../lib/core/config.mjs';
 
 test('RSSHub 生命周期路径相对项目根目录解析', () => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-rsshub-config-'));

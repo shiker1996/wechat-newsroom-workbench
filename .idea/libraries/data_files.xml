@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="data_files">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/RSSHub/node_modules/header-generator/data_files/header-network-definition.zip!/" />
+      <root url="jar://$PROJECT_DIR$/RSSHub/node_modules/header-generator/data_files/input-network-definition.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

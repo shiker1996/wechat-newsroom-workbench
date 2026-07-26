@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessSourceQuality, FETCH_UPGRADE_THRESHOLD } from '../lib/source-quality.mjs';
-import { fetchUrlContent } from '../lib/source-fetcher.mjs';
+import { assessSourceQuality, FETCH_UPGRADE_THRESHOLD } from '../lib/domain/source-quality.mjs';
+import { fetchUrlContent } from '../lib/integrations/source-fetcher.mjs';
 
 const ROOT = process.cwd();
 

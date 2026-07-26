@@ -1,0 +1,4 @@
+interface:
+  display_name: "工具图文生成"
+  short_description: "生成小红书图文或公众号工具贴图，并完成事实与布局审计"
+  default_prompt: "使用 $xiaohongshu-article-generator 将这些工具素材生成适合目标渠道的逐页图文并完成事实、布局和截图校验。"

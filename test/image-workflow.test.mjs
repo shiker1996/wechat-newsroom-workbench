@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applyImagePlan, parseImagePlaceholders, getImageWorkspace, saveLocalImage,
-  saveImageMetadata, buildImagesMarkdown } from '../lib/image-workflow.mjs';
+  saveImageMetadata, buildImagesMarkdown } from '../lib/llm/image-workflow.mjs';
 
 test('配图规划只插入结构化注释且不改写正文', () => {
   const markdown = '# 标题\n\n第一段说明事实。\n\n第二段给出判断。';

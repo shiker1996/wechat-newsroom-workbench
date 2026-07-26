@@ -94,7 +94,7 @@
 
 ### POST /api/batches/:id/candidates/composite
 创建综合选题 { hotspotIds, title, poolRole }
-tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-cards（工具图文）；纯新闻事件 → wechat-event-cards（事件图文，事实基座由事件卡+来源快照合成，见 lib/event-fact-base.mjs）
+tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-cards（工具图文）；纯新闻事件 → wechat-event-cards（事件图文，事实基座由事件卡+来源快照合成，见 lib/domain/event-fact-base.mjs）
 → 热点全景（事件卡片 → 创建综合选题）
 
 ### POST /api/batches/:id/custom-social-chat/stream

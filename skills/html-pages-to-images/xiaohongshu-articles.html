@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=375,height=667">
+<title>摩尔定律老了！华为提出中国首个半导体定律｜韬τ定律</title>
+<style>
+:root{
+  --tk-bg:     #1a1b2e;
+  --tk-card:   #25273e;
+  --tk-purple: #bb86fc;
+  --tk-pink:   #ff79c6;
+  --tk-blue:   #7aa2f7;
+  --tk-cyan:   #7dcfff;
+  --tk-text:   #e2e2e2;
+  --tk-dim:    #565f89;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f1023;font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;align-items:center;}
+.page{width:375px;height:667px;position:relative;overflow:hidden;background:var(--tk-bg);flex-shrink:0;color:var(--tk-text);}
+.page-inner{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding:0 16px 32px;}
+.page-cover{background:linear-gradient(180deg,#1a1b2e 0%,#0f1030 100%);}
+.glass-tag{position:absolute;top:20px;left:20px;background:rgba(187,134,252,.2);border:1px solid var(--tk-purple);color:var(--tk-purple);font-size:10px;padding:4px 12px;font-weight:700;letter-spacing:.5px;}
+.glass-hot{position:absolute;top:20px;right:20px;background:rgba(255,121,198,.15);border:1px solid var(--tk-pink);color:var(--tk-pink);font-size:10px;padding:4px 12px;font-weight:700;}
+.cover-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:100%;padding:0 24px;}
+.cover-title{font-size:28px;font-weight:900;line-height:1.2;letter-spacing:-1px;color:var(--tk-text);}
+.cover-title .hl{color:var(--tk-purple);}
+.cover-divider{width:48px;height:3px;background:linear-gradient(90deg,var(--tk-purple),var(--tk-pink));margin:16px auto;border-radius:2px;}
+.cover-sub{font-size:13px;color:var(--tk-dim);line-height:1.7;margin-bottom:20px;}
+.cover-tags{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;}
+.xhs-tag{display:inline-block;background:rgba(122,162,247,.15);border:1px solid rgba(122,162,247,.25);color:var(--tk-blue);font-size:10px;padding:2px 8px;font-weight:600;}
+.cover-date{font-size:10px;color:var(--tk-dim);margin-top:10px;}
+.tk-topbar{display:flex;align-items:center;gap:8px;padding:16px 4px 12px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:10px;}
+.tk-num{font-size:13px;color:var(--tk-purple);}
+.tk-title{font-size:15px;font-weight:800;color:var(--tk-text);flex:1;}
+.tk-sub{font-size:9px;color:var(--tk-dim);letter-spacing:.5px;}
+.page-body{flex:1;display:flex;flex-direction:column;gap:8px;padding:4px 0;}
+.tk-card{background:var(--tk-card);border:1px solid rgba(255,255,255,.06);padding:12px;border-left:3px solid var(--tk-purple);}
+.tk-card.pink{border-left-color:var(--tk-pink);}
+.tk-card.blue{border-left-color:var(--tk-blue);}
+.tk-card-label{font-size:11px;color:var(--tk-dim);font-weight:700;margin-bottom:4px;}
+.tk-card-title{font-size:16px;font-weight:800;color:var(--tk-text);line-height:1.3;margin-bottom:4px;}
+.tk-card-body{font-size:14px;color:var(--tk-dim);line-height:1.7;}
+.tk-quote{padding:12px;background:rgba(187,134,252,.08);border:1px solid rgba(187,134,252,.15);text-align:center;}
+.tk-quote-text{font-size:14px;font-weight:700;color:var(--tk-purple);line-height:1.6;}
+.tk-quote-sub{font-size:11px;color:var(--tk-dim);margin-top:6px;}
+.chat-area{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0;padding:0 4px;}
+.bubble{max-width:88%;padding:9px 13px;font-size:13px;line-height:1.6;}
+.b-left{background:var(--tk-card);border:1px solid rgba(255,255,255,.06);color:var(--tk-text);align-self:flex-start;border-radius:16px 16px 16px 4px;}
+.b-right{background:rgba(122,162,247,.15);border:1px solid rgba(122,162,247,.2);color:var(--tk-text);align-self:flex-end;border-radius:16px 16px 4px 16px;}
+.b-label{font-size:11px;color:var(--tk-dim);margin-bottom:2px;display:block;}
+.tk-cta{padding:12px;text-align:center;background:rgba(187,134,252,.1);border:1px solid rgba(187,134,252,.2);}
+.cta-text{font-size:13px;font-weight:900;color:var(--tk-text);margin-bottom:4px;}
+.cta-sub{font-size:10px;color:var(--tk-dim);}
+.cta-options{display:flex;gap:8px;justify-content:center;margin-top:8px;}
+.cta-opt{flex:1;padding:10px;background:var(--tk-card);border:1px solid rgba(255,255,255,.06);text-align:center;font-size:12px;font-weight:700;color:var(--tk-text);}
+.bottom-strip{display:flex;justify-content:space-between;align-items:center;padding:10px 4px 6px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto;}
+.bs-logo{font-size:9px;color:var(--tk-blue);font-weight:700;}
+.bs-right{font-size:9px;color:var(--tk-dim);}
+.tk-sub-card{padding:10px 12px;background:var(--tk-card);border:1px solid rgba(255,255,255,.06);border-left:3px solid var(--tk-pink);}
+.tk-sub-label{font-size:11px;color:var(--tk-pink);font-weight:700;margin-bottom:3px;}
+.tk-sub-title{font-size:14px;font-weight:800;color:var(--tk-text);margin-bottom:2px;}
+.tk-sub-body{font-size:12px;color:var(--tk-dim);line-height:1.6;}
+.tk-stat-row{display:flex;gap:6px;}
+.tk-stat{flex:1;text-align:center;padding:10px 4px;background:var(--tk-card);border:1px solid rgba(255,255,255,.06);}
+.tk-stat-num{font-size:20px;font-weight:900;color:var(--tk-purple);display:block;}
+.tk-stat-label{font-size:10px;color:var(--tk-dim);display:block;margin-top:2px;}
+.tags-row{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<!-- P1: COVER -->
+<div class="page page-cover">
+  <span class="glass-tag">📡 程序员摸鱼速报 #014</span>
+  <span class="glass-hot">🔥 今日重磅</span>
+  <div class="cover-center">
+    <div class="cover-title">
+      摩尔定律老了<br>
+      <span class="hl">华为提出中国首个</span><br>
+      <span class="hl">半导体定律</span>
+    </div>
+    <div class="cover-divider"></div>
+    <div class="cover-sub">
+      韬（τ）定律 · 用「时间缩微」替代「几何缩微」<br>六年量产381款芯片，晶体管密度提升55%
+    </div>
+    <div class="cover-tags">
+      <span class="xhs-tag">华为</span>
+      <span class="xhs-tag">半导体</span>
+      <span class="xhs-tag">芯片突破</span>
+    </div>
+    <div class="cover-date">2026.05.25</div>
+  </div>
+</div>
+
+<!-- P2: CORE EVENT -->
+<div class="page">
+  <div class="page-inner">
+    <div class="tk-topbar">
+      <span class="tk-num">🔥</span>
+      <span class="tk-title">核心爆点</span>
+      <span class="tk-sub">改变游戏规则</span>
+    </div>
+    <div class="page-body">
+      <div class="tk-card" style="border-left-color:var(--tk-cyan);">
+        <div class="tk-card-label">何庭波 · IEEE ISCAS 2026</div>
+        <div class="tk-card-title">华为正式发表「韬（τ）定律」</div>
+        <div class="tk-card-body">华为董事、半导体业务部总裁何庭波在IEEE ISCAS大会上正式提出韬τ定律。这是中国在全球半导体领域首次提出技术演进定律。</div>
+      </div>
+      <div class="tk-card pink">
+        <div class="tk-card-label">核心思想</div>
+        <div class="tk-card-title">从「几何缩微」到「时间缩微」</div>
+        <div class="tk-card-body">摩尔定律拼的是"把晶体管做多小"，韬定律拼的是"把信号时延做多短"。通过逻辑折叠技术降低时间常数(τ)，实现性能跃升。</div>
+      </div>
+      <div class="tk-card blue">
+        <div class="tk-card-label">硬实力证明</div>
+        <div class="tk-card-title">六年量产381款芯片</div>
+        <div class="tk-card-body">覆盖移动终端、AI加速器、汽车电子、工业与基础设施五大品类。周期内单代晶体管密度提升55%，不依赖新制程。</div>
+      </div>
+      <div class="tk-quote">
+        <div class="tk-quote-text">「韬(τ)定律是一条全新的赛道」</div>
+        <div class="tk-quote-sub">不是在摩尔定律的赛道上追赶，而是换了一条跑</div>
+      </div>
+    </div>
+    <div class="bottom-strip">
+      <span class="bs-logo">程序员摸鱼速报</span>
+      <span class="bs-right">← 02/06 →</span>
+    </div>
+  </div>
+</div>
+
+<!-- P3: GOLDEN QUOTE -->
+<div class="page">
+  <div class="page-inner" style="justify-content:center;align-items:center;text-align:center;padding:32px;">
+    <div style="display:flex;flex-direction:column;gap:24px;align-items:center;">
+      <div style="font-size:11px;color:var(--tk-dim);letter-spacing:1px;">⚠️ 金句 · 可截图</div>
+      <div style="font-size:22px;font-weight:900;line-height:1.4;color:var(--tk-text);">
+        过去六十年<br>
+        半导体只有一个<br>
+        <span style="color:var(--tk-dim);font-size:14px;font-weight:400;">摩尔定律</span>
+      </div>
+      <div style="width:40px;height:2px;background:var(--tk-purple);"></div>
+      <div style="font-size:22px;font-weight:900;line-height:1.4;">
+        <span class="hl" style="color:var(--tk-pink);">今天开始，</span>
+        <span style="color:var(--tk-text);">有第二条了。</span>
+      </div>
+      <div style="font-size:13px;color:var(--tk-dim);line-height:1.8;margin-top:8px;padding:0 20px;">
+        𐤄(τ) 不是替代摩尔定律<br>
+        而是在它失效之前，<br>
+        找到另一条路继续走
+      </div>
+    </div>
+    <div class="bottom-strip" style="width:100%;">
+      <span class="bs-logo">程序员摸鱼速报</span>
+      <span class="bs-right">← 03/06 →</span>
+    </div>
+  </div>
+</div>
+
+<!-- P4: CHAT -->
+<div class="page">
+  <div class="page-inner">
+    <div class="tk-topbar">
+      <span class="tk-num">💬</span>
+      <span class="tk-title">圈子里已经聊开了</span>
+      <span class="tk-sub"></span>
+    </div>
+    <div class="page-body">
+      <div class="chat-area">
+        <div class="bubble b-left">
+          <span class="b-label">芯片工程师</span>
+          "逻辑折叠技术看了论文，<br>思路确实巧妙<br>不是堆制程，是换思路"
+        </div>
+        <div class="bubble b-right">
+          <span class="b-label">知乎高赞</span>
+          "以前追赶摩尔定律的尾巴<br>现在他们自己开了一条新赛道"
+        </div>
+        <div class="bubble b-left">
+          <span class="b-label">嵌入式开发</span>
+          "381款芯片量产，<br>这才是最硬的<br>管你什么定律，能量产才是真"
+        </div>
+        <div class="bubble b-right">
+          <span class="b-label">半导体投资人</span>
+          "单代密度涨55%不靠新制程<br>这个数字比任何PPT都有说服力"
+        </div>
+        <div class="bubble b-left">
+          <span class="b-label">硬核极客</span>
+          "τ是时间常数符号<br>用时间缩微代替几何缩微<br>这命名有点东西"
+        </div>
+      </div>
+    </div>
+    <div class="bottom-strip">
+      <span class="bs-logo">程序员摸鱼速报</span>
+      <span class="bs-right">← 04/06 →</span>
+    </div>
+  </div>
+</div>
+
+<!-- P5: MORE DETAILS -->
+<div class="page">
+  <div class="page-inner">
+    <div class="tk-topbar">
+      <span class="tk-num">⚡</span>
+      <span class="tk-title">核心数据一览</span>
+      <span class="tk-sub">用数字说话</span>
+    </div>
+    <div class="page-body">
+      <div class="tk-stat-row">
+        <div class="tk-stat">
+          <span class="tk-stat-num">381</span>
+          <span class="tk-stat-label">量产芯片数</span>
+        </div>
+        <div class="tk-stat">
+          <span class="tk-stat-num">55%</span>
+          <span class="tk-stat-label">单代密度提升</span>
+        </div>
+        <div class="tk-stat">
+          <span class="tk-stat-num">6年</span>
+          <span class="tk-stat-label">从设计到量产</span>
+        </div>
+      </div>
+      <div class="tk-stat-row">
+        <div class="tk-stat">
+          <span class="tk-stat-num">5</span>
+          <span class="tk-stat-label">产品品类</span>
+        </div>
+        <div class="tk-stat">
+          <span class="tk-stat-num">1.4nm</span>
+          <span class="tk-stat-label">等效制程密度</span>
+        </div>
+        <div class="tk-stat">
+          <span class="tk-stat-num">2026</span>
+          <span class="tk-stat-label">ISCAS发布</span>
+        </div>
+      </div>
+      <div class="tk-sub-card" style="border-left-color:var(--tk-cyan);">
+        <div class="tk-sub-label">人民锐评</div>
+        <div class="tk-sub-title">中国定义，将改写世界</div>
+        <div class="tk-sub-body">人民网发表评论：半导体迎来"韬（τ）定律"，中国定义将改写世界。华为以量产的381款芯片证明了该定律的可行性与商业前景。</div>
+      </div>
+      <div class="tk-sub-card">
+        <div class="tk-sub-label">知乎 · 49个回答冲上热榜</div>
+        <div class="tk-sub-title">如何评价华为发表的韬(τ)定律？</div>
+        <div class="tk-sub-body">半导体行业热议：这是中国从"追赶者"变为"规则制定者"的标志性事件。</div>
+      </div>
+    </div>
+    <div class="bottom-strip">
+      <span class="bs-logo">程序员摸鱼速报</span>
+      <span class="bs-right">← 05/06 →</span>
+    </div>
+  </div>
+</div>
+
+<!-- P6: CTA -->
+<div class="page">
+  <div class="page-inner">
+    <div class="tk-topbar">
+      <span class="tk-num">🛠</span>
+      <span class="tk-title">今日相关</span>
+      <span class="tk-sub"></span>
+    </div>
+    <div class="page-body">
+      <div class="tk-card" style="border-left:none;padding:10px 12px;">
+        <div class="tk-card-body" style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--tk-text);">📄 韬(τ)定律论文</strong>
+          <span style="color:var(--tk-dim);font-size:11px;">IEEE ISCAS 2026</span>
+        </div>
+        <div class="tk-card-body" style="font-size:12px;">华为官网已发布完整技术解读</div>
+      </div>
+      <div class="tk-card" style="border-left:none;padding:10px 12px;">
+        <div class="tk-card-body" style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--tk-text);">💬 知乎热议</strong>
+          <span style="color:var(--tk-dim);font-size:11px;">49个回答</span>
+        </div>
+        <div class="tk-card-body" style="font-size:12px;">如何评价华为发表的韬(τ)定律？</div>
+      </div>
+      <div class="tk-cta">
+        <div class="cta-text">韬(τ)定律能改变芯片格局吗？</div>
+        <div class="cta-options">
+          <div class="cta-opt">A. 换赛道才是出路</div>
+          <div class="cta-opt">B. 量产才是硬道理</div>
+        </div>
+        <div class="cta-sub" style="margin-top:8px;">评论区选一个 👇</div>
+      </div>
+      <div class="tags-row">
+        <span class="xhs-tag">华为</span>
+        <span class="xhs-tag">芯片</span>
+        <span class="xhs-tag">半导体</span>
+        <span class="xhs-tag">韬τ定律</span>
+        <span class="xhs-tag">国产替代</span>
+        <span class="xhs-tag">摩尔定律</span>
+      </div>
+    </div>
+    <div class="bottom-strip">
+      <span class="bs-logo">程序员摸鱼速报</span>
+      <span class="bs-right">← 已完成 →</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

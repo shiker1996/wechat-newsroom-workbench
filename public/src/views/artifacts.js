@@ -22,6 +22,8 @@ function bindArtifacts() {
     if (!artifact) return;
     const dialog = document.getElementById("artifact-dialog");
     dialog.querySelector("iframe").src = `/api/artifacts/${artifact.dataset.artifact}/preview`;
+    const original = document.getElementById("artifact-open-original");
+    if (original) original.href = `/api/artifacts/${artifact.dataset.artifact}/content`;
     dialog.showModal();
   });
 }

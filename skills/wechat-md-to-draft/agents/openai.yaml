@@ -1,0 +1,4 @@
+interface:
+  display_name: "公众号 Markdown 转 HTML"
+  short_description: "按设计方案将公众号 Markdown 转为完整 HTML 初稿"
+  default_prompt: "使用 $wechat-md-to-draft 将这篇 Markdown 转成公众号 HTML 初稿。"

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHotspotAtlas } from '../lib/hotspot-atlas.mjs';
+import fs from 'node:fs';
+import { buildHotspotAtlas } from '../lib/domain/hotspot-atlas.mjs';
 
 test('热点全景按事件覆盖聚合且报道数守恒', () => {
   const clusters=[{
@@ -18,6 +19,22 @@ test('热点全景按事件覆盖聚合且报道数守恒', () => {
   assert.equal(atlas.gate.valid,true); assert.equal(atlas.gate.reportSum,3);
 });
 
+test('事件关系图使用固定视窗、缩放平移和确定性维度排序', () => {
+  const ui = fs.readFileSync(new URL('../public/src/views/atlas.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(ui, /viewportHeight = 500/);
+  assert.match(ui, /zoomGraph/);
+  assert.match(ui, /pointermove/);
+  assert.match(ui, /graphAutoFocusPending/);
+  assert.match(ui, /graphView\.scale=1\.22/);
+  assert.match(ui, /priorityRank/);
+  assert.match(ui, /localeCompare\(String\(b\.label\), "zh-CN"\)/);
+  assert.match(html, /data-graph-zoom="reset"/);
+  assert.match(html, /data-graph-lens="what"[^>]*>动作/);
+  assert.match(css, /\.event-graph \{[^}]*height:500px/);
+});
+
 test('事件关系图连接事件与维度节点，孤立主体不建维度节点', () => {
   const parts = (who, actionType, extra = {}) => ({ who, what:`${actionType}某事`, actionType, labels:{ who }, ...extra });
   const clusters=[1,2,3,4].map((n)=>({
@@ -29,6 +46,7 @@ test('事件关系图连接事件与维度节点，孤立主体不建维度节�
   const atlas=buildHotspotAtlas({clusters,totalArticles:4,taggedCount:4});
   const { nodes, edges } = atlas.graph;
   assert.equal(nodes.filter((node)=>node.type==='event').length, 4);
+  assert.equal(nodes.filter((node)=>node.type==='event')[0].priorityRank,0);
   const whoNodes = nodes.filter((node)=>node.type==='who');
   assert.equal(whoNodes.length, 1);
   assert.equal(whoNodes[0].id, 'who:openai');

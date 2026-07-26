@@ -24,17 +24,25 @@ function bindPreview() {
   document.getElementById("run-local-typeset").addEventListener("click", (event) => withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message))));
   document.getElementById("copy-typeset-html").addEventListener("click", (event) => withLoading(event.currentTarget, "正在复制…", () => copyTypesetHtml().catch((error) => toast(error.message))));
   document.addEventListener("click", (event) => {
-    const uploadImageButton = event.target.closest("[data-upload-image]");
-    if (uploadImageButton && !event.target.matches("[data-image-file]")) {
-      uploadImageAsset(uploadImageButton.dataset.uploadImage).catch((error) => toast(error.message));
+    // 显式「上传 CDN」按钮：本地图片已就位时点击才产生外部写入
+    const uploadCdnButton = event.target.closest("[data-upload-cdn]");
+    if (uploadCdnButton) {
+      uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message));
+      return;
+    }
+    // 点击图片区域只打开文件选择器，选中后仅保存到本地
+    const pickArea = event.target.closest("[data-upload-image]");
+    if (pickArea && !event.target.matches("[data-image-file]")) {
+      const card = pickArea.closest("[data-image-id]");
+      card?.querySelector("[data-image-file]")?.click();
     }
   });
-  // 图片文件选择后自动上传
+  // 图片文件选择后仅保存到本地，不自动上传 CDN（与页面文案承诺一致）
   document.addEventListener("change", (event) => {
     if (!event.target.matches("[data-image-file]")) return;
     const card = event.target.closest("[data-image-id]");
     if (!card) return;
-    uploadImageAsset(card.dataset.imageId).catch((error) => toast(error.message));
+    saveLocalImageAsset(card.dataset.imageId).catch((error) => toast(error.message));
   });
 }
 
@@ -54,7 +62,7 @@ function imageCard(item) {
       <input class="image-slot-file" data-image-file type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
     </div></div>
     <div class="image-slot-meta"><span>位置：${escapeHtml(item.position)}</span><span>比例：${escapeHtml(item.ratio)}</span><span>建议来源：${escapeHtml(item.suggestedSource)}</span></div>
-    <div class="image-slot-actions">${hasImage ? `<span class="muted">${item.status === "cdn" ? "已上传 CDN" : "本地已保存"}</span>` : ""}${item.status === "cdn" ? `<button class="ghost-button" data-upload-image="${escapeHtml(item.id)}">重新上传</button>` : ""}</div>
+    <div class="image-slot-actions">${hasImage ? `<span class="muted">${item.status === "cdn" ? "已上传 CDN" : "本地已保存"}</span>` : ""}${item.status === "local" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">上传 CDN</button>` : ""}${item.status === "cdn" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">重新上传 CDN</button>` : ""}</div>
     ${item.url ? `<a class="image-cdn-url" href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(item.url)}</a>` : ""}
   </article>`;
 }
@@ -145,12 +153,16 @@ async function loadProductionPreview() {
   }
   const prov = document.getElementById("typeset-provider");
   if (prov) prov.innerHTML = providerOptions(state.models?.defaultProvider || "");
+  const statusEl = document.getElementById("typeset-status");
+  if (statusEl && !ready.length) statusEl.innerHTML = '还没有终稿（09-FINAL.md），请先到 <a href="#editor">文章编辑器</a> 保存终稿。';
   const btn = document.getElementById("run-local-typeset");
   if (btn) btn.disabled = !ready.length;
   state.productionPreview = { batch, artifacts, candidates: ready };
+  // 渲染对象必须与下拉选中项一致（此前写死 ready[0]，下拉显示 B、内容却是 A）
+  const selectedId = Number(select?.value) || ready[0]?.id;
   if (ready.length) {
-    renderProductionCandidate(ready[0].id);
-    loadImageWorkspace(ready[0].id);
+    renderProductionCandidate(selectedId);
+    loadImageWorkspace(selectedId);
   }
 }
 
@@ -176,33 +188,38 @@ async function planArticleImages() {
   } catch (err) { toast(err.message); }
 }
 
-async function saveImageAsset(id) {
+// 选中图片后仅保存到本地，不产生外部写入；上传 CDN 由「上传 CDN」按钮显式触发
+async function saveLocalImageAsset(id) {
   const card = imageSlot(id);
   if (!card) return;
   const file = card.querySelector("[data-image-file]")?.files?.[0];
-  if (!file) return toast("请先选择图片文件");
-  const payload = { fileName: file.name, mimeType: file.type, base64: await fileAsDataUrl(file) };
-  await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify(payload) });
-  await loadImageWorkspace(state.imageWorkspace.candidateId);
-  await uploadImageAsset(id);
-}
-
-async function uploadImageAsset(id) {
-  const card = imageSlot(id);
-  if (!card) return;
-  const fileInput = card.querySelector("[data-image-file]");
-  const file = fileInput?.files?.[0];
-  if (!file) { fileInput?.click(); return; }
+  if (!file) return;
   const status = card.querySelector(".image-slot-status");
-  if (status) status.textContent = "正在上传…";
+  if (status) status.textContent = "正在保存到本地…";
   try {
     const payload = { fileName: file.name, mimeType: file.type, base64: await fileAsDataUrl(file) };
     await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify(payload) });
+    await loadImageWorkspace(state.imageWorkspace.candidateId);
+    toast(`${id} 已保存到本地，点击「上传 CDN」才会同步到图床`);
+  } catch (error) {
+    if (status?.isConnected) status.textContent = "本地待上传";
+    toast(error.message);
+  }
+}
+
+// 显式上传 CDN：服务端从已保存的本地图片读取，无需前端再传文件
+async function uploadImageAsset(id) {
+  const card = imageSlot(id);
+  if (!card) return;
+  const status = card.querySelector(".image-slot-status");
+  if (status) status.textContent = "正在上传 CDN…";
+  try {
     await request(`/api/candidates/${state.imageWorkspace.candidateId}/images/${encodeURIComponent(id)}/cdn`, { method: "POST", body: "{}" });
     await loadImageWorkspace(state.imageWorkspace.candidateId);
     toast(`${id} 已上传 CDN`);
-  } finally {
-    if (status?.isConnected) status.textContent = "上传结束";
+  } catch (error) {
+    if (status?.isConnected) status.textContent = "本地待上传";
+    toast(error.message);
   }
 }
 

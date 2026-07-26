@@ -16,7 +16,7 @@ async function loadHotspots(params) {
   if (!params) params = new URLSearchParams();
   const data = await request("/api/hotspots?" + params.toString());
   const total = data.length;
-  document.getElementById("archive-summary").textContent = `共 ${total} 条热点`;
+  document.getElementById("archive-summary").innerHTML = `共 ${total} 条热点 · <a href="#overview">返回热点全景</a>`;
   const list = document.getElementById("hotspot-list");
   list.innerHTML = total
     ? data.map((item) => {

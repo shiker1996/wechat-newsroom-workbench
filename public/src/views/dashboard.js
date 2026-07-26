@@ -20,7 +20,7 @@ export function localDate() {
 export function renderBatchSwitcher() {
   const switcher = $("#batch-switcher");
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-  const recent = state.batches.filter((b) => b.batch_date >= weekAgo.toISOString().slice(0, 10));
+  const recent = state.batches.filter((b) => b.batch_date >= weekAgo.toISOString().slice(0, 10) && (b.lifecycle_status||"active")==="active");
   switcher.innerHTML = recent.length
     ? recent.map((batch) => `<option value="${escapeHtml(batch.id)}" ${batch.id === state.activeBatchId ? "selected" : ""}>${escapeHtml(batch.batch_date)} · ${escapeHtml(batch.title)}</option>`).join("")
     : state.batches.length ? '<option value="">选择批次</option>' : '<option value="">暂无批次</option>';
@@ -49,6 +49,59 @@ function renderSources(sources) {
   }).join("");
 }
 
+function renderAttention(overview) {
+  const current = overview.current || {};
+  const latest = overview.latest;
+  const [stageName] = latest ? (stages[latest.stage] ?? [latest.stage]) : ["未开始"];
+  const signals = [
+    {
+      label: "采集状态", value: current.sourceTotal ? `${current.sourceOk} / ${current.sourceTotal}` : "未采集",
+      note: current.sourceTotal && current.sourceOk >= current.sourceTotal ? "采集源运行正常" : "有来源未完成或尚未运行",
+      tone: current.sourceTotal && current.sourceOk >= current.sourceTotal ? "ok" : "warn", go: "sources",
+    },
+    { label: "当前流程", value: stageName, note: latest ? latest.title : "建立今日批次后开始", tone: latest ? "active" : "warn", batch: latest?.id },
+    {
+      label: "待确认选题", value: current.pendingArticleCandidates ?? 0, note: "文章候选等待编辑判断",
+      tone: current.pendingArticleCandidates ? "active" : "ok", go: "topics",
+    },
+    {
+      label: "成稿门禁", value: current.blockedBriefs ?? 0, note: current.blockedBriefs ? "编辑简报尚未通过" : "暂无未通过简报",
+      tone: current.blockedBriefs ? "warn" : "ok", go: "editorial",
+    },
+    {
+      label: "失败任务", value: current.failedRuns ?? 0, note: current.failedRuns ? "需要查看错误并重试" : "当前批次运行正常",
+      tone: current.failedRuns ? "bad" : "ok", go: "logs",
+    },
+  ];
+  $("#dashboard-attention").innerHTML = signals.map((item) => `<button class="attention-card ${item.tone}" ${item.batch ? `data-batch="${escapeHtml(item.batch)}"` : `data-go="${item.go}"`}>
+    <span>${item.label}</span><strong>${escapeHtml(String(item.value))}</strong><small>${escapeHtml(item.note)}</small>
+  </button>`).join("");
+}
+
+function formatDuration(milliseconds) {
+  const seconds=Math.max(0,Math.round(Number(milliseconds||0)/1000));
+  if(!seconds)return "—";
+  if(seconds<60)return `${seconds} 秒`;
+  const minutes=Math.round(seconds/60);
+  return minutes<60?`${minutes} 分钟`:`${Math.floor(minutes/60)} 小时 ${minutes%60} 分`;
+}
+
+function renderEfficiency(overview) {
+  const data=overview.efficiency||{};
+  const baseline=overview.efficiencyBaseline||{};
+  const baselineNote=(value,formatter=(item)=>String(item))=>baseline.sampleSize&&value!=null
+    ? `近 ${baseline.sampleSize} 批均值 ${formatter(value)}`
+    : "暂无历史批次基线";
+  const cards=[
+    {label:"本次采集耗时",value:formatDuration(data.collectionDurationMs),note:`${baselineNote(baseline.collectionDurationMs,formatDuration)} · 重试累计 ${formatDuration(data.collectionRetryDurationMs)}`,go:"sources"},
+    {label:"AI 任务成功率",value:data.aiSuccessRate==null?"—":`${data.aiSuccessRate}%`,note:baselineNote(baseline.aiSuccessRate,(value)=>`${value}%`),go:"logs"},
+    {label:"选题推进率",value:data.candidateConversionRate==null?"—":`${data.candidateConversionRate}%`,note:baselineNote(baseline.candidateConversionRate,(value)=>`${value}%`),go:"topics"},
+    {label:"产物输出",value:String(data.artifactCount??0),note:baselineNote(baseline.artifactCount),go:"artifacts"},
+  ];
+  $("#dashboard-efficiency").innerHTML=cards.map((item)=>`<button type="button" class="efficiency-card" data-go="${item.go}"><span>${item.label}</span><strong>${escapeHtml(item.value)}</strong><small>${item.note}</small></button>`).join("");
+  $("#efficiency-insight").innerHTML=`<b>当前瓶颈</b><span>${escapeHtml(data.bottleneck||"暂无反馈")}</span>`;
+}
+
 export default async function loadOverview() {
   const [overview, batches] = await Promise.all([request("/api/overview"), request("/api/batches?limit=20")]);
   state.overview = overview;
@@ -56,14 +109,24 @@ export default async function loadOverview() {
   if (!state.activeBatchId && batches.length) state.activeBatchId = batches[0].id;
   renderBatchSwitcher();
   $("#edition-number").textContent = String(overview.hotspots).padStart(3, "0");
+  const current = overview.current || {};
+  const dashboardBrief = $("#dashboard-brief");
+  if (dashboardBrief) dashboardBrief.textContent = overview.latest
+    ? `${overview.latest.title}正在${(stages[overview.latest.stage] ?? [overview.latest.stage])[0]}阶段；${current.failedRuns ? `有 ${current.failedRuns} 个失败任务需要处理。` : "当前没有失败任务。"}`
+    : "今天还没有编辑批次，建立后即可开始采集与研判。";
+  const primary = $("#dashboard-primary-action");
+  if (primary) {
+    primary.textContent = overview.latest ? "查看当前批次 →" : "建立今日批次 →";
+    primary.dataset.dashboardAction = overview.latest ? "batch" : "new";
+  }
   $("#metrics").innerHTML = [
-    ["HOTSPOTS", overview.hotspots, "热点进入档案"],
-    ["ARTICLE POOL", overview.articleCandidates, "文章候选"],
-    ["SOCIAL POOL", overview.socialCandidates, "图文候选"],
-    ["ARTICLE ACTIVE", overview.articleInProgress, "文章生产中"],
-    ["SOCIAL ACTIVE", overview.socialInProgress, "图文生产中"],
-    ["ARTIFACTS", overview.artifacts, "待审核与可追溯产物"],
+    ["今日文章", overview.articleInProgress, "生产中的文章"],
+    ["今日图文", overview.socialInProgress, "生产中的图文"],
+    ["累计热点", overview.hotspots, "已归档"],
+    ["累计产物", overview.artifacts, "可追溯"],
   ].map(([label, value, note]) => `<article class="metric"><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
+  renderAttention(overview);
+  renderEfficiency(overview);
   renderLatest(overview.latest);
   renderSources(overview.sourceHealth);
 }

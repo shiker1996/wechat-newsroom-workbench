@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mermaid 转图片"
+  short_description: "将显式 Mermaid 围栏渲染为本地或授权上传的 PNG"
+  default_prompt: "使用 $mermaid-render 将这些 Mermaid 围栏渲染为图片。"

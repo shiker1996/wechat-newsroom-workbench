@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google DESIGN.md 贴图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .page {
+    width: 375px;
+    height: 667px;
+    position: relative;
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    background: #0d0d1a;
+  }
+
+  /* ========== Page 1: Cover ========== */
+  .page-1 {
+    background: linear-gradient(160deg, #0d0d1a 0%, #1a1a3e 40%, #0d0d1a 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 30px;
+    text-align: center;
+  }
+
+  .page-1 .google-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(66, 133, 244, 0.15);
+    border: 1px solid rgba(66, 133, 244, 0.3);
+    border-radius: 20px;
+    padding: 6px 16px;
+    margin-bottom: 30px;
+  }
+
+  .page-1 .google-badge span {
+    color: #8ab4f8;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .page-1 .google-logo {
+    width: 20px;
+    height: 20px;
+    background: #4285f4;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  .page-1 h1 {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+
+  .page-1 h1 .highlight {
+    background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .page-1 .subtitle {
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 35px;
+    max-width: 300px;
+  }
+
+  .page-1 .stats {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+
+  .page-1 .stat-item {
+    text-align: center;
+  }
+
+  .page-1 .stat-item .num {
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .page-1 .stat-item .num small {
+    font-size: 14px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .page-1 .stat-item .label {
+    color: rgba(255,255,255,0.4);
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  .page-1 .tag-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .page-1 .tag {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 4px 12px;
+    color: rgba(255,255,255,0.5);
+    font-size: 11px;
+  }
+
+  /* ========== Page 2: 核心内容 ========== */
+  .page-2 {
+    background: #0d0d1a;
+    padding: 30px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-2 .section-label {
+    color: #8ab4f8;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+
+  .page-2 h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 20px;
+  }
+
+  .page-2 .feature-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .page-2 .feature-card .ftitle {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .page-2 .feature-card .fdesc {
+    color: rgba(255,255,255,0.55);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .page-2 .feature-card .fdesc code {
+    background: rgba(66,133,244,0.12);
+    color: #8ab4f8;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+
+  .page-3 {
+    background: #0d0d1a;
+    padding: 30px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-3 .section-label {
+    color: #8ab4f8;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+
+  .page-3 h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 20px;
+  }
+
+  .page-3 .takeaway-box {
+    background: rgba(66, 133, 244, 0.08);
+    border: 1px solid rgba(66, 133, 244, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .page-3 .takeaway-box .tlabel {
+    color: #8ab4f8;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .page-3 .takeaway-box .tcontent {
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .page-3 .takeaway-box .tcontent strong {
+    color: #fff;
+  }
+
+  .page-3 .cta-box {
+    text-align: center;
+    margin-top: auto;
+    padding-top: 20px;
+  }
+
+  .page-3 .cta-box .cta-text {
+    color: #8ab4f8;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .page-3 .cta-box .cta-sub {
+    color: rgba(255,255,255,0.35);
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .page-number {
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Page 1: Cover -->
+<div class="page page-1" data-page-number="01">
+  <div class="google-badge">
+    <div class="google-logo">G</div>
+    <span>GOOD IDEA</span>
+  </div>
+  <h1>Google 出了一份<br><span class="highlight">DESIGN.md</span></h1>
+  <p class="subtitle">给 AI 编码 Agent 看的「设计系统描述文件」规范 —— 你的前端项目该加一份了</p>
+  <div class="stats">
+    <div class="stat-item">
+      <div class="num">1.5<span class="num small">K</span></div>
+      <div class="label">⭐ GitHub</div>
+    </div>
+    <div class="stat-item">
+      <div class="num">24H</div>
+      <div class="label">🔥 Trending</div>
+    </div>
+  </div>
+  <div class="tag-row">
+    <span class="tag">⚡ AI编码</span>
+    <span class="tag">🎨 设计规范</span>
+    <span class="tag">🤖 Agent</span>
+    <span class="tag">📘 前端工具</span>
+  </div>
+</div>
+
+<!-- Page 2: 核心内容 -->
+<div class="page page-2" data-page-number="02">
+  <div class="section-label">📋 WHAT IS IT</div>
+  <h2>一份让 AI 看懂<br>你设计规范的 Markdown</h2>
+
+  <div class="feature-card">
+    <div class="ftitle">🎨 品牌色 + Token 系统</div>
+    <div class="fdesc">定义 <code>--primary: #4285F4</code> 等 CSS 变量，AI 自动套用品牌设计语言</div>
+  </div>
+
+  <div class="feature-card">
+    <div class="ftitle">📐 组件命名 & 分类</div>
+    <div class="fdesc">按 <code>Button → Primary/Secondary/Ghost</code> 结构化说明，AI 知道用什么组件</div>
+  </div>
+
+  <div class="feature-card">
+    <div class="ftitle">📏 间距 & 布局规则</div>
+    <div class="fdesc">8px 网格系统、响应式断点、间距标尺 —— AI 不再乱加 margin</div>
+  </div>
+
+  <div class="feature-card">
+    <div class="ftitle">🖼️ 图例 & 图标说明</div>
+    <div class="fdesc">注明 SVG 路径、Material Icons 命名，AI 生成的 UI 不会漏图标</div>
+  </div>
+</div>
+
+<!-- Page 3: 为什么你要用 + CTA -->
+<div class="page page-3" data-page-number="03">
+  <div class="section-label">💡 WHY YOU NEED IT</div>
+  <h2>为什么开发者都在加<br>这份 DESIGN.md？</h2>
+
+  <div class="takeaway-box">
+    <div class="tlabel">🔍 场景一：AI 写 UI 翻车</div>
+    <div class="tcontent">AI 生成的 UI 组件颜色不对、间距乱跑？因为 AI 不知道你的设计规范。一份 <strong>DESIGN.md</strong> 直接解决。</div>
+  </div>
+
+  <div class="takeaway-box">
+    <div class="tlabel">⚡ 场景二：多人 AI 协同</div>
+    <div class="tcontent">多个 AI Agent 改同一个前端项目？<strong>DESIGN.md</strong> 是它们的"设计共识文档"，杜绝风格冲突。</div>
+  </div>
+
+  <div class="takeaway-box" style="background: rgba(52, 168, 83, 0.08); border-color: rgba(52, 168, 83, 0.2);">
+    <div class="tlabel" style="color: #81c995;">🛠️ 用法</div>
+    <div class="tcontent">在项目根目录放一个 <code style="background:rgba(52,168,83,0.12);color:#81c995;">DESIGN.md</code>，把设计系统写清楚。AI Agent 读取后自动遵从你的设计规范。</div>
+  </div>
+
+  <div class="cta-box">
+    <div class="cta-text">🔗 github.com/google/design-patterns</div>
+    <div class="cta-sub">🤖 连 Claude Code / Cursor 都能用</div>
+  </div>
+</div>
+
+</body>
+</html>

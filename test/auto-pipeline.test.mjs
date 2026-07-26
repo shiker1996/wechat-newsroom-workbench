@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 test('自动任务类型串联打标、事件卡与事件研判', () => {
-  const manager = fs.readFileSync(new URL('../lib/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
   assert.match(manager, /'tag','retag','event-cards','research','breaking-analysis','article','typeset','social-card','auto'/);
   const autoBranch = manager.slice(manager.indexOf("job.type === 'auto'"));
   assert.match(autoBranch, /runBreakingAnalysisPipeline/);
@@ -14,7 +14,7 @@ test('自动任务类型串联打标、事件卡与事件研判', () => {
 });
 
 test('事件卡是独立环节：单独任务类型，打标不再顺带生成', () => {
-  const manager = fs.readFileSync(new URL('../lib/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
   const tagBranch = manager.slice(manager.indexOf("job.type === 'tag'"), manager.indexOf("job.type === 'event-cards'"));
   assert.doesNotMatch(tagBranch, /ensureBatchEventCards/);
   const cardsBranch = manager.slice(manager.indexOf("job.type === 'event-cards'"));
@@ -38,4 +38,15 @@ test('批次一键自动化路由与手动重试入口并存', () => {
   assert.match(ui, /data-ai-retag/);
   assert.match(ui, /data-ai-research/);
   assert.match(ui, /一键采集并研判/);
+});
+
+test('一键流程实时刷新四步进度并把 auto 视为研判任务', () => {
+  const store = fs.readFileSync(new URL('../lib/core/store.mjs', import.meta.url), 'utf8');
+  assert.match(store, /item\.type === 'research' \|\| item\.type === 'auto'/);
+  const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
+  assert.match(ui, /data-pipeline-step="collect"/);
+  assert.match(ui, /data-pipeline-step="tag"/);
+  assert.match(ui, /data-pipeline-step="event-cards"/);
+  assert.match(ui, /data-pipeline-step="research"/);
+  assert.match(ui, /await refreshPipelineSteps\(job\)/);
 });

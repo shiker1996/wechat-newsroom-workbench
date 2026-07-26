@@ -3,20 +3,31 @@ import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
 
+const editorialStatusLabels = {
+  DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
+  DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判",
+};
+function statusLabel(value) { return editorialStatusLabels[String(value || "")] || String(value || "待处理"); }
+
 let bound = false;
+let editorialDirty = false;
 function bindEditorial() {
   if (bound) return;
   bound = true;
   const form = document.getElementById("editorial-form");
   form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message)));
-  form.addEventListener("input", renderEditorialReadiness);
+  form.addEventListener("input", () => { editorialDirty = true; renderEditorialReadiness(); });
   form.addEventListener("change", renderEditorialReadiness);
   document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message)));
   document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
   document.addEventListener("click", (event) => {
     const editCandidate = event.target.closest("[data-edit-candidate]");
     if (editCandidate) {
-      openEditorial(Number(editCandidate.dataset.editCandidate)).catch((error) => toast(error.message));
+      const nextId = Number(editCandidate.dataset.editCandidate);
+      const currentId = Number(document.getElementById("editorial-form")?.elements.candidateId?.value);
+      // 切换候选前保护未保存的决策底稿手改内容
+      if (editorialDirty && nextId !== currentId && !window.confirm("当前候选的决策底稿有未保存的修改，切换后将丢失。仍要切换吗？")) return;
+      openEditorial(nextId).catch((error) => toast(error.message));
     }
   });
 }
@@ -24,9 +35,31 @@ function bindEditorial() {
 async function loadEditorialRoom(selectedId) {
   setupEditorialGateNavigation();
   setupCandidateTabNavigation();
+  const loading = document.getElementById("editorial-loading");
+  const empty = document.getElementById("editorial-empty");
+  const fields = document.getElementById("editorial-fields");
+  if (loading) loading.hidden = false;
+  if (empty) empty.hidden = true;
+  if (fields) fields.hidden = true;
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
-  if (!batch) return;
-  state.candidates = await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`);
+  if (!batch) {
+    if (loading) loading.hidden = true;
+    if (empty) {
+      empty.innerHTML = '请先选择或建立一个批次。';
+      empty.hidden = false;
+    }
+    return;
+  }
+  try {
+    state.candidates = await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`);
+  } catch (error) {
+    if (loading) loading.hidden = true;
+    if (empty) {
+      empty.textContent = `候选加载失败：${error.message}`;
+      empty.hidden = false;
+    }
+    throw error;
+  }
   const sidebar = document.getElementById("editorial-candidates");
   if (!sidebar) return;
   // 与选题池同一成稿线：默认只展示 F≥55 的候选，选题池的"显示全部"开关同样生效
@@ -36,15 +69,21 @@ async function loadEditorialRoom(selectedId) {
     ? visibleCandidates.map((item) => {
         // 与选题池口径一致：综合候选展示组标题，单热点候选优先展示事件摘要
         const label = !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
-        return `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(item.brief_status || "DISCUSS")}</b><span>${escapeHtml(label)}</span></button>`;
+        return `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(statusLabel(item.brief_status || "DISCUSS"))}</b><span>${escapeHtml(label)}</span></button>`;
       }).join("")
     : '<div class="empty-state">选题池为空</div>';
   if (hiddenCount) sidebar.innerHTML += `<div class="editorial-hidden-note">已隐藏 ${hiddenCount} 条低于成稿线（F<55）的候选，可在选题池打开"显示全部"</div>`;
   requestAnimationFrame(updateCandidateTabControls);
-  if (visibleCandidates.length) await openEditorial(selectedId || visibleCandidates[0].id);
+  if (visibleCandidates.length) {
+    const requested = visibleCandidates.find((item) => Number(item.id) === Number(selectedId));
+    await openEditorial(requested?.id || visibleCandidates[0].id);
+    if (loading) loading.hidden = true;
+  }
   else {
-    const empty = document.getElementById("editorial-empty");
-    const fields = document.getElementById("editorial-fields");
+    if (loading) loading.hidden = true;
+    if (empty) empty.innerHTML = state.candidates.length
+      ? `当前批次有 ${state.candidates.length} 个文章候选，但均低于成稿线（F&lt;55）。<a href="#topics">前往文章选题池查看</a>`
+      : '当前批次还没有文章候选。<a href="#overview">前往热点全景创建选题</a>';
     if (empty) empty.hidden = false;
     if (fields) fields.hidden = true;
   }
@@ -106,7 +145,9 @@ async function openEditorial(id) {
   activeCandidateTab?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
   requestAnimationFrame(updateCandidateTabControls);
   const empty = document.getElementById("editorial-empty");
+  const loading = document.getElementById("editorial-loading");
   const fields = document.getElementById("editorial-fields");
+  if (loading) loading.hidden = true;
   if (empty) empty.hidden = true;
   if (fields) fields.hidden = false;
   const form = document.getElementById("editorial-form");
@@ -128,7 +169,7 @@ async function openEditorial(id) {
   const badge = document.getElementById("editorial-composite-badge");
   if (badge) badge.hidden = !candidate.composite;
   const briefState = document.getElementById("brief-state");
-  if (briefState) briefState.textContent = editorial.brief_status;
+  if (briefState) briefState.textContent = statusLabel(editorial.brief_status);
   const provEl = document.getElementById("editorial-provider");
   if (provEl) {
     const preferred = state.models?.providers?.find((p) => p.configured)?.name || state.models?.defaultProvider || "";
@@ -146,6 +187,7 @@ async function openEditorial(id) {
     messages.scrollTop = messages.scrollHeight;
   }
   state.editorialCandidate = candidate;
+  editorialDirty = false;
   renderEditorialReadiness();
   loadSimilarArticles(id);
 }
@@ -213,6 +255,12 @@ function renderEditorialReadiness() {
   const ready = passed === checks.length;
   const locked = state.editorialCandidate?.brief_status === "LOCKED" || state.editorialCandidate?.editorial?.brief_status === "LOCKED";
   gate.classList.toggle("ready", ready);
+  document.querySelector(".editorial-focus-grid")?.classList.toggle("is-ready", ready);
+  const replyButton = document.getElementById("send-editorial-answer");
+  if (replyButton) {
+    replyButton.classList.toggle("ink-button", !ready);
+    replyButton.classList.toggle("ghost-button", ready);
+  }
   const count = document.getElementById("editorial-gate-count");
   if (count) count.textContent = `${passed} / ${checks.length}`;
   const list = document.getElementById("editorial-gate-checks");
@@ -306,6 +354,7 @@ async function persistEditorialForm(opts) {
   const editorial = Object.fromEntries(fields.map((k) => [k, form.elements[k].value]));
   editorial.experience_required = form.elements.experience_required?.checked ? 1 : 0;
   await request(`/api/candidates/${candidateId}/editorial`, { method: "PUT", body: JSON.stringify(editorial) });
+  editorialDirty = false;
   if (opts.refresh !== false) await openEditorial(candidateId);
   return candidateId;
 }
@@ -325,6 +374,8 @@ async function startEditorialProduction() {
     await request(`/api/candidates/${candidateId}/lock`, { method: "POST" });
     const result = await request(`/api/candidates/${candidateId}/ai/article`, { method: "POST", body: JSON.stringify({ provider: document.getElementById("editorial-provider")?.value || "" }) });
     toast("完整成稿链已启动");
+    // 成稿链长达数分钟：打开进度弹窗，轮询输出写入 #production-job-console
+    document.getElementById("production-job-dialog")?.showModal();
     if (result?.id) {
       // poll job
       state.jobTimer = setTimeout(async function poll() {

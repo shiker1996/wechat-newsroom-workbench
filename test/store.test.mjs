@@ -3,7 +3,95 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/store.mjs';
+import { Store } from '../lib/core/store.mjs';
+
+test('完成和归档批次退出当前工作台但保留历史记录',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-batch-lifecycle-'));
+  let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const older=store.createBatch({date:'2026-07-25',title:'旧批次'});
+    const current=store.createBatch({date:'2026-07-26',title:'当前批次'});
+    assert.equal(store.overview().latest.id,current.id);
+    store.updateBatch(current.id,{status:'review',lifecycle_status:'completed'});
+    assert.equal(store.overview().latest.id,older.id);
+    store.updateBatch(older.id,{lifecycle_status:'archived'});
+    assert.equal(store.overview().latest,null);
+    const history=store.listBatches(10);
+    assert.deepEqual(history.map((item)=>item.lifecycle_status),['completed','archived']);
+    assert.equal(history[0].status,'review');
+  }finally{
+    store?.close();
+    fs.rmSync(tempRoot,{recursive:true,force:true});
+  }
+});
+
+test('工作台今日文章与图文只统计当前活动批次',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-current-batch-counts-'));
+  let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const oldBatch=store.createBatch({date:'2026-07-25',title:'旧批次'});
+    store.addHotspots(oldBatch.id,'rsshub',[{title:'旧选题',url:'https://example.com/old'}]);
+    const oldCandidate=store.addCandidates(oldBatch.id,[store.getBatch(oldBatch.id).hotspots[0].id],{tracks:['article','social_cards']})[0];
+    store.updateCandidateTrack(oldCandidate.id,'article',{status:'drafting'});
+    store.updateCandidateTrack(oldCandidate.id,'social_cards',{status:'drafting'});
+    const currentBatch=store.createBatch({date:'2026-07-26',title:'当前批次'});
+
+    let overview=store.overview();
+    assert.equal(overview.latest.id,currentBatch.id);
+    assert.equal(overview.articleCandidates,1);
+    assert.equal(overview.socialCandidates,1);
+    assert.equal(overview.articleInProgress,0);
+    assert.equal(overview.socialInProgress,0);
+
+    store.addHotspots(currentBatch.id,'rsshub',[{title:'今日选题',url:'https://example.com/today'}]);
+    const currentCandidate=store.addCandidates(currentBatch.id,[store.getBatch(currentBatch.id).hotspots[0].id],{tracks:['article']})[0];
+    store.updateCandidateTrack(currentCandidate.id,'article',{status:'review'});
+    overview=store.overview();
+    assert.equal(overview.articleCandidates,2);
+    assert.equal(overview.articleInProgress,1);
+    assert.equal(overview.socialInProgress,0);
+  }finally{
+    store?.close();
+    fs.rmSync(tempRoot,{recursive:true,force:true});
+  }
+});
+
+test('工作台效率反馈计算采集耗时、AI 成功率、推进率和瓶颈',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-efficiency-'));
+  let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const baselineBatch=store.createBatch({date:'2026-07-25',title:'效率基线'});
+    store.recordSubscriptionRun(baselineBatch.id,{sourceGroup:'rsshub',sourceType:'rsshub',sourceKey:'baseline',
+      sourceName:'历史测试源',status:'ok',itemCount:8,durationMs:4000});
+    const batch=store.createBatch({date:'2026-07-26',title:'效率反馈'});
+    const now=new Date().toISOString();
+    store.db.prepare(`INSERT INTO subscription_runs
+      (batch_id,source_group,source_type,source_key,source_name,status,item_count,duration_ms,error,started_at,ended_at)
+      VALUES (?,?,?,?,?,'failed',0,1000,'超时',?,?),
+             (?,?,?,?,?,'ok',10,2500,NULL,?,?)`).run(
+        batch.id,'rsshub','rsshub','test','测试源',now,now,
+        batch.id,'rsshub','rsshub','test','测试源',now,now);
+    store.db.prepare(`INSERT INTO ai_runs
+      (id,batch_id,type,provider,status,progress,result_json,error,created_at,updated_at)
+      VALUES ('ok',?,'tag','test','completed','','{}',NULL,?,?),
+             ('bad',?,'research','test','failed','','{}','失败',?,?)`).run(batch.id,now,now,batch.id,now,now);
+    const overview=store.overview();
+    assert.equal(overview.efficiency.collectionDurationMs,2500);
+    assert.equal(overview.efficiency.collectionCumulativeDurationMs,3500);
+    assert.equal(overview.efficiency.collectionRetryDurationMs,1000);
+    assert.equal(overview.efficiency.aiSuccessRate,50);
+    assert.equal(overview.efficiency.artifactCount,0);
+    assert.match(overview.efficiency.bottleneck,/失败任务/);
+    assert.equal(overview.efficiencyBaseline.sampleSize,1);
+    assert.equal(overview.efficiencyBaseline.collectionDurationMs,4000);
+  }finally{
+    store?.close();
+    fs.rmSync(tempRoot,{recursive:true,force:true});
+  }
+});
 
 test('打标持久化保留 eventParts 四要素与扩展字段', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-store-'));
@@ -26,6 +114,29 @@ test('打标持久化保留 eventParts 四要素与扩展字段', () => {
     assert.equal(saved.eventParts.actionType, '发布');
     assert.equal(saved.eventParts.object, 'gpt-5');
     assert.equal(saved.eventParts.labels.who, 'OpenAI');
+  } finally {
+    store?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('document revisions only record meaningful changes', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-revisions-'));
+  let store;
+  try {
+    store = new Store(path.join(tempRoot, 'test.db'));
+    const batch = store.createBatch({ date: '2026-07-26', title: 'revision test' });
+    const now = new Date().toISOString();
+    store.db.prepare(`INSERT INTO candidates
+      (batch_id,candidate_id,created_at,updated_at) VALUES (?,?,?,?)`).run(batch.id,'revision-candidate',now,now);
+    const candidateId = store.db.prepare('SELECT id FROM candidates WHERE batch_id=?').get(batch.id).id;
+    const first = store.saveDocument({ batchId:batch.id,candidateId,kind:'draft',title:'title',content:'first' });
+    store.saveDocument({ batchId:batch.id,candidateId,kind:'draft',title:'title',content:'first' });
+    store.saveDocument({ batchId:batch.id,candidateId,kind:'draft',title:'title',content:'second' });
+    const revisions = store.listDocumentRevisions(first.id);
+    assert.equal(revisions.length,2);
+    assert.equal(store.getDocumentRevision(first.id,revisions[0].id).content,'second');
+    assert.equal(store.getDocumentRevision(first.id,revisions[1].id).content,'first');
   } finally {
     store?.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput } from '../lib/typeset-pipeline.mjs';
+import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput } from '../lib/llm/typeset-pipeline.mjs';
 import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
 
 test('项目排版总技能声明与执行器使用相同的六阶段契约', () => {

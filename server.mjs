@@ -1,36 +1,42 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Store } from './lib/store.mjs';
-import { loadConfig } from './lib/config.mjs';
-import { indexArtifacts, isInsideRoots } from './lib/artifact-indexer.mjs';
-import { JobManager } from './lib/job-manager.mjs';
+import { backup as backupSqlite } from 'node:sqlite';
+import { Store } from './lib/core/store.mjs';
+import { loadConfig } from './lib/core/config.mjs';
+import { indexArtifacts, isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
+import { JobManager } from './lib/jobs/job-manager.mjs';
 import { checkReddit } from './collectors/reddit.mjs';
-import { checkRssHub, ensureStarted, testSubscription } from './collectors/rsshub.mjs';
-import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from './lib/subscriptions.mjs';
+import { checkRssHub, ensureStarted, stopRssHub, testSubscription } from './collectors/rsshub.mjs';
+import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from './lib/integrations/subscriptions.mjs';
 import { ModelGateway } from './lib/llm/gateway.mjs';
 import { draftArticle, tagBatch } from './lib/llm/tasks.mjs';
 import { isFreshForBatch } from './lib/llm/research-pipeline.mjs';
-import { loadEnv } from './lib/env.mjs';
-import { AiJobManager } from './lib/ai-job-manager.mjs';
+import { loadEnv } from './lib/core/env.mjs';
+import { AiJobManager } from './lib/llm/ai-job-manager.mjs';
 import { runEditorialTurn, runEditorialTurnStream } from './lib/llm/editorial-room.mjs';
 import { clusterItems, preselection, scoreCards, selectSocialCandidates, ensureBatchEventCards } from './lib/llm/research-pipeline.mjs';
-import { buildHotspotAtlas } from './lib/hotspot-atlas.mjs';
-import { fetchCandidateSource } from './lib/source-fetcher.mjs';
+import { buildHotspotAtlas } from './lib/domain/hotspot-atlas.mjs';
+import { fetchCandidateSource } from './lib/integrations/source-fetcher.mjs';
 import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
-  planImagePlaceholders, imageManifestFile } from './lib/image-workflow.mjs';
-import { inspectRepository, repositoryFactMarkdown } from './lib/repository-inspector.mjs';
-import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/social-card-gate.mjs';
-import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/custom-fact-builder.mjs';
+  planImagePlaceholders, imageManifestFile } from './lib/llm/image-workflow.mjs';
+import { inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
+import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
+import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/domain/custom-fact-builder.mjs';
 import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
-import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/event-fact-base.mjs';
+import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
-import { createZip } from './lib/zip-bundle.mjs';
-import { getGitHubApiHealth } from './lib/github-api.mjs';
-import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from './lib/artifact-preview.mjs';
-import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/workspace-paths.mjs';
+import { createZip } from './lib/artifacts/zip-bundle.mjs';
+import { validateWorkbenchBackup } from './lib/artifacts/backup-archive.mjs';
+import { getGitHubApiHealth } from './lib/integrations/github-api.mjs';
+import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from './lib/artifacts/artifact-preview.mjs';
+import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
 import { routeBreakingAnalysis } from './lib/llm/breaking-analysis-pipeline.mjs';
+import { SOCIAL_CARD_LAYOUTS, describeCardLayouts } from './lib/llm/social-card-pipeline.mjs';
+import { getRuntimeSettings, runPowerShellScript, updateRuntimeSettings } from './lib/integrations/runtime-settings.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
@@ -76,6 +82,34 @@ function serveStatic(response, pathname) {
 
 function batchWorkdir(batch) {
   return batchTopicsDir(config.workspaceRoot, batch);
+}
+
+async function binaryBody(request,maxBytes=100_000_000) {
+  const chunks=[];let size=0;
+  for await(const chunk of request){size+=chunk.length;if(size>maxBytes)throw new Error('备份包超过 100 MB 限制');chunks.push(chunk);}
+  return Buffer.concat(chunks);
+}
+
+async function createWorkbenchBackup() {
+  const tempDir=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-backup-'));
+  try {
+    const dbFile=path.join(tempDir,'workbench.db');
+    await backupSqlite(store.db,dbFile);
+    const files=[{name:'data/workbench.db',path:dbFile}];
+    for(const name of ['config.local.json','account-context.json']){
+      const filePath=path.join(root,name);
+      if(fs.existsSync(filePath))files.push({name,path:filePath});
+    }
+    const manifest={schemaVersion:1,createdAt:new Date().toISOString(),appVersion:'0.1.0',
+      excludes:['.env','API tokens','node_modules','cache/log files'],
+      files:files.map((file)=>({name:file.name,size:fs.statSync(file.path).size,
+        sha256:crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex')}))};
+    const manifestPath=path.join(tempDir,'manifest.json');
+    fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2),'utf8');
+    files.unshift({name:'manifest.json',path:manifestPath});
+    if(!manifest.files.every((item)=>item.size>0&&item.sha256.length===64))throw new Error('备份完整性校验失败');
+    return {buffer:createZip(files),manifest};
+  } finally { fs.rmSync(tempDir,{recursive:true,force:true}); }
 }
 
 function articleWorkdir(batch, candidate) {
@@ -239,7 +273,13 @@ async function api(request, response, url) {
     return json(response, batch ? 200 : 404, batch ?? { error: '批次不存在' });
   }
   if (batchMatch && request.method === 'PATCH') {
-    const updated = store.updateBatch(decodeURIComponent(batchMatch[1]), await body(request));
+    const input=await body(request);
+    if(input.lifecycleStatus!=null){
+      if(!['active','completed','archived'].includes(input.lifecycleStatus))return json(response,400,{error:'批次生命周期状态无效'});
+      input.lifecycle_status=input.lifecycleStatus;
+      delete input.lifecycleStatus;
+    }
+    const updated = store.updateBatch(decodeURIComponent(batchMatch[1]), input);
     return json(response, updated ? 200 : 404, updated ?? { error: '批次不存在' });
   }
   const collectMatch = pathname.match(/^\/api\/batches\/([^/]+)\/collect$/);
@@ -389,7 +429,7 @@ async function api(request, response, url) {
 
   // 选题与事件为一对多：候选的关联热点分属哪些事件，哪些事件就是本选题的关联事件；
   // 原文绑定在事件下：每个事件携带其全部热点的原文抓取快照。contentLimit 控制快照正文截断。
-  // 实现已下沉到 lib/event-fact-base.mjs，供事件图文事实基座在管线侧复用
+  // 实现已下沉到 lib/domain/event-fact-base.mjs，供事件图文事实基座在管线侧复用
   function candidateEventGroups(candidate, contentLimit = 2000) {
     return eventGroupsForCandidate({ store, workspaceRoot: config.workspaceRoot, candidate, contentLimit, defaultMaxAgeHours: config.rsshub.maxAgeHours });
   }
@@ -596,6 +636,8 @@ async function api(request, response, url) {
     return json(response, 200, { ok: true });
   }
   const cardEditorialMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-editorial$/);
+  const cardPageLayoutMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)\/layout$/);
+  const cardPageMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)$/);
   const socialCardsMatch = pathname.match(/^\/api\/candidates\/(\d+)\/social-cards$/);
   if(socialCardsMatch&&request.method==='GET'){
     const candidate=store.getCandidate(Number(socialCardsMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});const batch=store.getBatch(candidate.batch_id);const workspace=socialCardFiles(batch,candidate);
@@ -619,14 +661,57 @@ async function api(request, response, url) {
     const editorial=store.getCardEditorial(candidate.id); const facts=store.getRepositoryFactSheet(candidate.id); const score=store.getSocialScore(candidate.id);
     const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
-    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode:socialChannelMode(candidate),eventAnalysis,gate});
+    const cardPlan=JSON.parse(editorial.card_plan_json||'[]');const channelMode=socialChannelMode(candidate);
+    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+  }
+  if(cardPageLayoutMatch&&request.method==='PUT'){
+    const candidate=store.getCandidate(Number(cardPageLayoutMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
+    const pageIndex=Number(cardPageLayoutMatch[2])-1;const input=await body(request);const layoutStyle=String(input.layout_style||'auto');
+    if(!SOCIAL_CARD_LAYOUTS.includes(layoutStyle))return json(response,400,{error:'不支持的逐页版式'});
+    const current=store.getCardEditorial(candidate.id);let cardPlan;try{cardPlan=JSON.parse(current.card_plan_json||'[]');}catch{cardPlan=[];}
+    if(!Array.isArray(cardPlan)||!cardPlan[pageIndex])return json(response,404,{error:'故事板页面不存在'});
+    cardPlan[pageIndex]={...cardPlan[pageIndex],layout_style:layoutStyle};
+    const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan)});
+    const channelMode=socialChannelMode(candidate);
+    return json(response,200,{editorial,cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+  }
+  if(cardPageMatch&&request.method==='PUT'){
+    const candidate=store.getCandidate(Number(cardPageMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
+    const pageIndex=Number(cardPageMatch[2])-1;const input=await body(request);
+    const current=store.getCardEditorial(candidate.id);let cardPlan;try{cardPlan=JSON.parse(current.card_plan_json||'[]');}catch{cardPlan=[];}
+    if(!Array.isArray(cardPlan)||!cardPlan[pageIndex])return json(response,404,{error:'故事板页面不存在'});
+    const title=String(input.title||'').trim();
+    if(!title)return json(response,400,{error:'页面标题不能为空'});
+    const blocks=Array.isArray(input.content_blocks)?input.content_blocks.slice(0,4):null;
+    if(!blocks?.length)return json(response,400,{error:'每页至少保留一个内容块'});
+    const allowedBlockTypes=['text','list','code','note','stats','compare','steps','timeline','scenes','highlight'];
+    if(blocks.some((block)=>!allowedBlockTypes.includes(block?.type)))return json(response,400,{error:'故事板包含不支持的内容块类型'});
+    cardPlan[pageIndex]={
+      ...cardPlan[pageIndex],
+      title,
+      goal:String(input.goal||'').trim(),
+      content_blocks:blocks.map((block)=>({
+        ...block,
+        title:String(block.title||'').trim(),
+        content:String(block.content||'').trim(),
+      })),
+    };
+    const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
+    const facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
+    const eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    const channelMode=socialChannelMode(candidate);
+    return json(response,200,{editorial,cardPlan,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
   }
   if (cardEditorialMatch && request.method === 'PUT') {
     const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
     if(!candidate)return json(response,404,{error:'候选不存在'});
-    const editorial=store.saveCardEditorial(candidate.id,await body(request)); const facts=store.getRepositoryFactSheet(candidate.id);
+    const input=await body(request);
+    if(input.layout_style&&!SOCIAL_CARD_LAYOUTS.includes(input.layout_style))return json(response,400,{error:'不支持的图文版式'});
+    const editorial=store.saveCardEditorial(candidate.id,input); const facts=store.getRepositoryFactSheet(candidate.id);
     const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
-    return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis)});
+    let cardPlan=[];try{cardPlan=JSON.parse(editorial.card_plan_json||'[]');}catch{}
+    const channelMode=socialChannelMode(candidate);
+    return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
   }
   // 渠道切换：只换 output_mode 的渠道前缀（wechat-* ↔ xiaohongshu-*），类型部分不动，轨道与卡片决策同步
   const cardChannelMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-channel$/);
@@ -645,7 +730,8 @@ async function api(request, response, url) {
       store.saveCardEditorial(candidate.id,{...store.getCardEditorial(candidate.id),output_mode:nextMode});
     }
     const updated=store.getCandidate(candidate.id);
-    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(JSON.parse(store.getCardEditorial(candidate.id).card_plan_json||'[]').length),candidate:updated});
+    const editorial=store.getCardEditorial(candidate.id);const cardPlan=JSON.parse(editorial.card_plan_json||'[]');
+    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(cardPlan.length),candidate:updated,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode:channel})});
   }
   const cardEditorialAiMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/card-editorial$/);
   if (cardEditorialAiMatch && request.method === 'POST') {
@@ -691,7 +777,7 @@ async function api(request, response, url) {
       const cardPlan = (Array.isArray(parsed.card_plan) ? parsed.card_plan.slice(0,maxPages) : []).map((page) => {
         const instructionPatterns = [/^让读者(?:一眼)?知道/,/^让读者/,/^读者(?:能|会|可以|理解|了解|知道)/,/^本页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^这一页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本卡(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本章节(?:旨在|希望|要|应该|目的(?:是|为))?/,/^请/];
         const clean = (text) => { if(typeof text!=='string')return text; let s=text.trim(); for(const re of instructionPatterns)s=s.replace(re,'').trim(); return s.replace(/^[，。；、:：\s]+/,'').trim(); };
-        return { ...page, title:clean(page.title), goal:clean(page.goal), evidence:(Array.isArray(page.evidence)?page.evidence:[]).map(clean), content_blocks:(Array.isArray(page.content_blocks)?page.content_blocks:[]).map((b)=>({...b,title:clean(b.title),content:clean(b.content)})) };
+        return { ...page, layout_style:SOCIAL_CARD_LAYOUTS.includes(page.layout_style)?page.layout_style:'auto', title:clean(page.title), goal:clean(page.goal), evidence:(Array.isArray(page.evidence)?page.evidence:[]).map(clean), content_blocks:(Array.isArray(page.content_blocks)?page.content_blocks:[]).map((b)=>({...b,title:clean(b.title),content:clean(b.content)})) };
       });
       const asText=(value,fallback='')=>typeof value==='string'?value.trim():value==null?fallback:Array.isArray(value)?value.map((item)=>typeof item==='string'?item:JSON.stringify(item)).join('\n'):JSON.stringify(value);
       const editorial=store.saveCardEditorial(candidate.id,{...current,
@@ -700,7 +786,8 @@ async function api(request, response, url) {
         must_disclose:asText(parsed.must_disclose,current.must_disclose),getting_started:asText(parsed.getting_started,current.getting_started),
         forbidden_claims:asText(parsed.forbidden_claims,current.forbidden_claims),
         recommended_pages:Math.max(4,Math.min(maxPages,Number(parsed.recommended_pages)||cardPlan.length||6)),card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
-      const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis); return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis});
+      const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);const channelMode=socialChannelMode(candidate);
+      return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
     } catch(error) { return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
   }
   const repositoryInspectMatch = pathname.match(/^\/api\/candidates\/(\d+)\/repository\/inspect$/);
@@ -771,6 +858,23 @@ async function api(request, response, url) {
     }
     if (notes.length) store.addEditorialMessage(candidate.id, 'assistant', notes.join('\n'));
     return notes.join('\n');
+  }
+  const revisionMatch=pathname.match(/^\/api\/documents\/(\d+)\/revisions(?:\/(\d+))?(?:\/(restore))?$/);
+  if (revisionMatch && request.method === 'GET') {
+    const documentId=Number(revisionMatch[1]);
+    if (!store.getDocumentById(documentId)) return json(response,404,{error:'文档不存在'});
+    if (!revisionMatch[2]) return json(response,200,store.listDocumentRevisions(documentId));
+    const revision=store.getDocumentRevision(documentId,Number(revisionMatch[2]));
+    return json(response,revision?200:404,revision||{error:'版本不存在'});
+  }
+  if (revisionMatch && revisionMatch[3] === 'restore' && request.method === 'POST') {
+    const document=store.getDocumentById(Number(revisionMatch[1]));
+    const revision=document&&store.getDocumentRevision(document.id,Number(revisionMatch[2]));
+    if (!document || !revision) return json(response,404,{error:'文档或版本不存在'});
+    if (document.file_path) writeUtf8(document.file_path,revision.content);
+    const restored=store.saveDocument({batchId:document.batch_id,candidateId:document.candidate_row_id,
+      kind:document.kind,title:revision.title,content:revision.content,filePath:document.file_path,status:revision.status});
+    return json(response,200,restored);
   }
 
   const editorialAiMatch=pathname.match(/^\/api\/candidates\/(\d+)\/ai\/editorial$/);
@@ -1045,11 +1149,79 @@ if (request.method === 'GET' && pathname === '/api/articles/stats') {
     return fs.createReadStream(artifact.file_path).pipe(response);
   }
   if (request.method === 'GET' && pathname === '/api/system/health') {
-    const [reddit, rsshub] = await Promise.all([checkReddit(config.reddit), checkRssHub(config.rsshub)]);
-    return json(response, 200, { reddit, rsshub, github:getGitHubApiHealth(), node: process.version, now: new Date().toISOString() });
+    const target=searchParams.get('target')||'all';
+    if(!['all','reddit','rsshub','github'].includes(target))return json(response,400,{error:'未知的检查目标'});
+    const [reddit,rsshub]=await Promise.all([
+      target==='all'||target==='reddit'?checkReddit(config.reddit):Promise.resolve(null),
+      target==='all'||target==='rsshub'?checkRssHub(config.rsshub):Promise.resolve(null),
+    ]);
+    return json(response, 200, {
+      reddit, rsshub, github:target==='all'||target==='github'?getGitHubApiHealth():null,
+      node: process.version, now: new Date().toISOString(), target,
+    });
+  }
+  if (request.method === 'GET' && pathname === '/api/system/settings') {
+    return json(response, 200, getRuntimeSettings(root, config));
+  }
+  if (request.method === 'PUT' && pathname === '/api/system/settings') {
+    return json(response, 200, updateRuntimeSettings(root, config, await body(request)));
+  }
+  const runtimeMatch = pathname.match(/^\/api\/system\/runtime\/(rsshub|reddit)\/(start|stop|restart)$/);
+  if (request.method === 'POST' && runtimeMatch) {
+    const [, service, action] = runtimeMatch;
+    let result = { message: '操作完成' };
+    if (service === 'rsshub') {
+      if (action === 'stop' || action === 'restart') result = await stopRssHub(config.rsshub);
+      if (action === 'start' || action === 'restart') {
+        const started = await ensureStarted(config.rsshub, () => {});
+        result = { message: started ? 'RSSHub 已启动并通过健康检查' : 'RSSHub 已在运行' };
+      }
+    } else {
+      const port = String(new URL(config.reddit.cdpUrl).port || 9222);
+      if (action === 'stop' || action === 'restart') {
+        result = await runPowerShellScript(path.join(root, 'scripts', 'stop-reddit-chrome.ps1'), ['-Port', port]);
+      }
+      if (action === 'start' || action === 'restart') {
+        result = await runPowerShellScript(path.join(root, 'scripts', 'start-reddit-chrome.ps1'), ['-Port', port]);
+      }
+    }
+    return json(response, 200, { ...result, service, action });
   }
   if (request.method === 'GET' && pathname === '/api/subscriptions') {
     return json(response, 200, listSubscriptions(config,store.listSubscriptionHealth()));
+  }
+  if (request.method === 'GET' && pathname === '/api/system/backup') {
+    const backup=await createWorkbenchBackup();
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+    response.writeHead(200,{'content-type':'application/zip','content-disposition':`attachment; filename="write-assistant-${stamp}.zip"`,'content-length':backup.buffer.length,'cache-control':'no-store'});
+    return response.end(backup.buffer);
+  }
+  if (request.method === 'POST' && pathname === '/api/system/backup/validate') {
+    try {
+      const parsed=validateWorkbenchBackup(await binaryBody(request));
+      return json(response,200,{valid:true,createdAt:parsed.manifest.createdAt,appVersion:parsed.manifest.appVersion,
+        fileCount:parsed.manifest.files.length,totalBytes:parsed.manifest.files.reduce((sum,item)=>sum+item.size,0)});
+    } catch(error){return json(response,400,{valid:false,error:error.message});}
+  }
+  if (request.method === 'POST' && pathname === '/api/system/backup/restore') {
+    if(request.headers['x-restore-confirm']!=='RESTORE')return json(response,409,{error:'缺少恢复确认'});
+    let tempDir;
+    try {
+      const buffer=await binaryBody(request);
+      const parsed=validateWorkbenchBackup(buffer);
+      tempDir=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-restore-'));
+      const sourceDb=path.join(tempDir,'workbench.db');
+      fs.writeFileSync(sourceDb,parsed.entries.get('data/workbench.db'));
+      const probe=new (await import('node:sqlite')).DatabaseSync(sourceDb,{readOnly:true});
+      try{if(probe.prepare('PRAGMA integrity_check').get().integrity_check!=='ok')throw new Error('备份数据库完整性检查失败');}finally{probe.close();}
+      const safety=await createWorkbenchBackup();
+      const backupDir=path.join(root,'data','backups');fs.mkdirSync(backupDir,{recursive:true});
+      const safetyName=`before-restore-${new Date().toISOString().replace(/[:.]/g,'-')}.zip`;
+      fs.writeFileSync(path.join(backupDir,safetyName),safety.buffer);
+      const result=store.restoreFromDatabase(sourceDb);
+      return json(response,200,{restored:true,batches:result.count,safetyBackup:safetyName});
+    } catch(error){return json(response,400,{restored:false,error:error.message});}
+    finally{if(tempDir)fs.rmSync(tempDir,{recursive:true,force:true});}
   }
   if (request.method === 'GET' && pathname === '/api/subscriptions/health-history') {
     return json(response, 200, store.listSubscriptionHealthHistory({

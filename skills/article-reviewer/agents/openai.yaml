@@ -1,0 +1,4 @@
+interface:
+  display_name: "文章审阅与修订"
+  short_description: "检查事实、逻辑、标题、表达和发布风险并修订"
+  default_prompt: "使用 $article-reviewer 审阅并修订这篇文章。"

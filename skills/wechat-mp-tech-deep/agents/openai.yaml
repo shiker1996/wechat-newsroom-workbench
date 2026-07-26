@@ -1,0 +1,4 @@
+interface:
+  display_name: "公众号技术深解"
+  short_description: "用原理、算账和参照系写技术深度文章"
+  default_prompt: "使用 $wechat-mp-tech-deep 将这个技术主题写成可复算的深度文章。"
