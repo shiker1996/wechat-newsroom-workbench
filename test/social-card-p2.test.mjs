@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, describeCardLayouts, renderStoryboardHtml, resolveCardLayout, resolveCardLayoutDecision } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -151,6 +151,8 @@ test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)$/)"));
   assert.match(source,/每页至少保留一个内容块/);
   assert.match(source,/card_plan_json:JSON\.stringify\(cardPlan\),status:'AI_READY'/);
+  // 故事板策划 prompt 约束 stat 数值长度，避免窄数据卡内长算式折行
+  assert.match(source,/num 不超过 6 个字符/);
 });
 
 test('确定性故事板 HTML 通过真实浏览器布局审计', async () => {
@@ -160,6 +162,10 @@ test('确定性故事板 HTML 通过真实浏览器布局审计', async () => {
   const pages = Array.from({ length:6 }, (_, index) => ({
     kind:index === 0 ? 'cover' : index === 5 ? 'ending' : 'content',
     title:`第 ${index + 1} 页工具能力说明`, goal:'说明这一页对目标读者的具体价值和使用边界',
+    content_blocks: (index === 0 || index === 5) ? [] : [
+      { type:'text', title:'使用方式', content:'安装后即可在命令行中使用，支持通过配置文件自定义默认行为。' },
+      { type:'list', title:'核心能力', content:'增量构建缓存\n并行任务调度\n插件钩子机制\n详细错误报告\n类型化配置项' },
+    ],
     evidence:['来自 README 的已核验能力说明','安装命令 npm install example','基于项目文档整理，未实际运行'],
   }));
   fs.writeFileSync(htmlPath, renderStoryboardHtml({ topic:'测试工具', repository:'org/repo', pages }), 'utf8');
@@ -191,6 +197,7 @@ test('图文文案由模型生成，HTML 根据故事板确定性组装', () => 
   assert.match(html,/<pre><code>npm i demo<\/code><\/pre>/);
   assert.match(html, /\.page-ending \.note-block h2[^}]*color:inherit/);
   assert.match(html, /\.theme-palette \.page-ending \.note-block[^}]*color:var\(--ink\)/);
+  assert.match(html, /\.theme-palette \.page-ending \.highlight-block h2[^}]*color:var\(--ink\)/);
 });
 
 test('故事板渲染支持设计系统的完整视觉主题',()=>{
@@ -222,4 +229,205 @@ test('图文编辑室包含画廊、证据预览、下载和任务完成恢复',
 
 test('图文候选使用顶部滚动 Tab 与两端箭头', () => {
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');assert.match(html,/social-candidate-tab-strip[\s\S]*social-tabs-previous[\s\S]*social-editor-candidates[\s\S]*social-tabs-next/);assert.match(styles,/\.social-editor-layout \{ display:grid; grid-template-columns:minmax\(0,1fr\)/);assert.match(styles,/\.social-editor-candidates \{[^}]*display:flex[^}]*overflow-x:auto/);assert.match(source,/setupSocialTabNavigation/);assert.match(source,/scrollBy/);
+});
+
+test('智能构图按页面语义推断角色并规范化最小 DSL',()=>{
+  assert.deepEqual(SOCIAL_CARD_COMPOSITION_MODES,['smart','template']);
+  assert.equal(inferCardPageRole({kind:'timeline'}),'timeline');
+  assert.equal(inferCardPageRole({kind:'capability',content_blocks:[]}),'feature');
+  const normalized=normalizeCardComposition({kind:'risk',composition:{id:'free-html',columns:'absolute'}});
+  assert.equal(normalized.role,'risk');
+  assert.deepEqual(normalized.composition,{id:'risk-sidebar',columns:'split-narrow',flow:'alternate',alignment:'center',decoration:'stamp',overlap:'accent-edge'});
+  assert.equal(normalized.fallback,true);
+});
+
+test('智能构图输出确定性标记，稳定模板保持兼容',()=>{
+  const page={kind:'evidence',title:'证据边界',content_blocks:[{type:'text',content:'已确认事实'},{type:'note',content:'尚待核实'}]};
+  const smart=renderStoryboardHtml({topic:'构图测试',pages:[page],compositionMode:'smart'});
+  assert.match(smart,/composition-smart role-evidence comp-evidence-(?:ledger|frame)/);
+  assert.match(smart,/data-page-role="evidence"/);
+  assert.match(smart,/data-composition-mode="smart"/);
+  const stable=renderStoryboardHtml({topic:'构图测试',pages:[page],compositionMode:'template'});
+  assert.match(stable,/composition-template/);
+  assert.match(stable,/data-composition-mode="template"/);
+});
+
+test('相同种子稳定复现构图，多种子可覆盖同角色的多个变体',()=>{
+  const page={kind:'capability',title:'稳定构图',content_blocks:[{type:'list',content:'A\nB\nC'}]};
+  assert.equal(stableCardCompositionSeed(page,2,'batch-a'),stableCardCompositionSeed(page,2,'batch-a'));
+  const first=normalizeCardComposition(page,{pageIndex:2,seed:'batch-a'}).composition.id;
+  assert.equal(normalizeCardComposition(page,{pageIndex:2,seed:'batch-a'}).composition.id,first);
+  const variants=new Set(Array.from({length:20},(_,index)=>normalizeCardComposition(page,{pageIndex:2,seed:`batch-${index}`}).composition.id));
+  assert.equal(variants.size,2);
+});
+
+test('故事板构图 id 合法时部分接受并按注册变体补齐字段',()=>{
+  const page={kind:'capability',content_blocks:[{type:'text',content:'A'},{type:'text',content:'B'}],
+    composition:{id:'feature-ledger',columns:'absolute',flow:'alternate',alignment:'center',decoration:'glitter'}};
+  const normalized=normalizeCardComposition(page,{pageIndex:1,seed:'s'});
+  assert.equal(normalized.composition.id,'feature-ledger');
+  assert.equal(normalized.composition.columns,'split-even');
+  assert.equal(normalized.composition.flow,'alternate');
+  assert.equal(normalized.composition.decoration,'index-line');
+  assert.equal(normalized.adjusted,true);
+  assert.equal(normalized.fallback,false);
+  assert.equal(normalized.source,'storyboard');
+  const decision=resolveCardCompositionDecision(page,{compositionMode:'smart',pageIndex:1,seed:'s'});
+  assert.match(decision.reason,/按注册变体补齐/);
+});
+
+test('内容块体量悬殊时降级为单列，体量均衡时保留分列',()=>{
+  // 长步骤文本 + 短笔记：最大块占比约 0.68，左右分列会一高一低
+  const imbalanced={kind:'quickstart',content_blocks:[
+    {type:'text',title:'快速开始',content:'1. 访问 GitHub https://github.com/Lordog/dive-into-llms\n2. 选择感兴趣的章节，进入对应文件夹\n3. 下载课件和 Jupyter Notebook 脚本\n4. 在本地或云端运行（部分章节已提供在线链接）'},
+    {type:'note',title:'合作版本',content:'另提供国产化教程（含PPT、实验手册、视频），详见社区。'},
+  ]};
+  for(let index=0;index<20;index+=1){
+    const composition=normalizeCardComposition(imbalanced,{pageIndex:3,seed:`seed-${index}`}).composition;
+    assert.equal(composition.columns,'single');
+    assert.equal(composition.flow,'stack');
+  }
+  // 体量接近的两个块：保留分列变体
+  const balanced={kind:'risk',composition:{id:'risk-sidebar',columns:'split-narrow',flow:'alternate',alignment:'center',decoration:'stamp',overlap:'accent-edge'},content_blocks:[{type:'text',content:'不执行自由 HTML，装饰来自白名单'},{type:'note',content:'构图参数受枚举与角色双重约束'}]};
+  const kept=normalizeCardComposition(balanced,{pageIndex:3,seed:'seed-1'}).composition;
+  assert.equal(kept.id,'risk-sidebar');
+  assert.equal(kept.columns,'split-narrow');
+  assert.equal(kept.flow,'alternate');
+  // 表格块字数少但行数多：6 行对比表 vs 一句话笔记，表格应被判为大块
+  const tableHeavy={kind:'positions',content_blocks:[
+    {type:'compare',title:'各方回应',headers:['主体','立场'],rows:[['官方','已确认'],['媒体','报道中'],['专家','谨慎'],['用户','观望'],['竞品','沉默'],['社区','热议']]},
+    {type:'note',content:'持续跟进。'},
+  ]};
+  const tableComposition=normalizeCardComposition(tableHeavy,{pageIndex:2,seed:'seed-1'}).composition;
+  assert.equal(tableComposition.columns,'single');
+  // 数据卡块：4 张统计卡 vs 短文本，同样算大块
+  const statsHeavy={kind:'impact',content_blocks:[
+    {type:'stats',title:'关键数据',items:[{num:'45K',label:'星标'},{num:'11',label:'章节'},{num:'3',label:'合作方'},{num:'100%',label:'免费'}]},
+    {type:'text',content:'数据来自公开页面。'},
+  ]};
+  const statsComposition=normalizeCardComposition(statsHeavy,{pageIndex:2,seed:'seed-1'}).composition;
+  assert.equal(statsComposition.columns,'single');
+});
+
+test('同角色页面避免重复推荐同一构图变体',()=>{
+  const page={kind:'capability',title:'稳定构图',content_blocks:[{type:'list',content:'A\nB\nC'},{type:'note',content:'备注'}]};
+  const first=normalizeCardComposition(page,{pageIndex:1,seed:'dedupe'}).composition.id;
+  const second=normalizeCardComposition(page,{pageIndex:1,seed:'dedupe',avoidIds:[first]}).composition.id;
+  assert.notEqual(second,first);
+  // avoidIds 不影响显式指定的故事板构图
+  const explicit={...page,composition:{id:first,columns:'split-even',flow:'alternate',alignment:'start',decoration:'index-line',overlap:'none'}};
+  assert.equal(normalizeCardComposition(explicit,{pageIndex:1,seed:'dedupe',avoidIds:[first]}).composition.id,first);
+  // 渲染整组时同角色两页得到不同变体
+  const html=renderStoryboardHtml({topic:'去重',pages:[page,page],compositionMode:'smart',compositionSeed:'dedupe'});
+  const ids=[...html.matchAll(/<section\b[^>]*data-composition-id="([^"]*)"/g)].map((match)=>match[1]);
+  assert.equal(ids.length,2);
+  assert.notEqual(ids[0],ids[1]);
+});
+test('安全构图关闭高风险变体并输出审计回退标记',()=>{
+  const page={kind:'cover',title:'安全回退',content_blocks:[{type:'text',content:'说明'}]};
+  const html=renderStoryboardHtml({topic:'安全回退',pages:[page],compositionMode:'smart',compositionSeed:'risky',forceSafeComposition:true});
+  assert.match(html,/data-layout-source="safe"/);
+  assert.match(html,/comp-hero-stack/);
+  assert.match(html,/decor-none overlap-none/);
+});
+
+test('高密度内容与单内容块自动降级为单列构图',()=>{
+  const densePage={kind:'capability',title:'密集列表',content_blocks:[{type:'list',items:Array.from({length:9},(_,index)=>({title:`要点${index+1}`,content:'说明'}))}]};
+  for(let index=0;index<20;index+=1){
+    const composition=normalizeCardComposition(densePage,{pageIndex:1,seed:`seed-${index}`}).composition;
+    assert.equal(composition.columns,'single');
+    assert.equal(composition.flow,'stack');
+  }
+  const singleBlock={kind:'problem',title:'单块',composition:{id:'concept-split',columns:'split-wide',flow:'alternate',alignment:'center',decoration:'index-line',overlap:'none'},content_blocks:[{type:'text',content:'唯一的段落'}]};
+  const downgraded=normalizeCardComposition(singleBlock,{pageIndex:1,seed:'s'}).composition;
+  assert.equal(downgraded.id,'concept-split');
+  assert.equal(downgraded.columns,'single');
+  assert.equal(downgraded.flow,'stack');
+});
+
+test('安全回退优先单列稳定变体且支持按页启用',()=>{
+  const feature=normalizeCardComposition({kind:'capability',content_blocks:[{type:'text',content:'A'},{type:'text',content:'B'}]},{forceSafe:true});
+  assert.equal(feature.composition.id,'feature-stack');
+  assert.equal(feature.composition.columns,'single');
+  assert.equal(feature.composition.decoration,'none');
+  assert.equal(feature.composition.overlap,'none');
+  const concept=normalizeCardComposition({kind:'problem',content_blocks:[{type:'text',content:'A'},{type:'text',content:'B'}]},{forceSafe:true});
+  assert.equal(concept.composition.columns,'single');
+  assert.equal(concept.composition.flow,'stack');
+  const pages=[
+    {kind:'capability',title:'甲',content_blocks:[{type:'text',content:'A'},{type:'text',content:'B'}]},
+    {kind:'capability',title:'乙',content_blocks:[{type:'text',content:'A'},{type:'text',content:'B'}]},
+  ];
+  const html=renderStoryboardHtml({topic:'按页安全',pages,compositionMode:'smart',compositionSeed:'per-page',forceSafeComposition:[1]});
+  const sources=[...html.matchAll(/<section\b[^>]*data-layout-source="([^"]*)"[^>]*data-page-number="(\d+)"/g)]
+    .sort((a,b)=>Number(a[2])-Number(b[2])).map((match)=>match[1]);
+  assert.equal(sources.length,2);
+  assert.notEqual(sources[0],'safe');
+  assert.equal(sources[1],'safe');
+});
+
+test('暗色主题下标题卡对比度与步骤文本断行有保障',()=>{
+  const html=renderStoryboardHtml({topic:'暗色主题',pages:[{kind:'cover',title:'封面',content_blocks:[{type:'text',content:'说明'}]}],visualStyle:'neon',compositionMode:'smart'});
+  assert.match(html,/\.composition-smart\.overlap-title-card h1\{[^}]*color:var\(--ink,#102033\)/);
+  assert.match(html,/\.step p\{[^}]*overflow-wrap:anywhere/);
+  assert.match(html,/\.step h3\{[^}]*overflow-wrap:anywhere/);
+  assert.match(html,/body\.theme-neon\{--ink:#eafff7;--muted:#9bd8c2;--surface:#0c1c17;--accent:#55ffb6/);
+  // 卡片内不再重复渲染页码，decor-index-line 只保留短装饰线
+  assert.match(html,/\.decor-index-line \.page-content-stack:before\{content:"";/);
+  assert.doesNotMatch(html,/attr\(data-card-index\)/);
+});
+
+test('智能构图不再叠加旧模板骨架，语义版式仅保留为数据属性',()=>{
+  const pages=[
+    {kind:'evidence',title:'证据页',layout_style:'data',content_blocks:[{type:'text',content:'事实'},{type:'note',content:'边界'}]},
+    {kind:'ending',title:'结尾页',content_blocks:[{type:'highlight',content:'继续关注'}]},
+  ];
+  const html=renderStoryboardHtml({topic:'骨架隔离',pages,compositionMode:'smart'});
+  assert.match(html,/class="page page-content layout-smart[^"]*composition-smart/);
+  assert.match(html,/class="page page-ending layout-smart[^"]*composition-smart/);
+  assert.doesNotMatch(html,/class="page[^"]*layout-(?:editorial|data|steps|minimal)[^"]*composition-smart/);
+  assert.match(html,/data-layout="editorial"/);
+  assert.match(html,/page-ending\.overlap-title-card h1\{background:var\(--surface\);color:var\(--ink\)\}/);
+});
+
+test('智能构图多角色与受控装饰通过真实浏览器布局审计',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'smart-composition-audit-'));
+  try{
+    const pages=[
+      {kind:'cover',title:'智能构图不是随机换皮',content_blocks:[{type:'highlight',content:'同一内容稳定复现'}]},
+      {kind:'capability',title:'三个核心能力',content_blocks:[
+        {type:'list',title:'能力清单',content:'页面角色自动推断\n稳定随机种子复现\n按页安全回退\n构图部分接受\n同角色变体去重'},
+        {type:'text',title:'设计原则',content:'所有构图变体来自白名单，渲染层不支持自由 HTML，同一内容在相同种子下稳定复现。'},
+      ]},
+      {kind:'timeline',title:'从规划到交付',content_blocks:[{type:'timeline',items:[{time:'01',title:'规划',content:'识别页面角色与内容密度'},{time:'02',title:'渲染',content:'选择构图变体并去重'},{time:'03',title:'审计',content:'真实浏览器测量填充率'},{time:'04',title:'修复',content:'必要时按页安全回退'}]}]},
+      {kind:'risk',title:'自由度有明确边界',content_blocks:[
+        {type:'text',title:'渲染边界',content:'不执行模型生成的自由 HTML，所有版式来自确定性模板。'},
+        {type:'note',title:'装饰约束',content:'装饰与叠放均来自白名单构图，禁止空白卡与缩放凑版。'},
+        {type:'list',title:'审计兜底',content:'填充率实测\n溢出硬失败\n字号下限约束'},
+      ]},
+      {kind:'ending',title:'内容稳定，视觉更灵活',content_blocks:[{type:'highlight',content:'继续生成整组图文'}]},
+    ];
+    const htmlPath=path.join(dir,'smart.html'),reportPath=path.join(dir,'report.json');
+    fs.writeFileSync(htmlPath,renderStoryboardHtml({topic:'智能构图审计',pages,compositionMode:'smart',compositionSeed:'audit-seed'}),'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.equal(report.valid,true,JSON.stringify(report.pages?.filter((page)=>!page.valid)));
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('布局审计以真实内容边界测量，稀疏内容页标记 underfilled',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sparse-page-audit-'));
+  try{
+    const htmlPath=path.join(dir,'sparse.html'),reportPath=path.join(dir,'report.json');
+    // stack 带 min-height 装饰性高度：内容只有一句话时，按 stack 边界测会掩盖稀疏，按真实内容边界测必须标记 underfilled
+    fs.writeFileSync(htmlPath,renderStoryboardHtml({topic:'稀疏页',compositionMode:'smart',compositionSeed:'sparse-seed',pages:[
+      {kind:'capability',title:'只有一句话的页面',content_blocks:[{type:'text',content:'内容很少。'}]},
+    ]}),'utf8');
+    // 审计发现问题时进程以退出码 1 结束，但报告已写入，忽略退出码直接读报告
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.equal(report.valid,false);
+    assert.ok(report.pages[0].issues.includes('underfilled'),JSON.stringify(report.pages[0]));
+    assert.ok(report.pages[0].utilization<50,JSON.stringify(report.pages[0]));
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

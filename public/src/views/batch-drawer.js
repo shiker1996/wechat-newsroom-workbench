@@ -105,7 +105,7 @@ export async function openBatch(id, mode) {
   const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
       <div class="pipeline-steps"><div data-pipeline-step="collect" class="${batch.hotspots.length ? "done" : "active"}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${ai.tagged === ai.total && ai.total ? "done" : ai.tagged || autoRunning ? "active" : ""}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${cardsReady ? "done" : cards.count || (autoRunning && ai.total > 0 && ai.tagged >= ai.total) ? "active" : ""}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${researchDone ? "done" : (ai.latestResearch?.type === "research" && ai.latestResearch?.status === "running") || (autoRunning && cardsReady) ? "active" : ""}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
       <p>打标覆盖全量热点，生成事件语义指纹、地区、风险和预评估证据；研判随后完成全量聚类、核心 8 + 黑马 2、探索脑暴与临时复排。</p>
-      <div class="pipeline-actions"><div class="pipeline-next"><small>当前下一步</small>${pipelinePrimaryAction}</div><details class="pipeline-retry-menu"><summary>高级操作</summary><div><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards ${!ai.tagged ? "disabled" : ""}>重新生成事件卡</button><button class="ghost-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>重新执行事件研判</button></div></details></div>
+      <div class="pipeline-actions"><div class="pipeline-next"><small>当前下一步</small>${pipelinePrimaryAction}</div><details class="pipeline-retry-menu"><summary>高级操作</summary><div><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards-force ${!ai.tagged ? "disabled" : ""}>重新生成全部事件卡</button><button class="ghost-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>重新执行事件研判</button></div></details></div>
       ${ai.tagged < ai.total && ai.total ? `<small class="pipeline-gate">还差 ${ai.total - ai.tagged} 条完整语义标注，完成后才能进入事件研判。</small>` : ""}
       ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
     </section>` : "";
@@ -177,6 +177,7 @@ async function refreshPipelineSteps(job) {
   const cards = batch.event_cards || { count: 0, total: 0 };
   const collectRunning = job.type === "collect" && job.status === "running";
   const autoRunning = job.type === "auto" && job.status === "running";
+  const autoPhase = autoRunning ? job.phase : "";
   const collected = !collectRunning && batch.hotspots.length > 0;
   const tagged = ai.total > 0 && ai.tagged >= ai.total;
   const cardsReady = cards.total > 0 && cards.count >= cards.total;
@@ -184,10 +185,10 @@ async function refreshPipelineSteps(job) {
 
   setPipelineStep("collect", collectRunning ? "active" : collected ? "done" : "",
     `${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}`);
-  setPipelineStep("tag", tagged ? "done" : (ai.tagged > 0 || autoRunning) ? "active" : "", `${ai.tagged} / ${ai.total}`);
-  setPipelineStep("event-cards", cardsReady ? "done" : (cards.count > 0 || (autoRunning && tagged)) ? "active" : "", `${cards.count} / ${cards.total}`);
-  setPipelineStep("research", researchDone ? "done" : (autoRunning && cardsReady) || ai.latestResearch?.status === "running" ? "active" : "",
-    researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分");
+  setPipelineStep("tag", autoPhase === "tag" ? "active" : tagged ? "done" : ai.tagged > 0 ? "active" : "", `${ai.tagged} / ${ai.total}`);
+  setPipelineStep("event-cards", autoPhase === "event-cards" ? "active" : autoPhase === "tag" ? "" : cardsReady ? "done" : cards.count > 0 ? "active" : "", `${cards.count} / ${cards.total}`);
+  setPipelineStep("research", autoPhase === "research" ? "active" : autoPhase ? "" : researchDone ? "done" : ai.latestResearch?.status === "running" ? "active" : "",
+    researchDone && !autoPhase ? "已完成" : "核心 / 黑马筛选 · 六维评分");
 }
 
 export async function startCollection() {
@@ -203,10 +204,11 @@ export async function startBatchAi(type) {
   if (!provider) return toast("请先在模型中心配置服务商");
   // 重打会覆盖全部已有语义标注，先确认（此前无防呆，与模型中心同操作不同待遇）
   if (type === "retag" && !await confirmAction("重新打标将覆盖本批次全部已有语义标注，是否继续？", { confirmText: "重新打标" })) return;
-  const path = type === "research" ? "research" : type === "event-cards" ? "event-cards" : "tag";
-  const payload = { provider, background: true, force: type === "retag" || (type === "event-cards" && state.currentBatch?.event_cards?.count > 0) };
+  if (type === "event-cards-force" && !await confirmAction("这会覆盖本批次全部已有事件卡并重新调用模型，是否继续？", { confirmText: "重新生成全部" })) return;
+  const path = type === "research" ? "research" : type === "event-cards" || type === "event-cards-force" ? "event-cards" : "tag";
+  const payload = { provider, background: true, force: type === "retag" || type === "event-cards-force" };
   const job = await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/ai/${path}`, { method: "POST", body: JSON.stringify(payload) });
-  showJobConsole(type === "research" ? "事件研判任务已入队…" : type === "event-cards" ? "事件卡任务已入队…" : "语义打标任务已入队…");
+  showJobConsole(type === "research" ? "事件研判任务已入队…" : type === "event-cards-force" ? "全量事件卡重建任务已入队…" : type === "event-cards" ? "事件卡增量生成任务已入队…" : "语义打标任务已入队…");
   pollJob(job.id);
 }
 
@@ -297,6 +299,7 @@ export function bindBatchDrawer() {
     if (event.target.closest("[data-collect]")) startCollection().catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-tag]")) startBatchAi("tag").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-retag]")) startBatchAi("retag").catch((error) => toast(error.message));
+    if (event.target.closest("[data-ai-event-cards-force]")) startBatchAi("event-cards-force").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-event-cards]")) startBatchAi("event-cards").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-research]")) startBatchAi("research").catch((error) => toast(error.message));
     if (event.target.closest("[data-view-research]")) {

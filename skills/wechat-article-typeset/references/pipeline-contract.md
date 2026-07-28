@@ -12,9 +12,9 @@ rendered → design → images → draft → normalized → gate
 |---|---|---|---|---|
 | `rendered` | `wechat-md-render` | `09-FINAL.md` | `09-FINAL.rendered.md` | UTF-8、非空，正文和结构未丢失 |
 | `design` | `magazine-design-advisor` | rendered | `09-FINAL.design-scheme.md`、`magazine-design-tokens.json` | 方案非空，tokens 符合 schema 1 |
-| `images` | 总编排及条件转图子技能 | rendered、图片清单、tokens | `09-FINAL.images.md` | 正文未变化；未静默丢图；未处理视觉模块必须阻断 |
-| `draft` | `wechat-md-to-draft` | images、scheme、tokens | `article.ai.draft.html` | 标题、章节、链接和图片数量未减少 |
-| `normalized` | `wechat-html-normalizer` | draft | `article.ai.html` | 规范化脚本成功，内容完整 |
+| `images` | 总编排及条件转图子技能 | rendered、图片清单、tokens | `09-FINAL.images.md` | 正文未变化；未静默丢图；Mermaid/ECharts 围栏经确定性脚本转图，失败或无执行器的视觉模块必须阻断 |
+| `draft` | `wechat-md-to-draft` | images、scheme、tokens | `article.ai.draft.html` | 标题、章节、链接和图片数量未减少。默认确定性渲染（按 tokens 直接输出内联样式，不调模型）；`draftMode: 'llm'` 为模型实验路径 |
+| `normalized` | `wechat-html-normalizer` | draft | `article.ai.html` | 确定性初稿已是内联样式，直接采用；仅 llm 路径执行规范化脚本，要求脚本成功、内容完整 |
 | `gate` | `wechat-html-check-no-div` | `article.ai.html` | 有效门禁结果 | `valid=true` |
 
 ## 设计 Tokens

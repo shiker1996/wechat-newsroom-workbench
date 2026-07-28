@@ -9,12 +9,7 @@ config.local.json
 account-context.json
 
 # Generated data
-data/workbench.db*
-data/backups/
-data/server-subscriptions-check*
-data/source-cache/
-data/github-cache/
-data/rsshub.pid
+data/
 
 # Generated articles
 articles/

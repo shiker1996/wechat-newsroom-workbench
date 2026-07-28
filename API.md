@@ -164,7 +164,8 @@ AI 起草（单步）{ provider, instructions, existingDraft }
 → 文章编辑器
 
 ### POST /api/batches/:id/ai/typeset
-排版 { provider, candidateId, mode }
+排版 { provider, candidateId, mode, theme }
+- `theme` 可选：`magazine-warm`（默认，暖纸杂志风）、`gossip-card`（卡片吃瓜风）
 → 排版预览
 
 ---
@@ -294,3 +295,16 @@ AI 规划配图占位
 ### GET /api/logs
 审计日志 ?type=ai|source|model&limit=
 → 日志
+## 批次早报
+
+- `GET /api/batches/:id/daily`：返回当前批次可选的事件事实卡，以及最近保存的批次早报草稿/终稿。
+- `POST /api/batches/:id/daily`：启动关系维度早报任务。请求体：`{"provider":"模型配置名","focuses":[{"dimension":"who|what|where","key":"关系键"}]}`；支持跨维度多选，后端对关联事件取并集并去重。
+- 生成的 `daily-draft` / `daily-final` 是无候选 ID 的批次级文稿，可在文章编辑器保存版本，并通过排版接口的 `documentKind:"daily-final"` 进入公众号排版。
+
+## 自主写作
+
+- `POST /api/batches/:id/tutorial-chat/stream`：以 NDJSON 流式返回自主写作策划回复和表单更新；`articleMode` 支持 `experience`（心得经验）和 `tutorial`（使用教程）。教程请求可包含 `draft.localProjectPath`，或在本轮回答中提供绝对目录。
+- `POST /api/tools/local-project/read`：预检用户明确指定的本地项目目录。只读受支持的文本文件，跳过依赖/构建目录、密钥文件、二进制和符号链接，并受文件数、单文件与总字符数限制。
+- `POST /api/batches/:id/custom-articles`：根据对话填好的事实表单创建自主写作项目并启动成稿；旧的 `/tutorials` 路径保留兼容。
+- 自主写作项目使用标准文章候选保存 `draft` / `final`，完成后直接出现在文章编辑器和公众号排版页面。
+- 本地项目文件按 `user_material` 进入事实基座，只证明代码或配置存在，不证明已执行成功；成稿不得暴露本机绝对路径。

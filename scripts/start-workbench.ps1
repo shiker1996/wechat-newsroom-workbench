@@ -12,11 +12,20 @@ function Test-Workbench {
   } catch { return $false }
 }
 
-$node = Get-Command node.exe -ErrorAction Stop
-$major = [int]((& $node.Source --version).TrimStart('v').Split('.')[0])
-if ($major -lt 24) { throw "Node.js 24 or newer is required. Current version: $(& $node.Source --version)" }
+$node = Get-Command node.exe -ErrorAction SilentlyContinue
+if (-not $node) { throw "Node.js not found. Please install Node.js 24 or newer: https://nodejs.org/" }
+& $node.Source (Join-Path (Join-Path $projectRoot 'scripts') 'check-env.mjs')
+if ($LASTEXITCODE -ne 0) { throw "Environment check failed. See messages above." }
 
 if (-not (Test-Workbench)) {
+  $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+  if ($listeners) {
+    $holders = $listeners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
+      $p = Get-Process -Id $_ -ErrorAction SilentlyContinue
+      if ($p) { "$($p.ProcessName) (PID $($p.Id))" } else { "PID $_" }
+    }
+    throw "Port $Port is already in use by: $($holders -join ', '). Stop that process first, or run scripts\stop-workbench.ps1 if it is a previous workbench."
+  }
   $logDirectory = Join-Path $projectRoot 'logs'
   New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
   Start-Process -WindowStyle Hidden -FilePath $node.Source -ArgumentList '--disable-warning=ExperimentalWarning','server.mjs' `

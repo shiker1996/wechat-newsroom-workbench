@@ -3,6 +3,7 @@ import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 
 let bound = false;
 let validatedBackup = null;
+let runtimeModels = null;
 function bindSystem() {
   if (bound) return;
   bound = true;
@@ -23,6 +24,16 @@ function bindSystem() {
     saveRuntimeSettings(event.currentTarget).catch((error)=>toast(error.message));
   });
   document.getElementById("add-rsshub-env")?.addEventListener("click",()=>addRsshubKvRow());
+  document.getElementById("new-model-config")?.addEventListener("click",()=>resetModelForm());
+  document.getElementById("model-config-form")?.addEventListener("submit",(event)=>{
+    event.preventDefault();saveModelConfig(event.submitter).catch((error)=>toast(error.message));
+  });
+  document.getElementById("delete-model-config")?.addEventListener("click",(event)=>{
+    deleteModelConfig(event.currentTarget).catch((error)=>toast(error.message));
+  });
+  document.getElementById("runtime-model-list")?.addEventListener("click",(event)=>{
+    const item=event.target.closest("[data-model-edit]");if(item)editModelConfig(item.dataset.modelEdit);
+  });
   document.querySelector(".config-tabbar")?.addEventListener("click",(event)=>{
     const button=event.target.closest("[data-config-tab]");if(button)selectConfigTab(button.dataset.configTab);
   });
@@ -96,11 +107,11 @@ function renderEnvFields(target, fields) {
 }
 
 const APP_ENV_GROUPS=[
-  {id:"models",label:"模型服务",hint:"DeepSeek、MiniMax、Kimi 与搜索增强",keys:["DEEPSEEK_API_KEY","MINIMAX_API_KEY","MOONSHOT_API_KEY","TAVILY_API_KEY"]},
-  {id:"fetch",label:"原文抓取",hint:"Python、Firecrawl 与抓取策略",keys:["WRITE_ASSISTANT_PYTHON","SOURCE_FETCH_PROVIDER","FIRECRAWL_MCP_URL","FIRECRAWL_API_KEY","GITHUB_TOKEN"]},
+  {id:"fetch",label:"原文抓取",hint:"Python、Firecrawl、搜索增强与抓取策略",keys:["WRITE_ASSISTANT_PYTHON","SOURCE_FETCH_PROVIDER","FIRECRAWL_MCP_URL","FIRECRAWL_API_KEY","GITHUB_TOKEN","TAVILY_API_KEY"]},
   {id:"storage",label:"图片存储",hint:"又拍云上传与访问地址",keys:["UPYUN_BUCKET","UPYUN_OPERATOR","UPYUN_PASSWORD","UPYUN_DOMAIN","UPYUN_PREFIX"]},
   {id:"runtime",label:"工作台运行",hint:"本机 Web 服务参数",keys:["WORKBENCH_PORT"]},
 ];
+const LEGACY_MODEL_ENV_KEYS=["DEEPSEEK_API_KEY","MINIMAX_API_KEY","MOONSHOT_API_KEY"];
 
 function envFieldMarkup(field){
   return `<label class="env-field">
@@ -113,7 +124,7 @@ function envFieldMarkup(field){
 
 function renderAppEnvGroups(fields){
   const byKey=new Map(fields.map((field)=>[field.key,field]));
-  const assigned=new Set(APP_ENV_GROUPS.flatMap((group)=>group.keys));
+  const assigned=new Set([...APP_ENV_GROUPS.flatMap((group)=>group.keys),...LEGACY_MODEL_ENV_KEYS]);
   const groups=[...APP_ENV_GROUPS];
   const other=fields.filter((field)=>!assigned.has(field.key));
   if(other.length)groups.push({id:"other",label:"其他服务",hint:"其他可选运行参数",keys:other.map((field)=>field.key)});
@@ -143,6 +154,80 @@ function renderRsshubKv(fields){
 function addRsshubKvRow(){
   const node=document.getElementById("rsshub-env-fields");node.querySelector(".kv-empty")?.remove();
   node.insertAdjacentHTML("beforeend",rsshubKvMarkup());node.querySelector(".rsshub-kv-row:last-child .kv-key")?.focus();
+}
+
+function renderModelSettings(){
+  const node=document.getElementById("runtime-model-list");if(!node)return;
+  const providers=runtimeModels?.providers||[];
+  node.innerHTML=providers.length?providers.map((provider)=>`<button type="button" class="runtime-model-item ${provider.enabled===false?"disabled":""}" data-model-edit="${escapeHtml(provider.name)}"><b>${escapeHtml(provider.label)}</b><small>${escapeHtml(provider.model)} · ${escapeHtml(provider.baseUrl)}</small><em>${provider.enabled===false?"已停用":provider.configured?"已配置":"缺少 Key"}${provider.name===runtimeModels.defaultProvider?" · 默认":""}</em></button>`).join(""):'<div class="kv-empty">暂无模型配置。</div>';
+}
+
+async function loadModelSettings(){
+  runtimeModels=await request("/api/models");
+  renderModelSettings();
+}
+
+function resetModelForm(){
+  document.getElementById("model-config-form")?.reset();
+  document.getElementById("model-existing-id").value="";
+  document.getElementById("model-id").disabled=false;
+  document.getElementById("model-context-window").value="128000";
+  document.getElementById("model-max-output").value="8192";
+  document.getElementById("model-tagging-chunk").value="6";
+  document.getElementById("model-tagging-concurrency").value="4";
+  document.getElementById("model-json-mode").checked=true;
+  document.getElementById("model-enabled").checked=true;
+  document.getElementById("model-config-title").textContent="新增模型配置";
+  document.getElementById("delete-model-config").hidden=true;
+}
+
+function editModelConfig(id){
+  const provider=runtimeModels?.providers?.find((item)=>item.name===id);if(!provider)return;
+  document.getElementById("model-existing-id").value=provider.name;
+  document.getElementById("model-id").value=provider.name;
+  document.getElementById("model-id").disabled=true;
+  document.getElementById("model-label").value=provider.label||provider.name;
+  document.getElementById("model-base-url").value=provider.baseUrl||"";
+  document.getElementById("model-name").value=provider.model||"";
+  document.getElementById("model-api-key").value="";
+  document.getElementById("model-context-window").value=provider.contextWindow||128000;
+  document.getElementById("model-max-output").value=provider.maxOutputTokens||8192;
+  document.getElementById("model-max-token-field").value=provider.maxTokensField||"max_tokens";
+  document.getElementById("model-tagging-chunk").value=provider.taggingChunkSize||6;
+  document.getElementById("model-tagging-concurrency").value=provider.taggingConcurrency||4;
+  document.getElementById("model-json-mode").checked=provider.supportsJsonMode!==false;
+  document.getElementById("model-enabled").checked=provider.enabled!==false;
+  document.getElementById("model-default").checked=provider.name===runtimeModels.defaultProvider;
+  document.getElementById("model-config-title").textContent=`编辑 · ${provider.label}`;
+  document.getElementById("delete-model-config").hidden=false;
+}
+
+function modelFormPayload(){
+  return {
+    existingId:document.getElementById("model-existing-id").value,id:document.getElementById("model-id").value,
+    label:document.getElementById("model-label").value,baseUrl:document.getElementById("model-base-url").value,
+    model:document.getElementById("model-name").value,apiKey:document.getElementById("model-api-key").value,
+    contextWindow:Number(document.getElementById("model-context-window").value),maxOutputTokens:Number(document.getElementById("model-max-output").value),
+    maxTokensField:document.getElementById("model-max-token-field").value,taggingChunkSize:Number(document.getElementById("model-tagging-chunk").value),
+    taggingConcurrency:Number(document.getElementById("model-tagging-concurrency").value),supportsJsonMode:document.getElementById("model-json-mode").checked,
+    enabled:document.getElementById("model-enabled").checked,makeDefault:document.getElementById("model-default").checked,
+  };
+}
+
+async function saveModelConfig(button){
+  const original=button?.textContent;if(button){button.disabled=true;button.textContent="正在保存…";}
+  try{
+    const result=await request("/api/models/config",{method:"POST",body:JSON.stringify(modelFormPayload())});
+    toast("模型配置已保存并即时生效");await loadModelSettings();editModelConfig(result.id);
+  }finally{if(button){button.disabled=false;button.textContent=original;}}
+}
+
+async function deleteModelConfig(button){
+  const id=document.getElementById("model-existing-id").value;if(!id)return;
+  if(!await confirmAction("删除后，该模型将不能再被新任务选用。API Key 会保留在本机环境文件中，是否继续？",{confirmText:"删除配置"}))return;
+  button.disabled=true;
+  try{await request(`/api/models/config/${encodeURIComponent(id)}`,{method:"DELETE"});toast("模型配置已删除");resetModelForm();await loadModelSettings();}
+  finally{button.disabled=false;}
 }
 
 async function loadRuntimeSettings(){
@@ -220,5 +305,5 @@ async function loadSystem(target="all",button=null) {
 export default async function loadSystemView() {
   bindSystem();
   try{selectConfigTab(sessionStorage.getItem("runtime-config-tab")||"app");}catch{selectConfigTab("app");}
-  await Promise.all([loadSystem(),loadRuntimeSettings()]);
+  await Promise.all([loadSystem(),loadRuntimeSettings(),loadModelSettings()]);
 }

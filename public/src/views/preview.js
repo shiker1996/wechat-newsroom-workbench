@@ -11,7 +11,7 @@ function bindPreview() {
   if (bound) return;
   bound = true;
   document.getElementById("typeset-candidate").addEventListener("change", (event) => {
-    const id = Number(event.target.value);
+    const id = event.target.value;
     renderProductionCandidate(id);
     loadImageWorkspace(id).catch((error) => toast(error.message));
   });
@@ -94,6 +94,9 @@ function renderImageWorkspace() {
 
 function candidateArtifacts(candidate) {
   if (!state.productionPreview) return [];
+  if(candidate.daily){
+    return state.productionPreview.artifacts.filter((item)=>String(item.file_path||"").replaceAll("\\","/").toLowerCase().includes("/daily/"));
+  }
   const cid = candidate.candidate_id.toLowerCase();
   const bd = state.productionPreview.batch.batch_date.toLowerCase();
   return state.productionPreview.artifacts.filter((item) => {
@@ -105,11 +108,22 @@ function candidateArtifacts(candidate) {
 function renderProductionCandidate(candidateId) {
   const pp = state.productionPreview;
   if (!pp) return;
-  const candidate = pp.candidates.find((c) => c.id === Number(candidateId));
+  const candidate = pp.candidates.find((c) => String(c.id) === String(candidateId));
   if (!candidate) return;
+  // 与后端 defaultTypesetTheme 同一映射：八卦吃瓜类默认卡片风，其余按分类映射
+  const themeSelect = document.getElementById('typeset-theme');
+  const autoOption = themeSelect?.querySelector('option[value="auto"]');
+  if (autoOption) {
+    const suggested = candidate.category === '🏢 大厂战略' && /趣|离谱|八卦/.test(candidate.angle || '') ? '卡片吃瓜风'
+      : candidate.composite ? '财经印刷'
+      : { '🤖 AI/技术动态': '暗色终端', '📈 行业趋势': '财经印刷', '🏢 大厂战略': '财经印刷', '💼 职场生态': '书信手账', '📰 综合资讯': '黑白快讯' }[candidate.category] || '暖纸杂志风';
+    autoOption.textContent = `自动（${suggested}）`;
+  }
   const artifacts = candidateArtifacts(candidate);
   const names = new Set(artifacts.map((a) => a.name));
-  const steps = [['article-brief.md','锁定文章简报'],['09-FINAL.md','文章终稿'],['magazine-design-tokens.json','杂志设计'],['article.ai.draft.html','HTML 初稿'],['article.ai.html','门禁后 HTML']];
+  const steps = candidate.daily
+    ? [['01-news-items.json','早报事实清单'],['03-FINAL.md','早报终稿'],['magazine-design-tokens.json','杂志设计'],['article.ai.draft.html','HTML 初稿'],['article.ai.html','门禁后 HTML']]
+    : [['article-brief.md','锁定文章简报'],['09-FINAL.md','文章终稿'],['magazine-design-tokens.json','杂志设计'],['article.ai.draft.html','HTML 初稿'],['article.ai.html','门禁后 HTML']];
   const cl = document.getElementById('production-checklist');
   if (cl) cl.innerHTML = '<span class="kicker">PIPELINE GATES</span><h3>生产门禁</h3>' + steps.map(([name,label]) => '<div class="production-step ' + (names.has(name)?'done':'') + '"><i></i><div><b>' + label + '</b><small>' + (names.has(name)?'已生成':'缺少 ' + name) + '</small></div></div>').join('');
   const htmlArtifact = artifacts.find((a) => a.name === 'article.ai.html');
@@ -125,7 +139,7 @@ function renderProductionCandidate(candidateId) {
     status.classList.toggle('ready', Boolean(htmlArtifact));
     status.textContent = htmlArtifact ? candidate.candidate_id + ' 的排版 HTML 已就绪，可以直接复制到公众号编辑器。' : (candidate.candidate_id || '当前文章') + ' 尚未生成排版 HTML。';
   }
-  const deliveries = artifacts.filter((a) => ['09-FINAL.md','article.ai.html'].includes(a.name));
+  const deliveries = artifacts.filter((a) => [candidate.daily?'03-FINAL.md':'09-FINAL.md','article.ai.html'].includes(a.name));
   const dl = document.getElementById('delivery-links');
   if (dl) dl.innerHTML = deliveries.length ? deliveries.map((item) => '<div class="delivery-item"><small>' + escapeHtml(item.kind) + '</small><a href="/api/artifacts/' + item.id + '/content" target="_blank">' + escapeHtml(item.name) + '</a></div>').join('') : '<div class="empty-state">尚无可交付文件</div>';
 }
@@ -133,7 +147,7 @@ function renderProductionCandidate(candidateId) {
 async function loadProductionPreview() {
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
-  const prevId = Number(document.getElementById("typeset-candidate")?.value);
+  const prevId = document.getElementById("typeset-candidate")?.value;
   const [allArtifacts, candidates, documents] = await Promise.all([
     request("/api/artifacts?limit=500"),
     request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`),
@@ -142,12 +156,14 @@ async function loadProductionPreview() {
   const artifacts = allArtifacts.filter((item) => item.batch_id === batch.id);
   const finalIds = new Set(documents.filter((d) => d.kind === "final").map((d) => d.candidate_row_id));
   const ready = candidates.filter((c) => finalIds.has(c.id));
+  const dailyFinal=documents.find((d)=>d.kind==="daily-final"&&d.candidate_row_id==null);
+  if(dailyFinal)ready.unshift({id:"daily",candidate_id:"早报",hotspot_title:dailyFinal.title||"批次早报",category:"📰 综合资讯",daily:true});
   const select = document.getElementById("typeset-candidate");
   if (select) {
     select.innerHTML = ready.length
       ? ready.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`).join("")
       : '<option value="">缺少 09-FINAL.md</option>';
-    const selected = ready.find((c) => c.id === prevId) || ready[0] || null;
+    const selected = ready.find((c) => String(c.id) === String(prevId)) || ready[0] || null;
     select.value = selected ? String(selected.id) : "";
     select.disabled = !ready.length;
   }
@@ -159,7 +175,7 @@ async function loadProductionPreview() {
   if (btn) btn.disabled = !ready.length;
   state.productionPreview = { batch, artifacts, candidates: ready };
   // 渲染对象必须与下拉选中项一致（此前写死 ready[0]，下拉显示 B、内容却是 A）
-  const selectedId = Number(select?.value) || ready[0]?.id;
+  const selectedId = select?.value || ready[0]?.id;
   if (ready.length) {
     renderProductionCandidate(selectedId);
     loadImageWorkspace(selectedId);
@@ -168,6 +184,11 @@ async function loadProductionPreview() {
 
 async function loadImageWorkspace(candidateId) {
   const stage = document.getElementById('image-stage');
+  if(candidateId==="daily"){
+    state.imageWorkspace=null;if(stage)stage.hidden=true;
+    const button=document.getElementById('run-local-typeset');if(button){button.disabled=false;button.title='生成公众号排版 HTML';}
+    return;
+  }
   if (!candidateId) { state.imageWorkspace = null; if(stage)stage.hidden = true; document.getElementById('run-local-typeset') && (document.getElementById('run-local-typeset').disabled = true); return; }
   if (stage) stage.hidden = false;
   try {

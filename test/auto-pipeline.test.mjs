@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 test('自动任务类型串联打标、事件卡与事件研判', () => {
   const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
-  assert.match(manager, /'tag','retag','event-cards','research','breaking-analysis','article','typeset','social-card','auto'/);
+  assert.match(manager, /'tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','auto'/);
   const autoBranch = manager.slice(manager.indexOf("job.type === 'auto'"));
   assert.match(autoBranch, /runBreakingAnalysisPipeline/);
   const tagAt = autoBranch.indexOf('tagBatch');
@@ -42,11 +42,30 @@ test('批次一键自动化路由与手动重试入口并存', () => {
 
 test('一键流程实时刷新四步进度并把 auto 视为研判任务', () => {
   const store = fs.readFileSync(new URL('../lib/core/store.mjs', import.meta.url), 'utf8');
-  assert.match(store, /item\.type === 'research' \|\| item\.type === 'auto'/);
+  assert.match(store, /type IN \('research','auto'\)/);
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
   assert.match(ui, /data-pipeline-step="collect"/);
   assert.match(ui, /data-pipeline-step="tag"/);
   assert.match(ui, /data-pipeline-step="event-cards"/);
   assert.match(ui, /data-pipeline-step="research"/);
   assert.match(ui, /await refreshPipelineSteps\(job\)/);
+});
+
+test('一键流程按实际阶段点亮步骤，不被批次旧结果提前点亮', () => {
+  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
+  assert.match(manager, /job\.phase='tag'[\s\S]*job\.phase='event-cards'[\s\S]*job\.phase='research'/);
+  assert.match(ui, /const autoPhase = autoRunning \? job\.phase : ""/);
+  assert.match(ui, /autoPhase === "tag" \? "active"/);
+  assert.match(ui, /autoPhase === "event-cards" \? "active" : autoPhase === "tag" \? ""/);
+  assert.match(ui, /autoPhase === "research" \? "active" : autoPhase \? ""/);
+});
+
+test('继续生成事件卡走增量，高级操作才允许全量重建', () => {
+  const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
+  assert.match(ui, /data-ai-event-cards>.*继续生成事件卡/);
+  assert.match(ui, /data-ai-event-cards-force[^>]*>重新生成全部事件卡/);
+  assert.match(ui, /force: type === "retag" \|\| type === "event-cards-force"/);
+  assert.match(ui, /startBatchAi\("event-cards-force"\)/);
+  assert.doesNotMatch(ui, /type === "event-cards" && state\.currentBatch\?\.event_cards\?\.count > 0/);
 });

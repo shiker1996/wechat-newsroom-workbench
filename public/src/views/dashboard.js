@@ -93,7 +93,7 @@ function renderEfficiency(overview) {
     ? `近 ${baseline.sampleSize} 批均值 ${formatter(value)}`
     : "暂无历史批次基线";
   const cards=[
-    {label:"本次采集耗时",value:formatDuration(data.collectionDurationMs),note:`${baselineNote(baseline.collectionDurationMs,formatDuration)} · 重试累计 ${formatDuration(data.collectionRetryDurationMs)}`,go:"sources"},
+    {label:"采集到研判耗时",value:data.collectToResearchDurationMs==null?"—":formatDuration(data.collectToResearchDurationMs),note:baselineNote(baseline.collectToResearchDurationMs,formatDuration),go:"sources"},
     {label:"AI 任务成功率",value:data.aiSuccessRate==null?"—":`${data.aiSuccessRate}%`,note:baselineNote(baseline.aiSuccessRate,(value)=>`${value}%`),go:"logs"},
     {label:"选题推进率",value:data.candidateConversionRate==null?"—":`${data.candidateConversionRate}%`,note:baselineNote(baseline.candidateConversionRate,(value)=>`${value}%`),go:"topics"},
     {label:"产物输出",value:String(data.artifactCount??0),note:baselineNote(baseline.artifactCount),go:"artifacts"},

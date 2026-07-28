@@ -342,6 +342,8 @@ function selectedDocKind() {
   const el = document.querySelector("input[name=doc-kind]:checked");
   return el?.value || "draft";
 }
+function isDailyDocument() { return document.getElementById("writing-candidate")?.value==="daily"; }
+function storageDocKind() { return isDailyDocument()?`daily-${selectedDocKind()}`:selectedDocKind(); }
 
 function setWritingDeskAvailability(available) {
   const view=document.getElementById("view-editor");
@@ -375,24 +377,35 @@ async function loadWritingDesk() {
     (item) => item.brief_status === "LOCKED" || (item.brief_status == null && item.status === "locked")
   );
   state.documents = documents;
+  const dailyFinal=documents.find((item)=>item.kind==="daily-final"&&item.candidate_row_id==null);
   const select = document.getElementById("writing-candidate");
   if (!select) return;
-  select.innerHTML = state.candidates.length
-    ? state.candidates.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`).join("")
+  const writingOptions=[
+    ...(dailyFinal?[`<option value="daily">早报 · ${escapeHtml(dailyFinal.title||"批次早报")}</option>`]:[]),
+    ...state.candidates.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`),
+  ];
+  select.innerHTML = writingOptions.length
+    ? writingOptions.join("")
     : '<option value="">没有已锁定候选</option>';
-  select.disabled = !state.candidates.length;
-  setWritingDeskAvailability(Boolean(state.candidates.length));
+  select.disabled = !writingOptions.length;
+  if(select.value==="daily"){
+    const finalRadio=document.querySelector('input[name="doc-kind"][value="final"]');
+    if(finalRadio)finalRadio.checked=true;
+  }
+  setWritingDeskAvailability(Boolean(writingOptions.length));
   const ctxEl = document.getElementById("draft-context");
-  if (ctxEl) ctxEl.innerHTML = state.candidates.length
+  if (ctxEl) ctxEl.innerHTML = writingOptions.length
     ? "事实、观点、禁写项不会被压缩"
     : '当前没有可编辑文稿。<a class="primary-button editor-empty-primary" href="#overview">前往热点全景创建选题</a><small>创建后请在文章编辑室锁定候选，再返回这里写作。</small>';
   await loadSelectedDocument();
 }
 
 async function loadSelectedDocument() {
-  const candidateId = Number(document.getElementById("writing-candidate")?.value);
+  const candidateValue=document.getElementById("writing-candidate")?.value;
+  const candidateId = Number(candidateValue);
+  const daily=candidateValue==="daily";
   const kind = selectedDocKind();
-  if (!candidateId) {
+  if (!candidateId&&!daily) {
     currentDocument = null;
     editorDirty = false;
     clearAutoSave();
@@ -408,10 +421,10 @@ async function loadSelectedDocument() {
   }
   let docResult = null;
   try {
-    docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${candidateId}&kind=${kind}`);
+    docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${daily?"daily":candidateId}&kind=${daily?`daily-${kind}`:kind}`);
   } catch {}
   currentDocument = docResult?.id ? docResult : null;
-  const candidate = state.candidates.find((item) => item.id === candidateId);
+  const candidate = daily?null:state.candidates.find((item) => item.id === candidateId);
   const titleEl = document.getElementById("article-title");
   const editor = document.getElementById("markdown-editor");
   if (titleEl) titleEl.value = docResult?.title || candidate?.hotspot_title || "";
@@ -423,7 +436,7 @@ async function loadSelectedDocument() {
   clearAutoSave();
   setSaveState("saved",docResult?.updated_at?`已保存 · ${new Date(docResult.updated_at).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`:"尚未保存");
   renderPreflightSummary(editor?.value||"");
-  lastCandidateValue = String(candidateId || "");
+  lastCandidateValue = daily?"daily":String(candidateId || "");
   lastDocKind = kind;
 }
 
@@ -540,8 +553,10 @@ async function restoreRevision() {
 }
 
 async function saveDocument({automatic=false}={}) {
-  const candidateId = Number(document.getElementById("writing-candidate")?.value);
-  if (!candidateId) return toast("先锁定一个文章简报");
+  const candidateValue=document.getElementById("writing-candidate")?.value;
+  const candidateId = Number(candidateValue);
+  const daily=candidateValue==="daily";
+  if (!candidateId&&!daily) return toast("请先选择一篇文稿");
   const content = document.getElementById("markdown-editor")?.value || "";
   const kind = selectedDocKind();
   if (kind === "final" && visibleChars(content) > 2000) return toast("终稿超过 2000 可见字符，暂不能保存为终稿");
@@ -553,7 +568,7 @@ async function saveDocument({automatic=false}={}) {
   try {
     const docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents`, {
       method: "PUT",
-      body: JSON.stringify({ candidateId, kind, title, content, status: kind === "final" ? "finalized" : "draft" }),
+      body: JSON.stringify({ candidateId:daily?null:candidateId, kind:daily?`daily-${kind}`:kind, title, content, status: kind === "final" ? "finalized" : "draft" }),
     });
     if(sequence!==saveSequence)return docResult;
     currentDocument=docResult;
@@ -625,12 +640,15 @@ async function pollJob(id) {
 }
 
 async function runTypeset() {
-  const candidateId = Number(document.getElementById("typeset-candidate")?.value);
-  if (!candidateId) return toast("请先选择一个候选");
+  const candidateValue=document.getElementById("typeset-candidate")?.value;
+  const daily=candidateValue==="daily";
+  const candidateId = Number(candidateValue);
+  if (!candidateId&&!daily) return toast("请先选择一篇终稿");
   const provider = document.getElementById("typeset-provider")?.value || state.models?.defaultProvider;
+  const theme = document.getElementById("typeset-theme")?.value || "auto";
   try {
     const result = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/typeset`, {
-      method: "POST", body: JSON.stringify({ provider, candidateId }),
+      method: "POST", body: JSON.stringify({ provider, candidateId:daily?null:candidateId, documentKind:daily?"daily-final":null, theme }),
     });
     toast("排版任务已启动");
     // 排版任务数分钟：打开进度弹窗，避免页面上无任何可见反馈

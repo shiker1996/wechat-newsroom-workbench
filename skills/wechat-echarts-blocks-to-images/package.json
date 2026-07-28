@@ -1,5 +1,8 @@
 {
   "name": "wechat-echarts-blocks-to-images",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "echarts": "^6.1.0"
+  }
 }

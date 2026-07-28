@@ -5,6 +5,33 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../lib/core/store.mjs';
 
+test('编辑决策将布尔型体验要求规范化为 SQLite 整数',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-editorial-bool-'));let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-28',title:'自主写作'});
+    store.addHotspots(batch.id,'manual',[{title:'教程',url:'https://example.com/tutorial'}]);
+    const hotspot=store.getBatch(batch.id).hotspots[0];
+    const candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];
+    const saved=store.saveEditorial(candidate.id,{experience_required:true});
+    assert.equal(saved.experience_required,1);
+  }finally{store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('批次级早报反复保存时更新同一文稿并保留版本',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-daily-document-'));let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-28',title:'早报批次'});
+    store.saveDocument({batchId:batch.id,kind:'daily-final',title:'第一版',content:'# 第一版'});
+    store.saveDocument({batchId:batch.id,kind:'daily-final',title:'第二版',content:'# 第二版'});
+    const docs=store.listDocuments(batch.id).filter((item)=>item.kind==='daily-final');
+    assert.equal(docs.length,1);
+    assert.equal(docs[0].title,'第二版');
+    assert.equal(store.listDocumentRevisions(docs[0].id).length,2);
+  }finally{store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
 test('完成和归档批次退出当前工作台但保留历史记录',()=>{
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-batch-lifecycle-'));
   let store;
@@ -58,7 +85,7 @@ test('工作台今日文章与图文只统计当前活动批次',()=>{
   }
 });
 
-test('工作台效率反馈计算采集耗时、AI 成功率、推进率和瓶颈',()=>{
+test('工作台效率反馈计算采集到研判耗时、AI 成功率、推进率和瓶颈',()=>{
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-efficiency-'));
   let store;
   try{
@@ -78,15 +105,42 @@ test('工作台效率反馈计算采集耗时、AI 成功率、推进率和瓶�
       (id,batch_id,type,provider,status,progress,result_json,error,created_at,updated_at)
       VALUES ('ok',?,'tag','test','completed','','{}',NULL,?,?),
              ('bad',?,'research','test','failed','','{}','失败',?,?)`).run(batch.id,now,now,batch.id,now,now);
+    // 采集到研判耗时：source_runs 最早开始 → 最近完成的 research/auto 结束
+    store.db.prepare(`INSERT INTO source_runs (batch_id,source,status,item_count,started_at,ended_at)
+      VALUES (?,'rsshub','success',10,?,?)`).run(batch.id,'2026-07-26T08:00:00.000Z','2026-07-26T08:02:00.000Z');
+    store.db.prepare(`INSERT INTO ai_runs
+      (id,batch_id,type,provider,status,progress,result_json,error,created_at,updated_at)
+      VALUES ('auto-ok',?,'auto','test','completed','','{}',NULL,?,?)`).run(batch.id,'2026-07-26T08:02:00.000Z','2026-07-26T08:30:00.000Z');
     const overview=store.overview();
-    assert.equal(overview.efficiency.collectionDurationMs,2500);
-    assert.equal(overview.efficiency.collectionCumulativeDurationMs,3500);
-    assert.equal(overview.efficiency.collectionRetryDurationMs,1000);
-    assert.equal(overview.efficiency.aiSuccessRate,50);
+    assert.equal(overview.efficiency.aiSuccessRate,67);
     assert.equal(overview.efficiency.artifactCount,0);
+    assert.equal(overview.efficiency.collectToResearchDurationMs,30*60*1000);
     assert.match(overview.efficiency.bottleneck,/失败任务/);
     assert.equal(overview.efficiencyBaseline.sampleSize,1);
-    assert.equal(overview.efficiencyBaseline.collectionDurationMs,4000);
+    // 基线批次没有完成的研判记录，不参与均值
+    assert.equal(overview.efficiencyBaseline.collectToResearchDurationMs,null);
+  }finally{
+    store?.close();
+    fs.rmSync(tempRoot,{recursive:true,force:true});
+  }
+});
+
+test('研判完成状态不受 ai_runs 截断列表影响（latestResearch 独立查询）',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-research-'));
+  let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-27',title:'研判截断'});
+    store.createAiRun({id:'auto-1',batchId:batch.id,type:'auto',provider:'test'});
+    store.updateAiRun('auto-1',{status:'completed'});
+    // 模拟排版重试把研判记录挤出最新 20 条窗口
+    for(let i=0;i<24;i+=1){
+      store.createAiRun({id:`typeset-${i}`,batchId:batch.id,type:'typeset',provider:'test'});
+      store.updateAiRun(`typeset-${i}`,{status:'completed'});
+    }
+    const fetched=store.getBatch(batch.id);
+    assert.equal(fetched.ai_status.latestResearch?.id,'auto-1');
+    assert.equal(fetched.ai_status.latestResearch?.status,'completed');
   }finally{
     store?.close();
     fs.rmSync(tempRoot,{recursive:true,force:true});

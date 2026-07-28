@@ -9,12 +9,15 @@ description: 将 Markdown 中显式的 Mermaid 围栏渲染为 PNG，并用本�
 
 ## 流程
 
-1. 读取当前 Markdown 工作文件并按出现顺序提取围栏。
-2. 为每个围栏写临时 `.mmd`，使用已安装的 Mermaid CLI 渲染 PNG。
-3. 本地模式将围栏替换为相对 PNG 路径；预览模式只有在获得上传授权后才上传并替换为 HTTPS URL。
-4. 写入临时 Markdown，验证后替换调用方指定的工作文件。
+流水线直接执行确定性脚本：
 
-渲染前检查 `npx mmdc --version`。节点文本来自用户内容时，转义会破坏 Mermaid 语法的字符；不得改写节点含义。单个围栏失败时保留原围栏并报告，不得删除内容。
+```
+node scripts/render-mermaid.mjs <input.md> <output.md> [imageDir]
+```
+
+脚本按出现顺序提取围栏，为每个围栏写 `<imageDir>/mermaid-N.mmd`，调用全局安装的 Mermaid CLI（`@mermaid-js/mermaid-cli`，经 puppeteer 缓存中已存在的 Chrome 渲染）产出 `mermaid-N.png`，并把围栏替换为相对 PNG 路径。stdout 最后一行输出 JSON 报告 `{"converted":N,"failed":[...],"images":[...]}`；有失败时退出码为 1。
+
+渲染前检查 `npx mmdc --version`。节点文本来自用户内容时，转义会破坏 Mermaid 语法的字符；不得改写节点含义。单个围栏失败时保留原围栏并报告，不得删除内容。预览模式如需上传图床，必须先获得用户明确授权。
 
 ## 门禁
 

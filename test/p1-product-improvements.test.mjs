@@ -24,9 +24,9 @@ test("批次管理支持生命周期筛选、标题搜索和已完成待归档�
   assert.match(batches,/\["completed","已完成待归档"\]/);
 });
 
-test("效率反馈区分本次采集、累计重试并展示最近批次基线",()=>{
-  assert.match(dashboard,/本次采集耗时/);
-  assert.match(dashboard,/collectionRetryDurationMs/);
+test("效率反馈展示采集到研判耗时与最近批次基线",()=>{
+  assert.match(dashboard,/采集到研判耗时/);
+  assert.match(dashboard,/collectToResearchDurationMs/);
   assert.match(dashboard,/efficiencyBaseline/);
   assert.match(dashboard,/近 \$\{baseline\.sampleSize\} 批均值/);
 });

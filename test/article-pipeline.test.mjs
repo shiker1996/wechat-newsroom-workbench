@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { articleLengthStatus, buildDraftUserPrompt, buildArticleStageSystem, normalizePlanningResult, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
+import { articleLengthStatus, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
 import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
 
@@ -32,6 +32,30 @@ test('成稿提示词展开真实标题、简报和大纲', () => {
   assert.match(prompt, /\"thesis\":\"真实命题\"/);
   assert.match(prompt, /大纲:\n# 真实大纲/);
   assert.doesNotMatch(prompt, /\$\{(?:selectedTitle|outline|JSON\.stringify\(brief\))\}/);
+});
+
+test('综合候选汇总全部已抓取来源，写作简报移除来源原文', () => {
+  const candidate={composite:true,source_documents:[
+    {title:'来源甲',url:'https://example.com/a',source:{status:'ok',content:'甲正文'}},
+    {title:'来源乙',url:'https://example.com/b',source:{status:'ok',content:'乙正文'}},
+    {title:'失败来源',url:'https://example.com/c',source:{status:'error',content:'不应进入'}},
+  ]};
+  const corpus=compositeSourceText(candidate);
+  assert.match(corpus,/来源甲[\s\S]*甲正文/);
+  assert.match(corpus,/来源乙[\s\S]*乙正文/);
+  assert.doesNotMatch(corpus,/不应进入/);
+  const safe=authorizedWritingBrief({topic:'主题',sourceText:corpus,factBase:{claims:[]}});
+  assert.equal(safe.sourceText,undefined);
+  assert.equal(safe.topic,'主题');
+  assert.deepEqual(safe.factBase,{claims:[]});
+});
+
+test('质量门禁只授权 verified 事实并区分观点与亲测', () => {
+  const source=fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs',import.meta.url),'utf8');
+  assert.match(source,/正文事实只能来自事实基座中的 verified 项/);
+  assert.match(source,/第一人称作者判断或阅读动作/);
+  assert.match(source,/不得用新的数字、案例、榜单、硬件配置或模型常识替换/);
+  assert.doesNotMatch(source,/事实基座可能未穷尽其中数据/);
 });
 
 test('爆款结构门禁要求钩子、3-5个章节和来源链接', () => {
@@ -70,6 +94,23 @@ test('综合选题写作规则来自项目子技能而非执行器内置提示�
   assert.match(composite.prompt, /多个已核验热点/);
   const source = fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /composeSkillPrompts|const compositeSkill|你是事实编辑/);
+});
+
+test('写作类型路由覆盖技术深解并保护严肃议题边界',()=>{
+  assert.equal(selectWriterSkill({composite:true}).skill,'wechat-mp-composite');
+  assert.equal(selectWriterSkill({category:'🤖 AI/技术动态',hotspot_title:'新模型发布',angle:'解释这次发布对开发者的影响'}).skill,'wechat-mp-tech-hotspot');
+  assert.equal(selectWriterSkill({category:'🤖 AI/技术动态',hotspot_title:'MoE 模型',angle:'拆解推理架构和显存成本，给出可复算公式'}).skill,'wechat-mp-tech-deep');
+  assert.equal(selectWriterSkill({category:'🏢 大厂战略',angle:'一个离谱的职场趣闻'}).skill,'wechat-mp-gossip-chill');
+  assert.equal(selectWriterSkill({category:'🏢 大厂战略',angle:'离谱裁员事故背后的劳动关系'}).skill,'wechat-mp-deep-dive');
+  assert.match(selectWriterSkill({category:'📈 行业趋势',angle:'分析参与方利益关系'}).reason,/参与方/);
+});
+
+test('热点文章契约明确拒绝伪装教程、工具清单和纯快讯',()=>{
+  const skill=fs.readFileSync(new URL('../skills/wechat-mp-topic-to-article/SKILL.md',import.meta.url),'utf8');
+  assert.match(skill,/writer_skill_reason/);
+  assert.match(skill,/不承接纯资讯早报/);
+  assert.match(skill,/教程必须先建立环境、步骤、成功标准和作者实践证据/);
+  assert.match(skill,/工具 → 图文/);
 });
 
 test('阶段子技能从项目 skills 目录加载', () => {

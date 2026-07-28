@@ -27,6 +27,8 @@ import { inspectRepository, repositoryFactMarkdown } from './lib/integrations/re
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/domain/custom-fact-builder.mjs';
 import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
+import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
+import { extractLocalProjectPath, readLocalProject } from './lib/integrations/local-project-reader.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
@@ -35,8 +37,10 @@ import { getGitHubApiHealth } from './lib/integrations/github-api.mjs';
 import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from './lib/artifacts/artifact-preview.mjs';
 import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
 import { routeBreakingAnalysis } from './lib/llm/breaking-analysis-pipeline.mjs';
-import { SOCIAL_CARD_LAYOUTS, describeCardLayouts } from './lib/llm/social-card-pipeline.mjs';
+import { dailyFocusOptions } from './lib/llm/daily-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, describeCardLayouts, normalizeCardComposition } from './lib/llm/social-card-pipeline.mjs';
 import { getRuntimeSettings, runPowerShellScript, updateRuntimeSettings } from './lib/integrations/runtime-settings.mjs';
+import { deleteModelProvider, saveModelProvider } from './lib/integrations/model-provider-settings.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
@@ -226,6 +230,15 @@ async function api(request, response, url) {
   if (request.method === 'GET' && pathname === '/api/models') {
     return json(response, 200, { ...models.listProviders(), calls: store.listModelCalls(50) });
   }
+  if (request.method === 'POST' && pathname === '/api/models/config') {
+    const id=saveModelProvider(root,config,await body(request));
+    return json(response,200,{saved:true,id,...models.listProviders()});
+  }
+  const modelConfigDelete=pathname.match(/^\/api\/models\/config\/([^/]+)$/);
+  if(request.method==='DELETE'&&modelConfigDelete){
+    const id=deleteModelProvider(root,config,decodeURIComponent(modelConfigDelete[1]));
+    return json(response,200,{deleted:true,id,...models.listProviders()});
+  }
   if (request.method === 'POST' && pathname === '/api/models/test') {
     const input = await body(request);
     const result = await models.complete({ provider: input.provider, purpose: 'connection-test', maxOutputTokens: 16,
@@ -408,6 +421,32 @@ async function api(request, response, url) {
     const input=await body(request),batchId=decodeURIComponent(eventCardsMatch[1]),batch=store.getBatch(batchId);
     if(!batch)return json(response,404,{error:'批次不存在'});
     return json(response,202,aiJobs.start({batchId,provider:input.provider,type:'event-cards',force:Boolean(input.force)}));
+  }
+  const dailyMatch = pathname.match(/^\/api\/batches\/([^/]+)\/daily$/);
+  if (dailyMatch && request.method === 'GET') {
+    const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
+    if(!batch)return json(response,404,{error:'批次不存在'});
+    let eventCards=[],focusOptions=[];
+    try {
+      const cardFile=path.join(batchWorkdir(batch),'sources','event-cards.json');
+      if(fs.existsSync(cardFile)){
+        eventCards=JSON.parse(fs.readFileSync(cardFile,'utf8'))?.items||[];
+        const cardMap=new Map(eventCards.map((item)=>[item.event_id,item]));
+        const eligible=batch.hotspots.filter((item)=>isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
+        const clusters=clusterItems(eligible);
+        for(const event of clusters)event.card=cardMap.get(event.event_id)||null;
+        focusOptions=dailyFocusOptions(clusters);
+      }
+    } catch {}
+    const documents=store.listDocuments(batchId).filter((item)=>item.kind==='daily-draft'||item.kind==='daily-final');
+    return json(response,200,{batch:{id:batch.id,title:batch.title,batchDate:batch.batch_date,batchType:batch.batch_type},eventCards,focusOptions,documents});
+  }
+  if (dailyMatch && request.method === 'POST') {
+    const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
+    if(!batch)return json(response,404,{error:'批次不存在'});
+    const input=await body(request);
+    return json(response,202,aiJobs.start({batchId,provider:input.provider,type:'daily',
+      focuses:Array.isArray(input.focuses)?input.focuses:[],focus:input.focus||null}));
   }
   const candidatesMatch = pathname.match(/^\/api\/batches\/([^/]+)\/candidates$/);
   function loadBatchEventCards(batch) {
@@ -617,6 +656,79 @@ async function api(request, response, url) {
       return json(response, 400, { error: `创建自定义图文失败：${error.message}` });
     }
   }
+  // 教程策划可按用户明确给出的目录读取本地项目；只读文本文件，跳过依赖、密钥与符号链接。
+  if(pathname==='/api/tools/local-project/read'&&request.method==='POST'){
+    const input=await body(request);
+    try{
+      const project=readLocalProject(input.path);
+      return json(response,200,{root:project.root,summary:project.summary,files:project.files.map(({path:sizePath,size,truncated})=>({path:sizePath,size,truncated})),skipped:project.skipped,truncated:project.truncated});
+    }catch(error){return json(response,400,{error:`读取本地项目失败：${error.message}`});}
+  }
+  const tutorialChatMatch=pathname.match(/^\/api\/batches\/([^/]+)\/tutorial-chat\/stream$/);
+  if(tutorialChatMatch&&request.method==='POST'){
+    const batchId=decodeURIComponent(tutorialChatMatch[1]);
+    if(!store.getBatch(batchId))return json(response,404,{error:'批次不存在'});
+    const input=await body(request),draft=input.draft&&typeof input.draft==='object'?{...input.draft}:{};
+    const tutorialMode=String(draft.articleMode||'').trim()==='tutorial'||/教程|项目|仓库/.test(String(input.answer||''));
+    const detectedPath=tutorialMode?(String(draft.localProjectPath||'').trim()||extractLocalProjectPath(input.answer)):'';
+    let projectContext=null,projectReadError='';
+    if(detectedPath){
+      draft.localProjectPath=detectedPath;
+      try{projectContext=readLocalProject(detectedPath);}
+      catch(error){projectReadError=error.message;}
+    }
+    response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
+    const send=(event)=>response.write(`${JSON.stringify(event)}\n`);
+    try{
+      const result=await runTutorialChatStream({gateway:models,store,provider:input.provider,batchId,draft,history:Array.isArray(input.history)?input.history:[],answer:String(input.answer||''),projectContext,projectReadError,onText:(text)=>send({type:'delta',text})});
+      send({type:'done',data:{...result,project:projectContext?{root:projectContext.root,summary:projectContext.summary,files:projectContext.files.map((item)=>item.path),truncated:projectContext.truncated}:null,projectReadError}});
+    }catch(error){send({type:'error',error:error.message});}
+    response.end();return true;
+  }
+  // `/tutorials` 保留兼容；新入口统一称为自主写作。
+  const tutorialMatch=pathname.match(/^\/api\/batches\/([^/]+)\/(?:custom-articles|tutorials)$/);
+  if(tutorialMatch&&request.method==='POST'){
+    const batchId=decodeURIComponent(tutorialMatch[1]),batch=store.getBatch(batchId);
+    if(!batch)return json(response,404,{error:'批次不存在'});
+    const input=await body(request);
+    try{
+      const articleMode=String(input.articleMode||'tutorial').trim()==='experience'?'experience':'tutorial';
+      let project=null;
+      if(articleMode==='tutorial'&&String(input.localProjectPath||'').trim())project=readLocalProject(input.localProjectPath);
+      const fact=await buildCustomFactSheet({input:{...input,content_type:articleMode==='experience'?'opinion':'tutorial',scenario:input.environment},root,hasUserMaterialContext:Boolean(project)});
+      fact.article_mode=articleMode;
+      fact.environment=String(input.environment||'').trim();
+      fact.prerequisites=String(input.prerequisites||'').split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+      fact.expected_results=String(input.expected_results||'').split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+      fact.common_errors=String(input.common_errors||'').split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+      if(project){
+        fact.local_project={root:project.root,files:project.files.map(({path:filePath,size,excerpt,truncated})=>({path:filePath,size,excerpt,truncated})),summary:project.summary,truncated:project.truncated};
+      }
+      if(articleMode==='tutorial'&&!fact.environment)throw new Error('请填写实际运行环境或版本边界');
+      if(articleMode==='tutorial'&&fact.steps.length<2)throw new Error('教程步骤至少需要 2 步');
+      if(articleMode==='experience'&&!fact.thesis)throw new Error('心得经验文章需要明确核心观点');
+      if(articleMode==='experience'&&!fact.points.some((item)=>item.source_level==='author_experience'))throw new Error('心得经验文章至少需要一条【体验】要点');
+      if(fact.materials.some((item)=>item.status!=='ok'))throw new Error(`素材抓取失败：${fact.materials.filter((item)=>item.status!=='ok').map((item)=>item.url).join('、')}`);
+      const materialUrls=fact.materials.map((item)=>item.url);
+      const articleLabel=articleMode==='experience'?'心得经验':'使用教程';
+      const hotspot=store.addManualHotspot(batchId,{title:fact.topic,url:materialUrls[0]||null,materialUrls,notes:`自主写作（${articleLabel}）`});
+      store.addCandidates(batchId,[hotspot.id],{tracks:['article']});
+      const candidate=store.listCandidates(batchId,'article').find((item)=>Number(item.hotspot_id)===Number(hotspot.id));
+      if(!candidate)throw new Error('自主写作项目创建失败');
+      store.updateCandidate(candidate.id,{angle:articleMode==='experience'?`经验分享：${fact.topic}`:`实操教程：${fact.topic}`,thesis:articleMode==='experience'?fact.thesis:`帮助 ${fact.audience||'目标读者'} 在 ${fact.environment} 完成 ${fact.topic}`,status:'locked'});
+      store.updateCandidateTrack(candidate.id,'article',{status:'locked',pool_role:'自主写作',output_mode:articleMode==='experience'?'wechat-experience':'wechat-tutorial'});
+      const experiences=fact.points.filter((item)=>item.source_level==='author_experience').map((item)=>item.text).join('\n');
+      const facts=fact.points.filter((item)=>item.source_level!=='model_suggestion').map((item)=>item.text).join('\n');
+      store.saveEditorial(candidate.id,{editor_question:'',confirmed_facts:facts,author_opinions:articleMode==='experience'?fact.thesis:'',confirmed_experiences:experiences,rejected_angles:'',open_questions:'',forbidden_claims:'不得将模型建议写成亲测或确定结果',next_action:'WRITE_NOW',experience_required:articleMode==='experience'||Boolean(experiences),brief_status:'LOCKED'});
+      const dir=articleWorkdir(batch,candidate),factPath=path.join(dir,'01-tutorial-fact-base.json'),briefPath=path.join(dir,'article-brief.md');
+      const factFile=writeUtf8(factPath,JSON.stringify(fact,null,2));
+      const briefFile=writeUtf8(briefPath,`---\nbrief_status: LOCKED\ncandidate_id: ${candidate.candidate_id}\narticle_mode: ${articleMode}\nexperience_required: ${articleMode==='experience'||Boolean(experiences)}\nfinal_readiness: WRITE_NOW\n---\n\n# ${fact.topic}\n\n${articleMode==='experience'?`核心观点：${fact.thesis}`:`环境：${fact.environment}`}\n`);
+      store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'自主写作事实基座',name:'01-tutorial-fact-base.json',path:factPath,...factFile});
+      store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'锁定简报',name:'article-brief.md',path:briefPath,...briefFile});
+      const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+      return json(response,202,{...job,candidate:store.getCandidate(candidate.id)});
+    }catch(error){return json(response,400,{error:`创建自主写作失败：${error.message}`});}
+  }
   const candidateMatch = pathname.match(/^\/api\/candidates\/(\d+)$/);
   if (candidateMatch && request.method === 'GET') {
     const candidate = store.getCandidate(Number(candidateMatch[1]));
@@ -662,7 +774,7 @@ async function api(request, response, url) {
     const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
     const cardPlan=JSON.parse(editorial.card_plan_json||'[]');const channelMode=socialChannelMode(candidate);
-    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
   if(cardPageLayoutMatch&&request.method==='PUT'){
     const candidate=store.getCandidate(Number(cardPageLayoutMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
@@ -673,7 +785,7 @@ async function api(request, response, url) {
     cardPlan[pageIndex]={...cardPlan[pageIndex],layout_style:layoutStyle};
     const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan)});
     const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+    return json(response,200,{editorial,cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
   if(cardPageMatch&&request.method==='PUT'){
     const candidate=store.getCandidate(Number(cardPageMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
@@ -700,18 +812,19 @@ async function api(request, response, url) {
     const facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
     const eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,cardPlan,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+    return json(response,200,{editorial,cardPlan,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
   if (cardEditorialMatch && request.method === 'PUT') {
     const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
     if(!candidate)return json(response,404,{error:'候选不存在'});
     const input=await body(request);
     if(input.layout_style&&!SOCIAL_CARD_LAYOUTS.includes(input.layout_style))return json(response,400,{error:'不支持的图文版式'});
+    if(input.composition_mode&&!SOCIAL_CARD_COMPOSITION_MODES.includes(input.composition_mode))return json(response,400,{error:'不支持的构图模式'});
     const editorial=store.saveCardEditorial(candidate.id,input); const facts=store.getRepositoryFactSheet(candidate.id);
     const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
     let cardPlan=[];try{cardPlan=JSON.parse(editorial.card_plan_json||'[]');}catch{}
     const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+    return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
   // 渠道切换：只换 output_mode 的渠道前缀（wechat-* ↔ xiaohongshu-*），类型部分不动，轨道与卡片决策同步
   const cardChannelMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-channel$/);
@@ -731,7 +844,7 @@ async function api(request, response, url) {
     }
     const updated=store.getCandidate(candidate.id);
     const editorial=store.getCardEditorial(candidate.id);const cardPlan=JSON.parse(editorial.card_plan_json||'[]');
-    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(cardPlan.length),candidate:updated,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode:channel})});
+    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(cardPlan.length),candidate:updated,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode:channel})});
   }
   const cardEditorialAiMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/card-editorial$/);
   if (cardEditorialAiMatch && request.method === 'POST') {
@@ -766,18 +879,20 @@ async function api(request, response, url) {
 只依据自定义事实基座规划卡片，不得虚构体验、效果、数字或收益。体验真实性三来源等级是硬约束：source_level=author_experience 的要点可以写成第一人称亲历；user_material 必须保留来源归属；model_suggestion 只能表述为建议或参考，禁止写成亲测、效果或收益。按内容类型组织故事线：教程（cover→场景与痛点→step 分步页→注意事项→ending）；清单（cover→筛选标准→item 条目页→边界→ending）；观点（cover→核心论点→highlight 论据页→反方与边界→ending）。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"内容定位","must_highlight":"","must_disclose":"来源等级与体验边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|highlight|step|item|boundary|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'本页旨在...'；正确示例：'三步完成配置，第二步最容易漏。'","evidence":["事实基座中支持本页的要点，标注来源等级"],"content_blocks":[{"type":"${cardBlockTypes}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。至少一页说明事实边界与限制（boundary）；model_suggestion 要点不得单独成页充当卖点。must_disclose 必须写明体验性表述来自作者确认、建议性内容未实测。`;
       const storyboardSystem=contentType==='event'?eventSystem:contentType==='custom'?customSystem:repositorySystem;
       const storyboardChannelDirective=socialChannelMode(candidate)==='xiaohongshu'
-        ?'\n小红书渠道要求：页型与公众号一致（375×667），每页 2–4 个内容块；封面钩子更口语化、带好奇心；结尾页引导收藏与评论互动。除 text/list/note 外，内容块的 type 还可以使用以下版式：stats 数据卡（items:[{"num":"数字","label":"含义"}]，2–4 个，数字必须来自事实基座）、compare 对比卡（headers:["列名"],rows:[["单元格"]]，用于多方立场或产品对比）、steps 步骤卡（items:[{"title":"步骤名","content":"简述"}]，用于教程分步）、timeline 时间卡（items:[{"time":"时间","title":"事件","content":"简述"}]，用于事件时间线）、scenes 场景卡（items:[{"title":"场景","content":"简述"}]，2–3 个横排）、highlight 亮点卡（title+content，用于本页核心卖点）。使用这些版式时内容必须写入 items/headers/rows 字段，不要写入块的 content 字段。按内容选择合适版式，不要整篇都是纯文本块。'
+        ?'\n小红书渠道要求：页型与公众号一致（375×667），每页 2–4 个内容块；封面钩子更口语化、带好奇心；结尾页引导收藏与评论互动。除 text/list/note 外，内容块的 type 还可以使用以下版式：stats 数据卡（items:[{"num":"简短数字","label":"含义"}]，2–4 个，数字必须来自事实基座；num 不超过 6 个字符，如 "1h51m"、"3 线"、"99.9%"，禁止 "12+15+4" 这类长算式，长数据拆成多个条目或写进 label）、compare 对比卡（headers:["列名"],rows:[["单元格"]]，用于多方立场或产品对比）、steps 步骤卡（items:[{"title":"步骤名","content":"简述"}]，用于教程分步）、timeline 时间卡（items:[{"time":"时间","title":"事件","content":"简述"}]，用于事件时间线）、scenes 场景卡（items:[{"title":"场景","content":"简述"}]，2–3 个横排）、highlight 亮点卡（title+content，用于本页核心卖点）。使用这些版式时内容必须写入 items/headers/rows 字段，不要写入块的 content 字段。按内容选择合适版式，不要整篇都是纯文本块。'
         :'\n公众号渠道要求：页面为 9:16 长页，每页 2–4 个内容块；标题偏信息密度，结尾页引导收藏与转发。';
+      const storyboardCompositionDirective='\n构图字段要求：card_plan 每页增加 role（cover|concept|feature|steps|data|compare|evidence|timeline|risk|ending）。可选 composition 只允许由系统规范化，字段为 id、columns、flow、alignment、decoration、overlap；decoration 仅可表达 none/orbit/index-line/stamp，overlap 仅可表达 none/title-card/accent-edge。不要输出 CSS、坐标、尺寸或 HTML。';
       const result=await models.complete({provider:input.provider,purpose:'social-card-editorial',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(6000,providerConfig.maxOutputTokens),messages:[
-        {role:'system',protected:true,content:storyboardSystem+storyboardChannelDirective},
+        {role:'system',protected:true,content:storyboardSystem+storyboardChannelDirective+storyboardCompositionDirective},
         {role:'user',protected:true,content:JSON.stringify(contentType==='event'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,event_analysis:eventAnalysis.analysis}:contentType==='custom'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,custom_facts:facts.data}:{topic:candidate.hotspot_title,channel_mode:current.output_mode,repository_facts:facts.data})}
       ]});
       const parsed=JSON.parse(result.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));
       const maxPages=contentType==='repository'?7:10;
-      const cardPlan = (Array.isArray(parsed.card_plan) ? parsed.card_plan.slice(0,maxPages) : []).map((page) => {
+      const cardPlan = (Array.isArray(parsed.card_plan) ? parsed.card_plan.slice(0,maxPages) : []).map((page,pageIndex) => {
         const instructionPatterns = [/^让读者(?:一眼)?知道/,/^让读者/,/^读者(?:能|会|可以|理解|了解|知道)/,/^本页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^这一页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本卡(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本章节(?:旨在|希望|要|应该|目的(?:是|为))?/,/^请/];
         const clean = (text) => { if(typeof text!=='string')return text; let s=text.trim(); for(const re of instructionPatterns)s=s.replace(re,'').trim(); return s.replace(/^[，。；、:：\s]+/,'').trim(); };
-        return { ...page, layout_style:SOCIAL_CARD_LAYOUTS.includes(page.layout_style)?page.layout_style:'auto', title:clean(page.title), goal:clean(page.goal), evidence:(Array.isArray(page.evidence)?page.evidence:[]).map(clean), content_blocks:(Array.isArray(page.content_blocks)?page.content_blocks:[]).map((b)=>({...b,title:clean(b.title),content:clean(b.content)})) };
+        const smart=normalizeCardComposition(page,{pageIndex,seed:`${candidate.batch_id}|${candidate.id}`});
+        return { ...page, role:smart.role, composition:smart.composition, layout_style:SOCIAL_CARD_LAYOUTS.includes(page.layout_style)?page.layout_style:'auto', title:clean(page.title), goal:clean(page.goal), evidence:(Array.isArray(page.evidence)?page.evidence:[]).map(clean), content_blocks:(Array.isArray(page.content_blocks)?page.content_blocks:[]).map((b)=>({...b,title:clean(b.title),content:clean(b.content)})) };
       });
       const asText=(value,fallback='')=>typeof value==='string'?value.trim():value==null?fallback:Array.isArray(value)?value.map((item)=>typeof item==='string'?item:JSON.stringify(item)).join('\n'):JSON.stringify(value);
       const editorial=store.saveCardEditorial(candidate.id,{...current,
@@ -787,7 +902,7 @@ async function api(request, response, url) {
         forbidden_claims:asText(parsed.forbidden_claims,current.forbidden_claims),
         recommended_pages:Math.max(4,Math.min(maxPages,Number(parsed.recommended_pages)||cardPlan.length||6)),card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
       const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);const channelMode=socialChannelMode(candidate);
-      return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,channelMode})});
+      return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
     } catch(error) { return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
   }
   const repositoryInspectMatch = pathname.match(/^\/api\/candidates\/(\d+)\/repository\/inspect$/);
@@ -1036,14 +1151,15 @@ async function api(request, response, url) {
   if (typesetMatch && request.method === 'POST') {
     const batchId = decodeURIComponent(typesetMatch[1]);
     const input = await body(request);
-    const candidate = store.getCandidate(Number(input.candidateId));
-    if (!candidate || candidate.batch_id !== batchId) return json(response, 404, { error: '候选不存在或不属于当前批次' });
-    return json(response, 202, aiJobs.start({ batchId, candidateId: candidate.id,
-      provider: input.provider, type: 'typeset' }));
+    const daily=input.documentKind==='daily-final';
+    const candidate = daily?null:store.getCandidate(Number(input.candidateId));
+    if ((!daily&&(!candidate||candidate.batch_id!==batchId))||(daily&&!store.getDocument(batchId,null,'daily-final'))) return json(response, 404, { error: '待排版文稿不存在或不属于当前批次' });
+    return json(response, 202, aiJobs.start({ batchId, candidateId: candidate?.id??null,documentKind:daily?'daily-final':null,
+      provider: input.provider, type: 'typeset', theme: input.theme }));
   }
   const documentsMatch = pathname.match(/^\/api\/batches\/([^/]+)\/documents$/);
   if (documentsMatch && request.method === 'GET') {
-    const batchId=decodeURIComponent(documentsMatch[1]); const cId=searchParams.get('candidateId'); const kind=searchParams.get('kind'); if(cId&&kind){var doc=store.getDocument(batchId,Number(cId),kind);if(!doc&&kind==='draft'){var arts=store.listArtifacts({batchId:batchId});var da=arts.find(function(a){return a.kind==='文章初稿'&&a.file_path&&a.file_path.toLowerCase().includes(cId.toLowerCase());});if(da&&require('fs').existsSync(da.file_path)){doc={title:da.name,content:require('fs').readFileSync(da.file_path,'utf-8')};}}return json(response,doc?200:404,doc||{error:'文档不存在'});} return json(response,200,store.listDocuments(batchId));
+    const batchId=decodeURIComponent(documentsMatch[1]); const cId=searchParams.get('candidateId'); const kind=searchParams.get('kind'); if(cId&&kind){var doc=store.getDocument(batchId,cId==='daily'?null:Number(cId),kind);if(!doc&&kind==='draft'){var arts=store.listArtifacts({batchId:batchId});var da=arts.find(function(a){return a.kind==='文章初稿'&&a.file_path&&a.file_path.toLowerCase().includes(cId.toLowerCase());});if(da&&fs.existsSync(da.file_path)){doc={title:da.name,content:fs.readFileSync(da.file_path,'utf-8')};}}return json(response,doc?200:404,doc||{error:'文档不存在'});} return json(response,200,store.listDocuments(batchId));
   }
   if (documentsMatch && request.method === 'PUT') {
     const batchId = decodeURIComponent(documentsMatch[1]);
@@ -1052,15 +1168,17 @@ async function api(request, response, url) {
     const input = await body(request);
     const candidate = input.candidateId ? store.getCandidate(Number(input.candidateId)) : null;
     if (input.candidateId && !candidate) return json(response, 404, { error: '候选不存在' });
-    if (!['draft','final'].includes(input.kind)) return json(response, 400, { error: '文稿类型必须是 draft 或 final' });
-    const fileName = input.kind === 'final' ? '09-FINAL.md' : '04-draft.md';
-    const targetDir = candidate ? articleWorkdir(batch, candidate) : batchArticlesDir(config.workspaceRoot, batch);
+    if (!['draft','final','daily-draft','daily-final'].includes(input.kind)) return json(response, 400, { error: '未知文稿类型' });
+    const daily=input.kind.startsWith('daily-');
+    if(daily&&candidate)return json(response,400,{error:'批次早报不能关联单选题候选'});
+    const fileName = input.kind === 'final' ? '09-FINAL.md' : input.kind === 'draft' ? '04-draft.md' : input.kind === 'daily-final' ? '03-FINAL.md' : '02-draft.md';
+    const targetDir = candidate ? articleWorkdir(batch, candidate) : daily ? path.join(batchArticlesDir(config.workspaceRoot,batch),'daily') : batchArticlesDir(config.workspaceRoot, batch);
     const filePath = path.join(targetDir, fileName);
     const file = writeUtf8(filePath, String(input.content ?? ''));
     const document = store.saveDocument({ batchId, candidateId: candidate?.id ?? null, kind: input.kind,
       title: input.title ?? '', content: String(input.content ?? ''), filePath, status: input.status ?? 'draft' });
-    store.upsertArtifact({ batchId, kind: input.kind === 'final' ? '文章终稿' : '文章初稿', name: fileName, path: filePath, ...file });
-    store.updateBatch(batchId, { stage: input.kind === 'final' ? 'review' : 'drafting', status: 'running' });
+    store.upsertArtifact({ batchId, kind: input.kind.endsWith('final') ? (daily?'早报终稿':'文章终稿') : (daily?'早报初稿':'文章初稿'), name: fileName, path: filePath, ...file });
+    store.updateBatch(batchId, { stage: input.kind.endsWith('final') ? 'review' : 'drafting', status: 'running' });
     return json(response, 200, document);
   }
   const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)$/);

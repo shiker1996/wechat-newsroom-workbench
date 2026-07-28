@@ -36,6 +36,6 @@ test("累计数据退为四项次级指标", () => {
 test("工作台展示基于真实记录的内部生产效率反馈",()=>{
   assert.match(html,/id="dashboard-efficiency"/);
   assert.match(html,/id="efficiency-insight"/);
-  for(const label of ["本次采集耗时","AI 任务成功率","选题推进率","产物输出"])assert.match(dashboard,new RegExp(label));
+  for(const label of ["采集到研判耗时","AI 任务成功率","选题推进率","产物输出"])assert.match(dashboard,new RegExp(label));
   assert.match(dashboard,/data\.bottleneck/);
 });

@@ -1,0 +1,120 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const args = process.argv.slice(2);
+if (args.includes('--help') || args.includes('-h')) {
+  console.log('Usage: node render-echarts.mjs <input.md> <output.md> [imageDir]');
+  process.exit(0);
+}
+if (args.length < 2) {
+  console.error('Input and output Markdown paths are required.');
+  process.exit(2);
+}
+
+const input = path.resolve(args[0]);
+const output = path.resolve(args[1]);
+const imageDir = path.resolve(args[2] || path.join(path.dirname(output), 'images'));
+const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function fail(message) {
+  console.log(JSON.stringify({ converted: 0, failed: [], error: message }));
+  process.exit(2);
+}
+
+if (!fs.existsSync(input) || !fs.statSync(input).isFile()) fail(`Input file not found: ${input}`);
+
+// 复用 html-pages-to-images 技能里已安装的 puppeteer 与浏览器缓存
+async function loadPuppeteer() {
+  try {
+    return (await import('puppeteer')).default;
+  } catch {
+    const require = createRequire(import.meta.url);
+    const sibling = path.resolve(skillRoot, '..', 'html-pages-to-images');
+    const entry = require.resolve('puppeteer', { paths: [process.cwd(), sibling] });
+    const loaded = await import(pathToFileURL(entry).href);
+    return loaded.default ?? loaded;
+  }
+}
+
+function loadEchartsSource() {
+  const require = createRequire(import.meta.url);
+  const entry = require.resolve('echarts/dist/echarts.min.js', { paths: [skillRoot, process.cwd()] });
+  return fs.readFileSync(entry, 'utf8');
+}
+
+const FENCE_RE = /```echarts\b[^\n]*\r?\n([\s\S]*?)```/gi;
+const MAX_OPTION_CHARS = 200_000;
+
+const markdown = fs.readFileSync(input, 'utf8');
+const fences = [...markdown.matchAll(FENCE_RE)];
+const report = { converted: 0, failed: [], images: [] };
+
+let result = markdown;
+if (fences.length) {
+  fs.mkdirSync(imageDir, { recursive: true });
+  const puppeteer = await loadPuppeteer();
+  const echartsSource = loadEchartsSource();
+  // Chrome 启动偶发崩溃（尤其多进程并发时），失败后重试一次
+  let browser = null;
+  for (let attempt = 0; attempt < 2 && !browser; attempt += 1) {
+    try {
+      browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    } catch (error) {
+      if (attempt === 1 || !/Failed to launch the browser/i.test(String(error.message))) throw error;
+    }
+  }
+  try {
+    for (const [index, fence] of fences.entries()) {
+      const name = `echarts-${index + 1}`;
+      const pngPath = path.join(imageDir, `${name}.png`);
+      try {
+        const raw = fence[1].trim();
+        if (raw.length > MAX_OPTION_CHARS) throw new Error(`配置超过 ${MAX_OPTION_CHARS} 字符上限`);
+        // 只接受 JSON 配置，不执行来源不明的任意 JavaScript
+        const option = JSON.parse(raw);
+        if (!option || typeof option !== 'object' || Array.isArray(option)) throw new Error('配置必须是 JSON 对象');
+        const optionJson = JSON.stringify({ ...option, animation: false }).replace(/</g, '\\u003c');
+        const html = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">`
+          + `<div id="chart" style="width:900px;height:540px"></div>`
+          + `<script>${echartsSource}</script>`
+          + `<script>window.__chartDone=false;const chart=echarts.init(document.getElementById('chart'));`
+          + `chart.on('finished',()=>{window.__chartDone=true;});chart.setOption(${optionJson});</script>`
+          + `</body></html>`;
+        const page = await browser.newPage();
+        try {
+          await page.setViewport({ width: 920, height: 560, deviceScaleFactor: 2 });
+          await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+          await page.waitForFunction('window.__chartDone===true', { timeout: 15000 });
+          const element = await page.$('#chart');
+          await element.screenshot({ path: pngPath });
+        } finally {
+          await page.close();
+        }
+        if (!fs.existsSync(pngPath) || !fs.statSync(pngPath).size) throw new Error('渲染产物为空');
+        const relative = path.relative(path.dirname(output), pngPath).split(path.sep).join('/');
+        result = result.replace(fence[0], `![${name}](${relative})`);
+        report.images.push(relative);
+        report.converted += 1;
+      } catch (error) {
+        // 单个围栏失败时保留原围栏和错误信息，不得用空白图片替换
+        report.failed.push({ index: index + 1, error: String(error.message).trim().slice(0, 500) });
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+fs.mkdirSync(path.dirname(output), { recursive: true });
+const temp = `${output}.tmp`;
+fs.writeFileSync(temp, result, 'utf8');
+fs.renameSync(temp, output);
+
+const remaining = (result.match(FENCE_RE) || []).length;
+if (remaining !== report.failed.length) {
+  fail(`围栏数量校验失败：剩余 ${remaining}，失败记录 ${report.failed.length}`);
+}
+console.log(JSON.stringify(report));
+process.exit(report.failed.length ? 1 : 0);

@@ -44,7 +44,8 @@ test('RSSHub KV 编辑器支持任意合法键且拒绝重复或非法键',()=>{
 test('工作台环境配置按用途折叠分组且默认不展开', () => {
   const view=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
   const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
-  for(const label of ['模型服务','原文抓取','图片存储','工作台运行'])assert.match(view,new RegExp(label));
+  for(const label of ['原文抓取','图片存储','工作台运行'])assert.match(view,new RegExp(label));
+  assert.doesNotMatch(view,/label:"旧版模型服务"/);
   assert.match(view,/<details class="env-group"/);
   assert.doesNotMatch(view,/<details class="env-group"[^>]* open/);
   assert.match(styles,/\.env-group\[open\]>summary/);

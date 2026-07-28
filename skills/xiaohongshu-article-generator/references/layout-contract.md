@@ -39,13 +39,13 @@
 
 ## 实测指标
 
-审计以 `.page-body` 的 bounding box 为可用区域，以 `.page-content-stack` 的边界为已用区域。居中页的上下留白差应不超过 `max(8px, 正文区高度的 3%)`；超出标记 `vertical_imbalance`。
+审计以 `.page-body` 的 bounding box 为可用区域，以 `.page-content-stack` 内可见子元素（eyebrow、标题、内容块）的并集边界为已用区域——stack 自身可能带 `min-height` 等装饰性高度，直接测其边界会掩盖稀疏内容；装饰均为伪元素，不参与测量。居中页的上下留白差应不超过 `max(8px, 正文区高度的 3%)`；超出标记 `vertical_imbalance`。刻意顶部或底部锚定的构图（如 hero、data 及 `comp-align-start/end`）不做居中平衡要求。
 
 | 页面类型 | 合理利用率 | 说明 |
 |---|---:|---|
-| `cover` | 45%–82% | 允许较多刻意留白 |
-| `content` | 72%–94% | 兼顾信息密度和呼吸感 |
-| `ending` | 45%–86% | CTA 或总结页可留白 |
+| `cover` | 45%–90% | 允许较多刻意留白 |
+| `content` | 50%–96% | 真实内容至少占正文区一半 |
+| `ending` | 20%–90% | CTA 或总结页以留白为设计意图 |
 
 硬失败条件：
 

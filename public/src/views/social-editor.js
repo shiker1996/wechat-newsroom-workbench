@@ -6,11 +6,21 @@ let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
 let selectedContentType='repository';
 let selectedChannelMode='wechat';
+let selectedCompositionMode='smart';
 let currentCardPlan=[];
 let currentLayoutDecisions=[];
 
 const CARD_LAYOUT_LABELS={auto:'自动推荐',poster:'海报大字',editorial:'杂志分栏',data:'数据报告',checklist:'卡片清单',steps:'教程步骤',minimal:'极简留白'};
-const CARD_LAYOUT_STATUS={recommended:'自动推荐',manual:'手动指定',group:'整组指定',fallback:'自动降级'};
+const CARD_LAYOUT_STATUS={recommended:'自动推荐',storyboard:'故事板指定',manual:'手动指定',group:'整组指定',fallback:'自动降级'};
+const CARD_ROLE_LABELS={cover:'封面',concept:'概念',feature:'功能',steps:'步骤',data:'数据',compare:'对比',evidence:'证据',timeline:'时间线',risk:'风险',ending:'结尾'};
+const CARD_COMPOSITION_LABELS={'hero-stack':'主视觉堆叠','hero-frame':'主视觉框景','concept-split':'概念分栏','concept-offset':'概念错位','feature-ledger':'功能账本','feature-stack':'功能纵列','sequence-rail':'步骤轨道','sequence-offset':'步骤错列','metric-board':'数据面板','metric-split':'数据分栏','comparison-board':'对比面板','comparison-split':'对比分栏','evidence-ledger':'证据账本','evidence-frame':'证据框景','timeline-rail':'时间轨道','timeline-offset':'时间错列','risk-sidebar':'风险侧栏','risk-frame':'风险框景','closing-focus':'收束聚焦','closing-note':'收束便笺'};
+const CARD_DECORATION_LABELS={none:'无装饰',orbit:'轨道圆环','index-line':'索引线',stamp:'编辑戳记'};
+const CARD_OVERLAP_LABELS={none:'标准层级','title-card':'标题叠卡','accent-edge':'边缘错位'};
+
+function syncCompositionControls(){
+  const picker=document.getElementById('social-template-picker');
+  if(picker)picker.hidden=selectedCompositionMode==='smart';
+}
 
 const CUSTOM_TYPE_LABELS={tutorial:'教程',list:'清单',opinion:'观点'};
 const CUSTOM_LEVEL_LABELS={author_experience:'作者体验',user_material:'用户素材',model_suggestion:'模型建议'};
@@ -95,7 +105,10 @@ function renderCardPlan(value,decisions=currentLayoutDecisions) {
   document.getElementById("card-plan-preview").innerHTML=plan.length?plan.map((page,index)=>{
     const decision=currentLayoutDecisions[index]||{layout:page.layout_style||'auto',source:page.layout_style&&page.layout_style!=='auto'?'manual':'recommended',reason:''};
     const selected=page.layout_style||'auto';
-    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control"><label>页面版式<select data-card-page-layout="${index+1}">${options(selected)}</select></label><span class="layout-status ${escapeHtml(decision.source||'recommended')}">${escapeHtml(CARD_LAYOUT_STATUS[decision.source]||'自动推荐')} · ${escapeHtml(CARD_LAYOUT_LABELS[decision.layout]||decision.layout||'')}</span>${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
+    const control=decision.mode==='smart'
+      ? `<span class="layout-status ${escapeHtml(decision.source||'recommended')}">智能构图 · ${escapeHtml(CARD_ROLE_LABELS[decision.role]||decision.role||'内容')} · ${escapeHtml(CARD_COMPOSITION_LABELS[decision.composition?.id]||decision.composition?.id||'默认构图')} · 变体 ${(decision.variantIndex??0)+1}/${decision.variantCount||1}</span><small>${escapeHtml(CARD_DECORATION_LABELS[decision.composition?.decoration]||'无装饰')} · ${escapeHtml(CARD_OVERLAP_LABELS[decision.composition?.overlap]||'标准层级')}</small>`
+      : `<label>页面版式<select data-card-page-layout="${index+1}">${options(selected)}</select></label><span class="layout-status ${escapeHtml(decision.source||'recommended')}">${escapeHtml(CARD_LAYOUT_STATUS[decision.source]||'自动推荐')} · ${escapeHtml(CARD_LAYOUT_LABELS[decision.layout]||decision.layout||'')}</span>`;
+    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control">${control}${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
   }).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`;
 }
 
@@ -103,6 +116,7 @@ export async function openSocialEditor(id) {
   selectedId=Number(id); const data=await request(`/api/candidates/${selectedId}/card-editorial`);
   selectedContentType=data.contentType||'repository';
   selectedChannelMode=data.channelMode||'wechat';
+  selectedCompositionMode=data.editorial?.composition_mode||'template';
   document.getElementById("social-editor-empty").hidden=true; document.getElementById("social-editor-fields").hidden=false;
   document.getElementById("social-editor-code").textContent=data.candidate.candidate_id; document.getElementById("social-editor-title").textContent=data.candidate.hotspot_title;
   const link=document.getElementById("social-repository-link"); const url=data.candidate.url||data.facts?.source_url||''; link.href=url;link.textContent=url||(selectedContentType==='event'?'尚无事件来源':selectedContentType==='custom'?'自定义图文 · 无外部来源':'尚无仓库地址');
@@ -117,7 +131,7 @@ export async function openSocialEditor(id) {
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
   renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';syncCompositionControls();await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
@@ -203,6 +217,7 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
 }
 if(!window.__socialDeliveryBound){window.__socialDeliveryBound=true;document.addEventListener('click',(event)=>{const image=event.target.closest('[data-social-image]');if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}const tab=event.target.closest('[data-social-proof]');if(tab){proofTab=tab.dataset.socialProof;renderProof();}});document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});}
 if(!window.__socialThemeBound){window.__socialThemeBound=true;document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});toast('视觉主题已保存，生成图文时生效');}catch(error){toast(error.message);}});}
+if(!window.__socialCompositionBound){window.__socialCompositionBound=true;document.getElementById('social-composition-mode')?.addEventListener('change',async(event)=>{if(!selectedId)return;const previous=selectedCompositionMode;selectedCompositionMode=event.target.value;syncCompositionControls();try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({composition_mode:selectedCompositionMode})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast(selectedCompositionMode==='smart'?'已切换为智能构图，系统会按页面角色自动组织版面':'已切换为稳定模板，可整组或逐页指定版式');}catch(error){selectedCompositionMode=previous;event.target.value=previous;syncCompositionControls();toast(error.message);}});}
 if(!window.__socialLayoutBound){window.__socialLayoutBound=true;document.getElementById('social-layout-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');}catch(error){toast(error.message);}});}
 if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;renderCardPlan(currentCardPlan,data.layoutDecisions);if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
 const inspectButton=freshButton("inspect-repository");

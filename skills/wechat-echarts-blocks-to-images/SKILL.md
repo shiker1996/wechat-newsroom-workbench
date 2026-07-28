@@ -9,14 +9,15 @@ description: 将 Markdown 当前工作文件中的显式 ECharts 配置围栏渲
 
 ## 流程
 
-1. 从当前 Markdown 工作文件提取 ECharts 围栏。
-2. 验证配置、数据长度、标题和坐标轴标签。
-3. 为图表生成自包含 HTML，并设置完成标志。
-4. 使用 `html-pages-to-images` 等待图表完成后截图。
-5. 用本地 PNG 路径替换围栏；预览模式经授权后可换成 HTTPS URL。
-6. 写临时输出，验证后更新同一工作文件。
+流水线直接执行确定性脚本：
 
-没有围栏时原样保留并报告 `converted: 0`。单图失败时保留对应围栏和错误信息，不得用空白图片替换。
+```
+node scripts/render-echarts.mjs <input.md> <output.md> [imageDir]
+```
+
+脚本从工作文件提取 ECharts 围栏，验证配置（仅 JSON 对象、长度上限 200K 字符），为每个围栏生成自包含 HTML（内联本技能 `node_modules/echarts` 的 `echarts.min.js`，禁用动画并以 `finished` 事件作为完成标志），复用 `html-pages-to-images` 技能安装的 puppeteer 截图产出 `echarts-N.png`（2x 分辨率），再把围栏替换为相对 PNG 路径。stdout 最后一行输出 JSON 报告 `{"converted":N,"failed":[...],"images":[...]}`；有失败时退出码为 1。
+
+没有围栏时原样保留并报告 `converted: 0`。单图失败时保留对应围栏和错误信息，不得用空白图片替换。预览模式如需上传图床，必须先获得用户明确授权。
 
 ## 门禁
 
