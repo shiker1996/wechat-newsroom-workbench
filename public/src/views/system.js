@@ -76,6 +76,8 @@ function bindSystem() {
   document.getElementById("install-skill-package")?.addEventListener("click",()=>submitSkillDirectory(true).catch((error)=>toast(error.message)));
   document.getElementById("skill-package-zip")?.addEventListener("change",(event)=>submitSkillZip(event.target.files?.[0],event.target).catch((error)=>toast(error.message)));
   document.getElementById("skill-package-actions")?.addEventListener("click",(event)=>{
+    const defaultButton=event.target.closest("[data-skill-default-entry]");
+    if(defaultButton){setSkillDefault(defaultButton).catch((error)=>toast(error.message));return;}
     const button=event.target.closest("[data-skill-package-action]");if(button)manageSkillPackage(button).catch((error)=>toast(error.message));
   });
   document.getElementById("validate-tool-package")?.addEventListener("click",()=>submitToolPackage(false).catch((error)=>toast(error.message)));
@@ -305,7 +307,7 @@ async function loadSkillRegistry(){
   const connectedSlots=(slotData.items||[]).filter((slot)=>slot.available).length;
   if(summary)summary.innerHTML=`<span><b>${data.total}</b><small>创作技能</small><em>${thirdPartySkills?`${thirdPartySkills} 个已安装`:"全部为内置"}</em></span><span><b>${connectedSlots}/${slotData.items.length}</b><small>信息能力就绪</small><em>${connectedSlots===slotData.items.length?"写作资料能力完整":`${slotData.items.length-connectedSlots} 项可继续连接`}</em></span><span><b>${configuredSkills}</b><small>自定义配置</small><em>任务启动后冻结</em></span>`;
   const toolSummary=document.getElementById("tool-capability-summary");
-  if(toolSummary)toolSummary.textContent=availableTools===data.tools.length?`${data.tools.length} 个插件运行正常`:`${data.tools.length-availableTools} 个插件需要处理`;
+  if(toolSummary)toolSummary.textContent=availableTools===data.tools.length?`${data.tools.length} 个工具运行正常`:`${data.tools.length-availableTools} 个工具需要处理`;
   const disclosure=document.querySelector(".tool-capability-disclosure");
   if(disclosure&&availableTools<data.tools.length)disclosure.open=true;
   const toolList=document.getElementById("tool-capability-list");
@@ -322,7 +324,7 @@ async function loadSkillRegistry(){
       <small>${escapeHtml(detail)}</small><small>${escapeHtml(audit)}</small>
       <small>${escapeHtml(permissionSummary)}${tool.restartRequired?" · 需要重启":""}</small>
       <div class="tool-plugin-controls">
-        <label class="tool-plugin-toggle"><input type="checkbox" data-tool-enabled="${escapeHtml(tool.plugin)}" ${tool.enabled?"checked":""}><span>启用插件</span></label>
+        <label class="tool-plugin-toggle"><input type="checkbox" data-tool-enabled="${escapeHtml(tool.plugin)}" ${tool.enabled?"checked":""}><span>启用工具</span></label>
         ${tool.thirdParty?"":`<label>优先级 <input type="number" min="-100" max="100" value="${Number(tool.priority)||0}" data-tool-priority="${escapeHtml(tool.plugin)}"></label>`}
         <button type="button" class="ghost-button" data-tool-test="${escapeHtml(tool.plugin)}">检查依赖</button>
         <button type="button" class="text-button" data-tool-history="${escapeHtml(tool.capability)}">执行历史</button>
@@ -385,8 +387,8 @@ async function submitSkillDirectory(install){
 
 async function submitToolPackage(install){
   const directory=document.getElementById("tool-package-directory").value.trim();
-  if(!directory)throw new Error("请输入插件包目录");
-  if(install&&!await confirmAction("仅管理员可以安装本地 adapter。确认该插件已完成代码审查，并接受页面展示的权限范围？",{confirmText:"受信安装"}))return;
+  if(!directory)throw new Error("请输入工具包目录");
+  if(install&&!await confirmAction("仅管理员可以安装本地 adapter。确认该工具已完成代码审查，并接受页面展示的权限范围？",{confirmText:"受信安装"}))return;
   const result=await request(`/api/system/tool-plugin-packages/${install?"install":"validate"}`,{
     method:"POST",headers:install?{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"}:{},
     body:JSON.stringify({directory}),
@@ -400,8 +402,8 @@ async function submitToolPackage(install){
 
 function remoteManifestInput(){
   const text=document.getElementById("remote-plugin-manifest").value.trim();
-  if(!text)throw new Error("请输入远程插件 Manifest");
-  try{return JSON.parse(text);}catch{throw new Error("远程插件 Manifest 不是有效 JSON");}
+  if(!text)throw new Error("请输入远程工具连接声明");
+  try{return JSON.parse(text);}catch{throw new Error("远程工具连接声明不是有效 JSON");}
 }
 async function submitRemotePlugin(install){
   const manifest=remoteManifestInput();
@@ -441,6 +443,20 @@ async function manageSkillPackage(button){
   selectedSkillId="";await loadSkillRegistry();
 }
 
+async function setSkillDefault(button){
+  const id=button.dataset.skillId,entryPoint=button.dataset.skillDefaultEntry;
+  const slot=button.dataset.skillDefaultSlot,isDefault=button.dataset.skillDefaultActive==="true";
+  const endpoint=slot==="writer"
+    ?`/api/system/skill-entry-defaults/${encodeURIComponent(entryPoint)}`
+    :`/api/system/skill-stage-defaults/${encodeURIComponent(entryPoint)}/${encodeURIComponent(slot)}`;
+  button.disabled=true;
+  try{
+    await request(endpoint,{method:"PUT",body:JSON.stringify({skillId:isDefault?"":id})});
+    toast(isDefault?"已恢复系统默认技能":"已设为该入口的默认技能");
+    await loadSkillRegistry();await openSkillConfig(id);
+  }finally{button.disabled=false;}
+}
+
 async function manageToolPluginVersions(pluginId){
   const result=await request(`/api/system/tool-plugins/${encodeURIComponent(pluginId)}/versions`);
   if(!result.items.length){toast("暂无可回滚的历史版本");return;}
@@ -454,31 +470,31 @@ async function uninstallManagedToolPlugin(pluginId){
   const remote=skillRegistryData?.tools.some((tool)=>tool.plugin===pluginId&&tool.remote);
   if(!await confirmAction(`卸载 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`,{confirmText:"确认卸载"}))return;
   await request(remote?`/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}`:`/api/system/tool-plugins/${encodeURIComponent(pluginId)}`,{method:"DELETE",headers:remote?{}:{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"},body:JSON.stringify({confirmImpact:true})});
-  toast(remote?"远程连接已删除":"插件已卸载，重启工作台后完成卸载");await loadSkillRegistry();
+  toast(remote?"远程连接已删除":"工具已卸载，重启工作台后完成卸载");await loadSkillRegistry();
 }
 
 async function updateToolPlugin(pluginId,changes,control){
   const pluginView=skillRegistryData?.tools.find((tool)=>tool.plugin===pluginId);
   const installed=pluginView?.thirdParty;
   if(installed){
-    if(changes.enabled===false&&!await confirmAction(`停用 ${pluginId} 后，依赖能力的新任务将被阻断。是否继续？`,{confirmText:"停用插件"})){if(control?.matches("[type=checkbox]"))control.checked=true;return;}
+    if(changes.enabled===false&&!await confirmAction(`停用工具 ${pluginId} 后，依赖能力的新任务将被阻断。是否继续？`,{confirmText:"停用工具"})){if(control?.matches("[type=checkbox]"))control.checked=true;return;}
     if(control)control.disabled=true;
     try{
       const endpoint=pluginView.remote?`/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}/status`:`/api/system/tool-plugins/${encodeURIComponent(pluginId)}/status`;
       await request(endpoint,{method:"PATCH",headers:pluginView.remote?{}:{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"},body:JSON.stringify({status:changes.enabled===false?"disabled":"enabled"})});
-      toast(pluginView.remote?"远程连接状态已即时生效":"插件状态已保存，重启工作台后生效");await loadSkillRegistry();
+      toast(pluginView.remote?"远程连接状态已即时生效":"工具状态已保存，重启工作台后生效");await loadSkillRegistry();
     }finally{if(control)control.disabled=false;}
     return;
   }
   if(changes.enabled===false){
-    const confirmed=await confirmAction(`停用 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`,{confirmText:"停用插件"});
+    const confirmed=await confirmAction(`停用工具 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`,{confirmText:"停用工具"});
     if(!confirmed){if(control?.matches("[type=checkbox]"))control.checked=true;return;}
     changes.confirmDisable=true;
   }
   if(control)control.disabled=true;
   try{
     await request(`/api/system/tool-plugins/${encodeURIComponent(pluginId)}`,{method:"PATCH",body:JSON.stringify(changes)});
-    toast(changes.enabled===false?"插件已停用":changes.enabled===true?"插件已启用":"插件优先级已更新");
+    toast(changes.enabled===false?"工具已停用":changes.enabled===true?"工具已启用":"工具优先级已更新");
     await loadSkillRegistry();
   }finally{if(control)control.disabled=false;}
 }
@@ -507,6 +523,29 @@ async function loadToolHistory(capability){
   panel.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 
+const SKILL_KIND_GROUPS=[
+  {id:"writer",label:"主写作",hint:"文章正文生成"},
+  {id:"storyboard",label:"故事板",hint:"图文逐页结构规划"},
+  {id:"title",label:"标题",hint:"标题生成与筛选"},
+  {id:"reviewer",label:"审阅",hint:"事实、逻辑与质量门禁"},
+  {id:"humanizer",label:"自然化",hint:"表达与语气优化"},
+  {id:"seo",label:"SEO",hint:"搜索可发现性优化"},
+  {id:"image-planner",label:"配图规划",hint:"文章图片与占位规划"},
+  {id:"typesetter",label:"排版",hint:"公众号成稿排版"},
+  {id:"stage",label:"阶段技能",hint:"创作流程中的独立处理阶段"},
+  {id:"legacy",label:"其他",hint:"旧版或未声明类型"},
+];
+function skillKindGroup(skill){
+  return SKILL_KIND_GROUPS.some((group)=>group.id===skill.kind)?skill.kind:"legacy";
+}
+function skillListItem(skill){
+  return `<button type="button" class="skill-list-item ${skill.id===selectedSkillId?"active":""}" data-skill-edit="${escapeHtml(skill.id)}" aria-pressed="${skill.id===selectedSkillId}">
+    <span class="skill-list-item-top"><b>${escapeHtml(skill.name||skill.id)}</b><em>${skill.manifestStatus==="invalid"?"清单无效":skill.kind||"stage"}</em></span>
+    <small>${escapeHtml(skill.id)} · 包 v${escapeHtml(skill.packageVersion||"legacy")} · ${skill.fileCount} 文件</small>
+    ${skill.description?`<span>${escapeHtml(skill.description)}</span>`:""}
+    <code title="${escapeHtml(skill.promptHash)}">${escapeHtml(skill.promptHash.slice(0,20))}…</code>
+  </button>`;
+}
 function renderSkillList(){
   const list=document.getElementById("skill-registry-list");if(!list||!skillRegistryData)return;
   const query=String(document.getElementById("skill-search")?.value||"").trim().toLowerCase();
@@ -517,12 +556,15 @@ function renderSkillList(){
     return matchesStatus&&(!query||haystack.includes(query));
   });
   const count=document.getElementById("skill-filter-count");if(count)count.textContent=`${skills.length} / ${skillRegistryData.total}`;
-  list.innerHTML=skills.length?skills.map((skill)=>`<button type="button" class="skill-list-item ${skill.id===selectedSkillId?"active":""}" data-skill-edit="${escapeHtml(skill.id)}" aria-pressed="${skill.id===selectedSkillId}">
-    <span class="skill-list-item-top"><b>${escapeHtml(skill.name||skill.id)}</b><em>${skill.manifestStatus==="invalid"?"清单无效":skill.kind||"stage"}</em></span>
-    <small>${escapeHtml(skill.id)} · 包 v${escapeHtml(skill.packageVersion||"legacy")} · ${skill.fileCount} 文件</small>
-    ${skill.description?`<span>${escapeHtml(skill.description)}</span>`:""}
-    <code title="${escapeHtml(skill.promptHash)}">${escapeHtml(skill.promptHash.slice(0,20))}…</code>
-  </button>`).join(""):'<div class="skill-list-empty">没有匹配的技能。试试更短的关键词或切换状态筛选。</div>';
+  const grouped=new Map(SKILL_KIND_GROUPS.map((group)=>[group.id,[]]));
+  for(const skill of skills)grouped.get(skillKindGroup(skill)).push(skill);
+  list.innerHTML=skills.length?SKILL_KIND_GROUPS.map((group)=>{
+    const items=grouped.get(group.id);if(!items.length)return "";
+    return `<section class="skill-purpose-group" data-skill-kind="${group.id}">
+      <header><span><b>${group.label}</b><small>${group.hint}</small></span><em>${items.length}</em></header>
+      <div>${items.map(skillListItem).join("")}</div>
+    </section>`;
+  }).join(""):'<div class="skill-list-empty">没有匹配的技能。试试更短的关键词或切换状态筛选。</div>';
 }
 
 async function openSkillConfig(id){
@@ -535,7 +577,11 @@ async function openSkillConfig(id){
   document.getElementById("skill-config-meta").textContent=`${id} · v${data.version} · ${data.fileCount} 个规则文件${data.configured?" · 存在历史覆盖配置":""}`;
   const packageActions=document.getElementById("skill-package-actions");
   packageActions.hidden=!data.thirdParty;
-  packageActions.innerHTML=data.thirdParty?`<button class="outline-button" data-skill-package-action="${data.status==="enabled"?"disabled":"enabled"}" data-skill-id="${escapeHtml(id)}">${data.status==="enabled"?"停用":"启用"}</button><button class="text-button" data-skill-package-action="uninstall" data-skill-id="${escapeHtml(id)}">卸载</button><small>入口默认配置将在 P1 路由能力启用后生效。</small>`:"";
+  const entryLabels={"hotspot-article":"热点文章","independent-writing":"自主写作","batch-daily":"批次早报",
+    "social-tool":"工具图文","social-custom":"自定义图文","social-event":"事件图文","wechat-typeset":"公众号排版"};
+  const slotLabels={writer:"主写作",storyboard:"故事板规划",title:"标题生成",reviewer:"审稿与门禁",humanizer:"表达自然化",seo:"SEO 优化"};
+  const defaultActions=(data.defaultScopes||[]).map((scope)=>`<button class="${scope.isDefault?"primary-button":"outline-button"}" data-skill-default-entry="${escapeHtml(scope.entryPoint)}" data-skill-default-slot="${escapeHtml(scope.slot)}" data-skill-default-active="${scope.isDefault}" data-skill-id="${escapeHtml(id)}" ${data.status==="enabled"?"":"disabled"}>${scope.isDefault?"✓ 已设默认":"设为默认"} · ${escapeHtml(entryLabels[scope.entryPoint]||scope.entryPoint)} / ${escapeHtml(slotLabels[scope.slot]||scope.slot)}</button>`).join("");
+  packageActions.innerHTML=data.thirdParty?`<div class="skill-default-actions">${defaultActions||'<small>该技能没有可设置的创作入口。</small>'}</div><div class="skill-package-control"><button class="outline-button" data-skill-package-action="${data.status==="enabled"?"disabled":"enabled"}" data-skill-id="${escapeHtml(id)}">${data.status==="enabled"?"停用":"启用"}</button><button class="text-button" data-skill-package-action="uninstall" data-skill-id="${escapeHtml(id)}">卸载</button></div><small>默认技能按创作入口和阶段生效；单次手动选择仍具有更高优先级。</small>`:"";
   const policyNote=document.getElementById("skill-runtime-policy-note");
   policyNote.textContent=ownsRuntimePolicy
     ?"主技能：这里展示仓库内置契约；运行策略由程序和已发布历史配置共同决定。"
@@ -543,10 +589,8 @@ async function openSkillConfig(id){
   policyNote.classList.toggle("prompt-only",!ownsRuntimePolicy);
   document.getElementById("skill-source-path").textContent=data.sourcePath||"—";
   document.getElementById("skill-prompt-hash").textContent=data.promptHash||"—";
-  const kindLabels={writer:"主写作",reviewer:"审稿",title:"标题",humanizer:"表达优化",seo:"SEO",
+  const kindLabels={writer:"主写作",storyboard:"故事板规划",reviewer:"审稿",title:"标题",humanizer:"表达优化",seo:"SEO",
     "image-planner":"配图规划",typesetter:"排版主技能",stage:"阶段子技能"};
-  const entryLabels={"hotspot-article":"热点文章","independent-writing":"自主写作","batch-daily":"批次早报",
-    "social-tool":"工具图文","social-custom":"自定义图文","social-event":"事件图文","wechat-typeset":"公众号排版"};
   const capabilityState=(capability)=>{
     const tool=skillRegistryData.tools.find((item)=>item.capability===capability&&item.enabled);
     return tool&&tool.health?.status==="ok"&&tool.health.data?.available!==false?"可用":"不可用";

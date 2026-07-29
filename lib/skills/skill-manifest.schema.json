@@ -15,7 +15,7 @@
     "name": { "type": "string", "minLength": 1 },
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
     "kind": {
-      "enum": ["writer", "reviewer", "title", "humanizer", "seo", "image-planner", "typesetter", "stage"]
+      "enum": ["writer", "storyboard", "reviewer", "title", "humanizer", "seo", "image-planner", "typesetter", "stage"]
     },
     "entryPoints": {
       "type": "array",

@@ -30,7 +30,7 @@ import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
 import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
 import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from './lib/integrations/local-project-reader.mjs';
 import { resolveSkillToolPolicy } from './lib/skills/pipeline-runtime.mjs';
-import { resolveEntryWriterSkill } from './lib/skills/entry-routing.mjs';
+import { resolveArticleStageSkills, resolveEntryWriterSkill } from './lib/skills/entry-routing.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
@@ -65,6 +65,8 @@ function customArticleFingerprint(batchId,input={}) {
       ? value.map((item)=>String(item||'').trim()).filter(Boolean)
       : String(value||'').trim().replace(/\r\n/g,'\n');
   }
+  normalized.stageSkills=Object.fromEntries(Object.entries(input.stageSkills||{}).sort(([a],[b])=>a.localeCompare(b))
+    .map(([key,value])=>[key,String(value||'').trim()]));
   return crypto.createHash('sha256').update(JSON.stringify({batchId,...normalized})).digest('hex');
 }
 const models = new ModelGateway(config, store);
@@ -492,11 +494,16 @@ async function api(request, response, url) {
     const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
     if(!batch)return json(response,404,{error:'批次不存在'});
     const input=await body(request);
-    const previousSnapshot=input.useLatestSkill===true?null:store.findLatestGenerationSnapshot({
+    const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
+    const hasExplicitStages=Object.values(requestedStages).some((value)=>String(value||'').trim());
+    const previousSnapshot=(input.useLatestSkill===true||hasExplicitStages)?null:store.findLatestGenerationSnapshot({
       batchId,candidateId:null,purposes:['daily'],
     });
+    const stageSelections=previousSnapshot?null:await resolveArticleStageSkills({
+      workspaceRoot:root,entryPoint:'batch-daily',requested:requestedStages,
+    });
     return json(response,202,aiJobs.start({batchId,provider:previousSnapshot?null:input.provider,type:'daily',
-      snapshotId:previousSnapshot?.id||null,
+      snapshotId:previousSnapshot?.id||null,stageSelections,
       focuses:Array.isArray(input.focuses)?input.focuses:[],focus:input.focus||null}));
   }
   const candidatesMatch = pathname.match(/^\/api\/batches\/([^/]+)\/candidates$/);
@@ -769,6 +776,10 @@ async function api(request, response, url) {
         workspaceRoot:root,entryPoint:'independent-writing',contentType:articleMode,
         requestedSkillId:String(input.skillId||''),recommendedSkillId,
       });
+      const stageSelections=await resolveArticleStageSkills({
+        workspaceRoot:root,entryPoint:'independent-writing',
+        requested:input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{},
+      });
       const fingerprint=customArticleFingerprint(batchId,input);
       const requestId=String(input.creationRequestId||fingerprint).trim();
       let creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})
@@ -777,7 +788,7 @@ async function api(request, response, url) {
         const candidate=store.getCandidate(creation.candidate_row_id);
         let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
         if(candidate&&!job){
-          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection});
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
           store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
         }
         if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
@@ -807,7 +818,7 @@ async function api(request, response, url) {
         const candidate=store.getCandidate(creation.candidate_row_id);
         let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
         if(candidate&&!job){
-          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection});
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
           store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
         }
         if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
@@ -829,7 +840,7 @@ async function api(request, response, url) {
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'自主写作事实基座',name:'01-tutorial-fact-base.json',path:factPath,...factFile});
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'锁定简报',name:'article-brief.md',path:briefPath,...briefFile});
       store.updateCustomArticleRequest(creation.id,{candidateId:candidate.id});
-      const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection});
+      const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
       store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
       return json(response,202,{...job,candidate:store.getCandidate(candidate.id)});
     }catch(error){return json(response,400,{error:`创建自主写作失败：${error.message}`});}
@@ -843,7 +854,9 @@ async function api(request, response, url) {
     try{
       const creation=store.getCustomArticleRequestByCandidate(candidate.id);
       const explicitSkillId=String(input.skillId||'').trim();
-      const previousSnapshot=(input.useLatestSkill===true||explicitSkillId)?null:store.findLatestGenerationSnapshot({
+      const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
+      const hasExplicitStages=Object.values(requestedStages).some((value)=>String(value||'').trim());
+      const previousSnapshot=(input.useLatestSkill===true||explicitSkillId||hasExplicitStages)?null:store.findLatestGenerationSnapshot({
         batchId:candidate.batch_id,candidateId:candidate.id,purposes:['tutorial','personal-writing'],
       });
       const articleMode=candidate.output_mode==='wechat-experience'?'experience':'tutorial';
@@ -852,8 +865,11 @@ async function api(request, response, url) {
         requestedSkillId:explicitSkillId,
         recommendedSkillId:articleMode==='experience'?'wechat-mp-personal-writing':'wechat-mp-tutorial',
       });
+      const stageSelections=previousSnapshot?null:await resolveArticleStageSkills({
+        workspaceRoot:root,entryPoint:'independent-writing',requested:requestedStages,
+      });
       const job=aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:previousSnapshot?null:input.provider,
-        type:'tutorial',snapshotId:previousSnapshot?.id||null,skillSelection});
+        type:'tutorial',snapshotId:previousSnapshot?.id||null,skillSelection,stageSelections});
       if(creation)store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
       return json(response,202,{...job,candidate});
     }catch(error){return json(response,400,{error:`重新执行自主写作失败：${error.message}`});}

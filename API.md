@@ -108,6 +108,32 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 要点按行解析，【体验】/【素材】/【建议】前缀标注来源等级；素材链接创建时抓取；轨道 output_mode 写入 wechat-custom-cards 或 xiaohongshu-custom-cards
 → 图文编辑室（创建自定义图文）
 
+### GET /api/creation-entry-points/:entryPoint/social-card-stage-skills
+查询图文故事板技能槽位。`entryPoint` 为 `social-tool`、`social-event` 或 `social-custom`；
+`contentType` 查询参数分别使用 `repository`、`event` 或 `tutorial|list|opinion`。
+返回默认实现、兼容候选、可用状态和不可用原因。
+
+### POST /api/candidates/:id/ai/card-editorial
+根据事实基座生成故事板，可传：
+
+```json
+{
+  "provider": "",
+  "stageSkills": {
+    "storyboard": "skill-id"
+  }
+}
+```
+
+未显式选择时使用入口默认实现，并在默认不可用时按入口回退：
+
+- `social-tool` → `repository-card-storyboard`
+- `social-event` → `event-card-storyboard`
+- `social-custom` → `custom-card-storyboard`
+
+显式选择不兼容、未启用或缺少必需工具时返回错误。
+实际技能、选择来源和完整阶段 Prompt 会冻结到 generation snapshot。
+
 ### DELETE /api/candidates/:id
 移除候选
 → 选题池
@@ -286,10 +312,25 @@ AI 规划配图占位
 → 技能与插件
 
 ### GET /api/system/skills/:id
-返回内置 `SKILL.md` 原文、`skill.json` 结构化契约、来源文件、内容哈希、主/子技能策略归属和历史配置状态。
+返回内置 `SKILL.md` 原文、`skill.json` 结构化契约、来源文件、内容哈希、主/子技能策略归属、历史配置状态，以及该技能可设置的入口/阶段默认范围 `defaultScopes`。
 → 技能与插件
 
 技能写接口 `/versions`、`/dry-run` 和 `/versions/:version/restore` 当前统一返回 `403`。内置技能通过代码仓库修改 `SKILL.md`，不在工作台中在线编辑。
+
+### GET /api/system/skill-entry-defaults
+返回主写入口默认映射 `items` 和文章阶段默认映射 `stageItems`。
+→ 技能与插件
+
+### PUT /api/system/skill-entry-defaults/:entryPoint
+以 `{ "skillId": "..." }` 设置第三方主写技能为入口默认；传空字符串恢复内置路由。
+→ 技能与插件
+
+### PUT /api/system/skill-stage-defaults/:entryPoint/:slot
+以 `{ "skillId": "..." }` 设置标题、审稿、自然化或 SEO 阶段默认技能；技能必须已启用，并匹配入口、角色和输入输出契约。传空字符串恢复内置默认。
+→ 技能与插件
+
+### GET /api/creation-entry-points/:entryPoint/stage-skills
+返回指定创作入口的标题、审稿、自然化和 SEO 阶段槽位、当前默认技能、兼容候选及不可用原因，供热点事件、自主写作和批次早报的单次创作配置使用。
 
 ### PATCH /api/system/tool-plugins/:id
 更新插件启用状态或实现优先级 `{ enabled?, priority?, confirmDisable? }`。仍被活动技能使用时，停用需要显式确认。

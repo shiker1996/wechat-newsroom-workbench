@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   installSkillPackage, listSkillInstallEvents, readSkillPackageCatalog,
-  setInstalledSkillStatus, setSkillEntryDefault, uninstallSkillPackage,
+  setInstalledSkillStatus, setSkillEntryDefault, setSkillStageDefault, uninstallSkillPackage,
   validateSkillPackageDirectory,
 } from '../lib/skills/package-manager.mjs';
 import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
@@ -55,5 +55,41 @@ test('third-party package cannot replace a built-in skill',()=>{
     fs.mkdirSync(path.join(root,'skills','third-party-demo'),{recursive:true});
     fs.writeFileSync(path.join(root,'skills','third-party-demo','SKILL.md'),'# Built in','utf8');
     assert.throws(()=>installSkillPackage({workspaceRoot:root,directory:fixture(root)}),/内置技能冲突/);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('third-party stage skill can become an entry stage default and is cleared when disabled',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'skill-stage-default-'));
+  try{
+    const source=path.join(root,'source-title');fs.mkdirSync(source,{recursive:true});
+    fs.writeFileSync(path.join(source,'SKILL.md'),'---\nname: Viral Title\n---\n\n# Title\n','utf8');
+    fs.writeFileSync(path.join(source,'skill.json'),JSON.stringify({
+      schemaVersion:1,id:'viral-title',name:'Viral Title',version:'1.0.0',kind:'title',
+      entryPoints:['hotspot-article','independent-writing'],contentTypes:['article'],
+      inputContract:'article_fact_base',outputContract:'title_candidates',
+      requiredCapabilities:[],optionalCapabilities:[],compatibleApp:'>=0.1.0',source:{type:'installed',url:''},
+    }),'utf8');
+    installSkillPackage({workspaceRoot:root,directory:source});
+    setSkillStageDefault(root,'independent-writing','title','viral-title');
+    assert.equal(readSkillPackageCatalog(root).stageDefaults['independent-writing'].title,'viral-title');
+    setInstalledSkillStatus(root,'viral-title','disabled');
+    assert.equal(readSkillPackageCatalog(root).stageDefaults['independent-writing'],undefined);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('third-party storyboard skill can be configured for a social-card entry',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'storyboard-stage-default-'));
+  try{
+    const source=path.join(root,'source-storyboard');fs.mkdirSync(source,{recursive:true});
+    fs.writeFileSync(path.join(source,'SKILL.md'),'---\nname: Storyboard Demo\n---\n\n# Storyboard\n','utf8');
+    fs.writeFileSync(path.join(source,'skill.json'),JSON.stringify({
+      schemaVersion:1,id:'storyboard-demo',name:'Storyboard Demo',version:'1.0.0',kind:'storyboard',
+      entryPoints:['social-tool'],contentTypes:['repository'],
+      inputContract:'social_card_fact_base',outputContract:'social_card_storyboard',
+      requiredCapabilities:[],optionalCapabilities:[],compatibleApp:'>=0.1.0',source:{type:'installed',url:''},
+    }),'utf8');
+    installSkillPackage({workspaceRoot:root,directory:source});
+    setSkillStageDefault(root,'social-tool','storyboard','storyboard-demo');
+    assert.equal(readSkillPackageCatalog(root).stageDefaults['social-tool'].storyboard,'storyboard-demo');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

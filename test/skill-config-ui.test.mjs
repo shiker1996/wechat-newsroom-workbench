@@ -6,8 +6,9 @@ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8
 const system=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
 const main=fs.readFileSync(new URL('../public/src/main.js',import.meta.url),'utf8');
 const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 
-test('技能与插件页展示工具健康状态',()=>{
+test('技能与工具页展示工具健康状态',()=>{
   assert.match(html,/id="tool-capability-list"/);
   assert.match(system,/checked=Boolean\(tool\.health\)/);
   assert.match(system,/依赖正常/);
@@ -46,6 +47,16 @@ test('技能详情展示结构化角色、入口、输入输出契约和工具�
   assert.match(system,/capabilityState/);
 });
 
+test('第三方技能可按创作入口和阶段设置默认',()=>{
+  assert.match(system,/data-skill-default-entry=/);
+  assert.match(system,/data-skill-default-slot=/);
+  assert.match(system,/async function setSkillDefault/);
+  assert.match(system,/skill-stage-defaults/);
+  assert.match(system,/单次手动选择仍具有更高优先级/);
+  assert.match(routes,/setSkillStageDefault/);
+  assert.match(routes,/defaultScopes/);
+});
+
 test('技能注册表支持搜索筛选与主从编辑',()=>{
   assert.match(html,/class="skill-management-layout"/);
   assert.match(html,/id="skill-search"/);
@@ -55,13 +66,27 @@ test('技能注册表支持搜索筛选与主从编辑',()=>{
   assert.match(system,/selectedSkillId=id;renderSkillList\(\)/);
 });
 
-test('技能与插件作为独立一级页面而非运行配置标签',()=>{
-  assert.match(html,/class="nav-item" data-view="skills">技能与插件<\/button>/);
+test('技能列表严格按 kind 分组且每个技能只出现一次',()=>{
+  assert.match(system,/const SKILL_KIND_GROUPS=/);
+  for(const [kind,label] of [
+    ["writer","主写作"],["storyboard","故事板"],["title","标题"],["reviewer","审阅"],
+    ["humanizer","自然化"],["seo","SEO"],["image-planner","配图规划"],
+    ["typesetter","排版"],["stage","阶段技能"],
+  ])assert.match(system,new RegExp(`\\{id:"${kind}",label:"${label}"`));
+  assert.match(system,/function skillKindGroup\(skill\)/);
+  assert.match(system,/grouped\.get\(skillKindGroup\(skill\)\)\.push\(skill\)/);
+  assert.doesNotMatch(system,/function skillKindGroup\(skill\)\{[^}]*entryPoints/s);
+  assert.match(system,/class="skill-purpose-group"/);
+  assert.match(styles,/\.skill-purpose-group>header\{position:sticky;top:0;z-index:2/);
+});
+
+test('技能与工具作为独立一级页面而非运行配置标签',()=>{
+  assert.match(html,/class="nav-item" data-view="skills">技能与工具<\/button>/);
   assert.match(html,/<section class="view skill-registry-view" id="view-skills">/);
   assert.doesNotMatch(html,/data-config-tab="skills"/);
   assert.doesNotMatch(html,/id="config-panel-skills"/);
   assert.match(main,/skills: "\.\/views\/system\.js"/);
-  assert.match(main,/skills: "技能与插件"/);
+  assert.match(main,/skills: "技能与工具"/);
   assert.match(system,/if\(view==="skills"\)\{[\s\S]*?await loadSkillRegistry\(\)/);
 });
 
@@ -82,4 +107,14 @@ test('插件管理支持启停、优先级、依赖检查和执行历史',()=>{
   assert.match(system,/async function loadToolHistory/);
   assert.match(html,/id="tool-execution-panel"/);
   assert.match(html,/仅记录参数名，不保存输入正文或密钥/);
+});
+
+test('远程工具入口明确要求 Manifest 而不是单独 URL',()=>{
+  assert.match(html,/导入远程工具连接声明/);
+  assert.match(html,/这里不能直接粘贴 API 或 MCP 地址/);
+  assert.match(html,/MCP 还必须声明 toolName/);
+  assert.match(html,/暂不支持[^<]*<\/b>从 URL 自动发现工具、读取远程技能、GET 路径模板 API/);
+  assert.match(html,/placeholder='\{\s*"schemaVersion": 1,[\s\S]*"capabilities": \["content\.web\.search"\][\s\S]*"compatibleApp": ">=0\.1\.0"\s*\}'/);
+  assert.match(html,/保存远程工具/);
+  assert.match(styles,/\.remote-manifest-notice/);
 });

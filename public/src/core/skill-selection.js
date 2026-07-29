@@ -23,7 +23,7 @@ export async function loadSkillSelect(select, url) {
   const note = select.closest(".writer-skill-picker")?.querySelector("[data-skill-note]");
   if (note) note.textContent = available.length
     ? `系统会从 ${available.length} 个兼容技能中按内容类型选择。`
-    : "当前没有可用技能，请前往技能与插件检查状态和必需工具。";
+    : "当前没有可用技能，请前往技能与工具检查状态和必需工具。";
   return result;
 }
 

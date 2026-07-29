@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "social_card_fact_base",
+  "type": "object",
+  "required": ["schemaVersion", "contract", "entryPoint", "contentType", "channelMode", "topic", "facts", "constraints"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contract": { "const": "social_card_fact_base" },
+    "entryPoint": { "enum": ["social-tool", "social-event", "social-custom"] },
+    "contentType": { "enum": ["repository", "event", "custom"] },
+    "channelMode": { "enum": ["wechat", "xiaohongshu"] },
+    "topic": { "type": "string", "minLength": 1 },
+    "facts": { "type": "object" },
+    "constraints": {
+      "type": "object",
+      "required": ["minPages", "maxPages", "allowedBlockTypes", "pageWidth", "pageHeight"]
+    }
+  },
+  "additionalProperties": true
+}

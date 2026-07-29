@@ -37,8 +37,11 @@ test('事件图文分流设置正式输出模式和默认视觉主题',()=>{
   }finally{store.close();fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('项目图文技能把事件卡片纳入正式契约',()=>{
-  const skill=fs.readFileSync(new URL('../skills/xiaohongshu-article-generator/SKILL.md',import.meta.url),'utf8');
-  const reference=fs.readFileSync(new URL('../skills/xiaohongshu-article-generator/references/wechat-event-cards.md',import.meta.url),'utf8');
-  assert.match(skill,/wechat-event-cards/);assert.match(skill,/事件模式优先采用/);assert.match(reference,/传播张力不能高于证据强度/);
+test('事件故事板规则与后续生成交付规则职责分离',()=>{
+  const storyboard=fs.readFileSync(new URL('../skills/event-card-storyboard/SKILL.md',import.meta.url),'utf8');
+  const planning=fs.readFileSync(new URL('../skills/event-card-storyboard/references/storyboard.md',import.meta.url),'utf8');
+  const delivery=fs.readFileSync(new URL('../skills/xiaohongshu-article-generator/references/copy-event.md',import.meta.url),'utf8');
+  assert.match(storyboard,/突发事件/);
+  assert.match(planning,/至少一页说明事实边界/);
+  assert.match(delivery,/传播张力不得高于证据强度/);
 });
