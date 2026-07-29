@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://write-assistant.local/schemas/skill-manifest-v1.json",
+  "title": "Write Assistant Skill Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "name", "version", "kind", "entryPoints", "contentTypes",
+    "inputContract", "outputContract", "requiredCapabilities", "optionalCapabilities",
+    "compatibleApp", "source"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "kind": {
+      "enum": ["writer", "storyboard", "reviewer", "title", "humanizer", "seo", "image-planner", "typesetter", "stage"]
+    },
+    "entryPoints": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["hotspot-article", "independent-writing", "batch-daily", "social-tool", "social-custom", "social-event", "wechat-typeset"]
+      }
+    },
+    "contentTypes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "inputContract": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+    "outputContract": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+    "requiredCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "optionalCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "compatibleApp": { "type": "string", "pattern": "^>=\\d+\\.\\d+\\.\\d+$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "properties": {
+        "type": { "enum": ["builtin", "installed"] },
+        "url": { "type": "string" }
+      }
+    }
+  }
+}

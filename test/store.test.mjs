@@ -573,3 +573,22 @@ test('议题综合候选按标题去重、刷新成员并优先展示自身标�
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('重复生成按任务和用途精确查找最近快照', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-snapshot-lookup-'));let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-29',title:'快照测试'});
+    store.addHotspots(batch.id,'rsshub',[{title:'候选一'},{title:'候选二'}]);
+    const hotspots=store.getBatch(batch.id).hotspots;
+    store.addCandidates(batch.id,hotspots.map((item)=>item.id),{tracks:['article']});
+    const [candidate,other]=store.listCandidates(batch.id,'article');
+    store.saveGenerationSnapshot({batchId:batch.id,candidateId:candidate.id,purpose:'article',snapshot:{marker:'old'}});
+    store.saveGenerationSnapshot({batchId:batch.id,candidateId:candidate.id,purpose:'typeset',snapshot:{marker:'other'}});
+    const latest=store.saveGenerationSnapshot({batchId:batch.id,candidateId:candidate.id,purpose:'article',snapshot:{marker:'new'}});
+    store.saveGenerationSnapshot({batchId:batch.id,candidateId:other.id,purpose:'article',snapshot:{marker:'wrong-candidate'}});
+    const found=store.findLatestGenerationSnapshot({batchId:batch.id,candidateId:candidate.id,purposes:['article']});
+    assert.equal(found.id,latest.id);
+    assert.equal(found.snapshot.marker,'new');
+  }finally{store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});

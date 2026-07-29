@@ -1,6 +1,7 @@
 import { request } from "../core/http.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
+import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 let bound=false;
 let dailyData=null;
@@ -90,7 +91,8 @@ async function generateDaily() {
   if(!selected.length)throw new Error("请先选择一个或多个主体、动作或场合关系");
   const provider=document.getElementById("daily-provider").value;
   const focuses=selected.map((item)=>({dimension:item.dimension,key:item.key}));
-  const job=await request(`/api/batches/${encodeURIComponent(batch.id)}/daily`,{method:"POST",body:JSON.stringify({provider,focuses})});
+  const stageSkills=selectedStageSkills(document.getElementById("daily-stage-skills"));
+  const job=await request(`/api/batches/${encodeURIComponent(batch.id)}/daily`,{method:"POST",body:JSON.stringify({provider,focuses,stageSkills})});
   dailyGenerating=true;setDailyStage(2);
   document.getElementById("daily-job-status").textContent="关系维度早报任务已提交…";
   try{await pollJob(job.id);}catch(error){dailyGenerating=false;setDailyStage(2);throw error;}
@@ -139,6 +141,8 @@ async function loadDaily() {
   selectedFocuses=new Map();
   if(!batch){dailyData={focusOptions:[],documents:[]};setDailyStage(1);renderOptions();return;}
   dailyData=await request(`/api/batches/${encodeURIComponent(batch.id)}/daily`);
+  await loadStageSkillControls(document.getElementById("daily-stage-skills"),
+    "/api/creation-entry-points/batch-daily/stage-skills");
   renderLatest(dailyData.documents||[]);
   renderOptions();
   if(!dailyHasFinal)setDailyStage(1);

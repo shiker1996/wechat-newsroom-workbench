@@ -16,6 +16,7 @@
 | 采集控制 (system) | app-models-logs.js（首屏） |
 | 订阅源 (sources) | app-models-logs.js（首屏） |
 | 模型中心 (models) | app-models-logs.js（首屏） |
+| 技能与插件 (skills) | public/src/views/system.js（按需） |
 | 日志 (logs) | app-models-logs.js（首屏） |
 | 内容日历 (calendar) | app-models-logs.js（首屏） |
 
@@ -106,6 +107,32 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 创建自定义图文候选 { content_type: tutorial|list|opinion, channel: wechat|xiaohongshu, topic, audience, scenario, thesis, points, steps, items, materialUrls, limitations, expected_pages }
 要点按行解析，【体验】/【素材】/【建议】前缀标注来源等级；素材链接创建时抓取；轨道 output_mode 写入 wechat-custom-cards 或 xiaohongshu-custom-cards
 → 图文编辑室（创建自定义图文）
+
+### GET /api/creation-entry-points/:entryPoint/social-card-stage-skills
+查询图文故事板技能槽位。`entryPoint` 为 `social-tool`、`social-event` 或 `social-custom`；
+`contentType` 查询参数分别使用 `repository`、`event` 或 `tutorial|list|opinion`。
+返回默认实现、兼容候选、可用状态和不可用原因。
+
+### POST /api/candidates/:id/ai/card-editorial
+根据事实基座生成故事板，可传：
+
+```json
+{
+  "provider": "",
+  "stageSkills": {
+    "storyboard": "skill-id"
+  }
+}
+```
+
+未显式选择时使用入口默认实现，并在默认不可用时按入口回退：
+
+- `social-tool` → `repository-card-storyboard`
+- `social-event` → `event-card-storyboard`
+- `social-custom` → `custom-card-storyboard`
+
+显式选择不兼容、未启用或缺少必需工具时返回错误。
+实际技能、选择来源和完整阶段 Prompt 会冻结到 generation snapshot。
 
 ### DELETE /api/candidates/:id
 移除候选
@@ -280,6 +307,47 @@ AI 规划配图占位
 采集环境检查（Reddit CDP 状态、RSSHub 状态）
 → 采集控制
 
+### GET /api/system/skills
+返回只读技能注册表，包括技能包版本、角色、适用入口、内容类型、输入输出契约、必需/可选工具和清单校验状态；同时返回插件能力、启停状态、优先级、健康检查和最近执行结果。
+→ 技能与插件
+
+### GET /api/system/skills/:id
+返回内置 `SKILL.md` 原文、`skill.json` 结构化契约、来源文件、内容哈希、主/子技能策略归属、历史配置状态，以及该技能可设置的入口/阶段默认范围 `defaultScopes`。
+→ 技能与插件
+
+技能写接口 `/versions`、`/dry-run` 和 `/versions/:version/restore` 当前统一返回 `403`。内置技能通过代码仓库修改 `SKILL.md`，不在工作台中在线编辑。
+
+### GET /api/system/skill-entry-defaults
+返回主写入口默认映射 `items` 和文章阶段默认映射 `stageItems`。
+→ 技能与插件
+
+### PUT /api/system/skill-entry-defaults/:entryPoint
+以 `{ "skillId": "..." }` 设置第三方主写技能为入口默认；传空字符串恢复内置路由。
+→ 技能与插件
+
+### PUT /api/system/skill-stage-defaults/:entryPoint/:slot
+以 `{ "skillId": "..." }` 设置标题、审稿、自然化或 SEO 阶段默认技能；技能必须已启用，并匹配入口、角色和输入输出契约。传空字符串恢复内置默认。
+→ 技能与插件
+
+### GET /api/creation-entry-points/:entryPoint/stage-skills
+返回指定创作入口的标题、审稿、自然化和 SEO 阶段槽位、当前默认技能、兼容候选及不可用原因，供热点事件、自主写作和批次早报的单次创作配置使用。
+
+### PATCH /api/system/tool-plugins/:id
+更新插件启用状态或实现优先级 `{ enabled?, priority?, confirmDisable? }`。仍被活动技能使用时，停用需要显式确认。
+→ 技能与插件
+
+### POST /api/system/tool-plugins/:id/test
+对指定插件逐能力执行依赖健康检查；停用插件只返回停用状态，不隐式启用。
+→ 技能与插件
+
+### GET /api/system/tool-executions
+查询工具执行审计 `?batchId=&candidateId=&capability=&limit=`。仅返回参数名、状态、错误码、实现版本、耗时和任务关联，不保存输入正文。
+→ 技能与插件、审计
+
+### GET /api/system/generation-snapshots
+查询生成快照 `?batchId=&candidateId=&limit=`，用于核对任务使用的技能、Prompt、工具和模型版本。
+→ 审计
+
 ---
 
 ## 任务
@@ -308,3 +376,25 @@ AI 规划配图占位
 - `POST /api/batches/:id/custom-articles`：根据对话填好的事实表单创建自主写作项目并启动成稿；旧的 `/tutorials` 路径保留兼容。
 - 自主写作项目使用标准文章候选保存 `draft` / `final`，完成后直接出现在文章编辑器和公众号排版页面。
 - 本地项目文件按 `user_material` 进入事实基座，只证明代码或配置存在，不证明已执行成功；成稿不得暴露本机绝对路径。
+## 受信工具插件管理（P3）
+
+- `POST /api/system/tool-plugin-packages/validate`：预检本地插件目录并返回权限摘要。
+- `POST /api/system/tool-plugin-packages/install`：管理员安装受信本地 adapter；需要请求头 `x-admin-confirm: TRUSTED-LOCAL-PLUGIN`。
+- `PATCH /api/system/tool-plugins/:id/status`：启用或停用第三方插件；需要管理员确认头。
+- `GET /api/system/tool-plugins/:id/versions`：列出可回滚历史版本。
+- `POST /api/system/tool-plugins/:id/rollback`：回滚指定版本；需要管理员确认头。
+- `DELETE /api/system/tool-plugins/:id`：卸载第三方插件；存在技能依赖时先返回 `409`。
+- `GET /api/system/tool-plugin-install-events`：读取插件安装管理审计。
+
+所有本地 adapter 变更都返回 `restartRequired: true`，重启工作台后加载，不在安装请求内执行插件代码。
+## 远程 API / MCP 插件（P4）
+
+- `POST /api/system/remote-tool-plugins/validate`：校验声明式远程 Manifest。
+- `POST /api/system/remote-tool-plugins`：保存远程连接，默认停用。
+- `PATCH /api/system/remote-tool-plugins/:id/status`：即时启用或停用。
+- `GET|PUT /api/system/remote-tool-plugins/:id/credentials`：查看配置状态或写入/清除隔离凭据；永不返回凭据原文。
+- `POST /api/system/remote-tool-plugins/:id/test`：执行受控连接测试并返回可用性、端点主机和配额状态。
+- `DELETE /api/system/remote-tool-plugins/:id`：删除连接；存在技能依赖时先返回 `409`。
+- `GET /api/system/remote-tool-plugin-events`：读取安装、启停和卸载事件。
+
+远程连接仅允许 HTTPS，并实施域名、DNS、重定向、超时、响应大小和本地路径隔离策略。`external-write` 能力仍需每次工具调用明确授权。

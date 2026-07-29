@@ -89,7 +89,7 @@
 ## 6. 完整小红书渠道模式
 
 > 状态：已完成（2026-07-25）  
-> 第一批（随自定义图文）：渠道编码进 `candidate_tracks.output_mode`、独立品牌行与页脚、小红书专属规范 `references/custom-cards.md`、创建入口可选渠道。  
+> 第一批（随自定义图文）：渠道编码进 `candidate_tracks.output_mode`、独立品牌行与页脚、创建入口可选渠道。原 `references/custom-cards.md` 已拆为自定义故事板技能与 `references/copy-custom.md`。
 > 第二批：三类图文（工具/事件/自定义）全渠道打通——图文编辑器新增渠道下拉（`POST /api/candidates/:id/card-channel` 前缀互换）；小红书故事板开放数据卡/对比卡/步骤卡/时间卡/场景卡/亮点卡六种版式块（渲染层主题变量通用样式）；文案按渠道分化（小红书口语化 + emoji + 6–8 话题标签）；页型统一 375×667（原 3:4 分支移除）。
 
 - ~~增加独立于公众号工具贴图的标题、文案、页数、视觉和合规契约。~~

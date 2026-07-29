@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"article-reviewer","name":"文章审阅与修订","version":"1.0.0","kind":"reviewer","entryPoints":["hotspot-article","independent-writing","batch-daily"],"contentTypes":["article"],"inputContract":"article_fact_base","outputContract":"reviewed_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

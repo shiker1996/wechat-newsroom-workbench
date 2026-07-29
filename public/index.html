@@ -57,10 +57,11 @@
         </div>
       </details>
       <details class="nav-group" data-nav-group="system">
-        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 日志</small></summary>
+        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 技能 · 日志</small></summary>
         <div class="nav-group-items">
           <button class="nav-item" data-view="artifacts">产物中心</button>
           <button class="nav-item" data-view="models">模型中心</button>
+          <button class="nav-item" data-view="skills">技能与工具</button>
           <button class="nav-item" data-view="logs">任务日志</button>
         </div>
       </details>
@@ -180,10 +181,11 @@
           <div class="daily-stage-actions"><span>选好后进入下一步确认覆盖事件</span><button type="button" class="primary-button" id="daily-review-selection" disabled>下一步：确认生成 →</button></div>
         </section>
         <section class="panel daily-production-panel daily-stage-panel" data-daily-stage-panel="2" hidden>
-          <div class="workspace-head"><div><span class="kicker">PRODUCTION REVIEW</span><h3>确认事件覆盖与成稿设置</h3><small>AI 会对重复事件去重，并围绕所选关系组织信息流</small></div><span class="daily-step-badge">STEP 02</span></div>
-          <div id="daily-confirmation-summary" class="daily-confirmation-summary"></div>
-          <label class="daily-provider">成稿模型<select id="daily-provider"></select></label>
-          <div id="daily-readiness" class="daily-readiness">请选择一个或多个主体、动作、场合关系。</div>
+          <header class="daily-production-head"><div><span class="kicker">PRODUCTION REVIEW</span><h3>确认事件覆盖与成稿设置</h3><small>AI 会对重复事件去重，并围绕所选关系组织信息流</small></div><span class="daily-step-badge">STEP 02</span></header>
+          <div class="daily-production-grid">
+            <section class="daily-review-column"><div class="daily-column-label"><b>覆盖确认</b><span>01 / REVIEW</span></div><div id="daily-confirmation-summary" class="daily-confirmation-summary"></div><div id="daily-readiness" class="daily-readiness">请选择一个或多个主体、动作、场合关系。</div></section>
+            <section class="daily-settings-column"><div class="daily-column-label"><b>成稿配置</b><span>02 / SETTINGS</span></div><label class="daily-provider">成稿模型<select id="daily-provider"></select></label><details class="stage-skill-settings creation-stage-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="daily-stage-skills" class="stage-skill-list" aria-busy="true"></div></details></section>
+          </div>
           <div class="daily-stage-actions"><button type="button" class="outline-button" id="daily-back-selection">← 返回调整</button><button type="button" class="primary-button daily-generate-button" id="generate-daily" disabled>确认并生成早报 <span>→</span></button></div>
           <div id="daily-job-status" class="daily-job-status"></div>
         </section>
@@ -228,7 +230,18 @@
         <label>资料链接（每行一个；抓取失败会阻止成稿）<textarea name="materialUrls" rows="3"></textarea></label>
           </div>
         </details>
-        <div class="tutorial-actions"><button type="submit" class="primary-button" id="generate-tutorial">创建并生成文章</button></div>
+        <div class="tutorial-actions">
+          <details class="creation-skill-settings" id="tutorial-creation-skill-settings">
+            <summary><span><b>本次创作配置</b><small id="tutorial-skill-summary" aria-live="polite">系统推荐主写 · 4 个加工阶段使用默认配置</small></span><em>调整</em></summary>
+            <div class="creation-skill-popover">
+              <div class="stage-skill-settings-head"><span>CREATION ROUTE</span><b>选择主写与加工方式</b><small>默认配置适合大多数文章。只有明确需要替换某个技能时才调整。</small></div>
+              <label class="writer-skill-picker"><span>主写技能</span><select name="skillId" id="tutorial-writer-skill" aria-label="自主写作技能"><option value="">系统自动选择</option></select><small data-skill-note>选择文章类型后显示兼容技能</small></label>
+              <details class="stage-skill-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="tutorial-stage-skills" class="stage-skill-list" aria-busy="true"></div></details>
+              <div class="creation-skill-actions"><button type="button" class="text-button" id="reset-tutorial-skills">恢复默认</button><button type="button" class="outline-button" id="close-tutorial-skills">完成</button></div>
+            </div>
+          </details>
+          <button type="submit" class="primary-button" id="generate-tutorial">创建并生成文章</button>
+        </div>
         <div id="tutorial-job-status" class="daily-job-status"></div>
         <div id="tutorial-result" class="daily-result" hidden><div class="workspace-head"><div><span class="kicker">READY</span><h3>自主写作已进入文章链路</h3></div><button type="button" class="primary-button" id="open-tutorial-editor">到文章编辑器</button></div><p id="tutorial-result-copy"></p></div>
         </div>
@@ -289,12 +302,15 @@
         </div>
         <div id="social-editor-form" class="social-editor-form">
           <div id="social-editor-empty" class="empty-state">当前批次没有对应图文候选。<a href="#overview">前往热点全景添加选题</a></div>
-          <div id="social-editor-fields" hidden>
-            <div class="similar-hint" id="similar-social-cards" hidden></div><header class="social-editor-title"><span id="social-editor-code" class="kicker"></span><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></header>
-            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3></div><div><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
-            <section class="social-score-panel"><div><span class="kicker">SOCIAL FIT SCORE</span><strong id="social-fit-score">—</strong></div><div id="social-score-parts"></div></section>
-            <section class="repository-facts-panel"><div class="workspace-head"><div><span class="kicker">CARD STORYBOARD</span><h3>AI 卡片故事板</h3></div><div class="social-picker-group"><label class="social-theme-picker">渠道<select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker">构图模式<select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker">版式<select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker">视觉主题<select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
-            <section class="card-gate-panel"><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成图文</button></div></section>
+          <div id="social-editor-fields" class="social-studio-workspace" hidden>
+            <div class="similar-hint" id="similar-social-cards" hidden></div>
+            <header class="social-editor-title social-project-hero"><div class="social-project-index"><span id="social-editor-code" class="kicker"></span><small>当前图文项目</small></div><div class="social-project-copy"><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></div><ol class="social-flow-indicator" aria-label="图文创作流程"><li><b>01</b><span>核对事实</span></li><li><b>02</b><span>规划故事板</span></li><li><b>03</b><span>生成与交付</span></li></ol></header>
+            <div class="social-foundation-grid">
+              <section class="repository-facts-panel social-stage-panel social-facts-stage"><div class="social-stage-head"><span class="social-stage-number">01</span><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3><p>先确认事实和素材边界，再让 AI 规划页面。</p></div><div class="social-stage-actions"><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
+              <section class="social-score-panel social-stage-panel"><div class="social-score-hero"><span class="kicker">SOCIAL FIT</span><strong id="social-fit-score">—</strong><small>图文适配度</small></div><div id="social-score-parts"></div></section>
+            </div>
+            <section class="repository-facts-panel social-stage-panel social-storyboard-stage"><div class="social-stage-head social-storyboard-head"><span class="social-stage-number">02</span><div><span class="kicker">CARD STORYBOARD</span><h3>卡片故事板</h3><p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p></div></div><div class="social-control-deck"><details class="creation-skill-settings social-skill-settings"><summary><span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span><em>更换</em></summary><div class="creation-skill-popover"><div class="stage-skill-settings-head"><span>STORYBOARD ROUTE</span><b>选择故事板规划方式</b><small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small></div><div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div><div class="creation-skill-actions"><button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button><button type="button" class="outline-button" id="close-social-skills">完成</button></div></div></details><div class="social-picker-group"><label class="social-theme-picker"><span>发布渠道</span><select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker"><span>构图方式</span><select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker"><span>页面版式</span><select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker"><span>视觉主题</span><select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。</p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
           </div>
         </div>
@@ -330,7 +346,18 @@
               <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
               <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
               <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
-              <div class="editorial-actions"><button type="submit" class="ghost-button">保存当前进度</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
+              <div class="editorial-actions">
+                <details class="creation-skill-settings">
+                  <summary><span><b>本次创作配置</b><small id="editorial-skill-summary" aria-live="polite">系统推荐主写 · 4 个加工阶段使用默认配置</small></span><em>调整</em></summary>
+                  <div class="creation-skill-popover">
+                    <div class="stage-skill-settings-head"><span>CREATION ROUTE</span><b>选择主写与加工方式</b><small>默认配置适合大多数文章。只有明确需要替换某个技能时才调整。</small></div>
+                    <label class="writer-skill-picker"><span>主写技能</span><select id="editorial-writer-skill" aria-label="热点文章主写技能"><option value="">系统自动选择</option></select><small data-skill-note>系统会根据内容类型选择合适技能</small></label>
+                    <details class="stage-skill-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="editorial-stage-skills" class="stage-skill-list" aria-busy="true"></div></details>
+                    <div class="creation-skill-actions"><button type="button" class="text-button" id="reset-editorial-skills">恢复默认</button><button type="button" class="outline-button" id="close-editorial-skills">完成</button></div>
+                  </div>
+                </details>
+                <button type="submit" class="ghost-button">保存当前进度</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button>
+              </div>
             </section>
             </div>
             <details class="editorial-decision-details" id="editorial-decision-details">
@@ -470,6 +497,112 @@
         <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
       </div>
       <div class="artifact-grid" id="artifact-list"></div>
+    </section>
+
+    <section class="view skill-registry-view" id="view-skills">
+      <div class="section-intro"><div><span class="kicker">CREATION CAPABILITIES</span><h2>技能与工具</h2></div><p>技能决定内容怎么创作，工具负责获取资料与执行外部操作。默认配置可直接使用，需要时再安装或替换。</p></div>
+      <div class="runtime-path-strip skill-registry-summary" id="skill-registry-summary"><span>正在扫描项目技能…</span></div>
+      <nav class="capability-section-tabs" aria-label="技能与工具管理分区">
+        <button type="button" class="active" data-capability-tab="skills" aria-pressed="true"><span>01</span><b>技能库</b><small>查看创作规则与契约</small></button>
+        <button type="button" data-capability-tab="tools" aria-pressed="false"><span>02</span><b>信息工具</b><small>查看写作资料能力是否就绪</small></button>
+        <button type="button" data-capability-tab="extensions" aria-pressed="false"><span>03</span><b>安装扩展</b><small>增加技能或连接外部服务</small></button>
+      </nav>
+      <div class="extension-management-grid" data-capability-section="extensions" hidden>
+      <section class="runtime-commandbar skill-package-installer extension-card">
+        <div><b>安装第三方技能包</b><small>可先校验本地目录，或直接选择 ZIP；安装前不会执行包内代码。</small></div>
+        <input id="skill-package-directory" type="text" placeholder="本地技能包目录">
+        <button class="ghost-button" id="validate-skill-package">校验目录</button>
+        <button class="outline-button" id="install-skill-package">安装目录</button>
+        <label class="ghost-button">选择 ZIP<input id="skill-package-zip" type="file" accept=".zip,application/zip" hidden></label>
+      </section>
+      <section class="model-config-panel remote-plugin-installer extension-card">
+        <div class="panel-head"><div><span class="kicker">REMOTE TOOL MANIFEST</span><h3>导入远程工具连接声明</h3><small>面向开发者：用 Manifest 将一个兼容的 HTTPS API 或 MCP 工具映射为工作台能力。</small></div></div>
+        <div class="remote-manifest-notice" role="note">
+          <strong>这里不能直接粘贴 API 或 MCP 地址</strong>
+          <p>需要粘贴完整的 Manifest JSON，包括 endpoint、capabilities、输入输出 Schema；MCP 还必须声明 toolName。</p>
+          <div><span><b>支持</b>固定地址的 JSON POST API、MCP Streamable HTTP</span><span><b>暂不支持</b>从 URL 自动发现工具、读取远程技能、GET 路径模板 API</span></div>
+        </div>
+        <label class="remote-manifest-field" for="remote-plugin-manifest"><span>Manifest JSON</span><small>示例位于 docs/examples/remote-tool-plugin</small></label>
+        <textarea id="remote-plugin-manifest" rows="14" spellcheck="false" placeholder='{
+  "schemaVersion": 1,
+  "id": "my-web-search",
+  "name": "我的网络搜索",
+  "version": "1.0.0",
+  "type": "remote-api",
+  "capabilities": ["content.web.search"],
+  "riskLevel": "network-read",
+  "endpoint": "https://api.example.com/search",
+  "inputSchema": {
+    "type": "object",
+    "required": ["query"],
+    "properties": {"query": {"type": "string"}}
+  },
+  "outputSchema": {"type": "object"},
+  "timeoutMs": 10000,
+  "compatibleApp": ">=0.1.0"
+}'></textarea>
+        <div class="runtime-actions"><button class="ghost-button" id="validate-remote-plugin">校验 Manifest</button><button class="outline-button" id="install-remote-plugin">保存远程工具</button></div>
+        <div id="remote-credential-panel" class="runtime-actions" hidden>
+          <label>凭据 <input id="remote-credential-token" type="password" autocomplete="new-password" placeholder="仅写入服务端密钥存储"></label>
+          <button class="outline-button" id="save-remote-credential">保存凭据</button>
+          <button class="text-button" id="cancel-remote-credential">取消</button>
+        </div>
+      </section>
+      <section class="runtime-commandbar tool-package-installer extension-card">
+        <div><b>安装受信本地工具</b><small>仅限管理员审查过的本地 adapter；安装后默认停用，并需重启工作台加载。</small></div>
+        <input id="tool-package-directory" type="text" placeholder="本地工具包目录">
+        <button class="ghost-button" id="validate-tool-package">校验与权限摘要</button>
+        <button class="outline-button" id="install-tool-package">管理员安装</button>
+      </section>
+      </div>
+      <section class="information-slot-panel" data-capability-section="tools" hidden>
+        <div class="information-slot-heading"><div><span class="kicker">WRITING RESEARCH</span><b>写作所需的信息能力</b><small>绿色表示创作时可以直接使用；未连接的能力不会影响其他已就绪能力。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
+        <div class="information-slot-grid" id="information-slot-list"><div class="kv-empty">正在读取信息能力…</div></div>
+      </section>
+      <details class="tool-capability-disclosure" data-capability-section="tools" hidden>
+        <summary><span><b id="tool-capability-summary">正在检查工具运行状态…</b><small>供管理员排查版本、权限、优先级和执行记录</small></span><span>技术详情</span></summary>
+        <div class="runtime-model-list" id="tool-capability-list"></div>
+        <section class="tool-execution-panel" id="tool-execution-panel" hidden>
+          <div class="skill-config-section-head"><div><b id="tool-execution-title">执行历史</b><small>仅记录参数名，不保存输入正文或密钥</small></div><button type="button" class="text-button" id="tool-execution-close">关闭</button></div>
+          <div class="runtime-model-list" id="tool-execution-list"></div>
+        </section>
+      </details>
+      <div class="skill-management-layout" data-capability-section="skills">
+        <aside class="skill-browser" aria-label="创作技能列表">
+          <div class="skill-browser-head"><div><span class="kicker">SKILLS</span><h5>选择技能</h5></div><span id="skill-filter-count">—</span></div>
+          <div class="skill-browser-controls">
+            <label><span>搜索</span><input id="skill-search" type="search" placeholder="名称或用途" autocomplete="off"></label>
+            <label><span>状态</span><select id="skill-status-filter"><option value="all">全部</option><option value="configured">存在历史覆盖</option><option value="builtin">纯内置</option></select></label>
+          </div>
+          <div class="skill-list" id="skill-registry-list"></div>
+        </aside>
+        <div class="skill-detail">
+          <div class="skill-detail-empty" id="skill-detail-empty">
+            <span>01</span><h5>先从左侧选择一个技能</h5><p>查看内置 SKILL.md、来源文件、版本和内容哈希。</p>
+          </div>
+          <section class="model-config-panel skill-config-editor skill-readonly-view" id="skill-config-editor" hidden>
+            <div class="panel-head skill-editor-head"><div><span class="kicker">BUILT-IN SKILL · READ ONLY</span><h3 id="skill-config-title">技能说明</h3><small id="skill-config-meta">选择技能后读取 SKILL.md</small></div><span class="status-pill ok">只读</span></div>
+            <p id="skill-runtime-policy-note" class="skill-runtime-policy-note"></p>
+            <div id="skill-package-actions" class="runtime-actions" hidden></div>
+            <section class="skill-readonly-source">
+              <div><b>来源文件</b><code id="skill-source-path">—</code></div>
+              <div><b>内容哈希</b><code id="skill-prompt-hash">—</code></div>
+            </section>
+            <section class="skill-contract-section">
+              <div class="skill-config-section-head"><div><b>结构化契约</b><small>由 skill.json 提供，用于后续入口选择和兼容性判断</small></div><span>01</span></div>
+              <div class="skill-contract-grid" id="skill-contract-grid"></div>
+            </section>
+            <section class="skill-markdown-section">
+              <div class="skill-config-section-head"><div><b>SKILL.md</b><small>内置技能契约原文，不包含运行时安全附加段或历史覆盖层</small></div><span>02</span></div>
+              <pre class="skill-markdown-view" id="skill-markdown-view"></pre>
+            </section>
+            <details class="skill-version-panel">
+              <summary><span><b>关联规则文件</b><small>该技能运行时同时加载的 Markdown 文件</small></span><span>查看</span></summary>
+              <div class="runtime-model-list" id="skill-file-list"></div>
+            </details>
+          </section>
+        </div>
+      </div>
     </section>
 
     <section class="view" id="view-system">

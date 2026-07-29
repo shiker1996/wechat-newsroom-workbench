@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "social_card_layout_report",
+  "type": "object",
+  "required": ["valid", "pages"],
+  "properties": {
+    "valid": { "type": "boolean" },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "issues"],
+        "properties": {
+          "page": { "type": "integer", "minimum": 1 },
+          "issues": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

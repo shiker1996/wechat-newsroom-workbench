@@ -2,7 +2,7 @@
 
 > 状态：已拍板（2026-07-25），第一批已实施完成（2026-07-25）
 > 拍板结论：决策 2 捆绑设计；决策 3 复用 `repository_fact_sheets` 表（方案 A）；决策 4 共用执行器、facts/GATE 分流（方案 A）；决策 5 首批教程、清单、观点三类（方案 A）；决策 6 来源等级进数据结构 + GATE 检查（方案 A）
-> 实施记录：`lib/domain/custom-fact-builder.mjs`（事实基座 + 来源等级解析）、`lib/domain/social-card-gate.mjs` `evaluateCustomCardGate`（11 项检查）、`server.mjs`（创建路由 `POST /api/batches/:id/custom-social-candidates`、故事板 custom prompt、GATE 三分流统一为 `socialCardGate`）、`lib/llm/social-card-pipeline.mjs`（custom 分流、小红书 375×500 渲染与截图分支）、`skills/xiaohongshu-article-generator/references/custom-cards.md` + SKILL.md v5.1.0、前端图文编辑室创建入口与 custom 渲染；端到端验证通过（教程 × 小红书，7 页交付门禁通过）；种草/生活类与单页重绘不在本批
+> 历史实施记录：当时使用 `skills/xiaohongshu-article-generator/references/custom-cards.md`；现已拆分为 `skills/custom-card-storyboard/` 与生成交付阶段的 `references/copy-custom.md`。其余记录包括 `lib/domain/custom-fact-builder.mjs`、`lib/domain/social-card-gate.mjs`、自定义创建路由和图文渲染链路。
 > 追加（2026-07-25）：创建入口改为对话式策划——`lib/llm/custom-social-chat.mjs` + 流式路由 `POST /api/batches/:id/custom-social-chat/stream`（无状态，草稿与历史由前端全量传入），AI 策划编辑逐轮把方案回填进创建表单（`formUpdates` 经 `sanitizeFormUpdates` 白名单清洗），表单始终可手改，创建仍走原有路由与门禁；导航拆分为「工具图文」/「自定义图文」两个入口共用 `#view-social-editor`
 > 建立日期：2026-07-25
 > 配套文档：[可选功能扩展 TODO](./optional-feature-todos.md)（第 1、6 项）、[实施路线图](./optional-feature-implementation-roadmap.md)（第 4、6 节）
@@ -36,7 +36,7 @@
 ### 渲染与交付
 
 - `renderStoryboardHtml`（`lib/llm/social-card-pipeline.mjs:72-102`）14 套主题 CSS 硬编码；`channel_mode` 不进渲染函数。
-- `skills/xiaohongshu-article-generator/references/` 只有 `layout-contract.md`、`wechat-event-cards.md`、`wechat-tool-cards.md`，无小红书专属 reference；SKILL.md 声称支持 xiaohongshu 但无代码分支。
+- 当时 `skills/xiaohongshu-article-generator/references/` 只有 `layout-contract.md`、`wechat-event-cards.md`、`wechat-tool-cards.md`，无小红书专属 reference；该问题现已通过独立故事板技能与按内容类型加载的 `copy-*.md` 收敛。
 - 无独立 social_cards 表；图文产物落盘 `social-cards/<batch>-<candidate>/` 并登记 artifacts 表。
 
 ### 前端

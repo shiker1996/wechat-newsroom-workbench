@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"wechat-md-render","name":"公众号 Markdown 预渲染","version":"1.0.0","kind":"stage","entryPoints":["wechat-typeset"],"contentTypes":["wechat_article"],"inputContract":"wechat_markdown","outputContract":"rendered_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

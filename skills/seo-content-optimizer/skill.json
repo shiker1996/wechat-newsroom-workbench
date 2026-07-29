@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"seo-content-optimizer","name":"SEO 内容优化","version":"1.0.0","kind":"seo","entryPoints":["hotspot-article","independent-writing","batch-daily"],"contentTypes":["article"],"inputContract":"reviewed_markdown","outputContract":"wechat_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

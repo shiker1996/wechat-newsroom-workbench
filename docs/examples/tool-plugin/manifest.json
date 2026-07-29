@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "example-text-stats",
+  "name": "示例文本统计",
+  "version": "1.0.0",
+  "type": "local-adapter",
+  "capabilities": ["text.stats"],
+  "entry": "./adapter.mjs",
+  "riskLevel": "read-only",
+  "inputSchema": {
+    "type": "object",
+    "required": ["text"],
+    "properties": {
+      "text": {"type": "string"}
+    }
+  },
+  "outputSchema": {"type": "object"},
+  "source": {
+    "type": "reviewed-package",
+    "url": "https://example.com/plugins/example-text-stats"
+  },
+  "compatibleApp": ">=0.1.0",
+  "permissions": {
+    "networkDomains": [],
+    "pathAccess": [],
+    "externalWrite": false,
+    "credentials": []
+  },
+  "healthCheck": true,
+  "enabledByDefault": false
+}

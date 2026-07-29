@@ -1,0 +1,7 @@
+{
+  "id":"url-fetch","name":"URL 内容抓取","version":"1.0.0",
+  "capabilities":["content.url.fetch"],"entry":"./adapter.mjs","riskLevel":"network-read",
+  "pathInputs":["root"],
+  "inputSchema":{"type":"object","required":["targetUrl","root"],"properties":{"targetUrl":{"type":"string"},"title":{"type":"string"},"root":{"type":"string"},"sourceFetch":{"type":"object"}}},
+  "outputSchema":{"type":"object"},"healthCheck":true,"enabledByDefault":true
+}

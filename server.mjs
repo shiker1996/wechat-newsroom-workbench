@@ -23,12 +23,14 @@ import { buildHotspotAtlas } from './lib/domain/hotspot-atlas.mjs';
 import { fetchCandidateSource } from './lib/integrations/source-fetcher.mjs';
 import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
   planImagePlaceholders, imageManifestFile } from './lib/llm/image-workflow.mjs';
-import { inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
+import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/domain/custom-fact-builder.mjs';
 import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
 import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
-import { extractLocalProjectPath, readLocalProject } from './lib/integrations/local-project-reader.mjs';
+import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from './lib/integrations/local-project-reader.mjs';
+import { resolveSkillToolPolicy } from './lib/skills/pipeline-runtime.mjs';
+import { resolveArticleStageSkills, resolveEntryWriterSkill } from './lib/skills/entry-routing.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
@@ -57,12 +59,14 @@ const jobs = new JobManager(store, config);
 
 function customArticleFingerprint(batchId,input={}) {
   const normalized={};
-  for(const key of ['articleMode','topic','audience','thesis','environment','points','steps','prerequisites','expected_results','common_errors','limitations','materialUrls','localProjectPath']){
+  for(const key of ['articleMode','skillId','topic','audience','thesis','environment','points','steps','prerequisites','expected_results','common_errors','limitations','materialUrls','localProjectPath']){
     const value=input[key];
     normalized[key]=Array.isArray(value)
       ? value.map((item)=>String(item||'').trim()).filter(Boolean)
       : String(value||'').trim().replace(/\r\n/g,'\n');
   }
+  normalized.stageSkills=Object.fromEntries(Object.entries(input.stageSkills||{}).sort(([a],[b])=>a.localeCompare(b))
+    .map(([key,value])=>[key,String(value||'').trim()]));
   return crypto.createHash('sha256').update(JSON.stringify({batchId,...normalized})).digest('hex');
 }
 const models = new ModelGateway(config, store);
@@ -120,6 +124,35 @@ async function createWorkbenchBackup() {
     for(const name of ['config.local.json','account-context.json']){
       const filePath=path.join(root,name);
       if(fs.existsSync(filePath))files.push({name,path:filePath});
+    }
+    for(const name of ['tool-plugin-settings.json','information-capability-slots.json']){
+      const settingsFile=path.join(root,'data',name);
+      if(fs.existsSync(settingsFile))files.push({name:`data/${name}`,path:settingsFile});
+    }
+    for(const name of ['skill-packages.json','skill-install-events.jsonl','tool-plugins.json','tool-plugin-install-events.jsonl',
+      'remote-tool-plugins.json','remote-tool-plugin-events.jsonl']){
+      const filePath=path.join(root,'data',name);
+      if(fs.existsSync(filePath))files.push({name:`data/${name}`,path:filePath});
+    }
+    for(const directoryName of ['installed-skills','skill-package-archive','installed-tool-plugins','tool-plugin-archive']){
+      const directory=path.join(root,'data',directoryName);
+      if(fs.existsSync(directory)){
+        const visit=(current)=>{
+          for(const entry of fs.readdirSync(current,{withFileTypes:true})){
+            const filePath=path.join(current,entry.name);
+            if(entry.isDirectory())visit(filePath);
+            else if(entry.isFile())files.push({name:path.relative(root,filePath).replaceAll('\\','/'),path:filePath});
+          }
+        };
+        visit(directory);
+      }
+    }
+    const writingSkillsRoot=path.join(root,'writing-skills');
+    if(fs.existsSync(writingSkillsRoot)){
+      for(const skill of fs.readdirSync(writingSkillsRoot,{withFileTypes:true}).filter((entry)=>entry.isDirectory())){
+        const active=path.join(writingSkillsRoot,skill.name,'active.json');
+        if(fs.existsSync(active))files.push({name:`writing-skills/${skill.name}/active.json`,path:active});
+      }
     }
     const manifest={schemaVersion:1,createdAt:new Date().toISOString(),appVersion:'0.1.0',
       excludes:['.env','API tokens','node_modules','cache/log files'],
@@ -461,7 +494,16 @@ async function api(request, response, url) {
     const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
     if(!batch)return json(response,404,{error:'批次不存在'});
     const input=await body(request);
-    return json(response,202,aiJobs.start({batchId,provider:input.provider,type:'daily',
+    const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
+    const hasExplicitStages=Object.values(requestedStages).some((value)=>String(value||'').trim());
+    const previousSnapshot=(input.useLatestSkill===true||hasExplicitStages)?null:store.findLatestGenerationSnapshot({
+      batchId,candidateId:null,purposes:['daily'],
+    });
+    const stageSelections=previousSnapshot?null:await resolveArticleStageSkills({
+      workspaceRoot:root,entryPoint:'batch-daily',requested:requestedStages,
+    });
+    return json(response,202,aiJobs.start({batchId,provider:previousSnapshot?null:input.provider,type:'daily',
+      snapshotId:previousSnapshot?.id||null,stageSelections,
       focuses:Array.isArray(input.focuses)?input.focuses:[],focus:input.focus||null}));
   }
   const candidatesMatch = pathname.match(/^\/api\/batches\/([^/]+)\/candidates$/);
@@ -681,7 +723,7 @@ async function api(request, response, url) {
   if(pathname==='/api/tools/local-project/read'&&request.method==='POST'){
     const input=await body(request);
     try{
-      const project=readLocalProject(input.path);
+      const project=await readLocalProject(input.path,{toolContext:{store}});
       return json(response,200,{root:project.root,summary:project.summary,files:project.files.map(({path:sizePath,size,truncated})=>({path:sizePath,size,truncated})),skipped:project.skipped,truncated:project.truncated});
     }catch(error){return json(response,400,{error:`读取本地项目失败：${error.message}`});}
   }
@@ -695,7 +737,11 @@ async function api(request, response, url) {
     let projectContext=null,projectReadError='';
     if(detectedPath){
       draft.localProjectPath=detectedPath;
-      try{projectContext=readLocalProject(detectedPath);}
+      try{
+        const toolPolicy=await resolveSkillToolPolicy({workspaceRoot:root,skillId:'wechat-mp-tutorial'});
+        projectContext=await readLocalProject(detectedPath,{toolContext:{store,batchId,
+          skillId:'wechat-mp-tutorial',allowedCapabilities:toolPolicy.allowedCapabilities}});
+      }
       catch(error){projectReadError=error.message;}
     }
     response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
@@ -724,6 +770,16 @@ async function api(request, response, url) {
     if(!batch)return json(response,404,{error:'批次不存在'});
     const input=await body(request);
     try{
+      const articleMode=String(input.articleMode||'tutorial').trim()==='experience'?'experience':'tutorial';
+      const recommendedSkillId=articleMode==='experience'?'wechat-mp-personal-writing':'wechat-mp-tutorial';
+      const skillSelection=await resolveEntryWriterSkill({
+        workspaceRoot:root,entryPoint:'independent-writing',contentType:articleMode,
+        requestedSkillId:String(input.skillId||''),recommendedSkillId,
+      });
+      const stageSelections=await resolveArticleStageSkills({
+        workspaceRoot:root,entryPoint:'independent-writing',
+        requested:input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{},
+      });
       const fingerprint=customArticleFingerprint(batchId,input);
       const requestId=String(input.creationRequestId||fingerprint).trim();
       let creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})
@@ -732,14 +788,17 @@ async function api(request, response, url) {
         const candidate=store.getCandidate(creation.candidate_row_id);
         let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
         if(candidate&&!job){
-          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
           store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
         }
         if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
       }
-      const articleMode=String(input.articleMode||'tutorial').trim()==='experience'?'experience':'tutorial';
       let project=null;
-      if(articleMode==='tutorial'&&String(input.localProjectPath||'').trim())project=readLocalProject(input.localProjectPath);
+      if(articleMode==='tutorial'&&String(input.localProjectPath||'').trim()){
+        const toolPolicy=await resolveSkillToolPolicy({workspaceRoot:root,skillId:skillSelection.selectedSkill});
+        project=await readLocalProject(input.localProjectPath,{toolContext:{store,batchId,
+          skillId:skillSelection.selectedSkill,allowedCapabilities:toolPolicy.allowedCapabilities}});
+      }
       const fact=await buildCustomFactSheet({input:{...input,content_type:articleMode==='experience'?'opinion':'tutorial',scenario:input.environment},root,hasUserMaterialContext:Boolean(project)});
       fact.article_mode=articleMode;
       fact.environment=String(input.environment||'').trim();
@@ -759,7 +818,7 @@ async function api(request, response, url) {
         const candidate=store.getCandidate(creation.candidate_row_id);
         let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
         if(candidate&&!job){
-          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
           store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
         }
         if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
@@ -781,7 +840,7 @@ async function api(request, response, url) {
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'自主写作事实基座',name:'01-tutorial-fact-base.json',path:factPath,...factFile});
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'锁定简报',name:'article-brief.md',path:briefPath,...briefFile});
       store.updateCustomArticleRequest(creation.id,{candidateId:candidate.id});
-      const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+      const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial',skillSelection,stageSelections});
       store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
       return json(response,202,{...job,candidate:store.getCandidate(candidate.id)});
     }catch(error){return json(response,400,{error:`创建自主写作失败：${error.message}`});}
@@ -794,7 +853,23 @@ async function api(request, response, url) {
     const input=await body(request);
     try{
       const creation=store.getCustomArticleRequestByCandidate(candidate.id);
-      const job=aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+      const explicitSkillId=String(input.skillId||'').trim();
+      const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
+      const hasExplicitStages=Object.values(requestedStages).some((value)=>String(value||'').trim());
+      const previousSnapshot=(input.useLatestSkill===true||explicitSkillId||hasExplicitStages)?null:store.findLatestGenerationSnapshot({
+        batchId:candidate.batch_id,candidateId:candidate.id,purposes:['tutorial','personal-writing'],
+      });
+      const articleMode=candidate.output_mode==='wechat-experience'?'experience':'tutorial';
+      const skillSelection=previousSnapshot?null:await resolveEntryWriterSkill({
+        workspaceRoot:root,entryPoint:'independent-writing',contentType:articleMode,
+        requestedSkillId:explicitSkillId,
+        recommendedSkillId:articleMode==='experience'?'wechat-mp-personal-writing':'wechat-mp-tutorial',
+      });
+      const stageSelections=previousSnapshot?null:await resolveArticleStageSkills({
+        workspaceRoot:root,entryPoint:'independent-writing',requested:requestedStages,
+      });
+      const job=aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:previousSnapshot?null:input.provider,
+        type:'tutorial',snapshotId:previousSnapshot?.id||null,skillSelection,stageSelections});
       if(creation)store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
       return json(response,202,{...job,candidate});
     }catch(error){return json(response,400,{error:`重新执行自主写作失败：${error.message}`});}

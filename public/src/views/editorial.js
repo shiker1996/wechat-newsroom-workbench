@@ -2,6 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
@@ -17,7 +18,17 @@ function bindEditorial() {
   const form = document.getElementById("editorial-form");
   form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message)));
   form.addEventListener("input", () => { editorialDirty = true; renderEditorialReadiness(); });
-  form.addEventListener("change", renderEditorialReadiness);
+  form.addEventListener("change", () => { renderEditorialReadiness(); updateEditorialSkillSummary(); });
+  form.addEventListener("stage-skills-loaded", updateEditorialSkillSummary);
+  document.getElementById("reset-editorial-skills")?.addEventListener("click",()=>{
+    const writer=document.getElementById("editorial-writer-skill");
+    if(writer)writer.value="";
+    document.querySelectorAll("#editorial-stage-skills [data-stage-skill]").forEach((select)=>{select.value="";});
+    updateEditorialSkillSummary();
+  });
+  document.getElementById("close-editorial-skills")?.addEventListener("click",()=>{
+    document.querySelector(".creation-skill-settings")?.removeAttribute("open");
+  });
   document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message)));
   document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
   document.addEventListener("click", (event) => {
@@ -30,6 +41,16 @@ function bindEditorial() {
       openEditorial(nextId).catch((error) => toast(error.message));
     }
   });
+}
+
+function updateEditorialSkillSummary(){
+  const summary=document.getElementById("editorial-skill-summary");
+  if(!summary)return;
+  const writer=document.getElementById("editorial-writer-skill");
+  const writerLabel=writer?.value?writer.selectedOptions[0]?.textContent?.split(" · ")[0]:"系统推荐主写";
+  const stageSelects=[...document.querySelectorAll("#editorial-stage-skills [data-stage-skill]")];
+  const overridden=stageSelects.filter((select)=>select.value).length;
+  summary.textContent=`${writerLabel} · ${overridden?`${overridden} 个加工阶段已调整`:`${stageSelects.length||4} 个加工阶段使用默认配置`}`;
 }
 
 async function loadEditorialRoom(selectedId) {
@@ -136,6 +157,11 @@ function setupEditorialGateNavigation() {
 async function openEditorial(id) {
   try { state.models = await request("/api/models"); } catch {}
   const candidate = await request(`/api/candidates/${id}`);
+  await Promise.all([
+    loadSkillSelect(document.getElementById("editorial-writer-skill"), `/api/candidates/${id}/writer-skills`),
+    loadStageSkillControls(document.getElementById("editorial-stage-skills"), `/api/candidates/${id}/stage-skills`),
+  ]);
+  updateEditorialSkillSummary();
   let activeCandidateTab = null;
   $$(".editorial-candidate").forEach((item) => {
     const active = Number(item.dataset.editCandidate) === Number(id);
@@ -372,7 +398,11 @@ async function startEditorialProduction() {
   if (!candidateId) return toast("请先选择候选");
   try {
     await request(`/api/candidates/${candidateId}/lock`, { method: "POST" });
-    const result = await request(`/api/candidates/${candidateId}/ai/article`, { method: "POST", body: JSON.stringify({ provider: document.getElementById("editorial-provider")?.value || "" }) });
+    const result = await request(`/api/candidates/${candidateId}/ai/article`, { method: "POST", body: JSON.stringify({
+      provider: document.getElementById("editorial-provider")?.value || "",
+      skillId: document.getElementById("editorial-writer-skill")?.value || "",
+      stageSkills: selectedStageSkills(document.getElementById("editorial-stage-skills")),
+    }) });
     toast("完整成稿链已启动");
     // 成稿链长达数分钟：打开进度弹窗，轮询输出写入 #production-job-console
     document.getElementById("production-job-dialog")?.showModal();

@@ -1,6 +1,7 @@
 import { state } from "../core/state.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions } from "../core/ui.js";
+import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
@@ -9,6 +10,7 @@ let selectedChannelMode='wechat';
 let selectedCompositionMode='smart';
 let currentCardPlan=[];
 let currentLayoutDecisions=[];
+let socialSkillSlots=null;
 
 const CARD_LAYOUT_LABELS={auto:'自动推荐',poster:'海报大字',editorial:'杂志分栏',data:'数据报告',checklist:'卡片清单',steps:'教程步骤',minimal:'极简留白'};
 const CARD_LAYOUT_STATUS={recommended:'自动推荐',storyboard:'故事板指定',manual:'手动指定',group:'整组指定',fallback:'自动降级'};
@@ -24,6 +26,30 @@ function syncCompositionControls(){
 
 const CUSTOM_TYPE_LABELS={tutorial:'教程',list:'清单',opinion:'观点'};
 const CUSTOM_LEVEL_LABELS={author_experience:'作者体验',user_material:'用户素材',model_suggestion:'模型建议'};
+const SOCIAL_ENTRY_POINTS={repository:'social-tool',event:'social-event',custom:'social-custom'};
+
+function socialRoutingContentType(data){
+  return selectedContentType==='custom'?String(data?.facts?.data?.content_type||''):selectedContentType;
+}
+function updateSocialSkillSummary(){
+  const summary=document.getElementById('social-skill-summary');
+  const select=document.querySelector('#social-stage-skills [data-stage-skill="storyboard"]');
+  const slot=socialSkillSlots?.slots?.find((item)=>item.id==='storyboard');
+  if(!summary||!slot){if(summary)summary.textContent='未读取到兼容故事板技能';return;}
+  const explicit=select?.value||'';
+  const selected=slot.items.find((item)=>item.id===(explicit||slot.defaultSkillId));
+  const source=explicit?'本次指定':slot.configuredDefaultSkillId?'工作区默认':'内置默认';
+  summary.textContent=`${selected?.name||slot.defaultSkillId} · ${source}`;
+}
+async function loadSocialSkillControls(data){
+  const entryPoint=SOCIAL_ENTRY_POINTS[selectedContentType];
+  const contentType=socialRoutingContentType(data);
+  socialSkillSlots=await loadStageSkillControls(
+    document.getElementById('social-stage-skills'),
+    `/api/creation-entry-points/${encodeURIComponent(entryPoint)}/social-card-stage-skills?contentType=${encodeURIComponent(contentType)}`,
+  );
+  updateSocialSkillSummary();
+}
 
 // 工具图文 / 自定义图文 / 事件图文三个导航入口共用本模块，以 currentMode 区分
 let currentMode='tools';
@@ -131,11 +157,13 @@ export async function openSocialEditor(id) {
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
   renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';syncCompositionControls();await Promise.all([loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
-  if(!candidateId)return; const data=await request(`/api/candidates/${candidateId}/ai/card-editorial`,{method:'POST',body:'{}'});
+  if(!candidateId)return; const data=await request(`/api/candidates/${candidateId}/ai/card-editorial`,{method:'POST',body:JSON.stringify({
+    stageSkills:selectedStageSkills(document.getElementById('social-stage-skills')),
+  })});
   if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
@@ -148,9 +176,9 @@ async function runStoryboard({inspect=false}={}){
 }
 
 async function watchSocialJob(jobId,candidateId,button){
-  while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);if(candidateId===selectedId)button.textContent=job.status==='running'?(job.progress||'图文任务执行中…'):'生成图文';if(job.status==='running')continue;
+  while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);if(candidateId===selectedId)button.textContent=job.status==='running'?(job.progress||'图文任务执行中…'):'生成整组图文';if(job.status==='running')continue;
     // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
-    button.disabled=false;button.textContent=job.status==='completed'?'重新生成图文':'生成图文';
+    button.disabled=false;button.textContent=job.status==='completed'?'重新生成整组图文':'生成整组图文';
     if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else toast(`图文生成失败${job.error?`：${job.error}`:''}`);return;
   }
 }
@@ -220,12 +248,26 @@ if(!window.__socialThemeBound){window.__socialThemeBound=true;document.getElemen
 if(!window.__socialCompositionBound){window.__socialCompositionBound=true;document.getElementById('social-composition-mode')?.addEventListener('change',async(event)=>{if(!selectedId)return;const previous=selectedCompositionMode;selectedCompositionMode=event.target.value;syncCompositionControls();try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({composition_mode:selectedCompositionMode})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast(selectedCompositionMode==='smart'?'已切换为智能构图，系统会按页面角色自动组织版面':'已切换为稳定模板，可整组或逐页指定版式');}catch(error){selectedCompositionMode=previous;event.target.value=previous;syncCompositionControls();toast(error.message);}});}
 if(!window.__socialLayoutBound){window.__socialLayoutBound=true;document.getElementById('social-layout-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');}catch(error){toast(error.message);}});}
 if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;renderCardPlan(currentCardPlan,data.layoutDecisions);if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
+if(!window.__socialSkillSelectionBound){window.__socialSkillSelectionBound=true;
+  document.getElementById('social-stage-skills')?.addEventListener('change',(event)=>{
+    if(!event.target.closest('[data-stage-skill]'))return;
+    updateSocialSkillSummary();
+    if(currentCardPlan.length)toast('故事板技能已切换；点击“重新生成故事板”后生效，现有逐页编辑将被替换');
+  });
+  document.getElementById('reset-social-skills')?.addEventListener('click',()=>{
+    document.querySelectorAll('#social-stage-skills [data-stage-skill]').forEach((select)=>{select.value='';});
+    updateSocialSkillSummary();toast('已恢复当前图文入口的默认技能');
+  });
+  document.getElementById('close-social-skills')?.addEventListener('click',()=>{
+    document.querySelector('.social-skill-settings')?.removeAttribute('open');
+  });
+}
 const inspectButton=freshButton("inspect-repository");
 inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");
-generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const candidateId=selectedId;generateButton.disabled=true;generateButton.textContent="正在启动…";try{const job=await request(`/api/candidates/${candidateId}/ai/social-card`,{method:'POST',body:'{}'});generateButton.textContent="图文任务执行中…";toast("图文生成任务已启动，可在任务日志查看进度");watchSocialJob(job.id,candidateId,generateButton).catch((error)=>{generateButton.disabled=false;generateButton.textContent="生成图文";toast(error.message);});}catch(error){toast(error.message);generateButton.disabled=false;generateButton.textContent="生成图文";}});
+generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const candidateId=selectedId;generateButton.disabled=true;generateButton.textContent="正在启动…";try{const job=await request(`/api/candidates/${candidateId}/ai/social-card`,{method:'POST',body:'{}'});generateButton.textContent="图文任务执行中…";toast("图文生成任务已启动，可在任务日志查看进度");watchSocialJob(job.id,candidateId,generateButton).catch((error)=>{generateButton.disabled=false;generateButton.textContent="生成整组图文";toast(error.message);});}catch(error){toast(error.message);generateButton.disabled=false;generateButton.textContent="生成整组图文";}});
 
 window.openSocialEditor=openSocialEditor;
 

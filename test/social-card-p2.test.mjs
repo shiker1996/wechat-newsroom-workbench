@@ -6,7 +6,7 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
+import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
 import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 
@@ -21,6 +21,28 @@ test('项目图文技能加载完整文案、标题、设计与布局契约', ()
   }
   assert.match(bundle.prompt, /布局审计/);
   assert.match(bundle.prompt, /375/);
+});
+
+test('生成交付技能按阶段和内容类型选择 reference',()=>{
+  const bundle=loadSkillBundle({workspaceRoot:root,skillName:'xiaohongshu-article-generator'});
+  const eventCopy=selectSkillPromptReferences(bundle.prompt,{
+    include:['COPY_GUIDE.md','references\\copy-event.md'],
+  });
+  assert.match(eventCopy,/事件图文配套文案规则/);
+  assert.match(eventCopy,/不可变系统安全门禁/);
+  assert.doesNotMatch(eventCopy,/工具图文配套文案规则/);
+  assert.doesNotMatch(eventCopy,/自定义图文配套文案规则/);
+  assert.doesNotMatch(eventCopy,/小红书图文布局契约/);
+  assert.doesNotMatch(eventCopy,/## REFERENCE: COLOR_SCHEMES_PREVIEW\.md/);
+
+  const customRepair=selectSkillPromptReferences(bundle.prompt,{
+    include:['DESIGN_SYSTEM.md','references\\layout-contract.md','references\\copy-custom.md'],
+  });
+  assert.match(customRepair,/自定义图文配套文案规则/);
+  assert.match(customRepair,/小红书图文布局契约/);
+  assert.match(customRepair,/设计系统/);
+  assert.doesNotMatch(customRepair,/事件图文配套文案规则/);
+  assert.doesNotMatch(customRepair,/## REFERENCE: TITLE_GUIDE\.md/);
 });
 
 test('智能版式按页面角色与内容块选择不同构图',()=>{
@@ -148,11 +170,12 @@ test('图文编辑室可以独立选择版式和视觉主题',()=>{
 
 test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
   const source=fs.readFileSync(path.join(root,'lib/http/routes/social-card-routes.mjs'),'utf8');
+  const storyboardPrompt=fs.readFileSync(path.join(root,'lib','domain','social-card-prompts','channel-xiaohongshu.md'),'utf8');
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)$/)"));
   assert.match(source,/每页至少保留一个内容块/);
   assert.match(source,/card_plan_json:JSON\.stringify\(cardPlan\),status:'AI_READY'/);
   // 故事板策划 prompt 约束 stat 数值长度，避免窄数据卡内长算式折行
-  assert.match(source,/num 不超过 6 个字符/);
+  assert.match(storyboardPrompt,/num 不超过 6 个字符/);
 });
 
 test('确定性故事板 HTML 通过真实浏览器布局审计', async () => {

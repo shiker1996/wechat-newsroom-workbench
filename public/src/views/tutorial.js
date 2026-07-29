@@ -1,6 +1,7 @@
 import { request } from "../core/http.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
+import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 let bound = false;
 let candidateId = null;
@@ -9,6 +10,7 @@ let writingGenerating = false;
 let writingCompleted = false;
 let writingFailed = false;
 let customProjects = [];
+let loadedSkillMode = "";
 
 const form = () => document.getElementById("tutorial-form");
 const field = (name) => form().elements.namedItem(name);
@@ -102,6 +104,16 @@ function syncMode() {
     updateWritingSteps(1);
     return;
   }
+  if (loadedSkillMode !== mode) {
+    loadedSkillMode = mode;
+    Promise.all([
+      loadSkillSelect(document.getElementById("tutorial-writer-skill"),
+        `/api/creation-entry-points/independent-writing/skills?contentType=${encodeURIComponent(mode)}`),
+      loadStageSkillControls(document.getElementById("tutorial-stage-skills"),
+        "/api/creation-entry-points/independent-writing/stage-skills"),
+    ])
+      .catch((error)=>toast(error.message));
+  }
   const title = document.getElementById("tutorial-empty-title");
   const copy = document.getElementById("tutorial-empty-copy");
   if (title) title.textContent = mode === "tutorial" ? "先说清楚要完成什么" : "从一段真实经历开始";
@@ -134,6 +146,16 @@ function updateProgress() {
     : `已完成 ${done}/${checks.length} 项 · AI 会继续追问缺失信息`;
   document.getElementById("generate-tutorial").disabled = !ready || writingGenerating;
   updateWritingSteps(writingGenerating || writingCompleted || ready ? 3 : 2);
+}
+
+function updateTutorialSkillSummary(){
+  const summary=document.getElementById("tutorial-skill-summary");
+  if(!summary)return;
+  const writer=document.getElementById("tutorial-writer-skill");
+  const writerLabel=writer?.value?writer.selectedOptions[0]?.textContent?.split(" · ")[0]:"系统推荐主写";
+  const stages=[...document.querySelectorAll("#tutorial-stage-skills [data-stage-skill]")];
+  const overridden=stages.filter((select)=>select.value).length;
+  summary.textContent=`${writerLabel} · ${overridden?`${overridden} 个加工阶段已调整`:`${stages.length||4} 个加工阶段使用默认配置`}`;
 }
 
 function appendMessage(role, content, pending = false) {
@@ -231,6 +253,7 @@ async function submit() {
   updateWritingSteps(3);
   try {
     const input=payload();
+    input.stageSkills=selectedStageSkills(document.getElementById("tutorial-stage-skills"));
     input.creationRequestId=globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const url=retrying
       ? `/api/candidates/${candidateId}/custom-article-runs`
@@ -267,7 +290,11 @@ async function retryProject(projectId) {
   writingFailed=false;
   try{
     const result=await request(`/api/candidates/${candidateId}/custom-article-runs`,{
-      method:"POST",body:JSON.stringify({provider:field("provider").value}),
+      method:"POST",body:JSON.stringify({
+        provider:field("provider").value,
+        skillId:document.getElementById("tutorial-writer-skill")?.value||"",
+        stageSkills:selectedStageSkills(document.getElementById("tutorial-stage-skills")),
+      }),
     });
     await loadProjects();
     await poll(result.id);
@@ -305,6 +332,16 @@ function bind() {
     document.getElementById("tutorial-chat-input").focus();
   }));
   form().addEventListener("input", updateProgress);
+  form().addEventListener("change",updateTutorialSkillSummary);
+  form().addEventListener("stage-skills-loaded",updateTutorialSkillSummary);
+  document.getElementById("reset-tutorial-skills").addEventListener("click",()=>{
+    const writer=document.getElementById("tutorial-writer-skill");if(writer)writer.value="";
+    document.querySelectorAll("#tutorial-stage-skills [data-stage-skill]").forEach((select)=>{select.value="";});
+    updateTutorialSkillSummary();
+  });
+  document.getElementById("close-tutorial-skills").addEventListener("click",()=>{
+    document.getElementById("tutorial-creation-skill-settings")?.removeAttribute("open");
+  });
   document.getElementById("open-tutorial-editor").addEventListener("click", () => openEditor().catch((error) => toast(error.message)));
   document.getElementById("custom-writing-project-list").addEventListener("click",(event)=>{
     const open=event.target.closest("[data-custom-writing-open]");

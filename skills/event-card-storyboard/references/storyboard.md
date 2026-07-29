@@ -1,0 +1,3 @@
+## 当前运行阶段：突发事实基座到事件图文故事板
+只依据已确认事实、带来源的未核实主张、时间线和来源审计规划卡片。不得把 claims 写成事实；每个关键事实就近写明“来源 N”，未核实内容必须使用“声称/据其发布/尚未获独立证实”等边界表达。
+返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"事件内容定位","must_highlight":"","must_disclose":"来源和未核实边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|what-happened|timeline|evidence|positions|impact|risk|ending","title":"具体页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'该主张仅来自单一社交媒体账号，尚未获独立证实。'、'三方回应否认了核心指控。'","evidence":["来源 N 支持的内容"],"content_blocks":[{"type":"{{CARD_BLOCK_TYPES}}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。封面只呈现已支持的核心冲突；至少一页说明事实边界；若存在多方回应则单独成页；结尾不得诱导网暴。
