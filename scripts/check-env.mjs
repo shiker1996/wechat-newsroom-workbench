@@ -1,6 +1,7 @@
 // 启动前环境检测：缺少必须依赖或配置时给出提示并以非零码退出。
 // 硬性问题（阻断启动）标记 [错误]，可选问题（不阻断）标记 [警告]。
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +57,30 @@ if (!fs.existsSync(envPath)) {
 // 5. RSSHub 目录（热点采集依赖；缺失不阻断启动）
 if (!fs.existsSync(path.join(root, 'RSSHub', 'lib'))) {
   warnings.push('未找到 RSSHub 目录，热点采集功能不可用。如需该功能请恢复 RSSHub/ 目录。');
+}
+
+// 6. Mermaid 图表渲染（可选能力，不阻断普通文章启动）
+const mermaidCliCandidates = [
+  path.join(root, 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),
+  path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),
+];
+const mermaidCli = mermaidCliCandidates.find((candidate) => fs.existsSync(candidate));
+if (!mermaidCli) {
+  warnings.push('未找到 Mermaid CLI，含 ```mermaid 图表的文章将无法完成排版。建议在项目根目录运行: npm install -D @mermaid-js/mermaid-cli');
+} else {
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || '';
+  const chromeCandidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH || '',
+    path.join(process.env.PROGRAMFILES || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    programFilesX86 ? path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
+    path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  ].filter(Boolean);
+  const puppeteerCache = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
+  const cachedChrome = fs.existsSync(puppeteerCache)
+    && fs.readdirSync(puppeteerCache).some((version) => fs.existsSync(path.join(puppeteerCache, version, 'chrome-win64', 'chrome.exe')));
+  if (!cachedChrome && !chromeCandidates.some((candidate) => fs.existsSync(candidate))) {
+    warnings.push('已找到 Mermaid CLI，但未找到 Puppeteer 缓存或系统 Chrome。Mermaid 图表渲染可能失败；可重新安装 Mermaid CLI 下载浏览器，或设置 PUPPETEER_EXECUTABLE_PATH。');
+  }
 }
 
 // 输出结果

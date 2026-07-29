@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { mermaidConfigForTheme, mermaidSourceWithTheme } from '../../../lib/llm/chart-theme.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -19,6 +21,7 @@ if (args.length < 2) {
 const input = path.resolve(args[0]);
 const output = path.resolve(args[1]);
 const imageDir = path.resolve(args[2] || path.join(path.dirname(output), 'images'));
+const tokens = args[3] && fs.existsSync(path.resolve(args[3])) ? JSON.parse(fs.readFileSync(path.resolve(args[3]), 'utf8')) : {};
 
 function fail(message) {
   console.log(JSON.stringify({ converted: 0, failed: [], error: message }));
@@ -29,11 +32,25 @@ if (!fs.existsSync(input) || !fs.statSync(input).isFile()) fail(`Input file not 
 
 const FENCE_RE = /```mermaid\b[^\n]*\r?\n([\s\S]*?)```/gi;
 
-const mmdcCli = path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const mmdcCandidates = [
+  path.join(projectRoot, 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),
+  path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),
+];
+const mmdcCli = mmdcCandidates.find((candidate) => fs.existsSync(candidate)) || '';
 
 // mmdc 自带的 puppeteer 可能找不到它期望的 Chrome 版本；
 // 在 puppeteer 缓存里挑一个真实存在的 chrome.exe，通过 -p 配置文件喂给它。
 function findChromeExecutable() {
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || '';
+  const explicitCandidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH || '',
+    path.join(process.env.PROGRAMFILES || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    programFilesX86 ? path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
+    path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  ].filter(Boolean);
+  const explicit = explicitCandidates.find((candidate) => fs.existsSync(candidate));
+  if (explicit) return explicit;
   const base = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
   if (!fs.existsSync(base)) return '';
   const versions = fs.readdirSync(base)
@@ -50,16 +67,18 @@ const report = { converted: 0, failed: [], images: [] };
 let result = markdown;
 if (fences.length) {
   fs.mkdirSync(imageDir, { recursive: true });
-  if (!fs.existsSync(mmdcCli)) fail(`未找到全局安装的 @mermaid-js/mermaid-cli：${mmdcCli}`);
+  if (!mmdcCli) fail(`未找到 @mermaid-js/mermaid-cli（已检查项目本地依赖和 npm 全局目录）。请运行 npm install -D @mermaid-js/mermaid-cli`);
   const chrome = findChromeExecutable();
   const pptrConfig = path.join(imageDir, '.mmdc-puppeteer-config.json');
+  const mermaidConfig = path.join(imageDir, '.mmdc-theme-config.json');
+  fs.writeFileSync(mermaidConfig, JSON.stringify(mermaidConfigForTheme(tokens)));
   if (chrome) fs.writeFileSync(pptrConfig, JSON.stringify({ executablePath: chrome, args: ['--no-sandbox'] }));
   for (const [index, fence] of fences.entries()) {
     const name = `mermaid-${index + 1}`;
     const mmdPath = path.join(imageDir, `${name}.mmd`);
     const pngPath = path.join(imageDir, `${name}.png`);
-    fs.writeFileSync(mmdPath, fence[1].trim() + '\n', 'utf8');
-    const mmdcArgs = ['-i', mmdPath, '-o', pngPath, '-b', 'white'];
+    fs.writeFileSync(mmdPath, mermaidSourceWithTheme(fence[1], tokens) + '\n', 'utf8');
+    const mmdcArgs = ['-i', mmdPath, '-o', pngPath, '-c', mermaidConfig, '-b', tokens.colors?.background || 'white', '-w', '1080', '-s', '2'];
     if (chrome) mmdcArgs.push('-p', pptrConfig);
     try {
       // 直接以 node 运行 mmdc 入口，绕开 Windows 下 spawn .cmd 的 EINVAL 限制。

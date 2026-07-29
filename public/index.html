@@ -34,20 +34,23 @@
       <details class="nav-group" data-nav-group="article">
         <summary><span>03</span><b>文章生产</b><small>入口 · 编辑 · 排版</small></summary>
         <div class="nav-group-items">
-          <div class="nav-section-label">内容入口</div>
-          <button class="nav-item" data-view="topics">热点事件文</button>
-          <button class="nav-item" data-view="daily">批次早报文</button>
-          <button class="nav-item" data-view="tutorial">自主写作文</button>
-          <div class="nav-section-label">编辑与交付</div>
-          <button class="nav-item" data-view="editorial">文章编辑室</button>
+          <div class="nav-section-label">选题管理</div>
+          <button class="nav-item" data-view="topics">文章选题池</button>
+          <div class="nav-section-label">创作方式</div>
+          <button class="nav-item" data-view="editorial">热点事件</button>
+          <button class="nav-item" data-view="daily">批次早报</button>
+          <button class="nav-item" data-view="tutorial">自主写作</button>
+          <div class="nav-section-label">统一编辑与交付</div>
           <button class="nav-item" data-view="editor">文章编辑器</button>
           <button class="nav-item" data-view="preview">公众号排版</button>
         </div>
       </details>
       <details class="nav-group" data-nav-group="social">
-        <summary><span>04</span><b>图文生产</b><small>选题 · 三类图文</small></summary>
+        <summary><span>04</span><b>图文生产</b><small>管理 · 创作</small></summary>
         <div class="nav-group-items">
+          <div class="nav-section-label">选题管理</div>
           <button class="nav-item" data-view="social-topics">图文选题池</button>
+          <div class="nav-section-label">创作方式</div>
           <button class="nav-item" data-view="social-editor">工具图文</button>
           <button class="nav-item" data-view="social-custom">自定义图文</button>
           <button class="nav-item" data-view="social-event">事件图文</button>
@@ -146,6 +149,7 @@
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
+          <div class="scope-tabs" id="article-type-tabs" aria-label="文章类型筛选"><button type="button" class="active" data-article-type="all">全部</button><button type="button" data-article-type="hotspot">热点事件</button><button type="button" data-article-type="independent">自主写作</button></div>
           <div class="topic-pool-hint">选题请在「<a href="#overview">热点全景</a>」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
           <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>历史表现 H</b>相似题材的历史传播信号</span><span><b>成稿潜力 B</b>角度、情绪、标题、受众与事实支撑</span><span><b>账号匹配 P</b>与账号内容方向及独家素材的匹配度</span><span><b>同题饱和 S</b>市场中同类内容的竞争扣分</span><span><b>竞争修正 D</b>额外竞争因素校正</span><span><b>综合成稿分 F</b>最终排序依据，低于 55 默认隐藏</span></div><small>公式：F = H × 60% + B × 25% + P × 15% − S；缩写仅用于与研判报告对照。</small></details>
           <div id="candidate-list" class="candidate-list"></div>
@@ -192,6 +196,10 @@
 
     <section class="view" id="view-tutorial">
       <div class="section-intro"><div><span class="kicker">INDEPENDENT WRITING</span><h2>自主写作</h2></div><p>通过 AI 对话完成心得经验或使用教程；保留主观表达与事实边界，成稿后统一进入文章编辑器和公众号排版。</p></div>
+      <section class="panel custom-writing-projects">
+        <div class="workspace-head"><div><span class="kicker">CURRENT BATCH</span><h3>当前批次自主文章</h3><small>继续查看、重试或编辑已经创建的文章，不必重复新建。</small></div><span id="custom-writing-project-count">0 篇</span></div>
+        <div id="custom-writing-project-list" class="custom-writing-project-list" aria-live="polite" aria-busy="true"><div class="empty-state">正在读取当前批次自主文章…</div></div>
+      </section>
       <form id="tutorial-form" class="panel tutorial-form">
         <div class="creation-steps" id="tutorial-creation-steps" aria-label="自主写作步骤"><span class="active" data-step="1"><b>01</b>选择文章类型</span><span data-step="2"><b>02</b>与 AI 补齐素材</span><span data-step="3"><b>03</b>复核并生成</span></div>
         <section class="writing-mode-section">
@@ -294,7 +302,7 @@
     </section>
 
     <section class="view" id="view-editorial">
-      <div class="section-intro"><div><span class="kicker">EDITORIAL ROOM</span><h2>编辑室</h2></div><p>逐项确认事实、观点与实践边界。所有创作门禁通过后，直接从这里确认简报并启动成稿链。</p></div>
+      <div class="section-intro"><div><span class="kicker">HOTSPOT EDITORIAL ROOM</span><h2>热点事件创作</h2></div><p>只处理热点事件候选：逐项确认事实、观点与实践边界，通过门禁后启动成稿链。</p></div>
       <div class="editorial-layout">
         <div class="candidate-tab-strip">
           <button type="button" class="candidate-tab-arrow previous" id="candidate-tabs-previous" aria-label="向左查看更多候选题">‹</button>
@@ -344,22 +352,24 @@
     <section class="view" id="view-editor">
       <div class="section-intro"><div><span class="kicker">WRITING DESK</span><h2>文章编辑器</h2></div><p>编辑器只接受已锁定候选。草稿与终稿分别保存为 04-draft.md 和 09-FINAL.md，并实时计算可见字符。</p></div>
       <div class="writing-toolbar">
-        <select id="writing-candidate" aria-label="文章候选"></select>
-        <input id="article-title" placeholder="文章标题">
-        <label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked> 草稿</label>
-        <label class="kind-toggle"><input type="radio" name="doc-kind" value="final"> 终稿</label>
-        <span id="char-count">0 / 2000</span>
-        <span id="document-save-state" class="document-save-state saved" role="status" aria-live="polite">已保存</span>
-        <button class="ghost-button" id="document-find" title="查找替换（Ctrl/⌘+F）">查找替换</button>
-        <button class="ghost-button" id="document-history">版本历史</button>
-        <button class="primary-button" id="save-document">保存文稿</button>
+        <div class="document-identity"><select id="writing-candidate" aria-label="文章候选"></select><input id="article-title" placeholder="文章标题"></div>
+        <div class="document-state"><div class="document-kind" role="radiogroup" aria-label="文稿阶段"><label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked><span>草稿</span></label><label class="kind-toggle"><input type="radio" name="doc-kind" value="final"><span>终稿</span></label></div><span id="char-count">0 / 2000</span><span id="document-save-state" class="document-save-state saved" role="status" aria-live="polite">已保存</span></div>
+        <div class="document-actions"><button class="ghost-button" id="document-find" title="查找替换（Ctrl/⌘+F）">查找替换</button><button class="ghost-button" id="document-history">版本历史</button><button class="primary-button" id="save-document">保存文稿</button></div>
       </div>
-      <div class="ai-writing-bar">
-        <div><span class="kicker">MODEL ASSIST</span><b>对当前文稿单步改写</b></div>
-        <select id="draft-provider" aria-label="创作模型"></select>
-        <input id="draft-instructions" placeholder="本轮要求，例如：保留结构，把开头改得更直接">
-        <button class="outline-button" id="ai-draft">AI 生成 / 改写</button>
-        <small id="draft-context">事实、观点、禁写项不会被压缩</small>
+      <div class="editor-assist-grid">
+        <section class="ai-writing-bar" aria-labelledby="model-assist-title">
+          <div class="assist-heading"><span class="kicker">MODEL ASSIST</span><b id="model-assist-title">AI 改写</b><small>对当前文稿执行一次明确修改</small></div>
+          <div class="ai-writing-controls"><select id="draft-provider" aria-label="创作模型"></select><input id="draft-instructions" placeholder="例如：保留结构，把开头改得更直接"><button class="outline-button" id="ai-draft">生成 / 改写</button></div>
+          <small id="draft-context">事实、观点、禁写项不会被压缩</small>
+        </section>
+        <section class="visual-planner" id="visual-planner" aria-labelledby="visual-planner-title">
+          <div class="visual-planner-head">
+            <div><span class="kicker">VISUAL EDITOR</span><b id="visual-planner-title">图表建议</b><small>识别适合流程图或数据图的段落，确认后再插入。</small></div>
+            <button type="button" class="outline-button" id="plan-article-visuals">分析机会</button>
+          </div>
+          <div id="visual-plan-summary" class="visual-plan-summary">终稿确认后，可检查哪些段落值得用图表达。</div>
+          <div id="visual-plan-list" class="visual-plan-list"></div>
+        </section>
       </div>
       <div class="markdown-toolbar" role="toolbar" aria-label="Markdown 格式工具">
         <span>MARKDOWN</span>
@@ -521,7 +531,7 @@
                   <label>模型名称<input id="model-name" required placeholder="gpt-4.1"></label>
                   <label>API Key<input id="model-api-key" type="password" autocomplete="off" placeholder="留空保持现值"></label>
                   <label>上下文窗口<input id="model-context-window" type="number" min="4096" value="128000"></label>
-                  <label>最大输出 Token<input id="model-max-output" type="number" min="256" value="8192"></label>
+                  <label>最大输出 Token<input id="model-max-output" type="number" min="256" value="8192"><small>这是模型能力上限，不是每次调用量。系统会按阶段分配预算，遇到截断时自动扩容重试一次。</small></label>
                   <label>Token 参数<select id="model-max-token-field"><option value="max_tokens">max_tokens</option><option value="max_completion_tokens">max_completion_tokens</option></select></label>
                   <label>打标分组<input id="model-tagging-chunk" type="number" min="1" max="20" value="6"></label>
                   <label>打标并发<input id="model-tagging-concurrency" type="number" min="1" max="20" value="4"></label>
@@ -598,7 +608,7 @@
           <article class="context-card">
             <div><span class="kicker">CONTEXT POLICY</span><h3>分层上下文压缩</h3></div>
             <div class="context-flow"><span>事实 / 来源 / 作者确认<br><b>永久保留</b></span><i>＋</i><span>最近 8 轮<br><b>原文保留</b></span><i>＋</i><span>更早讨论与旧稿<br><b>滚动摘要</b></span></div>
-            <p>预算 = 模型上下文上限 − 最大输出 − 安全余量。摘要必须保留来源 URL、数字、专名、反证、禁写项和未决问题；压缩后仍超限时拒绝调用，不静默截断。</p>
+            <p>输入预算 = 模型上下文上限 − 当前阶段输出预算 − 安全余量。各阶段不会直接占满模型最大输出；仅在模型明确返回长度截断时扩容重试一次。摘要必须保留来源 URL、数字、专名、反证、禁写项和未决问题。</p>
           </article>
         </section>
         <aside class="model-actions-panel">

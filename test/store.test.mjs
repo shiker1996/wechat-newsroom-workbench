@@ -5,6 +5,54 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../lib/core/store.mjs';
 
+test('自主写作创建请求按请求 ID 和内容指纹保持幂等并关联原候选',()=>{
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-custom-idempotency-'));let store;
+  try{
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-28',title:'自主写作幂等'});
+    const first=store.createCustomArticleRequest({batchId:batch.id,requestId:'request-1',fingerprint:'fingerprint-1'});
+    const sameRequest=store.createCustomArticleRequest({batchId:batch.id,requestId:'request-1',fingerprint:'fingerprint-1'});
+    const sameContent=store.createCustomArticleRequest({batchId:batch.id,requestId:'request-2',fingerprint:'fingerprint-1'});
+    assert.equal(sameRequest.id,first.id);
+    assert.equal(sameContent.id,first.id);
+    store.addHotspots(batch.id,'manual',[{title:'教程'}]);
+    const candidate=store.addCandidates(batch.id,[store.getBatch(batch.id).hotspots[0].id])[0];
+    store.updateCandidateTrack(candidate.id,'article',{output_mode:'wechat-tutorial',pool_role:'自主写作'});
+    store.createAiRun({id:'job-1',batchId:batch.id,type:'tutorial',provider:'test'});
+    store.updateAiRun('job-1',{status:'failed',error:'质量门禁未通过'});
+    store.updateCustomArticleRequest(first.id,{candidateId:candidate.id,latestJobId:'job-1'});
+    const restored=store.getCustomArticleRequestByCandidate(candidate.id);
+    assert.equal(restored.latest_job_id,'job-1');
+    assert.equal(restored.request_id,'request-1');
+    let projects=store.listCustomArticleProjects(batch.id);
+    assert.equal(projects.length,1);
+    assert.equal(projects[0].job_status,'failed');
+    store.saveDocument({batchId:batch.id,candidateId:candidate.id,kind:'draft',title:'教程草稿',content:'# 教程草稿'});
+    projects=store.listCustomArticleProjects(batch.id);
+    assert.equal(projects[0].document_title,'教程草稿');
+  }finally{store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('自动图文预选排除历史上已生成完整图文的同一仓库，但不影响人工加入', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-social-history-filter-'));let store;
+  try {
+    store=new Store(path.join(tempRoot,'test.db'));
+    const oldBatch=store.createBatch({date:'2026-07-22',title:'历史批次'});
+    store.addHotspots(oldBatch.id,'github',[{title:'alibaba/open-code-review',url:'https://github.com/alibaba/open-code-review',repository:'alibaba/open-code-review'}]);
+    store.addCandidates(oldBatch.id,[store.getBatch(oldBatch.id).hotspots[0].id],{tracks:['social_cards']});
+    const oldCandidate=store.listCandidates(oldBatch.id,'social_cards')[0];
+    const html=path.join(tempRoot,'my-design.html');fs.writeFileSync(html,'<html></html>');const stat=fs.statSync(html);
+    store.upsertArtifact({batchId:oldBatch.id,candidateId:oldCandidate.id,track:'social_cards',kind:'图文设计 HTML',name:'my-design.html',path:html,size:stat.size,modifiedAt:'2026-07-22T08:00:00.000Z'});
+    const newBatch=store.createBatch({date:'2026-07-29',title:'当前批次'});
+    store.addHotspots(newBatch.id,'github',[{title:'alibaba/open-code-review 再次上榜',url:'https://github.com/alibaba/open-code-review',repository:'alibaba/open-code-review'}]);
+    const hotspot=store.getBatch(newBatch.id).hotspots[0];
+    store.saveSocialPreselection(newBatch.id,[{hotspotId:hotspot.id,socialScore:88}]);
+    assert.equal(store.listCandidates(newBatch.id,'social_cards').length,0);
+    store.addCandidates(newBatch.id,[hotspot.id],{tracks:['social_cards']});
+    assert.equal(store.listCandidates(newBatch.id,'social_cards').length,1);
+  } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
 test('编辑决策将布尔型体验要求规范化为 SQLite 整数',()=>{
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-editorial-bool-'));let store;
   try{

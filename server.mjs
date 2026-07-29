@@ -3,15 +3,15 @@ import path from 'node:path';
 import http from 'node:http';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { backup as backupSqlite } from 'node:sqlite';
 import { Store } from './lib/core/store.mjs';
 import { loadConfig } from './lib/core/config.mjs';
-import { indexArtifacts, isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
+import { isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
 import { JobManager } from './lib/jobs/job-manager.mjs';
-import { checkReddit } from './collectors/reddit.mjs';
-import { checkRssHub, ensureStarted, stopRssHub, testSubscription } from './collectors/rsshub.mjs';
-import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from './lib/integrations/subscriptions.mjs';
+import { ensureStarted } from './collectors/rsshub.mjs';
 import { ModelGateway } from './lib/llm/gateway.mjs';
 import { draftArticle, tagBatch } from './lib/llm/tasks.mjs';
 import { isFreshForBatch } from './lib/llm/research-pipeline.mjs';
@@ -32,15 +32,20 @@ import { extractLocalProjectPath, readLocalProject } from './lib/integrations/lo
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
-import { validateWorkbenchBackup } from './lib/artifacts/backup-archive.mjs';
-import { getGitHubApiHealth } from './lib/integrations/github-api.mjs';
-import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from './lib/artifacts/artifact-preview.mjs';
 import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
 import { routeBreakingAnalysis } from './lib/llm/breaking-analysis-pipeline.mjs';
 import { dailyFocusOptions } from './lib/llm/daily-pipeline.mjs';
 import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, describeCardLayouts, normalizeCardComposition } from './lib/llm/social-card-pipeline.mjs';
-import { getRuntimeSettings, runPowerShellScript, updateRuntimeSettings } from './lib/integrations/runtime-settings.mjs';
-import { deleteModelProvider, saveModelProvider } from './lib/integrations/model-provider-settings.mjs';
+import { analyzeVisualComplexity, planArticleVisuals } from './lib/llm/visual-planner.mjs';
+import { defaultTypesetTheme, TYPESET_THEMES } from './lib/llm/typeset-pipeline.mjs';
+import { isResearchEligibleHotspot } from './lib/domain/hotspot-pipeline-scope.mjs';
+import { buildBatchPipelineStatus } from './lib/domain/batch-pipeline-status.mjs';
+import { handleContentRoutes } from './lib/http/routes/content-routes.mjs';
+import { handleModelRoutes } from './lib/http/routes/model-routes.mjs';
+import { handleSystemRoutes } from './lib/http/routes/system-routes.mjs';
+import { handleMediaRoutes } from './lib/http/routes/media-routes.mjs';
+import { handleArticleRoutes } from './lib/http/routes/article-routes.mjs';
+import { handleSocialCardRoutes } from './lib/http/routes/social-card-routes.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
@@ -49,10 +54,22 @@ const store = new Store(path.join(root, 'data', 'workbench.db'));
 const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
 const jobs = new JobManager(store, config);
+
+function customArticleFingerprint(batchId,input={}) {
+  const normalized={};
+  for(const key of ['articleMode','topic','audience','thesis','environment','points','steps','prerequisites','expected_results','common_errors','limitations','materialUrls','localProjectPath']){
+    const value=input[key];
+    normalized[key]=Array.isArray(value)
+      ? value.map((item)=>String(item||'').trim()).filter(Boolean)
+      : String(value||'').trim().replace(/\r\n/g,'\n');
+  }
+  return crypto.createHash('sha256').update(JSON.stringify({batchId,...normalized})).digest('hex');
+}
 const models = new ModelGateway(config, store);
 const aiJobs = new AiJobManager(store, models, config);
 const artifactRoots = [config.workspaceRoot, ...config.contentRoots];
 const publicRoot = path.join(root, 'public');
+const execFileAsync = promisify(execFile);
 
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -164,7 +181,7 @@ function decorateBatch(batch) {
   batch.freshness={fresh:batch.hotspots.length-stale,stale,maxAgeHours};
   // 打标进度只统计有效窗口内的热点：旧闻归档不参与打标与研判，不应计入分母
   if (batch.ai_status) {
-    const freshItems = batch.hotspots.filter((item) => !item.is_stale);
+    const freshItems = batch.hotspots.filter((item) => !item.is_stale && isResearchEligibleHotspot(item));
     batch.ai_status = { ...batch.ai_status,
       tagged: freshItems.filter((item) => { try { return Boolean(JSON.parse(item.raw_json).aiTags?.eventKey); } catch { return false; } }).length,
       total: freshItems.length };
@@ -227,25 +244,16 @@ async function api(request, response, url) {
   if (request.method === 'GET' && pathname === '/api/overview') {
     return json(response, 200, store.overview());
   }
-  if (request.method === 'GET' && pathname === '/api/models') {
-    return json(response, 200, { ...models.listProviders(), calls: store.listModelCalls(50) });
-  }
-  if (request.method === 'POST' && pathname === '/api/models/config') {
-    const id=saveModelProvider(root,config,await body(request));
-    return json(response,200,{saved:true,id,...models.listProviders()});
-  }
-  const modelConfigDelete=pathname.match(/^\/api\/models\/config\/([^/]+)$/);
-  if(request.method==='DELETE'&&modelConfigDelete){
-    const id=deleteModelProvider(root,config,decodeURIComponent(modelConfigDelete[1]));
-    return json(response,200,{deleted:true,id,...models.listProviders()});
-  }
-  if (request.method === 'POST' && pathname === '/api/models/test') {
-    const input = await body(request);
-    const result = await models.complete({ provider: input.provider, purpose: 'connection-test', maxOutputTokens: 16,
-      messages: [{ role: 'user', content: '只回复 OK', protected: true }] });
-    return json(response, 200, { provider: result.provider, model: result.model, reply: result.content,
-      latencyTokens: result.usage, compressed: result.context.compressed });
-  }
+  if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
+  if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json })) return;
+  if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
+    binaryBody, createWorkbenchBackup })) return;
+  const mediaResult = await handleMediaRoutes({ request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity });
+  if (mediaResult !== false) return mediaResult;
+  const articleResult = await handleArticleRoutes({ request, response, pathname, store, json, body, candidateEventGroups, fetchCandidateSource, config, root, runEditorialTurn, runEditorialTurnStream, writeUtf8, path, batchWorkdir, lockedBrief, draftArticle, models, aiJobs });
+  if (articleResult !== false) return articleResult;
+  const socialCardResult = await handleSocialCardRoutes({ request, response, pathname, searchParams, store, json, body, path, fs, root, config, mime, models, aiJobs, socialCardFiles, isInsideRoots, createZip, socialContentType, resolveEventAnalysisFor, socialCardGate, socialChannelMode, describeCardLayouts, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_COMPOSITION_MODES, normalizeCardComposition, loadSkillBundle, fetchCandidateSource, candidateEventGroups, candidateRepositoryUrl, inspectRepository, socialCardWorkdir, writeUtf8, repositoryFactMarkdown, evaluateCardGate });
+  if (socialCardResult !== false) return socialCardResult;
   if (request.method === 'GET' && pathname === '/api/batches') {
     return json(response, 200, store.listBatches(Number(searchParams.get('limit') ?? 60)));
   }
@@ -275,13 +283,21 @@ async function api(request, response, url) {
       try {
         const cardFile = path.join(batchWorkdir(batch), 'sources', 'event-cards.json');
         const cardCount = fs.existsSync(cardFile) ? (JSON.parse(fs.readFileSync(cardFile, 'utf8'))?.items || []).length : 0;
-        const tagged = batch.hotspots.filter((item) => !item.is_stale).filter((item) => {
+        const tagged = batch.hotspots.filter((item) => !item.is_stale && isResearchEligibleHotspot(item)).filter((item) => {
           try { const tags = JSON.parse(item.raw_json).aiTags; return Boolean(tags?.eventKey && tags?.preScores); } catch { return false; }
         });
         const cardTotal = clusterItems(tagged).length;
         // 同日常规批次共享 topics 工作目录：本批还没有已打标事件时，目录里的卡属于其他批次，不能计入进度
         batch.event_cards = { count: cardTotal ? Math.min(cardCount, cardTotal) : 0, total: cardTotal };
       } catch { batch.event_cards = { count: 0, total: 0 }; }
+      batch.pipeline_status = buildBatchPipelineStatus({
+        hotspotCount: batch.ai_status.total,
+        tagged: batch.ai_status.tagged,
+        total: batch.ai_status.total,
+        cardsCount: batch.event_cards.count,
+        cardsTotal: batch.event_cards.total,
+        latestResearch: batch.ai_status.latestResearch,
+      });
     }
     return json(response, batch ? 200 : 404, batch ?? { error: '批次不存在' });
   }
@@ -317,7 +333,7 @@ async function api(request, response, url) {
     if(!batch)return json(response,404,{error:'批次不存在'});
     const file=path.join(batchWorkdir(batch),'sources','social-card-ranking.json');
     let items=[];try{items=JSON.parse(fs.readFileSync(file,'utf8')).items||[];}catch{}
-    if(!items.length){const eligible=batch.hotspots.filter((item)=>isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
+    if(!items.length){const eligible=batch.hotspots.filter(isResearchEligibleHotspot).filter((item)=>isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
       const tagged=eligible.filter((item)=>{try{const tags=JSON.parse(item.raw_json||'{}').aiTags;return tags?.eventKey&&tags?.preScores;}catch{return false;}});
       if(tagged.length)items=selectSocialCandidates(preselection(clusterItems(tagged),batch.batch_date),tagged.length,true).map((item,index)=>({...item,socialRank:index+1,selected:index<10&&item.eligible}));}
     const candidates=store.listCandidates(batchId,'social_cards');const inPoolIds=new Set(candidates.map((item)=>item.hotspot_id));
@@ -356,7 +372,7 @@ async function api(request, response, url) {
     const batchId = decodeURIComponent(overviewMatch[1]);
     const batch = store.getBatch(batchId);
     if (!batch) return json(response, 404, { error: '批次不存在' });
-    const eligible = batch.hotspots.filter((item) => isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
+    const eligible = batch.hotspots.filter(isResearchEligibleHotspot).filter((item) => isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
     const taggedCount = eligible.filter((item) => { try { const tags=JSON.parse(item.raw_json).aiTags; return Boolean(tags?.eventKey&&tags?.relevanceReason&&tags?.preScores); } catch { return false; } }).length;
     const atlas = buildHotspotAtlas({ clusters:clusterItems(eligible), totalArticles:eligible.length, taggedCount,
       excludedStale:batch.hotspots.length-eligible.length });
@@ -432,7 +448,7 @@ async function api(request, response, url) {
       if(fs.existsSync(cardFile)){
         eventCards=JSON.parse(fs.readFileSync(cardFile,'utf8'))?.items||[];
         const cardMap=new Map(eventCards.map((item)=>[item.event_id,item]));
-        const eligible=batch.hotspots.filter((item)=>isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
+        const eligible=batch.hotspots.filter(isResearchEligibleHotspot).filter((item)=>isFreshForBatch(item,batch.batch_date,batchMaxAgeHours(batch)));
         const clusters=clusterItems(eligible);
         for(const event of clusters)event.card=cardMap.get(event.event_id)||null;
         focusOptions=dailyFocusOptions(clusters);
@@ -455,7 +471,7 @@ async function api(request, response, url) {
     if (!fs.existsSync(cardFile)) return null;
     const cardMap = new Map((JSON.parse(fs.readFileSync(cardFile, 'utf8'))?.items || []).map((item) => [item.event_id, item]));
     if (!cardMap.size) return null;
-    const eligible = batch.hotspots.filter((item) => isFreshForBatch(item, batch.batch_date, batchMaxAgeHours(batch)));
+    const eligible = batch.hotspots.filter(isResearchEligibleHotspot).filter((item) => isFreshForBatch(item, batch.batch_date, batchMaxAgeHours(batch)));
     const hotspotCard = new Map();
     for (const event of clusterItems(eligible)) {
       const card = cardMap.get(event.event_id);
@@ -500,7 +516,12 @@ async function api(request, response, url) {
     try {
       const batchId = decodeURIComponent(candidatesMatch[1]);
       const track = searchParams.get('track') || 'article';
-      const candidates = store.listCandidates(batchId, track);
+      const kind = searchParams.get('kind') || 'all';
+      let candidates = store.listCandidates(batchId, track);
+      if(track==='article'&&kind!=='all'){
+        const independent=(item)=>['wechat-experience','wechat-tutorial'].includes(String(item.output_mode||''));
+        candidates=candidates.filter((item)=>kind==='independent'?independent(item):kind==='hotspot'?!independent(item):true);
+      }
       // 重叠标注需要成员热点：综合候选取 candidate_hotspots 全量成员，单热点候选取自身
       for (const candidate of candidates) {
         candidate.member_hotspot_ids = candidate.composite
@@ -636,7 +657,7 @@ async function api(request, response, url) {
     try {
       const fact = await buildCustomFactSheet({ input, root });
       const materialUrls = (fact.materials || []).map((item) => item.url);
-      const hotspot = store.addManualHotspot(batch.id, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自定义图文（${fact.content_type_label}）` });
+      const hotspot = store.addManualHotspot(batch.id, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自定义图文（${fact.content_type_label}）`, researchEligible:false });
       if (!hotspot) throw new Error('手工热点创建失败');
       store.addCandidates(batch.id, [hotspot.id], { tracks: ['social_cards'] });
       const candidate = store.listCandidates(batch.id, 'social_cards').find((item) => Number(item.hotspot_id) === Number(hotspot.id));
@@ -687,11 +708,35 @@ async function api(request, response, url) {
   }
   // `/tutorials` 保留兼容；新入口统一称为自主写作。
   const tutorialMatch=pathname.match(/^\/api\/batches\/([^/]+)\/(?:custom-articles|tutorials)$/);
+  if(tutorialMatch&&request.method==='GET'){
+    const batchId=decodeURIComponent(tutorialMatch[1]);
+    if(!store.getBatch(batchId))return json(response,404,{error:'批次不存在'});
+    const projects=store.listCustomArticleProjects(batchId).map((item)=>{
+      const projectStatus=item.document_id?'draft_ready'
+        : item.job_status==='running'?'generating'
+          : ['failed','interrupted'].includes(item.job_status)?'failed':'ready_to_generate';
+      return {...item,project_status:projectStatus};
+    });
+    return json(response,200,projects);
+  }
   if(tutorialMatch&&request.method==='POST'){
     const batchId=decodeURIComponent(tutorialMatch[1]),batch=store.getBatch(batchId);
     if(!batch)return json(response,404,{error:'批次不存在'});
     const input=await body(request);
     try{
+      const fingerprint=customArticleFingerprint(batchId,input);
+      const requestId=String(input.creationRequestId||fingerprint).trim();
+      let creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})
+        ||store.createCustomArticleRequest({batchId,requestId,fingerprint});
+      if(creation?.candidate_row_id){
+        const candidate=store.getCandidate(creation.candidate_row_id);
+        let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
+        if(candidate&&!job){
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+          store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
+        }
+        if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
+      }
       const articleMode=String(input.articleMode||'tutorial').trim()==='experience'?'experience':'tutorial';
       let project=null;
       if(articleMode==='tutorial'&&String(input.localProjectPath||'').trim())project=readLocalProject(input.localProjectPath);
@@ -709,9 +754,19 @@ async function api(request, response, url) {
       if(articleMode==='experience'&&!fact.thesis)throw new Error('心得经验文章需要明确核心观点');
       if(articleMode==='experience'&&!fact.points.some((item)=>item.source_level==='author_experience'))throw new Error('心得经验文章至少需要一条【体验】要点');
       if(fact.materials.some((item)=>item.status!=='ok'))throw new Error(`素材抓取失败：${fact.materials.filter((item)=>item.status!=='ok').map((item)=>item.url).join('、')}`);
+      creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})||creation;
+      if(creation?.candidate_row_id){
+        const candidate=store.getCandidate(creation.candidate_row_id);
+        let job=creation.latest_job_id?aiJobs.get(creation.latest_job_id):null;
+        if(candidate&&!job){
+          job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+          store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
+        }
+        if(candidate&&job)return json(response,200,{...job,candidate,reused:true});
+      }
       const materialUrls=fact.materials.map((item)=>item.url);
       const articleLabel=articleMode==='experience'?'心得经验':'使用教程';
-      const hotspot=store.addManualHotspot(batchId,{title:fact.topic,url:materialUrls[0]||null,materialUrls,notes:`自主写作（${articleLabel}）`});
+      const hotspot=store.addManualHotspot(batchId,{title:fact.topic,url:materialUrls[0]||null,materialUrls,notes:`自主写作（${articleLabel}）`,researchEligible:false});
       store.addCandidates(batchId,[hotspot.id],{tracks:['article']});
       const candidate=store.listCandidates(batchId,'article').find((item)=>Number(item.hotspot_id)===Number(hotspot.id));
       if(!candidate)throw new Error('自主写作项目创建失败');
@@ -725,9 +780,24 @@ async function api(request, response, url) {
       const briefFile=writeUtf8(briefPath,`---\nbrief_status: LOCKED\ncandidate_id: ${candidate.candidate_id}\narticle_mode: ${articleMode}\nexperience_required: ${articleMode==='experience'||Boolean(experiences)}\nfinal_readiness: WRITE_NOW\n---\n\n# ${fact.topic}\n\n${articleMode==='experience'?`核心观点：${fact.thesis}`:`环境：${fact.environment}`}\n`);
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'自主写作事实基座',name:'01-tutorial-fact-base.json',path:factPath,...factFile});
       store.upsertArtifact({batchId,candidateId:candidate.id,track:'article',kind:'锁定简报',name:'article-brief.md',path:briefPath,...briefFile});
+      store.updateCustomArticleRequest(creation.id,{candidateId:candidate.id});
       const job=aiJobs.start({batchId,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+      store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
       return json(response,202,{...job,candidate:store.getCandidate(candidate.id)});
     }catch(error){return json(response,400,{error:`创建自主写作失败：${error.message}`});}
+  }
+  const tutorialRetryMatch=pathname.match(/^\/api\/candidates\/(\d+)\/custom-article-runs$/);
+  if(tutorialRetryMatch&&request.method==='POST'){
+    const candidate=store.getCandidate(Number(tutorialRetryMatch[1]));
+    if(!candidate)return json(response,404,{error:'自主写作项目不存在'});
+    if(!['wechat-experience','wechat-tutorial'].includes(candidate.output_mode))return json(response,409,{error:'该候选不是自主写作项目'});
+    const input=await body(request);
+    try{
+      const creation=store.getCustomArticleRequestByCandidate(candidate.id);
+      const job=aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:input.provider,type:'tutorial'});
+      if(creation)store.updateCustomArticleRequest(creation.id,{latestJobId:job.id});
+      return json(response,202,{...job,candidate});
+    }catch(error){return json(response,400,{error:`重新执行自主写作失败：${error.message}`});}
   }
   const candidateMatch = pathname.match(/^\/api\/candidates\/(\d+)$/);
   if (candidateMatch && request.method === 'GET') {
@@ -746,440 +816,6 @@ async function api(request, response, url) {
   if (candidateMatch && request.method === 'DELETE') {
     store.deleteCandidate(Number(candidateMatch[1]));
     return json(response, 200, { ok: true });
-  }
-  const cardEditorialMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-editorial$/);
-  const cardPageLayoutMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)\/layout$/);
-  const cardPageMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)$/);
-  const socialCardsMatch = pathname.match(/^\/api\/candidates\/(\d+)\/social-cards$/);
-  if(socialCardsMatch&&request.method==='GET'){
-    const candidate=store.getCandidate(Number(socialCardsMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});const batch=store.getBatch(candidate.batch_id);const workspace=socialCardFiles(batch,candidate);
-    const read=(name,fallback='')=>{const file=path.join(workspace.dir,name);if(!fs.existsSync(file))return fallback;return fs.readFileSync(file,'utf8');};
-    const parse=(name,fallback)=>{try{return JSON.parse(read(name));}catch{return fallback;}};
-    const images=workspace.files.filter((file)=>file.name.startsWith('output/')).map((file,index)=>({index:index+1,name:path.basename(file.name),url:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}`,downloadUrl:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}?download=1`,size:fs.statSync(file.path).size}));
-    return json(response,200,{candidateId:candidate.id,code:candidate.candidate_id,title:candidate.hotspot_title,ready:images.length>0,images,copy:read('copy.txt'),facts:read('fact-sheet.md'),cardPlan:parse('card-plan.json',{}),layout:parse('layout-report.json',{}),delivery:parse('delivery-report.json',{}),htmlUrl:fs.existsSync(path.join(workspace.dir,'my-design.html'))?`/api/candidates/${candidate.id}/social-cards/files/my-design.html`:'',bundleUrl:images.length?`/api/candidates/${candidate.id}/social-cards/download`:''});
-  }
-  const socialCardFileMatch=pathname.match(/^\/api\/candidates\/(\d+)\/social-cards\/files\/(.+)$/);
-  if(socialCardFileMatch&&request.method==='GET'){
-    const candidate=store.getCandidate(Number(socialCardFileMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});const batch=store.getBatch(candidate.batch_id);const workspace=socialCardFiles(batch,candidate);const relative=decodeURIComponent(socialCardFileMatch[2]);const file=path.resolve(workspace.dir,relative);
-    if(!isInsideRoots(file,[workspace.dir])||!fs.existsSync(file)||!fs.statSync(file).isFile())return json(response,404,{error:'图文产物不存在'});const headers={'content-type':mime[path.extname(file)]||'application/octet-stream','cache-control':'no-store'};if(searchParams.get('download')==='1')headers['content-disposition']=`attachment; filename="${path.basename(file).replace(/"/g,'')}"`;response.writeHead(200,headers);return fs.createReadStream(file).pipe(response);
-  }
-  const socialCardDownloadMatch=pathname.match(/^\/api\/candidates\/(\d+)\/social-cards\/download$/);
-  if(socialCardDownloadMatch&&request.method==='GET'){
-    const candidate=store.getCandidate(Number(socialCardDownloadMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});const batch=store.getBatch(candidate.batch_id);const workspace=socialCardFiles(batch,candidate);if(!workspace.files.length)return json(response,404,{error:'暂无可下载图文产物'});const zip=createZip(workspace.files);response.writeHead(200,{'content-type':'application/zip','content-disposition':`attachment; filename="${candidate.candidate_id.toLowerCase()}-social-cards.zip"`,'content-length':zip.length});return response.end(zip);
-  }
-  if (cardEditorialMatch && request.method === 'GET') {
-    const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const editorial=store.getCardEditorial(candidate.id); const facts=store.getRepositoryFactSheet(candidate.id); const score=store.getSocialScore(candidate.id);
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
-    const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
-    const cardPlan=JSON.parse(editorial.card_plan_json||'[]');const channelMode=socialChannelMode(candidate);
-    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
-  }
-  if(cardPageLayoutMatch&&request.method==='PUT'){
-    const candidate=store.getCandidate(Number(cardPageLayoutMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
-    const pageIndex=Number(cardPageLayoutMatch[2])-1;const input=await body(request);const layoutStyle=String(input.layout_style||'auto');
-    if(!SOCIAL_CARD_LAYOUTS.includes(layoutStyle))return json(response,400,{error:'不支持的逐页版式'});
-    const current=store.getCardEditorial(candidate.id);let cardPlan;try{cardPlan=JSON.parse(current.card_plan_json||'[]');}catch{cardPlan=[];}
-    if(!Array.isArray(cardPlan)||!cardPlan[pageIndex])return json(response,404,{error:'故事板页面不存在'});
-    cardPlan[pageIndex]={...cardPlan[pageIndex],layout_style:layoutStyle};
-    const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan)});
-    const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
-  }
-  if(cardPageMatch&&request.method==='PUT'){
-    const candidate=store.getCandidate(Number(cardPageMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
-    const pageIndex=Number(cardPageMatch[2])-1;const input=await body(request);
-    const current=store.getCardEditorial(candidate.id);let cardPlan;try{cardPlan=JSON.parse(current.card_plan_json||'[]');}catch{cardPlan=[];}
-    if(!Array.isArray(cardPlan)||!cardPlan[pageIndex])return json(response,404,{error:'故事板页面不存在'});
-    const title=String(input.title||'').trim();
-    if(!title)return json(response,400,{error:'页面标题不能为空'});
-    const blocks=Array.isArray(input.content_blocks)?input.content_blocks.slice(0,4):null;
-    if(!blocks?.length)return json(response,400,{error:'每页至少保留一个内容块'});
-    const allowedBlockTypes=['text','list','code','note','stats','compare','steps','timeline','scenes','highlight'];
-    if(blocks.some((block)=>!allowedBlockTypes.includes(block?.type)))return json(response,400,{error:'故事板包含不支持的内容块类型'});
-    cardPlan[pageIndex]={
-      ...cardPlan[pageIndex],
-      title,
-      goal:String(input.goal||'').trim(),
-      content_blocks:blocks.map((block)=>({
-        ...block,
-        title:String(block.title||'').trim(),
-        content:String(block.content||'').trim(),
-      })),
-    };
-    const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
-    const facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
-    const eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
-    const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,cardPlan,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
-  }
-  if (cardEditorialMatch && request.method === 'PUT') {
-    const candidate=store.getCandidate(Number(cardEditorialMatch[1]));
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const input=await body(request);
-    if(input.layout_style&&!SOCIAL_CARD_LAYOUTS.includes(input.layout_style))return json(response,400,{error:'不支持的图文版式'});
-    if(input.composition_mode&&!SOCIAL_CARD_COMPOSITION_MODES.includes(input.composition_mode))return json(response,400,{error:'不支持的构图模式'});
-    const editorial=store.saveCardEditorial(candidate.id,input); const facts=store.getRepositoryFactSheet(candidate.id);
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
-    let cardPlan=[];try{cardPlan=JSON.parse(editorial.card_plan_json||'[]');}catch{}
-    const channelMode=socialChannelMode(candidate);
-    return json(response,200,{editorial,contentType,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),cardPlan,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
-  }
-  // 渠道切换：只换 output_mode 的渠道前缀（wechat-* ↔ xiaohongshu-*），类型部分不动，轨道与卡片决策同步
-  const cardChannelMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-channel$/);
-  if (cardChannelMatch && request.method === 'POST') {
-    const candidate=store.getCandidate(Number(cardChannelMatch[1]));
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const input=await body(request);
-    const channel=String(input.channel||'').trim();
-    if(!['wechat','xiaohongshu'].includes(channel))return json(response,400,{error:'channel 必须是 wechat 或 xiaohongshu'});
-    const track=candidate.tracks?.find((item)=>item.track==='social_cards');
-    const currentMode=track?.output_mode||store.getCardEditorial(candidate.id).output_mode||'wechat-tool-cards';
-    const typeSuffix=String(currentMode).replace(/^(wechat|xiaohongshu)-/,'');
-    const nextMode=`${channel}-${typeSuffix}`;
-    if(nextMode!==currentMode){
-      store.updateCandidateTrack(candidate.id,'social_cards',{output_mode:nextMode});
-      store.saveCardEditorial(candidate.id,{...store.getCardEditorial(candidate.id),output_mode:nextMode});
-    }
-    const updated=store.getCandidate(candidate.id);
-    const editorial=store.getCardEditorial(candidate.id);const cardPlan=JSON.parse(editorial.card_plan_json||'[]');
-    return json(response,200,{outputMode:nextMode,channelMode:channel,hasPlan:Boolean(cardPlan.length),candidate:updated,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode:channel})});
-  }
-  const cardEditorialAiMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/card-editorial$/);
-  if (cardEditorialAiMatch && request.method === 'POST') {
-    const candidate=store.getCandidate(Number(cardEditorialAiMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
-    const contentType=socialContentType(candidate),facts=store.getRepositoryFactSheet(candidate.id);
-    let eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
-    if(contentType==='repository'&&!facts?.data?.sourceUrl)return json(response,409,{error:'请先完成仓库事实核验'});
-    if(contentType==='event'){
-      if(!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该事件尚无事件卡，请先在热点全景运行事件研判'});
-      // 日常批次事件候选可能尚未抓取来源，生成故事板前自动补抓
-      if(!(eventAnalysis.analysis.sources||[]).some((item)=>item.status==='ok')){
-        const hotspots=candidateEventGroups(candidate).flatMap((group)=>group.hotspots);
-        if(hotspots.length){try{await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId:candidate.id,root,force:false,hotspots});}catch{}}
-        eventAnalysis=resolveEventAnalysisFor(candidate);
-      }
-    }
-    if(contentType==='custom'&&facts?.data?.kind!=='custom')return json(response,409,{error:'请先填写自定义事实基座'});
-    const input=await body(request); const current=store.getCardEditorial(candidate.id); const providerConfig=models.config.providers[input.provider||models.config.defaultProvider];
-    try {
-      const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:'xiaohongshu-article-generator'});
-      if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
-      // 小红书渠道开放数据卡/对比卡/步骤卡/时间卡/场景卡/亮点卡版式，公众号维持基础块
-      const xhsChannel=socialChannelMode(candidate)==='xiaohongshu';
-      const cardBlockTypes=xhsChannel?'text|list|note|stats|compare|steps|timeline|scenes|highlight':'text|list|note';
-      const repoBlockTypes=xhsChannel?'text|list|code|note|stats|compare|steps|timeline|scenes|highlight':'text|list|code|note';
-      const eventSystem=`${socialSkill.prompt}\n\n## 当前运行阶段：突发事实基座到事件卡片故事板
-只依据已确认事实、带来源的未核实主张、时间线和来源审计规划卡片。不得把 claims 写成事实；每个关键事实就近写明“来源 N”，未核实内容必须使用“声称/据其发布/尚未获独立证实”等边界表达。
-返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"事件内容定位","must_highlight":"","must_disclose":"来源和未核实边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|what-happened|timeline|evidence|positions|impact|risk|ending","title":"具体页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'该主张仅来自单一社交媒体账号，尚未获独立证实。'、'三方回应否认了核心指控。'","evidence":["来源 N 支持的内容"],"content_blocks":[{"type":"${cardBlockTypes}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。封面只呈现已支持的核心冲突；至少一页说明事实边界；若存在多方回应则单独成页；结尾不得诱导网暴。`;
-      const repositorySystem=`${socialSkill.prompt}\n\n## 当前运行阶段：README 到卡片故事板
-只依据已核验仓库事实和 README 生成图文决策，不得虚构体验、效果、性能、价格、权限或数字。故事板必须让读者明确回答：它是什么、解决什么具体问题、核心功能如何工作、怎样开始、适合谁、有什么限制。禁止用 GitHub topics 代替功能解释。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"","must_highlight":"","must_disclose":"","getting_started":"","forbidden_claims":"","recommended_pages":4到7,"card_plan":[{"kind":"cover|problem|capability|quickstart|scenario|limitation|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'复制命令即可安装该组件，无需额外配置。'、'相比手动实现，这个库把底层样板代码封装成一条链式 API。'","evidence":["直接支持内容的 README 或仓库事实"],"content_blocks":[{"type":"${repoBlockTypes}","title":"可选小标题","content":"文字，或 list 类型使用换行分隔；单块不超过 160 字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。每页 2–4 个内容块，能力页必须写出 README 中的具体能力和工作方式，快速上手页保留真实命令，限制页明确未核验项。must_disclose 必须说明“基于项目文档整理，未实际运行”以及未知权限、网络和成熟度。`;
-      const customSystem=`${socialSkill.prompt}\n\n## 当前运行阶段：自定义事实基座到卡片故事板
-只依据自定义事实基座规划卡片，不得虚构体验、效果、数字或收益。体验真实性三来源等级是硬约束：source_level=author_experience 的要点可以写成第一人称亲历；user_material 必须保留来源归属；model_suggestion 只能表述为建议或参考，禁止写成亲测、效果或收益。按内容类型组织故事线：教程（cover→场景与痛点→step 分步页→注意事项→ending）；清单（cover→筛选标准→item 条目页→边界→ending）；观点（cover→核心论点→highlight 论据页→反方与边界→ending）。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"内容定位","must_highlight":"","must_disclose":"来源等级与体验边界","getting_started":"","forbidden_claims":"","recommended_pages":4到10,"card_plan":[{"kind":"cover|highlight|step|item|boundary|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'本页旨在...'；正确示例：'三步完成配置，第二步最容易漏。'","evidence":["事实基座中支持本页的要点，标注来源等级"],"content_blocks":[{"type":"${cardBlockTypes}","title":"可选小标题","content":"每块不超过160字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。至少一页说明事实边界与限制（boundary）；model_suggestion 要点不得单独成页充当卖点。must_disclose 必须写明体验性表述来自作者确认、建议性内容未实测。`;
-      const storyboardSystem=contentType==='event'?eventSystem:contentType==='custom'?customSystem:repositorySystem;
-      const storyboardChannelDirective=socialChannelMode(candidate)==='xiaohongshu'
-        ?'\n小红书渠道要求：页型与公众号一致（375×667），每页 2–4 个内容块；封面钩子更口语化、带好奇心；结尾页引导收藏与评论互动。除 text/list/note 外，内容块的 type 还可以使用以下版式：stats 数据卡（items:[{"num":"简短数字","label":"含义"}]，2–4 个，数字必须来自事实基座；num 不超过 6 个字符，如 "1h51m"、"3 线"、"99.9%"，禁止 "12+15+4" 这类长算式，长数据拆成多个条目或写进 label）、compare 对比卡（headers:["列名"],rows:[["单元格"]]，用于多方立场或产品对比）、steps 步骤卡（items:[{"title":"步骤名","content":"简述"}]，用于教程分步）、timeline 时间卡（items:[{"time":"时间","title":"事件","content":"简述"}]，用于事件时间线）、scenes 场景卡（items:[{"title":"场景","content":"简述"}]，2–3 个横排）、highlight 亮点卡（title+content，用于本页核心卖点）。使用这些版式时内容必须写入 items/headers/rows 字段，不要写入块的 content 字段。按内容选择合适版式，不要整篇都是纯文本块。'
-        :'\n公众号渠道要求：页面为 9:16 长页，每页 2–4 个内容块；标题偏信息密度，结尾页引导收藏与转发。';
-      const storyboardCompositionDirective='\n构图字段要求：card_plan 每页增加 role（cover|concept|feature|steps|data|compare|evidence|timeline|risk|ending）。可选 composition 只允许由系统规范化，字段为 id、columns、flow、alignment、decoration、overlap；decoration 仅可表达 none/orbit/index-line/stamp，overlap 仅可表达 none/title-card/accent-edge。不要输出 CSS、坐标、尺寸或 HTML。';
-      const result=await models.complete({provider:input.provider,purpose:'social-card-editorial',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(6000,providerConfig.maxOutputTokens),messages:[
-        {role:'system',protected:true,content:storyboardSystem+storyboardChannelDirective+storyboardCompositionDirective},
-        {role:'user',protected:true,content:JSON.stringify(contentType==='event'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,event_analysis:eventAnalysis.analysis}:contentType==='custom'?{topic:candidate.hotspot_title,channel_mode:current.output_mode,custom_facts:facts.data}:{topic:candidate.hotspot_title,channel_mode:current.output_mode,repository_facts:facts.data})}
-      ]});
-      const parsed=JSON.parse(result.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));
-      const maxPages=contentType==='repository'?7:10;
-      const cardPlan = (Array.isArray(parsed.card_plan) ? parsed.card_plan.slice(0,maxPages) : []).map((page,pageIndex) => {
-        const instructionPatterns = [/^让读者(?:一眼)?知道/,/^让读者/,/^读者(?:能|会|可以|理解|了解|知道)/,/^本页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^这一页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本卡(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本章节(?:旨在|希望|要|应该|目的(?:是|为))?/,/^请/];
-        const clean = (text) => { if(typeof text!=='string')return text; let s=text.trim(); for(const re of instructionPatterns)s=s.replace(re,'').trim(); return s.replace(/^[，。；、:：\s]+/,'').trim(); };
-        const smart=normalizeCardComposition(page,{pageIndex,seed:`${candidate.batch_id}|${candidate.id}`});
-        return { ...page, role:smart.role, composition:smart.composition, layout_style:SOCIAL_CARD_LAYOUTS.includes(page.layout_style)?page.layout_style:'auto', title:clean(page.title), goal:clean(page.goal), evidence:(Array.isArray(page.evidence)?page.evidence:[]).map(clean), content_blocks:(Array.isArray(page.content_blocks)?page.content_blocks:[]).map((b)=>({...b,title:clean(b.title),content:clean(b.content)})) };
-      });
-      const asText=(value,fallback='')=>typeof value==='string'?value.trim():value==null?fallback:Array.isArray(value)?value.map((item)=>typeof item==='string'?item:JSON.stringify(item)).join('\n'):JSON.stringify(value);
-      const editorial=store.saveCardEditorial(candidate.id,{...current,
-        target_reader:asText(parsed.target_reader,current.target_reader),pain_point:asText(parsed.pain_point,current.pain_point),
-        tool_positioning:asText(parsed.tool_positioning,current.tool_positioning),must_highlight:asText(parsed.must_highlight,current.must_highlight),
-        must_disclose:asText(parsed.must_disclose,current.must_disclose),getting_started:asText(parsed.getting_started,current.getting_started),
-        forbidden_claims:asText(parsed.forbidden_claims,current.forbidden_claims),
-        recommended_pages:Math.max(4,Math.min(maxPages,Number(parsed.recommended_pages)||cardPlan.length||6)),card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
-      const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);const channelMode=socialChannelMode(candidate);
-      return json(response,200,{editorial,gate,cardPlan,contentType,eventAnalysis,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
-    } catch(error) { return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
-  }
-  const repositoryInspectMatch = pathname.match(/^\/api\/candidates\/(\d+)\/repository\/inspect$/);
-  if (repositoryInspectMatch && request.method === 'POST') {
-    const candidate=store.getCandidate(Number(repositoryInspectMatch[1]));
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    if(socialContentType(candidate)==='event')return json(response,409,{error:'事件型图文使用突发事实基座，不执行仓库核验'});
-    if(socialContentType(candidate)==='custom')return json(response,409,{error:'自定义图文使用自定义事实基座，不执行仓库核验'});
-    const sourceUrl=candidateRepositoryUrl(candidate); if(!sourceUrl)return json(response,409,{error:'该候选没有可核验的 GitHub 仓库地址'});
-    try {
-      const fact=await inspectRepository(sourceUrl,{cacheDir:path.join(root,'data','github-cache')}); const saved=store.saveRepositoryFactSheet(candidate.id,{repository:fact.repository,sourceUrl:fact.sourceUrl,status:'ok',data:fact,checkedAt:fact.stars.checkedAt});
-      const score=store.getSocialScore(candidate.id);
-      const batch=store.getBatch(candidate.batch_id); const dir=socialCardWorkdir(batch,candidate); const jsonPath=path.join(dir,'repository-fact-sheet.json'); const mdPath=path.join(dir,'fact-sheet.md');
-      const jsonFile=writeUtf8(jsonPath,JSON.stringify(fact,null,2)); const mdFile=writeUtf8(mdPath,repositoryFactMarkdown(fact));
-      store.upsertArtifact({batchId:batch.id,kind:'仓库事实基座',name:path.basename(jsonPath),path:jsonPath,...jsonFile});
-      store.upsertArtifact({batchId:batch.id,kind:'图文事实清单',name:path.basename(mdPath),path:mdPath,...mdFile});
-      const editorial=store.getCardEditorial(candidate.id); return json(response,200,{facts:saved,score,gate:evaluateCardGate(candidate,saved,editorial)});
-    } catch(error) {
-      store.saveRepositoryFactSheet(candidate.id,{sourceUrl,status:'failed',data:{},error:error.message,checkedAt:new Date().toISOString()});
-      return json(response,502,{error:`仓库核验失败：${error.message}`});
-    }
-  }
-  const cardLockMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-lock$/);
-  if (cardLockMatch && request.method === 'POST') {
-    const candidate=store.getCandidate(Number(cardLockMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
-    const editorial=store.getCardEditorial(candidate.id),facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
-    const gate=socialCardGate(candidate,contentType,facts,editorial,contentType==='event'?resolveEventAnalysisFor(candidate):null);
-    if(!gate.ready)return json(response,409,{error:`CARD GATE 未通过：${gate.issues.join('；')}`,gate});
-    store.saveCardEditorial(candidate.id,{...editorial,status:'LOCKED'});
-    store.updateCandidateTrack(candidate.id,'social_cards',{status:'locked',locked_at:new Date().toISOString()});
-    return json(response,200,{ok:true,gate,track:store.listCandidateTracks(candidate.id).find((item)=>item.track==='social_cards')});
-  }
-  const socialGenerateMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/social-card$/);
-  if (socialGenerateMatch && request.method === 'POST') {
-    const candidate=store.getCandidate(Number(socialGenerateMatch[1]));
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const input=await body(request);
-    return json(response,202,aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:input.provider,type:'social-card'}));
-  }
-  const editorialMatch = pathname.match(/^\/api\/candidates\/(\d+)\/editorial$/);
-  if (editorialMatch && request.method === 'GET') {
-    const candidate = store.getCandidate(Number(editorialMatch[1]));
-    return json(response, candidate ? 200 : 404, candidate?.editorial ?? { error: '候选不存在' });
-  }
-
-  const docContentMatch=pathname.match(/^\/api\/documents\/(\d+)\/content$/);
-  if (docContentMatch && request.method === "GET") {
-    const doc = store.getDocumentContent(Number(docContentMatch[1]));
-    if (!doc) return json(response, 404, { error: "?????" });
-    response.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    return response.end(doc.content || doc.title || "");
-  }
-
-
-  // 编辑会自治：AI 在 fetchEvents 中列出需要原文的事件，系统抓取并把结果写入对话
-  async function autoFetchEditorialEvents(candidate, fetchEvents) {
-    const ids = (Array.isArray(fetchEvents) ? fetchEvents : []).map(String).slice(0, 3);
-    if (!ids.length) return '';
-    const groups = candidateEventGroups(candidate).filter((group) => ids.includes(group.event_id));
-    const notes = [];
-    for (const group of groups) {
-      try {
-        const r = await fetchCandidateSource({ store, sourceFetch: config.sourceFetch, candidateId: candidate.id, root, force: false, hotspots: group.hotspots });
-        notes.push(`已自动抓取「${group.title}」的原文：${r.ok}/${r.count} 个来源成功`);
-      } catch (error) {
-        notes.push(`「${group.title}」原文抓取失败：${error.message}`);
-      }
-    }
-    if (notes.length) store.addEditorialMessage(candidate.id, 'assistant', notes.join('\n'));
-    return notes.join('\n');
-  }
-  const revisionMatch=pathname.match(/^\/api\/documents\/(\d+)\/revisions(?:\/(\d+))?(?:\/(restore))?$/);
-  if (revisionMatch && request.method === 'GET') {
-    const documentId=Number(revisionMatch[1]);
-    if (!store.getDocumentById(documentId)) return json(response,404,{error:'文档不存在'});
-    if (!revisionMatch[2]) return json(response,200,store.listDocumentRevisions(documentId));
-    const revision=store.getDocumentRevision(documentId,Number(revisionMatch[2]));
-    return json(response,revision?200:404,revision||{error:'版本不存在'});
-  }
-  if (revisionMatch && revisionMatch[3] === 'restore' && request.method === 'POST') {
-    const document=store.getDocumentById(Number(revisionMatch[1]));
-    const revision=document&&store.getDocumentRevision(document.id,Number(revisionMatch[2]));
-    if (!document || !revision) return json(response,404,{error:'文档或版本不存在'});
-    if (document.file_path) writeUtf8(document.file_path,revision.content);
-    const restored=store.saveDocument({batchId:document.batch_id,candidateId:document.candidate_row_id,
-      kind:document.kind,title:revision.title,content:revision.content,filePath:document.file_path,status:revision.status});
-    return json(response,200,restored);
-  }
-
-  const editorialAiMatch=pathname.match(/^\/api\/candidates\/(\d+)\/ai\/editorial$/);
-  if(editorialAiMatch&&request.method==='POST') {
-    const input=await body(request); const answer=String(input.answer||'');
-    const candidateId=Number(editorialAiMatch[1]); const candidate=store.getCandidate(candidateId);
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const suppliedUrl=(answer.match(/https?:\/\/[^\s<>"']+/i)||[])[0]?.replace(/[，。；、)）\]]+$/,'');
-    if(suppliedUrl)await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force:true,urlOverride:suppliedUrl});
-    const result=await runEditorialTurn({gateway:models,store,candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000)});
-    const fetchNote=await autoFetchEditorialEvents(candidate,result.fetchEvents);
-    if(fetchNote)result.reply=[result.reply,fetchNote].filter(Boolean).join('\n\n');
-    return json(response,200,result);
-  }
-  const editorialStreamMatch=pathname.match(/^\/api\/candidates\/(\d+)\/ai\/editorial\/stream$/);
-  if(editorialStreamMatch&&request.method==='POST') {
-    const input=await body(request);const answer=String(input.answer||'');
-    const candidateId=Number(editorialStreamMatch[1]);const candidate=store.getCandidate(candidateId);
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const suppliedUrl=(answer.match(/https?:\/\/[^\s<>"']+/i)||[])[0]?.replace(/[，。；、）\]]+$/,'');
-    response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
-    const send=(event)=>response.write(`${JSON.stringify(event)}\n`);
-    try {
-      if(suppliedUrl)await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force:true,urlOverride:suppliedUrl});
-      const result=await runEditorialTurnStream({gateway:models,store,candidateId,provider:input.provider,answer,webSearch:true,events:candidateEventGroups(candidate,12000),onText:(text)=>send({type:'delta',text})});
-      const fetchNote=await autoFetchEditorialEvents(candidate,result.fetchEvents);
-      if(fetchNote)send({type:'delta',text:'\n\n'+fetchNote});
-      send({type:'done',data:{candidate:result.candidate,editorial:result.editorial,usage:result.usage,model:result.model}});
-    } catch(error) {
-      send({type:'error',error:error.message});
-    }
-    response.end();return true;
-  }
-  const sourceMatch=pathname.match(/^\/api\/candidates\/(\d+)\/source$/);
-  if(sourceMatch&&request.method==='POST') {
-    const input=await body(request); const candidateId=Number(sourceMatch[1]);
-    const candidate=store.getCandidate(candidateId);
-    if(!candidate)return json(response,404,{error:'候选不存在'});
-    const force=Boolean(input.force);
-    // 支持按单个热点或单个事件抓取；默认抓取本选题全部关联事件下的热点原文
-    if (input.hotspotId != null) {
-      const hotspot=candidateEventGroups(candidate).flatMap((group)=>group.hotspots).find((h)=>h.id===Number(input.hotspotId));
-      if(!hotspot)return json(response,404,{error:'该热点不属于本选题的关联事件'});
-      return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:[hotspot]}));
-    }
-    if (input.eventId) {
-      const group=candidateEventGroups(candidate).find((g)=>g.event_id===String(input.eventId));
-      if(!group)return json(response,404,{error:'该事件不属于本选题'});
-      return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:group.hotspots}));
-    }
-    const seen=new Set(); const all=[];
-    for(const group of candidateEventGroups(candidate))for(const hotspot of group.hotspots) {
-      if(!seen.has(hotspot.id)){seen.add(hotspot.id);all.push(hotspot);}
-    }
-    if(all.length)return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force,hotspots:all}));
-    return json(response,200,await fetchCandidateSource({store,sourceFetch:config.sourceFetch,candidateId,root,force}));
-  }
-  if (editorialMatch && request.method === 'PUT') {
-    const candidateId = Number(editorialMatch[1]);
-    if (!store.getCandidate(candidateId)) return json(response, 404, { error: '候选不存在' });
-    return json(response, 200, store.saveEditorial(candidateId, await body(request)));
-  }
-  const lockMatch = pathname.match(/^\/api\/candidates\/(\d+)\/lock$/);
-  if (lockMatch && request.method === 'POST') {
-    const candidate = store.getCandidate(Number(lockMatch[1]));
-    if (!candidate) return json(response, 404, { error: '候选不存在' });
-    const editorial = candidate.editorial;
-    if (!candidate.thesis.trim()) return json(response, 409, { error: '请先填写并保存锁定命题' });
-    if (editorial.next_action !== 'WRITE_NOW') return json(response, 409, { error: 'next_action 必须是 WRITE_NOW' });
-    if (editorial.open_questions.trim()) return json(response, 409, { error: '仍有未解决问题，不能锁定简报' });
-    if (editorial.experience_required && !editorial.confirmed_experiences.trim()) {
-      return json(response, 409, { error: '本题依赖亲身实践，但尚未填写已确认实践' });
-    }
-    const batch = store.getBatch(candidate.batch_id);
-    const filePath = path.join(batchWorkdir(batch), candidate.candidate_id, 'article-brief.md');
-    const file = writeUtf8(filePath, lockedBrief(candidate, editorial));
-    store.saveEditorial(candidate.id, { ...editorial, brief_status: 'LOCKED' });
-    store.updateCandidate(candidate.id, { status: 'locked' });
-    store.updateBatch(batch.id, { stage: 'drafting', status: 'running' });
-    store.upsertArtifact({ batchId: batch.id, kind: '锁定简报', name: 'article-brief.md', path: filePath, ...file });
-    return json(response, 200, { candidate: store.getCandidate(candidate.id), filePath });
-  }
-  const draftMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/draft$/);
-  if (draftMatch && request.method === 'POST') {
-    const input = await body(request);
-    const result = await draftArticle({ gateway: models, store, candidateId: Number(draftMatch[1]),
-      provider: input.provider, instructions: input.instructions, existingDraft: input.existingDraft });
-    return json(response, 200, { content: result.content, provider: result.provider, model: result.model,
-      usage: result.usage, context: { beforeTokens: result.context.beforeTokens,
-        afterTokens: result.context.afterTokens, compressed: result.context.compressed } });
-  }
-  const articleMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/article$/);
-  if (articleMatch && request.method === 'POST') {
-    const candidate = store.getCandidate(Number(articleMatch[1]));
-    if (!candidate) return json(response, 404, { error: '候选不存在' });
-    const input = await body(request);
-    return json(response, 202, aiJobs.start({ batchId: candidate.batch_id, candidateId: candidate.id,
-      provider: input.provider, type: 'article' }));
-  }
-  const imageWorkspaceMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images$/);
-  if (imageWorkspaceMatch && request.method === 'GET') {
-    const candidate = store.getCandidate(Number(imageWorkspaceMatch[1]));
-    if (!candidate) return json(response, 404, { error:'候选不存在' });
-    const batch = store.getBatch(candidate.batch_id);
-    return json(response, 200, getImageWorkspace(articleWorkdir(batch, candidate)));
-  }
-  const imagePlanMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images\/plan$/);
-  if (imagePlanMatch && request.method === 'POST') {
-    const candidate = store.getCandidate(Number(imagePlanMatch[1]));
-    if (!candidate) return json(response, 404, { error:'候选不存在' });
-    const batch = store.getBatch(candidate.batch_id); const workdir = articleWorkdir(batch, candidate);
-    const finalPath = path.join(workdir, '09-FINAL.md');
-    if (!fs.existsSync(finalPath)) return json(response, 409, { error:'缺少 09-FINAL.md，请先完成成稿链' });
-    const input = await body(request); const provider = input.provider || models.config.defaultProvider;
-    const providerConfig = models.config.providers[provider];
-    if (!providerConfig) return json(response, 400, { error:'未知模型服务商' });
-    const original = fs.readFileSync(finalPath, 'utf8');
-    const content = await planImagePlaceholders({ gateway:models, store, batchId:batch.id, candidateId:candidate.id,
-      provider, markdown:original, maxOutputTokens:Math.min(3000, providerConfig.maxOutputTokens) });
-    const file = writeUtf8(finalPath, content);
-    const existing = store.listDocuments(batch.id).find((item) => item.candidate_row_id === candidate.id && item.kind === 'final');
-    store.saveDocument({ batchId:batch.id, candidateId:candidate.id, kind:'final', title:existing?.title || candidate.hotspot_title,
-      content, filePath:finalPath, status:'finalized' });
-    store.upsertArtifact({ batchId:batch.id, kind:'文章终稿', name:'09-FINAL.md', path:finalPath, ...file });
-    return json(response, 200, getImageWorkspace(workdir));
-  }
-  const imageLocalMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images\/([^/]+)\/local$/);
-  if (imageLocalMatch && request.method === 'GET') {
-    const candidate = store.getCandidate(Number(imageLocalMatch[1]));
-    if (!candidate) return json(response, 404, { error:'候选不存在' });
-    const batch = store.getBatch(candidate.batch_id); const workdir = articleWorkdir(batch, candidate);
-    const id = decodeURIComponent(imageLocalMatch[2]); const item = getImageWorkspace(workdir).items.find((entry) => entry.id === id);
-    if (!item?.localPath || !isInsideRoots(item.localPath, [workdir]) || !fs.existsSync(item.localPath)) return json(response, 404, { error:'本地图片不存在' });
-    response.writeHead(200, { 'content-type':item.mimeType || mime[path.extname(item.localPath)] || 'application/octet-stream', 'cache-control':'no-store' });
-    return fs.createReadStream(item.localPath).pipe(response);
-  }
-  const imageItemMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images\/([^/]+)$/);
-  if (imageItemMatch && ['PUT','POST'].includes(request.method)) {
-    const candidate = store.getCandidate(Number(imageItemMatch[1]));
-    if (!candidate) return json(response, 404, { error:'候选不存在' });
-    const batch = store.getBatch(candidate.batch_id); const workdir = articleWorkdir(batch, candidate);
-    const id = decodeURIComponent(imageItemMatch[2]); const input = await body(request);
-    const item = request.method === 'POST' ? saveLocalImage(workdir, id, input) : saveImageMetadata(workdir, id, input);
-    const manifestPath = imageManifestFile(workdir); const stat = fs.statSync(manifestPath);
-    store.upsertArtifact({ batchId:batch.id, kind:'配图资产清单', name:path.basename(manifestPath), path:manifestPath, size:stat.size, modifiedAt:stat.mtime.toISOString() });
-    return json(response, 200, item);
-  }
-  const imageCdnMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images\/([^/]+)\/cdn$/);
-  if (imageCdnMatch && request.method === 'POST') {
-    const candidate = store.getCandidate(Number(imageCdnMatch[1]));
-    if (!candidate) return json(response, 404, { error:'候选不存在' });
-    const batch = store.getBatch(candidate.batch_id); const workdir = articleWorkdir(batch, candidate);
-    const item = await uploadImageToCdn(workdir, decodeURIComponent(imageCdnMatch[2]));
-    const manifestPath = imageManifestFile(workdir); const stat = fs.statSync(manifestPath);
-    store.upsertArtifact({ batchId:batch.id, kind:'配图资产清单', name:path.basename(manifestPath), path:manifestPath, size:stat.size, modifiedAt:stat.mtime.toISOString() });
-    return json(response, 200, item);
-  }
-  const typesetMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/typeset$/);
-  if (typesetMatch && request.method === 'POST') {
-    const batchId = decodeURIComponent(typesetMatch[1]);
-    const input = await body(request);
-    const daily=input.documentKind==='daily-final';
-    const candidate = daily?null:store.getCandidate(Number(input.candidateId));
-    if ((!daily&&(!candidate||candidate.batch_id!==batchId))||(daily&&!store.getDocument(batchId,null,'daily-final'))) return json(response, 404, { error: '待排版文稿不存在或不属于当前批次' });
-    return json(response, 202, aiJobs.start({ batchId, candidateId: candidate?.id??null,documentKind:daily?'daily-final':null,
-      provider: input.provider, type: 'typeset', theme: input.theme }));
-  }
-  const documentsMatch = pathname.match(/^\/api\/batches\/([^/]+)\/documents$/);
-  if (documentsMatch && request.method === 'GET') {
-    const batchId=decodeURIComponent(documentsMatch[1]); const cId=searchParams.get('candidateId'); const kind=searchParams.get('kind'); if(cId&&kind){var doc=store.getDocument(batchId,cId==='daily'?null:Number(cId),kind);if(!doc&&kind==='draft'){var arts=store.listArtifacts({batchId:batchId});var da=arts.find(function(a){return a.kind==='文章初稿'&&a.file_path&&a.file_path.toLowerCase().includes(cId.toLowerCase());});if(da&&fs.existsSync(da.file_path)){doc={title:da.name,content:fs.readFileSync(da.file_path,'utf-8')};}}return json(response,doc?200:404,doc||{error:'文档不存在'});} return json(response,200,store.listDocuments(batchId));
-  }
-  if (documentsMatch && request.method === 'PUT') {
-    const batchId = decodeURIComponent(documentsMatch[1]);
-    const batch = store.getBatch(batchId);
-    if (!batch) return json(response, 404, { error: '批次不存在' });
-    const input = await body(request);
-    const candidate = input.candidateId ? store.getCandidate(Number(input.candidateId)) : null;
-    if (input.candidateId && !candidate) return json(response, 404, { error: '候选不存在' });
-    if (!['draft','final','daily-draft','daily-final'].includes(input.kind)) return json(response, 400, { error: '未知文稿类型' });
-    const daily=input.kind.startsWith('daily-');
-    if(daily&&candidate)return json(response,400,{error:'批次早报不能关联单选题候选'});
-    const fileName = input.kind === 'final' ? '09-FINAL.md' : input.kind === 'draft' ? '04-draft.md' : input.kind === 'daily-final' ? '03-FINAL.md' : '02-draft.md';
-    const targetDir = candidate ? articleWorkdir(batch, candidate) : daily ? path.join(batchArticlesDir(config.workspaceRoot,batch),'daily') : batchArticlesDir(config.workspaceRoot, batch);
-    const filePath = path.join(targetDir, fileName);
-    const file = writeUtf8(filePath, String(input.content ?? ''));
-    const document = store.saveDocument({ batchId, candidateId: candidate?.id ?? null, kind: input.kind,
-      title: input.title ?? '', content: String(input.content ?? ''), filePath, status: input.status ?? 'draft' });
-    store.upsertArtifact({ batchId, kind: input.kind.endsWith('final') ? (daily?'早报终稿':'文章终稿') : (daily?'早报初稿':'文章初稿'), name: fileName, path: filePath, ...file });
-    store.updateBatch(batchId, { stage: input.kind.endsWith('final') ? 'review' : 'drafting', status: 'running' });
-    return json(response, 200, document);
   }
   const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)$/);
   if (request.method === 'GET' && pathname === '/api/jobs') {
@@ -1203,165 +839,6 @@ async function api(request, response, url) {
     const job = jobs.get(jobMatch[1]) ?? aiJobs.get(jobMatch[1])
       ?? (persistedSource ? store.getSourceRun(Number(persistedSource[1])) : null);
     return json(response, job ? 200 : 404, job ?? { error: '任务不存在或服务已重启' });
-  }
-  if (request.method === 'GET' && pathname === '/api/hotspots') {
-    return json(response, 200, store.listHotspots({
-      q: searchParams.get('q') ?? '', source: searchParams.get('source') ?? '',
-      date: searchParams.get('date') ?? '', limit: Number(searchParams.get('limit') ?? 200),
-    }));
-  }
-  if (request.method === 'GET' && pathname === '/api/artifacts') {
-    return json(response, 200, store.listArtifacts({
-      limit: Number(searchParams.get('limit') ?? 300),
-      batchId: searchParams.get('batch_id') || undefined
-    }));
-  }
-  if (request.method === 'POST' && pathname === '/api/artifacts/reindex') {
-    return json(response, 200, { indexed: indexArtifacts(store, artifactRoots) });
-  }
-  
-  if (request.method === 'GET' && pathname === '/api/articles') {
-    const week = searchParams.get('week') || undefined;
-    const month = searchParams.get('month') || undefined;
-    return json(response, 200, store.listFinalArticles({ week, month }));
-  }
-
-  if (request.method === 'GET' && pathname === '/api/calendar') {
-    const month = searchParams.get('month') || undefined;
-    return json(response, 200, store.listCalendarContent({ month }));
-  }
-
-if (request.method === 'GET' && pathname === '/api/articles/stats') {
-    return json(response, 200, store.articleStats());
-  }
-  if (request.method === 'GET' && pathname === '/api/logs') {
-    const limit = Math.min(Number(searchParams.get('limit') ?? 100), 500);
-    const logType = searchParams.get('type') || undefined;
-    return json(response, 200, store.listLogs({ limit, logType }));
-  }
-  const artifactPreviewMatch = pathname.match(/^\/api\/artifacts\/(\d+)\/preview$/);
-  if (artifactPreviewMatch && request.method === 'GET') {
-    const artifact = store.getArtifact(Number(artifactPreviewMatch[1]));
-    if (!artifact || !isInsideRoots(artifact.file_path, artifactRoots) || !fs.existsSync(artifact.file_path)) {
-      return json(response, 404, { error: '产物不存在或不在允许目录内' });
-    }
-    if (isImageArtifact(artifact.file_path)) {
-      response.writeHead(200, { 'content-type':'text/html; charset=utf-8', 'cache-control':'no-store' });
-      return response.end(imageArtifactPreviewHtml(`/api/artifacts/${artifact.id}/content`, artifact.name));
-    }
-    response.writeHead(302, { location:`/api/artifacts/${artifact.id}/content` });
-    return response.end();
-  }
-  const artifactMatch = pathname.match(/^\/api\/artifacts\/(\d+)\/content$/);
-  if (artifactMatch && request.method === 'GET') {
-    const artifact = store.getArtifact(Number(artifactMatch[1]));
-    if (!artifact || !isInsideRoots(artifact.file_path, artifactRoots) || !fs.existsSync(artifact.file_path)) {
-      return json(response, 404, { error: '产物不存在或不在允许目录内' });
-    }
-    const extension = path.extname(artifact.file_path).toLowerCase();
-    if (extension === '.html' && searchParams.get('preview') === 'phone') {
-      response.writeHead(200, { 'content-type':'text/html; charset=utf-8', 'cache-control':'no-store' });
-      return response.end(injectPhonePreviewStyles(fs.readFileSync(artifact.file_path, 'utf8')));
-    }
-    response.writeHead(200, { 'content-type': mime[extension] ?? 'text/plain; charset=utf-8' });
-    return fs.createReadStream(artifact.file_path).pipe(response);
-  }
-  if (request.method === 'GET' && pathname === '/api/system/health') {
-    const target=searchParams.get('target')||'all';
-    if(!['all','reddit','rsshub','github'].includes(target))return json(response,400,{error:'未知的检查目标'});
-    const [reddit,rsshub]=await Promise.all([
-      target==='all'||target==='reddit'?checkReddit(config.reddit):Promise.resolve(null),
-      target==='all'||target==='rsshub'?checkRssHub(config.rsshub):Promise.resolve(null),
-    ]);
-    return json(response, 200, {
-      reddit, rsshub, github:target==='all'||target==='github'?getGitHubApiHealth():null,
-      node: process.version, now: new Date().toISOString(), target,
-    });
-  }
-  if (request.method === 'GET' && pathname === '/api/system/settings') {
-    return json(response, 200, getRuntimeSettings(root, config));
-  }
-  if (request.method === 'PUT' && pathname === '/api/system/settings') {
-    return json(response, 200, updateRuntimeSettings(root, config, await body(request)));
-  }
-  const runtimeMatch = pathname.match(/^\/api\/system\/runtime\/(rsshub|reddit)\/(start|stop|restart)$/);
-  if (request.method === 'POST' && runtimeMatch) {
-    const [, service, action] = runtimeMatch;
-    let result = { message: '操作完成' };
-    if (service === 'rsshub') {
-      if (action === 'stop' || action === 'restart') result = await stopRssHub(config.rsshub);
-      if (action === 'start' || action === 'restart') {
-        const started = await ensureStarted(config.rsshub, () => {});
-        result = { message: started ? 'RSSHub 已启动并通过健康检查' : 'RSSHub 已在运行' };
-      }
-    } else {
-      const port = String(new URL(config.reddit.cdpUrl).port || 9222);
-      if (action === 'stop' || action === 'restart') {
-        result = await runPowerShellScript(path.join(root, 'scripts', 'stop-reddit-chrome.ps1'), ['-Port', port]);
-      }
-      if (action === 'start' || action === 'restart') {
-        result = await runPowerShellScript(path.join(root, 'scripts', 'start-reddit-chrome.ps1'), ['-Port', port]);
-      }
-    }
-    return json(response, 200, { ...result, service, action });
-  }
-  if (request.method === 'GET' && pathname === '/api/subscriptions') {
-    return json(response, 200, listSubscriptions(config,store.listSubscriptionHealth()));
-  }
-  if (request.method === 'GET' && pathname === '/api/system/backup') {
-    const backup=await createWorkbenchBackup();
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    response.writeHead(200,{'content-type':'application/zip','content-disposition':`attachment; filename="write-assistant-${stamp}.zip"`,'content-length':backup.buffer.length,'cache-control':'no-store'});
-    return response.end(backup.buffer);
-  }
-  if (request.method === 'POST' && pathname === '/api/system/backup/validate') {
-    try {
-      const parsed=validateWorkbenchBackup(await binaryBody(request));
-      return json(response,200,{valid:true,createdAt:parsed.manifest.createdAt,appVersion:parsed.manifest.appVersion,
-        fileCount:parsed.manifest.files.length,totalBytes:parsed.manifest.files.reduce((sum,item)=>sum+item.size,0)});
-    } catch(error){return json(response,400,{valid:false,error:error.message});}
-  }
-  if (request.method === 'POST' && pathname === '/api/system/backup/restore') {
-    if(request.headers['x-restore-confirm']!=='RESTORE')return json(response,409,{error:'缺少恢复确认'});
-    let tempDir;
-    try {
-      const buffer=await binaryBody(request);
-      const parsed=validateWorkbenchBackup(buffer);
-      tempDir=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-restore-'));
-      const sourceDb=path.join(tempDir,'workbench.db');
-      fs.writeFileSync(sourceDb,parsed.entries.get('data/workbench.db'));
-      const probe=new (await import('node:sqlite')).DatabaseSync(sourceDb,{readOnly:true});
-      try{if(probe.prepare('PRAGMA integrity_check').get().integrity_check!=='ok')throw new Error('备份数据库完整性检查失败');}finally{probe.close();}
-      const safety=await createWorkbenchBackup();
-      const backupDir=path.join(root,'data','backups');fs.mkdirSync(backupDir,{recursive:true});
-      const safetyName=`before-restore-${new Date().toISOString().replace(/[:.]/g,'-')}.zip`;
-      fs.writeFileSync(path.join(backupDir,safetyName),safety.buffer);
-      const result=store.restoreFromDatabase(sourceDb);
-      return json(response,200,{restored:true,batches:result.count,safetyBackup:safetyName});
-    } catch(error){return json(response,400,{restored:false,error:error.message});}
-    finally{if(tempDir)fs.rmSync(tempDir,{recursive:true,force:true});}
-  }
-  if (request.method === 'GET' && pathname === '/api/subscriptions/health-history') {
-    return json(response, 200, store.listSubscriptionHealthHistory({
-      days: Number(searchParams.get('days') ?? 14),
-      limit: Number(searchParams.get('limit') ?? 500),
-    }));
-  }
-  if (request.method === 'POST' && pathname === '/api/subscriptions/test') {
-    const input = subscriptionTestInput(await body(request));
-    return json(response, 200, await testSubscription(config.rsshub, input));
-  }
-  if (request.method === 'POST' && pathname === '/api/subscriptions') {
-    addSubscription(root, config, await body(request));
-    return json(response, 201, listSubscriptions(config,store.listSubscriptionHealth()));
-  }
-  if (request.method === 'PATCH' && pathname === '/api/subscriptions') {
-    updateSubscription(root, config, await body(request));
-    return json(response, 200, listSubscriptions(config,store.listSubscriptionHealth()));
-  }
-  if (request.method === 'DELETE' && pathname === '/api/subscriptions') {
-    removeSubscription(root, config, await body(request));
-    return json(response, 200, listSubscriptions(config,store.listSubscriptionHealth()));
   }
   return false;
 }

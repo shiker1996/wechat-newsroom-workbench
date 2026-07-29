@@ -58,7 +58,7 @@
 
 落地情况（2026-07-27）：
 
-- `skills/mermaid-render/scripts/render-mermaid.mjs`：提取 ` ```mermaid ` 围栏 → 调用全局 `@mermaid-js/mermaid-cli`（自动从 puppeteer 缓存挑选真实存在的 Chrome，解决 mmdc 期望版本与本地不一致的问题；以 node 直接运行入口绕开 Windows spawn .cmd 的 EINVAL 限制）→ PNG 替换围栏
+- `skills/mermaid-render/scripts/render-mermaid.mjs`：提取 ` ```mermaid ` 围栏 → 优先调用项目本地 `@mermaid-js/mermaid-cli`，兼容全局安装 → 按 `PUPPETEER_EXECUTABLE_PATH`、系统 Chrome、Puppeteer 缓存的顺序选择浏览器（以 node 直接运行入口绕开 Windows spawn `.cmd` 的 `EINVAL` 限制）→ PNG 替换围栏
 - `skills/wechat-echarts-blocks-to-images/scripts/render-echarts.mjs`：提取 ` ```echarts ` 围栏（仅接受 JSON 对象、200K 字符上限，不执行任意 JS）→ 自包含 HTML（内联技能内 `npm i echarts` 的 echarts.min.js，`finished` 事件做完成标志）→ 复用 `html-pages-to-images` 的 puppeteer 截图（2x 分辨率）
 - 两个脚本统一契约：`node <script> <input.md> <output.md> [imageDir]`，stdout 末行 JSON 报告，单围栏失败保留原围栏并以退出码 1 报告，绝不静默丢图
 - 流水线 images 阶段串行调用两个脚本，产出 `09-FINAL.mermaid.md` / `09-FINAL.echarts.md` 工件；渲染失败即阻断。内联视觉模块（stats-grid/timeline）仍维持阻断（无执行器）

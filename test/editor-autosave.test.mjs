@@ -141,8 +141,8 @@ test('发布前检查统一汇总保存、目标、质量与终稿门禁',()=>{
 });
 
 test('空候选批次不请求 candidateId 0 且候选恢复后清除空态提示',()=>{
-  assert.match(editor,/if \(!candidateId\) \{/);
+  assert.match(editor,/if\s*\(\s*!candidateId\s*&&\s*!daily\s*\)\s*\{/);
   assert.match(editor,/setSaveState\("saved","等待锁定候选"\)/);
-  assert.match(editor,/ctxEl\.innerHTML = state\.candidates\.length/);
+  assert.match(editor,/ctxEl\.innerHTML = writingOptions\.length/);
   assert.match(editor,/\? "事实、观点、禁写项不会被压缩"/);
 });

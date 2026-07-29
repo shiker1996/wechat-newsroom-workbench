@@ -51,7 +51,7 @@ async function loadEditorialRoom(selectedId) {
     return;
   }
   try {
-    state.candidates = await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`);
+    state.candidates = await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?kind=hotspot`);
   } catch (error) {
     if (loading) loading.hidden = true;
     if (empty) {

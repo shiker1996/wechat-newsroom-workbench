@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { echartsOptionWithTheme } from '../../../lib/llm/chart-theme.mjs';
 
 const args = process.argv.slice(2);
 if (args.includes('--help') || args.includes('-h')) {
@@ -16,6 +17,7 @@ if (args.length < 2) {
 const input = path.resolve(args[0]);
 const output = path.resolve(args[1]);
 const imageDir = path.resolve(args[2] || path.join(path.dirname(output), 'images'));
+const tokens = args[3] && fs.existsSync(path.resolve(args[3])) ? JSON.parse(fs.readFileSync(path.resolve(args[3]), 'utf8')) : {};
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function fail(message) {
@@ -75,16 +77,17 @@ if (fences.length) {
         // 只接受 JSON 配置，不执行来源不明的任意 JavaScript
         const option = JSON.parse(raw);
         if (!option || typeof option !== 'object' || Array.isArray(option)) throw new Error('配置必须是 JSON 对象');
-        const optionJson = JSON.stringify({ ...option, animation: false }).replace(/</g, '\\u003c');
-        const html = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">`
-          + `<div id="chart" style="width:900px;height:540px"></div>`
+        const themedOption = echartsOptionWithTheme(option, tokens);
+        const optionJson = JSON.stringify(themedOption).replace(/</g, '\\u003c');
+        const html = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:${themedOption.backgroundColor}">`
+          + `<div id="chart" style="width:1080px;height:675px"></div>`
           + `<script>${echartsSource}</script>`
           + `<script>window.__chartDone=false;const chart=echarts.init(document.getElementById('chart'));`
           + `chart.on('finished',()=>{window.__chartDone=true;});chart.setOption(${optionJson});</script>`
           + `</body></html>`;
         const page = await browser.newPage();
         try {
-          await page.setViewport({ width: 920, height: 560, deviceScaleFactor: 2 });
+          await page.setViewport({ width: 1100, height: 695, deviceScaleFactor: 2 });
           await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
           await page.waitForFunction('window.__chartDone===true', { timeout: 15000 });
           const element = await page.$('#chart');

@@ -66,9 +66,10 @@ export async function openBatch(id, mode) {
   const ai = batch.ai_status || { tagged: 0, total: batch.hotspots.length, latestResearch: null };
   const preferred = state.models.providers.find((item) => item.configured)?.name || state.models.defaultProvider;
   const researchDone = ai.latestResearch?.status === "completed";
-  const autoRunning = ai.latestResearch?.type === "auto" && ai.latestResearch?.status === "running";
   const cards = batch.event_cards || { count: 0, total: 0 };
   const cardsReady = cards.total > 0 && cards.count >= cards.total;
+  const pipeline = batch.pipeline_status?.steps || {};
+  const stepClass = (name) => ({ completed:"done", active:"active", pending:"" })[pipeline[name]?.status] || "";
   const latestAiRun = batch.ai_runs?.[0];
   const pipelinePrimaryAction = researchDone
     ? `<button class="primary-button" data-view-research>查看研判结果 →</button>`
@@ -103,7 +104,7 @@ export async function openBatch(id, mode) {
     ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
   </section>` : "";
   const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
-      <div class="pipeline-steps"><div data-pipeline-step="collect" class="${batch.hotspots.length ? "done" : "active"}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${ai.tagged === ai.total && ai.total ? "done" : ai.tagged || autoRunning ? "active" : ""}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${cardsReady ? "done" : cards.count || (autoRunning && ai.total > 0 && ai.tagged >= ai.total) ? "active" : ""}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${researchDone ? "done" : (ai.latestResearch?.type === "research" && ai.latestResearch?.status === "running") || (autoRunning && cardsReady) ? "active" : ""}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
+      <div class="pipeline-steps"><div data-pipeline-step="collect" class="${stepClass("collect")}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${stepClass("tag")}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${stepClass("eventCards")}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${stepClass("research")}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
       <p>打标覆盖全量热点，生成事件语义指纹、地区、风险和预评估证据；研判随后完成全量聚类、核心 8 + 黑马 2、探索脑暴与临时复排。</p>
       <div class="pipeline-actions"><div class="pipeline-next"><small>当前下一步</small>${pipelinePrimaryAction}</div><details class="pipeline-retry-menu"><summary>高级操作</summary><div><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards-force ${!ai.tagged ? "disabled" : ""}>重新生成全部事件卡</button><button class="ghost-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>重新执行事件研判</button></div></details></div>
       ${ai.tagged < ai.total && ai.total ? `<small class="pipeline-gate">还差 ${ai.total - ai.tagged} 条完整语义标注，完成后才能进入事件研判。</small>` : ""}

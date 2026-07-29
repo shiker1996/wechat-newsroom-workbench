@@ -147,7 +147,7 @@ test('图文编辑室可以独立选择版式和视觉主题',()=>{
 });
 
 test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
-  const source=fs.readFileSync(path.join(root,'server.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'lib/http/routes/social-card-routes.mjs'),'utf8');
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)$/)"));
   assert.match(source,/每页至少保留一个内容块/);
   assert.match(source,/card_plan_json:JSON\.stringify\(cardPlan\),status:'AI_READY'/);

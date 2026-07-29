@@ -24,9 +24,14 @@ function statusLabel(value) { return editorialStatusLabels[String(value || "")] 
 
 function renderCandidates(candidates, track = activeTrack()) {
   const elements = trackElements(track);
+  const articleType=state.topicArticleType||"all";
+  const typeFiltered=track!=="article"||articleType==="all"?candidates:candidates.filter((item)=>{
+    const independent=["wechat-experience","wechat-tutorial"].includes(String(item.output_mode||""));
+    return articleType==="independent"?independent:!independent;
+  });
   // 成稿硬门槛 F≥55：低于门槛的候选即使完成编辑会也无法成稿，默认隐藏，可点开查看
-  const hiddenItems = track === "article" && !state.topicShowAll ? candidates.filter((item) => !isDraftEligible(item)) : [];
-  const visible = track === "article" && !state.topicShowAll ? candidates.filter(isDraftEligible) : candidates;
+  const hiddenItems = track === "article" && !state.topicShowAll ? typeFiltered.filter((item) => !isDraftEligible(item)) : [];
+  const visible = track === "article" && !state.topicShowAll ? typeFiltered.filter(isDraftEligible) : typeFiltered;
   const count = document.getElementById(elements.count);
   if (count) count.textContent = visible.length + " 条";
   const list = document.getElementById(elements.list);
@@ -52,8 +57,11 @@ function renderCandidates(candidates, track = activeTrack()) {
         const isEvent = track === "social_cards" && String(item.output_mode||"").includes("event-cards");
         const socialTarget = isCustom ? "social-custom" : isEvent ? "social-event" : "social-editor";
         const socialLabel = isCustom ? "自定义" : isEvent ? "事件" : "工具";
+        const isIndependentWriting = track === "article" && ["wechat-experience","wechat-tutorial"].includes(String(item.output_mode||""));
         const primaryAction = track === "article"
-          ? `<button class="ink-button candidate-primary-action" data-editorial-id="${item.id}">进入文章编辑室 →</button>`
+          ? isIndependentWriting
+            ? `<button class="ink-button candidate-primary-action" data-go="tutorial">查看自主写作 →</button>`
+            : `<button class="ink-button candidate-primary-action" data-editorial-id="${item.id}">进入热点事件创作 →</button>`
           : `<button class="ink-button candidate-primary-action" data-social-editor-id="${item.id}" data-social-target="${socialTarget}">进入${socialLabel}图文编辑室 →</button>`;
         const social=item.social_score?.score||{};
         const socialParts=[['工具',social.toolClarity],['场景',social.scenarioValue],['演示',social.demonstrability],['拆页',social.visualPotential],['收藏',social.saveSearchValue],['来源',social.sourceCompleteness],['事实扣',social.factGapPenalty],['权限扣',social.permissionRiskPenalty],['FIT',social.finalScore]];
@@ -69,8 +77,9 @@ function renderCandidates(candidates, track = activeTrack()) {
         // 综合候选（维度组）展示组标题（如"腾讯近期动态"），单热点候选优先展示事件摘要，与编辑室口径一致
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
         const dimensionLabel = { who: "主体", what: "对比", where: "场合" }[item.dimension] || "";
+        const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
-          <h4>${escapeHtml(headline)}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
+          <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
           ${track==='article'&&!item.composite&&item.event_conclusion?`<p class="candidate-description">代表报道：${escapeHtml(item.hotspot_title)}</p>`:''}
           ${track==='social_cards'&&item.repository_description?`<p class="candidate-description">${escapeHtml(item.repository_description)}</p>`:''}
           ${track==='social_cards'&&item.social_selection_reason?`<p class="candidate-selection-reason"><b>入选理由</b>${escapeHtml(item.social_selection_reason)}</p>`:''}
@@ -158,6 +167,13 @@ if (!window.__candidateTrackActionsBound) {
     if (toggleHidden) {
       state.topicShowAll = !state.topicShowAll;
       renderCandidates(state.candidates || [], activeTrack());
+      return;
+    }
+    const articleType=event.target.closest("[data-article-type]");
+    if(articleType){
+      state.topicArticleType=articleType.dataset.articleType;
+      document.querySelectorAll("[data-article-type]").forEach((button)=>button.classList.toggle("active",button===articleType));
+      renderCandidates(state.candidates||[],"article");
       return;
     }
     const remove = event.target.closest("[data-remove-track]");

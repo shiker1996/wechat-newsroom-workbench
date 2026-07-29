@@ -267,16 +267,60 @@ test('draftMode llm 保留模型初稿路径并走浏览器内联化', async (t)
   assert.match(modelRequests.find((item) => item.purpose === 'typeset-html').messages[0].content, /## SKILL: wechat-md-to-draft/);
 });
 
-test('含 mermaid 围栏的文章经 images 阶段转图后完成排版', { timeout: 180000 }, async (t) => {
+test('Mermaid 转图后必须上传 CDN 才能继续排版', { timeout: 180000 }, async (t) => {
   const { root, artifacts, store, gateway } = createTypesetFixture(t,
     '# 测试文章\n\n## 流程\n\n```mermaid\ngraph TD\n  A[采集] --> B[成稿]\n```\n\n正文。\n');
-  const result = await runTypesetPipeline({ gateway, store, batchId:'batch-1', candidateId:1, provider:'fake', workspaceRoot:root, skillsWorkspaceRoot:process.cwd() });
-  const html = fs.readFileSync(result.finalHtml, 'utf8');
-  assert.doesNotMatch(html, /```mermaid/);
-  assert.match(html, /<img src="images\/mermaid-1\.png"/);
-  const executions = JSON.parse(fs.readFileSync(result.stageExecutions, 'utf8'));
-  assert.match(executions.find((item) => item.stage === 'images').detail, /Mermaid 1 张/);
+  await assert.rejects(
+    runTypesetPipeline({ gateway, store, batchId:'batch-1', candidateId:1, provider:'fake', workspaceRoot:root, skillsWorkspaceRoot:process.cwd(), autoUploadGeneratedImages:false }),
+    /生成图:mermaid-1/,
+  );
   assert.ok(artifacts.some((item) => item.name === '09-FINAL.mermaid.md'));
   const workdir = path.join(root, 'articles', '2026-07-19-c01');
   assert.ok(fs.statSync(path.join(workdir, 'images', 'mermaid-1.png')).size > 0);
+  const manifest = JSON.parse(fs.readFileSync(path.join(workdir, 'image-assets.json'), 'utf8'));
+  assert.equal(manifest.items['生成图:mermaid-1'].localPath, path.join(workdir, 'images', 'mermaid-1.png'));
+});
+test('Markdown converter renders fenced code blocks and GFM tables', () => {
+  const html = markdownToHtml(`# Example
+
+\`\`\`powershell
+Copy-Item "a.md" "b.md"
+Write-Output "<done>"
+\`\`\`
+
+| Problem | Check |
+| --- | --- |
+| **Cannot start** | Run \`npm test\` |
+| Pipe | A \\| B |
+`);
+  assert.match(html, /<pre style="[^"]*overflow-x:auto[^"]*"><code data-language="powershell" style="[^"]*">Copy-Item/);
+  assert.match(html, /Write-Output &quot;&lt;done&gt;&quot;<\/code><\/pre>/);
+  assert.doesNotMatch(html, /```powershell/);
+  assert.match(html, /<table style="[^"]*border-collapse:collapse[^"]*"><thead><tr><th[^>]*>Problem<\/th><th[^>]*>Check<\/th><\/tr><\/thead><tbody>/);
+  assert.match(html, /<td[^>]*><span leaf=""><span textstyle="" style="font-weight: bold;[^"]*">Cannot start<\/span><\/span><\/td>/);
+  assert.match(html, /<code style="[^"]*">npm test<\/code>/);
+  assert.match(html, /<td[^>]*>A \| B<\/td>/);
+});
+
+test('full typeset pipeline preserves fenced code blocks and tables', async (t) => {
+  const markdown = `# Example
+
+\`\`\`js
+const answer = 42;
+\`\`\`
+
+| Key | Value |
+| --- | --- |
+| answer | \`42\` |
+`;
+  const { root, store, gateway } = createTypesetFixture(t, markdown);
+  const result = await runTypesetPipeline({
+    gateway, store, batchId:'batch-1', candidateId:1, provider:'fake',
+    workspaceRoot:root, skillsWorkspaceRoot:process.cwd(),
+  });
+  const html = fs.readFileSync(result.finalHtml, 'utf8');
+  assert.match(html, /<pre\b[^>]*><code\b[^>]*data-language="js"/);
+  assert.match(html, /const answer = 42;/);
+  assert.match(html, /<table\b[^>]*><thead><tr><th[^>]*>Key<\/th><th[^>]*>Value<\/th>/);
+  assert.match(html, /<tbody><tr><td[^>]*>answer<\/td><td[^>]*><code[^>]*>42<\/code><\/td><\/tr><\/tbody>/);
 });

@@ -1,16 +1,63 @@
 import { request } from "../core/http.js";
 import { state } from "../core/state.js";
-import { providerOptions, toast, withLoading } from "../core/ui.js";
+import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 
 let bound = false;
 let candidateId = null;
 let history = [];
 let writingGenerating = false;
 let writingCompleted = false;
+let writingFailed = false;
+let customProjects = [];
 
 const form = () => document.getElementById("tutorial-form");
 const field = (name) => form().elements.namedItem(name);
 const lines = (value) => String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+
+function projectStatus(item) {
+  if(item.project_status==="draft_ready"||item.document_id)return {label:"草稿完成",tone:"completed"};
+  if(item.project_status==="generating"||item.job_status==="running")return {label:"生成中",tone:"running"};
+  if(item.project_status==="failed"||item.job_status==="failed"||item.job_status==="interrupted")return {label:"生成失败",tone:"failed"};
+  return {label:"待生成",tone:"pending"};
+}
+
+function renderProjects() {
+  const count=document.getElementById("custom-writing-project-count");
+  const list=document.getElementById("custom-writing-project-list");
+  if(!list)return;
+  list.setAttribute("aria-busy","false");
+  if(count)count.textContent=`${customProjects.length} 篇`;
+  list.innerHTML=customProjects.length?customProjects.map((item)=>{
+    const status=projectStatus(item);
+    const mode=item.output_mode==="wechat-experience"?"心得经验":"使用教程";
+    const action=status.tone==="completed"
+      ? `<button type="button" class="ink-button" data-custom-writing-open="${item.id}">进入文章编辑器 →</button>`
+      : status.tone==="running"
+        ? `<button type="button" class="outline-button" data-custom-writing-resume="${item.latest_job_id}" data-candidate-id="${item.id}">查看生成进度</button>`
+        : `<button type="button" class="outline-button" data-custom-writing-retry="${item.id}">重新执行</button>`;
+    return `<article class="custom-writing-project">
+      <div><span class="custom-writing-mode">${mode}</span><h4>${escapeHtml(item.title||item.candidate_id)}</h4><p>${escapeHtml(String(item.job_error||item.job_progress||"事实基座已保存，可继续生成").slice(0,180))}</p></div>
+      <div class="custom-writing-project-meta"><span class="status-pill ${status.tone}">${status.label}</span><small>${new Date(item.document_updated_at||item.updated_at).toLocaleString("zh-CN")}</small>${action}</div>
+    </article>`;
+  }).join(""):'<div class="empty-state">当前批次还没有自主文章。选择下方文章类型后开始创建。</div>';
+}
+
+async function loadProjects() {
+  const batch=state.batches.find((item)=>item.id===state.activeBatchId);
+  if(!batch){customProjects=[];renderProjects();return;}
+  const list=document.getElementById("custom-writing-project-list");
+  list?.setAttribute("aria-busy","true");
+  try{
+    customProjects=await request(`/api/batches/${encodeURIComponent(batch.id)}/custom-articles`);
+    renderProjects();
+  }catch(error){
+    customProjects=[];
+    if(list){
+      list.setAttribute("aria-busy","false");
+      list.innerHTML=`<div class="empty-state">自主文章读取失败：${escapeHtml(error.message)}<br><button type="button" class="outline-button" data-reload-custom-writing>重新加载</button></div>`;
+    }
+  }
+}
 
 function updateWritingSteps(stage) {
   document.querySelectorAll("#tutorial-creation-steps [data-step]").forEach((item) => {
@@ -85,7 +132,7 @@ function updateProgress() {
   document.getElementById("tutorial-form-progress").textContent = done === checks.length
     ? "事实基座已齐备 · 建议展开复核后生成"
     : `已完成 ${done}/${checks.length} 项 · AI 会继续追问缺失信息`;
-  document.getElementById("generate-tutorial").disabled = !ready;
+  document.getElementById("generate-tutorial").disabled = !ready || writingGenerating;
   updateWritingSteps(writingGenerating || writingCompleted || ready ? 3 : 2);
 }
 
@@ -169,23 +216,42 @@ async function poll(id) {
     document.getElementById("tutorial-result").hidden = false;
     document.getElementById("tutorial-result-copy").textContent = `${job.result?.title || "文章终稿"}已生成，可继续编辑、查看版本历史和公众号排版。`;
     toast("自主写作已生成并进入文章编辑器");
+    await loadProjects();
     return;
   }
 }
 
 async function submit() {
+  if (writingGenerating) return;
   const batch = state.batches.find((item) => item.id === state.activeBatchId);
   if (!batch) throw new Error("请先选择批次");
-  const result = await request(`/api/batches/${encodeURIComponent(batch.id)}/custom-articles`, { method: "POST", body: JSON.stringify(payload()) });
-  candidateId = result.candidate?.id || null;
   writingGenerating = true;
+  const retrying = Boolean(candidateId && writingFailed);
+  writingFailed = false;
   updateWritingSteps(3);
-  document.getElementById("tutorial-job-status").textContent = "自主写作项目已创建，正在成稿…";
-  try{await poll(result.id);}catch(error){writingGenerating=false;updateProgress();throw error;}
+  try {
+    const input=payload();
+    input.creationRequestId=globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const url=retrying
+      ? `/api/candidates/${candidateId}/custom-article-runs`
+      : `/api/batches/${encodeURIComponent(batch.id)}/custom-articles`;
+    const result = await request(url, { method: "POST", body: JSON.stringify(input) });
+    candidateId = result.candidate?.id || candidateId;
+    document.getElementById("tutorial-job-status").textContent = result.reused
+      ? "已恢复当前自主写作任务，正在继续等待结果…"
+      : retrying ? "正在原自主写作项目上重新成稿…" : "自主写作项目已创建，正在成稿…";
+    await poll(result.id);
+  } catch(error) {
+    writingGenerating=false;
+    writingFailed=Boolean(candidateId);
+    updateProgress();
+    throw error;
+  }
 }
 
-async function openEditor() {
-  if (!candidateId) return;
+async function openEditor(selectedCandidateId=candidateId) {
+  if (!selectedCandidateId) return;
+  candidateId=Number(selectedCandidateId);
   await window.go("editor");
   const select = document.getElementById("writing-candidate");
   if (select?.querySelector(`option[value="${candidateId}"]`)) {
@@ -194,12 +260,35 @@ async function openEditor() {
   }
 }
 
+async function retryProject(projectId) {
+  if(writingGenerating)return;
+  candidateId=Number(projectId);
+  writingGenerating=true;
+  writingFailed=false;
+  try{
+    const result=await request(`/api/candidates/${candidateId}/custom-article-runs`,{
+      method:"POST",body:JSON.stringify({provider:field("provider").value}),
+    });
+    await loadProjects();
+    await poll(result.id);
+  }catch(error){
+    writingGenerating=false;writingFailed=true;await loadProjects();throw error;
+  }
+}
+
 function bind() {
   if (bound) return;
   bound = true;
-  form().addEventListener("submit", (event) => {
+  form().addEventListener("submit", async (event) => {
     event.preventDefault();
-    withLoading(document.getElementById("generate-tutorial"), "生成中…", () => submit().catch((error) => { toast(error.message); throw error; }));
+    const button=document.getElementById("generate-tutorial");
+    try {
+      await withLoading(button, writingFailed ? "重新执行中…" : "生成中…", () => submit());
+    } catch(error) {
+      toast(error.message);
+    } finally {
+      if(writingFailed)button.textContent="重新执行";
+    }
   });
   document.getElementById("tutorial-chat-send").addEventListener("click", () => withLoading(document.getElementById("tutorial-chat-send"), "思考中…", () => sendChat().catch((error) => { toast(error.message); throw error; })));
   document.getElementById("tutorial-chat-input").addEventListener("keydown", (event) => {
@@ -217,10 +306,27 @@ function bind() {
   }));
   form().addEventListener("input", updateProgress);
   document.getElementById("open-tutorial-editor").addEventListener("click", () => openEditor().catch((error) => toast(error.message)));
+  document.getElementById("custom-writing-project-list").addEventListener("click",(event)=>{
+    const open=event.target.closest("[data-custom-writing-open]");
+    if(open)return openEditor(Number(open.dataset.customWritingOpen)).catch((error)=>toast(error.message));
+    const resume=event.target.closest("[data-custom-writing-resume]");
+    if(resume){
+      candidateId=Number(resume.dataset.candidateId);
+      writingGenerating=true;
+      return withLoading(resume,"等待生成…",()=>poll(resume.dataset.customWritingResume))
+        .catch((error)=>{writingGenerating=false;writingFailed=true;toast(error.message);})
+        .finally(()=>loadProjects().catch(()=>{}));
+    }
+    const retry=event.target.closest("[data-custom-writing-retry]");
+    if(retry)return withLoading(retry,"重新执行中…",()=>retryProject(Number(retry.dataset.customWritingRetry)))
+      .catch((error)=>toast(error.message));
+    if(event.target.closest("[data-reload-custom-writing]"))loadProjects();
+  });
 }
 
 export default async function loadTutorial() {
   bind();
   document.getElementById("tutorial-provider").innerHTML = providerOptions(state.models?.defaultProvider || "");
   syncMode();
+  await loadProjects();
 }

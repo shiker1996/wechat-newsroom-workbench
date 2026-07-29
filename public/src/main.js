@@ -22,11 +22,11 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260728-local-project-tool";
+const moduleVersion = "20260728-custom-writing-p1";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
-  topics: "文章选题池", daily: "批次早报", tutorial: "自主写作", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "文章编辑室", editor: "文章编辑器",
+  topics: "文章选题池", daily: "批次早报", tutorial: "自主写作", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "热点事件创作", editor: "文章编辑器",
   preview: "公众号排版", hotspots: "热点档案", artifacts: "产物中心",
   system: "运行与配置中心", sources: "采集源", models: "模型中心",
   logs: "任务日志", calendar: "内容日历",
