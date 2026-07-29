@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"wechat-html-check-no-div","name":"公众号 HTML 最终门禁","version":"1.0.0","kind":"stage","entryPoints":["wechat-typeset"],"contentTypes":["wechat_article"],"inputContract":"normalized_html","outputContract":"quality_report","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

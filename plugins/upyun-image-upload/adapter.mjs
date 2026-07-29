@@ -1,0 +1,36 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { failure, ok } from '../../lib/tools/schemas.mjs';
+
+const run = promisify(execFile);
+const skillRoot = path.join(process.env.USERPROFILE || 'C:\\Users\\Administrator', '.codex', 'skills', 'upyun-upload-image');
+const script = path.join(skillRoot, 'upyun-upload-image.js');
+
+export async function health() {
+  return fs.existsSync(script)
+    ? ok({ available:true })
+    : failure('DEPENDENCY_MISSING', '未安装 upyun-upload-image 技能', { action:'安装并配置 upyun-upload-image 技能' });
+}
+
+export async function execute(input, context = {}) {
+  if (!fs.existsSync(input.localPath)) return failure('INVALID_INPUT', '本地图片不存在');
+  if (!fs.existsSync(script)) return failure('DEPENDENCY_MISSING', '未安装 upyun-upload-image 技能');
+  try {
+    const { stdout } = await run(process.execPath, [script, input.localPath], {
+      cwd:skillRoot, windowsHide:true, timeout:context.timeoutMs || 120000, maxBuffer:1_000_000,
+    });
+    const result = JSON.parse(String(stdout).trim().split(/\r?\n/).at(-1));
+    if (!result.success || !/^https:\/\//i.test(result.data?.url || '') || !result.data?.key) {
+      return failure('UPLOAD_FAILED', result.message || 'CDN 上传未返回有效 HTTPS URL');
+    }
+    return ok({ url:result.data.url, key:result.data.key }, {
+      artifacts:[{ type:'image', url:result.data.url, key:result.data.key }],
+      provenance:{ provider:'upyun', uploadedAt:new Date().toISOString() },
+    });
+  } catch (error) {
+    return failure(/timeout/i.test(String(error.message)) ? 'TIMEOUT' : 'UPLOAD_FAILED',
+      String(error.stdout || error.stderr || error.message).trim(), { retryable:/timeout/i.test(String(error.message)) });
+  }
+}

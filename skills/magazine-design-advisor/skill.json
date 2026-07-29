@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"magazine-design-advisor","name":"杂志风设计顾问","version":"1.0.0","kind":"stage","entryPoints":["wechat-typeset"],"contentTypes":["wechat_article"],"inputContract":"rendered_markdown","outputContract":"design_scheme","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

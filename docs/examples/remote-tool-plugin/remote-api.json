@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "company-search",
+  "name": "企业资料搜索",
+  "version": "1.0.0",
+  "type": "remote-api",
+  "capabilities": ["content.company.search"],
+  "riskLevel": "network-read",
+  "endpoint": "https://api.example.com/company/search",
+  "healthEndpoint": "https://api.example.com/health",
+  "credentialProfile": "company-search",
+  "inputSchema": {
+    "type": "object",
+    "required": ["query"],
+    "properties": {"query": {"type": "string"}}
+  },
+  "outputSchema": {"type": "object"},
+  "timeoutMs": 10000,
+  "maxResponseBytes": 1000000,
+  "compatibleApp": ">=0.1.0"
+}

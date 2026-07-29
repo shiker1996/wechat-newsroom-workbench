@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"wechat-mp-topic-to-article","name":"热点文章编排","version":"1.0.0","kind":"stage","entryPoints":["hotspot-article"],"contentTypes":["article"],"inputContract":"locked_article_brief","outputContract":"wechat_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

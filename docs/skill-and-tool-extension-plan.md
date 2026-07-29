@@ -1,0 +1,631 @@
+# 技能与工具扩展能力方案
+
+> 状态：P0–P4 已完成，P1 创作路由闭环于 2026-07-29 补齐
+> 版本：v1.2
+> 日期：2026-07-29
+> 前置方案：`tool-plugins-and-configurable-writing-skills.md`
+
+## 1. 决策摘要
+
+技能与工具面向不同用户，不应采用相同的开放方式。
+
+- **技能扩展优先面向创作者和运营人员**：以 Markdown 内容包为主，低风险、高频使用，可通过安装、选择和设为默认直接影响创作结果。
+- **工具插件扩展优先面向管理员和开发者**：涉及网络、文件系统和外部写入，继续采用受信任白名单；普通用户扩展优先支持受控远程 API 或 MCP，不开放任意本地代码执行。
+- 下一阶段优先实施“**可安装技能包 + 创作入口选择技能**”，工具插件市场和任意代码插件不进入近期范围。
+
+扩展能力聚焦于文章写作和写作工程，不建设通用自动化平台：
+
+- **技能是用户入口**：描述文章如何写、如何审、如何加工。
+- **工具是能力供给**：优先提供网页、搜索、新闻、仓库和文档等外部信息获取能力。
+- 工程工具只承接确定性处理与交付，例如图表渲染、排版、图片上传；普通创作者无需编排 capability。
+- 安装不等于启用，启用不等于被任务选中；创作入口必须完成兼容过滤和最终路由。
+
+价值判断：
+
+| 维度 | 技能扩展 | 工具插件扩展 |
+| --- | --- | --- |
+| 主要用户 | 创作者、编辑、运营 | 管理员、开发者 |
+| 用户门槛 | Markdown / 配置 | API、Schema、适配器开发 |
+| 使用频率 | 高频，每次创作可选择 | 低频，安装后被多个流程复用 |
+| 直接价值 | 改变内容类型、结构、口吻和审稿规则 | 增加抓取、处理、渲染和交付能力 |
+| 风险 | Prompt 质量、规则冲突 | 路径越界、凭据泄露、任意执行和外部写入 |
+| 产品优先级 | P0 | P1，且先保持受信模式 |
+
+## 2. 当前基础与缺口
+
+### 2.1 已具备
+
+技能侧：
+
+- 扫描 `skills/<id>/SKILL.md` 并生成目录。
+- 展示 `SKILL.md`、来源文件、版本和内容哈希。
+- 运行时加载主技能与阶段子技能。
+- 任务启动时冻结技能内容、工具和模型快照。
+- 历史任务可复用原 generation snapshot。
+
+工具侧：
+
+- 从项目白名单加载 `plugins/<id>/manifest.json` 和 adapter。
+- 统一 capability 解析、输入输出校验、权限策略和标准错误。
+- 支持插件启停、实现优先级、健康检查和执行历史。
+- URL 抓取、本地项目读取、图表渲染和 CDN 上传已接入。
+
+### 2.2 主要缺口
+
+技能：
+
+- 新增 `SKILL.md` 只能被发现，不会自动进入某条创作流程。
+- 技能角色、适用入口和输入输出契约仍由管线代码隐式决定。
+- 创作入口不能选择技能，也不能设置用户或工作区默认技能。
+- 缺少第三方技能的安装、升级、停用、卸载和兼容性检查。
+
+工具：
+
+- 插件仍由 `BUILTIN_PLUGINS` 硬编码白名单加载。
+- 缺少可信来源、安装包完整性和兼容版本声明。
+- 尚未支持远程 API/MCP 型扩展。
+- 没有插件安装前的权限摘要和凭据隔离配置流程。
+
+## 3. 设计原则
+
+1. **内容和执行分离**：技能描述“如何完成任务”，工具提供“可执行能力”。
+2. **默认只读**：已安装技能在工作台中只读查看，通过代码仓库或受控安装包更新。
+3. **显式选择**：技能不会仅因安装而接管流程，必须由入口映射、用户选择或默认策略选中。
+4. **最小权限**：技能只能声明工具需求，最终授权由工作区策略和插件状态共同决定。
+5. **历史不漂移**：任务执行后冻结技能、工具、模型和路由决策。
+6. **不执行任意代码**：普通用户不能上传 JavaScript、Python、Shell 或可执行文件作为插件。
+7. **内置可恢复**：内置技能和插件不可永久删除，第三方包可停用或卸载。
+
+## 4. 技能扩展设计
+
+### 4.1 技能包结构
+
+最小技能包：
+
+```text
+skills/
+  custom-product-review/
+    SKILL.md
+```
+
+完整技能包：
+
+```text
+skills/
+  custom-product-review/
+    SKILL.md
+    skill.json
+    references/
+      tone.md
+      checklist.md
+    tests/
+      fixture.json
+      expected.json
+```
+
+`SKILL.md` 是人类可读的唯一主契约。`skill.json` 只承载可确定性解析的发现和路由信息，不复制 Prompt 正文。
+
+### 4.2 技能清单
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "custom-product-review",
+  "name": "产品评测文章",
+  "version": "1.0.0",
+  "kind": "writer",
+  "entryPoints": ["hotspot-article", "independent-writing"],
+  "contentTypes": ["product-review"],
+  "inputContract": "article_fact_base",
+  "outputContract": "wechat_markdown",
+  "requiredCapabilities": ["content.url.fetch"],
+  "optionalCapabilities": ["diagram.mermaid.render"],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  }
+}
+```
+
+必要字段：
+
+| 字段 | 作用 |
+| --- | --- |
+| `id` | 稳定标识，不因显示名改变 |
+| `version` | 技能包语义版本 |
+| `kind` | 技能角色 |
+| `entryPoints` | 可以出现在哪些创作入口 |
+| `inputContract` | 可接受的事实基座 |
+| `outputContract` | 预期输出类型 |
+| `requiredCapabilities` | 缺失时不能启动 |
+| `optionalCapabilities` | 缺失时允许降级 |
+| `compatibleApp` | 工作台版本边界 |
+
+### 4.3 技能角色
+
+首期固定角色：
+
+- `writer`：主写作技能，拥有一次创作任务的运行策略。
+- `reviewer`：审稿与风险检查。
+- `title`：标题生成与筛选。
+- `humanizer`：表达优化。
+- `seo`：搜索优化。
+- `image-planner`：配图规划。
+- `typesetter`：排版编排。
+- `stage`：其他阶段子技能。
+
+只有 `writer` 和 `typesetter` 可以成为主技能。其他角色作为阶段覆盖层，不接管模型、工具和全局门禁。
+
+### 4.4 技能选择顺序
+
+每次任务按以下顺序解析：
+
+1. 用户本次明确选择的技能。
+2. 当前创作入口的工作区默认技能。
+3. 内容类型映射的内置默认技能。
+4. 现有确定性路由规则。
+
+解析结果必须记录：
+
+```json
+{
+  "entryPoint": "hotspot-article",
+  "requestedSkill": "custom-product-review",
+  "selectedSkill": "custom-product-review",
+  "selectionSource": "user",
+  "fallbackReason": ""
+}
+```
+
+技能已停用、版本不兼容、输入契约不匹配或必需工具缺失时，不静默换成另一个第三方技能；返回可操作错误，用户确认后才能使用内置回退。
+
+### 4.5 技能生命周期
+
+状态：
+
+```text
+discovered → validating → installed → enabled
+                                  ↘ disabled
+enabled → update-available → enabled
+disabled → uninstalled
+```
+
+约束：
+
+- 内置技能只能查看、校验和恢复，不能卸载。
+- 第三方技能安装前必须通过结构、ID、版本、引用路径和能力声明检查。
+- 更新创建新版本，不覆盖历史包。
+- 被历史快照引用的版本可以从目录隐藏，但不能从审计存档删除。
+- 卸载只影响新任务，不影响历史任务查看。
+
+### 4.6 技能页面
+
+技能目录：
+
+- 名称、角色、来源、版本和状态。
+- 适用入口与内容类型。
+- 必需/可选工具能力及当前可用性。
+- `SKILL.md` 原文、关联文件和内容哈希。
+- 被哪些入口设为默认。
+
+第三方技能操作：
+
+- 安装技能包。
+- 启用/停用。
+- 设为某入口默认。
+- 检查更新。
+- 卸载。
+
+内置技能只展示，不出现编辑、卸载按钮。
+
+创作入口：
+
+- 显示当前推荐技能和选择原因。
+- 允许从兼容技能中切换。
+- 显示必需工具缺失或技能停用状态。
+- 任务启动后显示已冻结的技能版本。
+
+## 5. 工具插件扩展设计
+
+### 5.1 信任等级
+
+#### 一级：内置插件
+
+- 随工作台代码发布。
+- 可以使用本地 adapter。
+- 经过代码审查、契约测试和白名单登记。
+
+#### 二级：受信任扩展插件
+
+- 由管理员安装。
+- 来源必须是受信仓库或经过完整性校验的安装包。
+- 本地 adapter 仍需加入管理员白名单并重启加载。
+- 不面向普通创作者开放。
+
+#### 三级：远程能力
+
+- 普通用户扩展的首选方式。
+- 仅允许远程 API 或 MCP 的声明式连接。
+- 工作台负责固定协议、Schema、超时、域名和响应大小控制。
+- 远端不能获得本地路径、数据库连接或其他插件凭据。
+
+不支持：
+
+- 上传并执行任意 JavaScript、Python、Shell。
+- 插件声明任意环境变量读取。
+- 未确认的外部写入。
+- 不受限制的内网地址和重定向。
+
+### 5.2 扩展 Manifest
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "company-search",
+  "name": "企业资料搜索",
+  "version": "1.0.0",
+  "type": "remote-api",
+  "capabilities": ["content.company.search"],
+  "riskLevel": "network-read",
+  "endpoint": "https://example.com/api/search",
+  "credentialProfile": "company-search",
+  "inputSchema": {},
+  "outputSchema": {},
+  "timeoutMs": 30000,
+  "compatibleApp": ">=0.1.0"
+}
+```
+
+本地 adapter 插件继续使用现有 `entry`；远程插件不能声明 `entry`。
+
+### 5.3 安装与授权
+
+安装前展示：
+
+- 插件来源和版本。
+- 提供的能力。
+- 网络、路径和外部写入风险。
+- 请求的域名和凭据类型。
+- 当前哪些技能可能使用这些能力。
+
+安装不等于启用。管理员确认权限后才进入 enabled 状态。
+
+外部写入能力仍需两级授权：
+
+1. 插件已启用并获准提供该 capability。
+2. 每次具体外部写入由用户动作或任务上下文明确授权。
+
+### 5.4 能力解析
+
+同一 capability 多实现时按以下顺序选择：
+
+1. 任务快照指定的历史实现和版本。
+2. 技能或入口显式指定的实现。
+3. 管理员设置的实现优先级。
+4. 内置安全默认实现。
+
+实现停用或健康检查失败时：
+
+- 新任务在启动前阻断并展示影响。
+- 已启动任务继续使用冻结实例，不在执行中途自动换实现。
+- 用户明确重试并选择“使用最新运行环境”时才重新解析。
+
+## 6. 数据模型
+
+建议新增或补齐：
+
+```text
+skill_packages
+  id
+  skill_id
+  version
+  kind
+  source_type
+  source_url
+  install_path
+  content_hash
+  manifest_json
+  status
+  installed_at
+
+skill_entry_defaults
+  entry_point
+  skill_id
+  updated_at
+
+skill_install_events
+  skill_id
+  version
+  action
+  result
+  detail_json
+  created_at
+
+tool_plugin_packages
+  plugin_id
+  version
+  source_type
+  source_url
+  integrity
+  manifest_json
+  status
+  installed_at
+
+credential_profiles
+  profile_id
+  plugin_id
+  configured
+  updated_at
+```
+
+敏感凭据不进入普通 JSON 字段、备份清单或执行日志，继续使用服务端密钥存储方式。
+
+generation snapshot 增加：
+
+```json
+{
+  "skillSelection": {
+    "entryPoint": "independent-writing",
+    "selectionSource": "user"
+  },
+  "skills": [
+    {
+      "id": "custom-product-review",
+      "version": "1.0.0",
+      "sourceType": "installed",
+      "contentHash": "sha256:..."
+    }
+  ]
+}
+```
+
+## 7. API 设计
+
+### 技能目录
+
+```text
+GET    /api/system/skills
+GET    /api/system/skills/:id
+POST   /api/system/skill-packages/validate
+POST   /api/system/skill-packages/install
+PATCH  /api/system/skills/:id/status
+DELETE /api/system/skills/:id
+GET    /api/system/skills/:id/updates
+POST   /api/system/skills/:id/update
+GET    /api/system/skill-entry-defaults
+PUT    /api/system/skill-entry-defaults/:entryPoint
+```
+
+删除内置技能返回 `403`；删除仍被设为默认或被新任务依赖的第三方技能返回 `409` 和影响列表。
+
+### 创作入口
+
+```text
+GET /api/creation-entry-points/:entryPoint/skills
+```
+
+返回兼容技能、推荐技能、工具可用性和不可选原因。
+
+现有创作请求增加：
+
+```json
+{
+  "skillId": "custom-product-review",
+  "useLatestSkill": false
+}
+```
+
+### 工具插件
+
+保留现有管理 API，并扩展：
+
+```text
+POST   /api/system/tool-plugin-packages/validate
+POST   /api/system/tool-plugin-packages/install
+DELETE /api/system/tool-plugins/:id
+POST   /api/system/tool-plugins/:id/update
+PUT    /api/system/tool-plugins/:id/credentials
+```
+
+## 8. 分阶段实施
+
+### P0：技能包声明与兼容性
+
+> 实施状态：已完成（2026-07-29）
+
+1. 定义 `skill.json` Schema。
+2. 为现有技能生成或补充角色、入口和契约声明。
+3. 注册中心同时读取 `SKILL.md` 与 `skill.json`。
+4. 增加 ID、版本、引用路径、能力和 App 兼容性校验。
+5. 技能页面展示角色、入口、契约和工具需求。
+
+交付结果：28 个内置技能已从“文件目录”升级为可被程序理解的内容包，但尚不开放安装。Schema 位于 `lib/skills/skill-manifest.schema.json`，确定性校验器位于 `lib/skills/manifest.mjs`。
+
+### P1：创作入口选择技能
+
+> 实施状态：已完成（2026-07-29）。主写技能选择首期按价值收口到“热点事件创作”和“自主写作”两个文章入口；批次早报继续使用固定的早报主写技能。三个文章入口的默认成文链现已统一包含标题生成、表达自然化、审稿与质量门禁、SEO 优化。
+
+1. 建立 entry point 常量和兼容性解析器。
+2. 为热点文章和自主写作建立工作区默认、内容推荐与内置兜底映射。
+3. 创作页面增加技能选择器、来源提示和不可用原因。
+4. 请求携带 `skillId`，管线校验后加载。
+5. snapshot 记录 `requestedSkill`、`selectedSkill`、`selectionSource`、入口和内容类型。
+6. 历史重试默认继续使用原技能。
+7. 任务启动前校验启用状态、入口、角色、输入输出契约和必需工具；用户显式选择不可用技能时返回错误，不静默替换。
+
+交付结果：已存在的兼容主写技能可以真正被用户选择并参与热点文章或自主写作任务；未选择时按“工作区默认 → 内容推荐 → 内置兜底”解析。
+
+### P2：第三方技能安装管理
+
+实施状态（2026-07-29）：已完成。入口默认映射已经参与 P1 创作路由。
+
+- 已支持目录和 ZIP 预检、受控安装、版本归档与事务回滚。
+- 已支持第三方技能启用、停用、更新、卸载和只读查看。
+- 已限制文件类型、数量、体积、相对引用、路径穿越、符号链接、内置 ID 冲突和 App 版本兼容性。
+- 已增加安装事件审计、备份收集、最小模板及 `npm run skill:validate -- <目录>` 校验命令。
+- 已增加运行时隔离：停用或卸载技能不会被新任务加载。
+
+1. 支持目录或 ZIP 技能包的预检。
+2. 安装到受控目录，不允许路径穿越和符号链接。
+3. 增加启用、停用、更新和卸载。
+4. 建立入口默认技能配置。
+5. 增加安装事件审计和备份。
+6. 提供官方技能包模板和本地校验命令。
+
+交付结果：创作者可以安装无需执行代码的技能包。
+
+### P2.1：外部信息能力槽位
+
+> 实施状态：已完成首期（2026-07-29）。
+
+技能继续声明 capability，但创作流程不绑定具体插件，而是调用面向写作任务的稳定槽位：
+
+| 槽位 | capability | 当前接入 |
+| --- | --- | --- |
+| 网页正文读取 | `content.url.fetch` | URL 来源抓取、素材事实基座 |
+| 网络搜索 | `content.web.search` | 等待连接远程搜索实现 |
+| 新闻搜索 | `content.news.search` | 等待连接远程新闻实现 |
+| 代码仓库分析 | `content.repository.inspect` | GitHub 仓库事实基座 |
+| 文档检索 | `content.document.search` | 等待连接知识库或文档服务 |
+| 本地项目读取 | `filesystem.project.read` | 自主写作教程素材 |
+
+实现规则：
+
+1. 槽位 ID 和输入语义由工作台固定，插件不能创建任意流程入口。
+2. 一个槽位映射一个标准 capability；同一 capability 可以有多个插件实现。
+3. 管理员可以为槽位指定实现；未指定时沿用插件优先级解析。
+4. 技能必需能力在任务启动前检查，可选能力缺失时只允许明确降级。
+5. 搜索、新闻和文档槽位在没有实现时明确显示“尚未连接”，不能回退为模型常识。
+6. 槽位偏好随工作台备份与恢复；任务执行仍由 generation snapshot 冻结具体插件版本。
+
+交付结果：网页读取、本地项目读取和 GitHub 仓库核验已经通过槽位调用；新安装的兼容工具无需修改创作流程即可替换对应实现。
+
+### P3：工具插件受信扩展
+
+实施状态（2026-07-29）：已完成。本阶段仅开放管理员受信的本地 adapter；远程 API / MCP 连接仍属于 P4。
+
+- 内置插件由 `plugins/` 受控目录发现，不再依赖加载白名单；第三方插件只从安装清单加载。
+- 安装前校验来源、内容完整性、App 兼容性、权限声明、文件边界和 adapter 相对依赖。
+- 安装默认停用；安装、启用、升级、回滚和卸载均要求管理员确认并记录审计事件。
+- 升级前归档当前版本，支持回滚；卸载前返回技能依赖影响，确认后才可继续。
+- 本地 adapter 的安装、升级、回滚、启停和卸载均标记需要重启，不在安装请求中执行新代码。
+- 工作台备份与恢复已覆盖第三方插件清单、安装包、版本归档及审计记录。
+- 提供 `docs/examples/tool-plugin` 模板和 `npm run plugin:validate -- <目录>` 校验命令。
+
+1. 将硬编码插件白名单迁移为受控安装清单。
+2. 增加来源、完整性、App 兼容性和权限摘要。
+3. 只对管理员开放本地 adapter 安装。
+4. 建立升级、回滚和卸载影响检查。
+5. 保持所有本地 adapter 需要重启加载。
+
+交付结果：开发者可以安装经过审查的工具插件，普通用户仍不能执行任意代码。
+
+### P3.1：文章阶段技能覆盖
+
+> 实施状态：默认执行链已完成（2026-07-29）。热点事件、自主写作和批次早报均执行主写、标题生成、表达自然化、审稿与质量门禁、SEO 优化，并将阶段技能及中间产物写入 generation snapshot。首期的“用户可替换阶段技能”仍只开放在热点文章入口。
+
+| 阶段槽位 | 默认技能 | 角色 | 输入 → 输出 |
+| --- | --- | --- | --- |
+| 标题生成 | `title-generator` | `title` | `article_fact_base` → `title_candidates` |
+| 审稿与质量门禁 | `article-reviewer` | `reviewer` | `article_fact_base` → `reviewed_markdown` |
+| 表达自然化 | `humanizer-zh` | `humanizer` | `wechat_markdown` → `wechat_markdown` |
+| SEO 内容优化 | `seo-content-optimizer` | `seo` | `reviewed_markdown` → `wechat_markdown` |
+
+规则：
+
+1. 阶段设置收纳在热点成稿入口的高级设置中，默认不增加普通用户决策负担。
+2. 候选技能必须同时满足角色、入口、输入契约、输出契约、启用状态和必需工具。
+3. 阶段技能只替换对应 Prompt，不拥有主技能的模型、工具白名单、字数门禁或返工策略。
+4. 审稿技能同时覆盖初稿门禁、正式审稿和终稿门禁，避免同一任务出现相互矛盾的审稿标准。
+5. 用户显式选择不可用技能时阻断启动；留空时使用内置默认，不自动换成其他第三方技能。
+6. 选择结果写入 generation snapshot、技能清单和阶段执行清单；历史重试继续使用原阶段技能。
+
+暂不开放：
+
+- SEO 关键词评分：当前由确定性搜索联想程序执行，技能 Prompt 不影响评分算法。
+- 配图规划：与图片占位、上传和排版链耦合，待图片工作流契约独立后再开放。
+- 自主写作和批次早报的阶段技能手动替换：两者已执行完整默认阶段链，但暂不向用户提供逐阶段替换入口；需在 reviewer 输入契约和失败恢复体验进一步稳定后再开放。
+
+### P4：远程 API / MCP 能力
+
+实施状态（2026-07-29）：已完成。
+
+- 支持声明式 `remote-api` JSON POST 和 MCP Streamable HTTP `tools/call`，远程插件禁止声明本地 `entry`。
+- 仅允许 HTTPS；逐跳校验授权域名和 DNS，拒绝内网、保留地址、跨域重定向、超时及超限响应。
+- 远程调用参数递归拒绝本地绝对路径，远端无法取得工作区路径、数据库连接或其他插件凭据。
+- 凭据按 profile 隔离保存于服务端 `.env.remote-plugins`，页面、备份和执行日志均不回读原文。
+- 远程响应转换为标准工具结果，继续执行输入/输出 Schema、技能能力白名单及外部写入逐次授权。
+- 支持 Manifest 预检、安装、凭据配置、即时启停、连接测试、配额响应头、卸载影响检查和事件审计。
+- 提供 `docs/examples/remote-tool-plugin` 下的 Remote API 与 MCP 示例。
+
+1. 定义不含本地执行入口的远程插件 Manifest。
+2. 建立域名、内网、重定向、超时和响应大小策略。
+3. 建立独立凭据配置。
+4. 将远程响应转换为标准工具结果。
+5. 增加连接测试、配额状态和执行审计。
+
+交付结果：普通用户可以连接受控远程能力，而无需安装本地执行代码。
+
+## 9. 验收标准
+
+### 技能扩展
+
+- 新技能包可以被发现、校验并只读展示。
+- 角色、入口和输入输出契约可以确定性解析。
+- 创作入口只列出兼容技能。
+- 用户选择会进入请求和 generation snapshot。
+- 必需工具缺失时任务启动前阻断。
+- 停用或卸载不会改变历史任务。
+- 内置技能不能卸载。
+- 技能包不能通过路径穿越读取包外文件。
+
+### 工具扩展
+
+- 未登记插件不能加载。
+- 停用插件不参与 capability 解析。
+- 多实现按快照、显式偏好和优先级确定性选择。
+- 远程插件不能声明本地 adapter。
+- 外部写入仍需每次明确授权。
+- 日志不记录正文、密钥或完整凭据。
+- 插件安装、更新、停用和卸载均有审计记录。
+
+### 兼容性
+
+- 未选择技能时，现有入口行为不变。
+- 现有内置技能和插件无需重新安装。
+- 旧 generation snapshot 仍可解析。
+- 旧活动配置继续影响已有兼容流程，直到明确迁移。
+- 工作台备份可恢复技能默认映射、第三方包清单和插件设置。
+
+## 10. 风险与控制
+
+| 风险 | 控制 |
+| --- | --- |
+| 技能安装后意外接管流程 | 安装与选择分离，必须显式设为默认或本次选择 |
+| 技能声明不存在的工具 | 安装校验；启动前再次检查 |
+| Prompt 引导越过系统安全规则 | 不可变系统门禁始终最后追加 |
+| 第三方包路径穿越 | 解包路径校验、禁止符号链接、固定安装根 |
+| 本地插件执行恶意代码 | 仅管理员受信白名单，不对普通用户开放 |
+| 远程插件访问内网 | URL 和重定向策略拒绝内网及保留地址 |
+| 插件升级改变历史结果 | 历史快照冻结实现和版本 |
+| 卸载造成默认入口失效 | 卸载前影响分析，存在引用时返回 `409` |
+
+## 11. 推荐近期范围
+
+近期产品主线保持：
+
+```text
+写作技能安装与选择
+  → 外部信息能力槽位
+  → 标题 / 审稿 / SEO 等阶段技能按需覆盖
+```
+
+P3 本地工具维持管理员/开发者能力，P4 远程工具优先承接网页、搜索、新闻、仓库和文档检索。下一轮工具侧不扩展通用调用自由度，而是建立受控的信息能力槽位。
+
+不建议近期建设：
+
+- 公共在线插件市场。
+- 用户上传并运行本地代码。
+- 通用无代码工作流编排器。
+- 允许技能自定义系统级权限规则。

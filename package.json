@@ -9,7 +9,9 @@
         "dev": "node --disable-warning=ExperimentalWarning --watch --watch-path=server.mjs --watch-path=lib server.mjs",
         "test": "node --disable-warning=ExperimentalWarning --test test/**/*.test.mjs",
         "build": "node scripts/build.mjs",
-        "build:watch": "node --watch scripts/build.mjs"
+        "build:watch": "node --watch scripts/build.mjs",
+        "skill:validate": "node scripts/validate-skill-package.mjs",
+        "plugin:validate": "node scripts/validate-tool-plugin.mjs"
     },
     "engines": {
         "node": ">=24"

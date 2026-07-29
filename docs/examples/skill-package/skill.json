@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "example-installed-skill",
+  "name": "示例第三方技能",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": ["independent-writing"],
+  "contentTypes": ["article"],
+  "inputContract": "fact_base",
+  "outputContract": "article_markdown",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "installed",
+    "url": ""
+  }
+}

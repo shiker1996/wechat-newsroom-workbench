@@ -1,6 +1,7 @@
 import { request } from "../core/http.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
+import { loadSkillSelect } from "../core/skill-selection.js";
 
 let bound = false;
 let candidateId = null;
@@ -9,6 +10,7 @@ let writingGenerating = false;
 let writingCompleted = false;
 let writingFailed = false;
 let customProjects = [];
+let loadedSkillMode = "";
 
 const form = () => document.getElementById("tutorial-form");
 const field = (name) => form().elements.namedItem(name);
@@ -101,6 +103,12 @@ function syncMode() {
     document.getElementById("generate-tutorial").disabled = true;
     updateWritingSteps(1);
     return;
+  }
+  if (loadedSkillMode !== mode) {
+    loadedSkillMode = mode;
+    loadSkillSelect(document.getElementById("tutorial-writer-skill"),
+      `/api/creation-entry-points/independent-writing/skills?contentType=${encodeURIComponent(mode)}`)
+      .catch((error)=>toast(error.message));
   }
   const title = document.getElementById("tutorial-empty-title");
   const copy = document.getElementById("tutorial-empty-copy");

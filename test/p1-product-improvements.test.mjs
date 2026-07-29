@@ -11,7 +11,7 @@ test("文章编辑器无锁定候选时禁用写作、AI 与检查工具并只�
   assert.match(editor,/function setWritingDeskAvailability\(available\)/);
   assert.match(editor,/\.markdown-toolbar button/);
   assert.match(editor,/control\.disabled=!available/);
-  assert.match(editor,/setWritingDeskAvailability\(Boolean\(state\.candidates\.length\)\)/);
+  assert.match(editor,/setWritingDeskAvailability\(Boolean\(writingOptions\.length\)\)/);
   assert.match(editor,/href="#overview">前往热点全景创建选题/);
   assert.doesNotMatch(editor,/href="#editorial">文章编辑室/);
 });

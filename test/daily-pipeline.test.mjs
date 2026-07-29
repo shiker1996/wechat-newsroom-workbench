@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { dailyFocusOptions, dailyVisibleChars, normalizeDailyQuality, selectDailyEvents } from '../lib/llm/daily-pipeline.mjs';
+
+test('批次早报执行标题、自然化、审阅与 SEO 完整阶段',()=>{
+  const source=fs.readFileSync(new URL('../lib/llm/daily-pipeline.mjs',import.meta.url),'utf8');
+  for(const skill of ['title-generator','humanizer-zh','article-reviewer','seo-content-optimizer']){
+    assert.match(source,new RegExp(skill));
+  }
+  for(const artifact of ['02-titles.md','03-humanized.md','04-reviewed.md','05-seo-optimized.md']){
+    assert.match(source,new RegExp(artifact.replace('.','\\.')));
+  }
+  assert.match(source,/03-FINAL\.md/);
+});
 
 test('批次早报按主体关系选择全部关联事实卡事件', () => {
   const clusters = [

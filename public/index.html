@@ -57,10 +57,11 @@
         </div>
       </details>
       <details class="nav-group" data-nav-group="system">
-        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 日志</small></summary>
+        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 技能 · 日志</small></summary>
         <div class="nav-group-items">
           <button class="nav-item" data-view="artifacts">产物中心</button>
           <button class="nav-item" data-view="models">模型中心</button>
+          <button class="nav-item" data-view="skills">技能与插件</button>
           <button class="nav-item" data-view="logs">任务日志</button>
         </div>
       </details>
@@ -228,7 +229,10 @@
         <label>资料链接（每行一个；抓取失败会阻止成稿）<textarea name="materialUrls" rows="3"></textarea></label>
           </div>
         </details>
-        <div class="tutorial-actions"><button type="submit" class="primary-button" id="generate-tutorial">创建并生成文章</button></div>
+        <div class="tutorial-actions">
+          <label class="writer-skill-picker"><span>写作技能</span><select name="skillId" id="tutorial-writer-skill" aria-label="自主写作技能"><option value="">自动选择</option></select><small data-skill-note>选择文章类型后显示兼容技能</small></label>
+          <button type="submit" class="primary-button" id="generate-tutorial">创建并生成文章</button>
+        </div>
         <div id="tutorial-job-status" class="daily-job-status"></div>
         <div id="tutorial-result" class="daily-result" hidden><div class="workspace-head"><div><span class="kicker">READY</span><h3>自主写作已进入文章链路</h3></div><button type="button" class="primary-button" id="open-tutorial-editor">到文章编辑器</button></div><p id="tutorial-result-copy"></p></div>
         </div>
@@ -330,7 +334,18 @@
               <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
               <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
               <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
-              <div class="editorial-actions"><button type="submit" class="ghost-button">保存当前进度</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button></div>
+              <div class="editorial-actions">
+                <details class="creation-skill-settings">
+                  <summary><span><b>本次创作配置</b><small id="editorial-skill-summary" aria-live="polite">系统推荐主写 · 4 个加工阶段使用默认配置</small></span><em>调整</em></summary>
+                  <div class="creation-skill-popover">
+                    <div class="stage-skill-settings-head"><span>CREATION ROUTE</span><b>选择主写与加工方式</b><small>默认配置适合大多数文章。只有明确需要替换某个技能时才调整。</small></div>
+                    <label class="writer-skill-picker"><span>主写技能</span><select id="editorial-writer-skill" aria-label="热点文章主写技能"><option value="">系统自动选择</option></select><small data-skill-note>系统会根据内容类型选择合适技能</small></label>
+                    <details class="stage-skill-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="editorial-stage-skills" class="stage-skill-list" aria-busy="true"></div></details>
+                    <div class="creation-skill-actions"><button type="button" class="text-button" id="reset-editorial-skills">恢复默认</button><button type="button" class="outline-button" id="close-editorial-skills">完成</button></div>
+                  </div>
+                </details>
+                <button type="submit" class="ghost-button">保存当前进度</button><button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button>
+              </div>
             </section>
             </div>
             <details class="editorial-decision-details" id="editorial-decision-details">
@@ -470,6 +485,89 @@
         <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
       </div>
       <div class="artifact-grid" id="artifact-list"></div>
+    </section>
+
+    <section class="view skill-registry-view" id="view-skills">
+      <div class="section-intro"><div><span class="kicker">CREATION CAPABILITIES</span><h2>技能与插件</h2></div><p>技能决定文章怎么写，工具负责获取外部资料。默认配置可直接创作，需要时再安装或替换。</p></div>
+      <div class="runtime-path-strip skill-registry-summary" id="skill-registry-summary"><span>正在扫描项目技能…</span></div>
+      <nav class="capability-section-tabs" aria-label="技能与插件管理分区">
+        <button type="button" class="active" data-capability-tab="skills" aria-pressed="true"><span>01</span><b>技能库</b><small>查看创作规则与契约</small></button>
+        <button type="button" data-capability-tab="tools" aria-pressed="false"><span>02</span><b>信息工具</b><small>查看写作资料能力是否就绪</small></button>
+        <button type="button" data-capability-tab="extensions" aria-pressed="false"><span>03</span><b>安装扩展</b><small>增加技能或连接外部服务</small></button>
+      </nav>
+      <div class="extension-management-grid" data-capability-section="extensions" hidden>
+      <section class="runtime-commandbar skill-package-installer extension-card">
+        <div><b>安装第三方技能包</b><small>可先校验本地目录，或直接选择 ZIP；安装前不会执行包内代码。</small></div>
+        <input id="skill-package-directory" type="text" placeholder="本地技能包目录">
+        <button class="ghost-button" id="validate-skill-package">校验目录</button>
+        <button class="outline-button" id="install-skill-package">安装目录</button>
+        <label class="ghost-button">选择 ZIP<input id="skill-package-zip" type="file" accept=".zip,application/zip" hidden></label>
+      </section>
+      <section class="model-config-panel remote-plugin-installer extension-card">
+        <div class="panel-head"><div><span class="kicker">REMOTE CAPABILITY</span><h3>连接远程 API / MCP</h3><small>仅声明式 HTTPS 连接；拒绝内网地址、本地路径和本地 adapter。</small></div></div>
+        <textarea id="remote-plugin-manifest" rows="8" spellcheck="false" placeholder='粘贴 remote-api 或 mcp Manifest JSON'></textarea>
+        <div class="runtime-actions"><button class="ghost-button" id="validate-remote-plugin">校验连接声明</button><button class="outline-button" id="install-remote-plugin">保存连接</button></div>
+        <div id="remote-credential-panel" class="runtime-actions" hidden>
+          <label>凭据 <input id="remote-credential-token" type="password" autocomplete="new-password" placeholder="仅写入服务端密钥存储"></label>
+          <button class="outline-button" id="save-remote-credential">保存凭据</button>
+          <button class="text-button" id="cancel-remote-credential">取消</button>
+        </div>
+      </section>
+      <section class="runtime-commandbar tool-package-installer extension-card">
+        <div><b>安装受信工具插件</b><small>仅限管理员审查过的本地 adapter；安装后默认停用，并需重启工作台加载。</small></div>
+        <input id="tool-package-directory" type="text" placeholder="本地插件包目录">
+        <button class="ghost-button" id="validate-tool-package">校验与权限摘要</button>
+        <button class="outline-button" id="install-tool-package">管理员安装</button>
+      </section>
+      </div>
+      <section class="information-slot-panel" data-capability-section="tools" hidden>
+        <div class="information-slot-heading"><div><span class="kicker">WRITING RESEARCH</span><b>写作所需的信息能力</b><small>绿色表示创作时可以直接使用；未连接的能力不会影响其他已就绪能力。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
+        <div class="information-slot-grid" id="information-slot-list"><div class="kv-empty">正在读取信息能力…</div></div>
+      </section>
+      <details class="tool-capability-disclosure" data-capability-section="tools" hidden>
+        <summary><span><b id="tool-capability-summary">正在检查插件运行状态…</b><small>供管理员排查版本、权限、优先级和执行记录</small></span><span>技术详情</span></summary>
+        <div class="runtime-model-list" id="tool-capability-list"></div>
+        <section class="tool-execution-panel" id="tool-execution-panel" hidden>
+          <div class="skill-config-section-head"><div><b id="tool-execution-title">执行历史</b><small>仅记录参数名，不保存输入正文或密钥</small></div><button type="button" class="text-button" id="tool-execution-close">关闭</button></div>
+          <div class="runtime-model-list" id="tool-execution-list"></div>
+        </section>
+      </details>
+      <div class="skill-management-layout" data-capability-section="skills">
+        <aside class="skill-browser" aria-label="创作技能列表">
+          <div class="skill-browser-head"><div><span class="kicker">SKILLS</span><h5>选择技能</h5></div><span id="skill-filter-count">—</span></div>
+          <div class="skill-browser-controls">
+            <label><span>搜索</span><input id="skill-search" type="search" placeholder="名称或用途" autocomplete="off"></label>
+            <label><span>状态</span><select id="skill-status-filter"><option value="all">全部</option><option value="configured">存在历史覆盖</option><option value="builtin">纯内置</option></select></label>
+          </div>
+          <div class="skill-list" id="skill-registry-list"></div>
+        </aside>
+        <div class="skill-detail">
+          <div class="skill-detail-empty" id="skill-detail-empty">
+            <span>01</span><h5>先从左侧选择一个技能</h5><p>查看内置 SKILL.md、来源文件、版本和内容哈希。</p>
+          </div>
+          <section class="model-config-panel skill-config-editor skill-readonly-view" id="skill-config-editor" hidden>
+            <div class="panel-head skill-editor-head"><div><span class="kicker">BUILT-IN SKILL · READ ONLY</span><h3 id="skill-config-title">技能说明</h3><small id="skill-config-meta">选择技能后读取 SKILL.md</small></div><span class="status-pill ok">只读</span></div>
+            <p id="skill-runtime-policy-note" class="skill-runtime-policy-note"></p>
+            <div id="skill-package-actions" class="runtime-actions" hidden></div>
+            <section class="skill-readonly-source">
+              <div><b>来源文件</b><code id="skill-source-path">—</code></div>
+              <div><b>内容哈希</b><code id="skill-prompt-hash">—</code></div>
+            </section>
+            <section class="skill-contract-section">
+              <div class="skill-config-section-head"><div><b>结构化契约</b><small>由 skill.json 提供，用于后续入口选择和兼容性判断</small></div><span>01</span></div>
+              <div class="skill-contract-grid" id="skill-contract-grid"></div>
+            </section>
+            <section class="skill-markdown-section">
+              <div class="skill-config-section-head"><div><b>SKILL.md</b><small>内置技能契约原文，不包含运行时安全附加段或历史覆盖层</small></div><span>02</span></div>
+              <pre class="skill-markdown-view" id="skill-markdown-view"></pre>
+            </section>
+            <details class="skill-version-panel">
+              <summary><span><b>关联规则文件</b><small>该技能运行时同时加载的 Markdown 文件</small></span><span>查看</span></summary>
+              <div class="runtime-model-list" id="skill-file-list"></div>
+            </details>
+          </section>
+        </div>
+      </div>
     </section>
 
     <section class="view" id="view-system">

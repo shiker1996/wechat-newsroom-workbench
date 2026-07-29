@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"humanizer-zh","name":"中文表达自然化","version":"1.0.0","kind":"humanizer","entryPoints":["hotspot-article","independent-writing","batch-daily"],"contentTypes":["article"],"inputContract":"wechat_markdown","outputContract":"wechat_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

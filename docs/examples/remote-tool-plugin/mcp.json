@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "company-search-mcp",
+  "name": "企业资料搜索 MCP",
+  "version": "1.0.0",
+  "type": "mcp",
+  "capabilities": ["content.company.search"],
+  "riskLevel": "network-read",
+  "endpoint": "https://mcp.example.com/mcp",
+  "toolName": "company_search",
+  "credentialProfile": "company-search-mcp",
+  "inputSchema": {
+    "type": "object",
+    "required": ["query"],
+    "properties": {"query": {"type": "string"}}
+  },
+  "outputSchema": {"type": "object"},
+  "timeoutMs": 10000,
+  "maxResponseBytes": 1000000,
+  "compatibleApp": ">=0.1.0"
+}

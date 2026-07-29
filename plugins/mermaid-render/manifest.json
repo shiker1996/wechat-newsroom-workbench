@@ -1,0 +1,7 @@
+{
+  "id":"mermaid-render","name":"Mermaid 图片渲染","version":"1.0.0",
+  "capabilities":["diagram.mermaid.render"],"entry":"./adapter.mjs","riskLevel":"local-write",
+  "pathInputs":["inputPath","outputPath","imageDir","tokensPath"],
+  "inputSchema":{"type":"object","required":["inputPath","outputPath","imageDir"],"properties":{"inputPath":{"type":"string"},"outputPath":{"type":"string"},"imageDir":{"type":"string"},"tokensPath":{"type":"string"}}},
+  "outputSchema":{"type":"object"},"healthCheck":true,"enabledByDefault":true
+}

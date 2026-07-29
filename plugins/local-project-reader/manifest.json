@@ -1,0 +1,13 @@
+{
+  "id": "local-project-reader",
+  "name": "本地项目读取",
+  "version": "1.0.0",
+  "capabilities": ["filesystem.project.read"],
+  "entry": "./adapter.mjs",
+  "riskLevel": "read-only",
+  "pathInputs": ["path"],
+  "inputSchema": {"type":"object","required":["path"],"properties":{"path":{"type":"string"},"options":{"type":"object"}}},
+  "outputSchema": {"type":"object"},
+  "healthCheck": true,
+  "enabledByDefault": true
+}

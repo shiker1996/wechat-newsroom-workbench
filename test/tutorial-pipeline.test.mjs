@@ -10,6 +10,12 @@ test('教程字数统计忽略标题和链接URL',()=>{
 test('教程管线使用独立技能并保存标准文章终稿',()=>{
   const source=fs.readFileSync(new URL('../lib/llm/tutorial-pipeline.mjs',import.meta.url),'utf8');
   assert.match(source,/wechat-mp-tutorial/);
+  for(const skill of ['title-generator','humanizer-zh','article-reviewer','seo-content-optimizer']){
+    assert.match(source,new RegExp(skill));
+  }
+  for(const artifact of ['03-titles.md','05-humanized.md','06-reviewed.md','08-seo-optimized.md']){
+    assert.match(source,new RegExp(artifact.replace('.','\\.')));
+  }
   assert.match(source,/kind:'final'/);
   assert.match(source,/09-FINAL\.md/);
 });
