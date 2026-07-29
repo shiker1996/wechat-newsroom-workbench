@@ -13,6 +13,7 @@ let selectedRevision = null;
 let autoSaveTimer = null;
 let saveSequence = 0;
 let editGeneration = 0;
+let visualPlan = null;
 
 function setFocusMode(enabled,{persist=true}={}) {
   document.body.classList.toggle("editor-focus",enabled);
@@ -83,6 +84,97 @@ function markdownHtml(text) {
   return `<pre><code>${escapeHtml(text)}</code></pre>`;
 }
 
+function renderVisualPlan() {
+  const summary=document.getElementById("visual-plan-summary");
+  const list=document.getElementById("visual-plan-list");
+  if(!summary||!list)return;
+  summary.textContent=visualPlan ? `${visualPlan.summary}${visualPlan.themeLabel?` · 图表主题：${visualPlan.themeLabel}`:""}` : "终稿确认后，可在这里检查哪些段落值得用图表达。";
+  const items=visualPlan?.placements||[];
+  document.getElementById("visual-planner")?.classList.toggle("has-results",Boolean(items.length));
+  list.innerHTML=items.length?items.map((item)=>`<article class="visual-plan-card" data-visual-id="${escapeHtml(item.id)}" data-kind="${item.type.toUpperCase()}">
+    <h4>${escapeHtml(item.purpose||item.afterHeading)}</h4>
+    <div class="visual-plan-meta"><span>插入到「${escapeHtml(item.afterHeading)}」</span><span class="${item.complexity?.mobileReady?"mobile-ready":"mobile-warning"}">${item.complexity?.mobileReady?"移动端可读":escapeHtml(item.complexity?.warning||"需要精简")}</span>${(item.sourceRefs||[]).map((ref)=>"<span>"+escapeHtml(ref)+"</span>").join("")}</div>
+    <p>${escapeHtml(item.reason||"将复杂关系改为更易扫读的视觉表达")}</p>
+    <textarea class="visual-code-editor" data-visual-code="${escapeHtml(item.id)}" spellcheck="false">${escapeHtml(item.code)}</textarea>
+    <div class="visual-preview-frame" data-visual-preview="${escapeHtml(item.id)}"><span>点击预览生成主题化图片</span></div>
+    <div class="visual-plan-actions"><button type="button" class="ghost-button" data-ignore-visual="${escapeHtml(item.id)}">忽略</button><button type="button" class="ghost-button" data-preview-visual="${escapeHtml(item.id)}">预览</button><button type="button" class="ghost-button" data-insert-visual="${escapeHtml(item.id)}">插入文章</button></div>
+  </article>`).join(""):`<div class="image-stage-empty">${escapeHtml(visualPlan?.rejections?.length?visualPlan.summary:"当前文章没有必须增加的图表，保持文字表达即可。")}</div>`;
+}
+
+async function previewVisual(id) {
+  const item=visualPlan?.placements?.find((entry)=>entry.id===id);
+  const card=document.querySelector(`[data-visual-id="${CSS.escape(id)}"]`);
+  if(!item||!card)return;
+  const code=card.querySelector("[data-visual-code]")?.value.trim()||"";
+  const result=await request("/api/visual-preview",{method:"POST",body:JSON.stringify({type:item.type,code,theme:visualPlan?.theme})});
+  item.code=code;
+  item.fence=`\`\`\`${item.type}\n${code}\n\`\`\``;
+  item.complexity=result.complexity||item.complexity;
+  item.previewedCode=code;
+  const preview=card.querySelector("[data-visual-preview]");
+  if(preview)preview.innerHTML=`<img src="${result.image}" alt="${escapeHtml(item.purpose||item.type)} 预览">`;
+}
+
+async function planVisuals() {
+  const candidateValue=String(document.getElementById("writing-candidate")?.value||"");
+  const daily=candidateValue==="daily";
+  const candidateId=Number(candidateValue);
+  if(!daily&&!candidateId)return toast("请先选择文章");
+  const content=document.getElementById("markdown-editor")?.value||"";
+  if(!content.trim())return toast("文章内容为空");
+  const provider=document.getElementById("draft-provider")?.value||state.models?.defaultProvider;
+  visualPlan=await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/visual-plan`,{
+    method:"POST",body:JSON.stringify({provider,candidateId:daily?null:candidateId,documentKind:daily?"daily-final":null,content}),
+  });
+  renderVisualPlan();
+}
+
+function insertVisual(id) {
+  const item=visualPlan?.placements?.find((entry)=>entry.id===id);
+  const editor=document.getElementById("markdown-editor");
+  if(!item||!editor)return;
+  const editedCode=document.querySelector(`[data-visual-id="${CSS.escape(id)}"] [data-visual-code]`)?.value.trim();
+  if(editedCode){
+    if(item.type==="mermaid"&&!/^(?:flowchart\s+(?:TB|LR)|sequenceDiagram|stateDiagram-v2)\b/i.test(editedCode))return toast("Mermaid 支持流程图、时序图和状态图");
+    if(item.type==="echarts"){try{JSON.parse(editedCode);}catch{return toast("ECharts 配置必须是严格 JSON");}}
+    item.code=editedCode;item.fence=`\`\`\`${item.type}\n${editedCode}\n\`\`\``;
+  }
+  if(item.previewedCode!==item.code)return toast("请先预览当前代码，通过移动端复杂度门禁后再插入");
+  if(item.complexity&&!item.complexity.mobileReady)return toast(`移动端复杂度门禁未通过：${item.complexity.warning}`);
+  if(editor.value.includes(item.fence))return toast("该图表已经插入文章");
+  const escaped=item.afterHeading.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const heading=new RegExp(`^(#{1,3})\\s+${escaped}\\s*$`,"m").exec(editor.value);
+  if(!heading)return toast(`未找到章节「${item.afterHeading}」`);
+  const sectionStart=heading.index+heading[0].length;
+  const rest=editor.value.slice(sectionStart);
+  const next=/\n#{1,3}\s+/.exec(rest);
+  const insertAt=next?sectionStart+next.index:editor.value.length;
+  editor.value=`${editor.value.slice(0,insertAt).trimEnd()}\n\n${item.fence}\n${editor.value.slice(insertAt)}`;
+  markDocumentDirty();renderMarkdown();
+  const card=document.querySelector(`[data-visual-id="${CSS.escape(id)}"]`);
+  card?.classList.add("inserted");
+  card?.querySelector("button")?.setAttribute("disabled","");
+  toast("图表围栏已插入文章，请检查后保存终稿");
+  recordVisualDecision(item,"inserted");
+}
+
+function recordVisualDecision(item,action) {
+  const value=String(document.getElementById("writing-candidate")?.value||"");
+  request("/api/visual-decisions",{method:"POST",body:JSON.stringify({
+    batchId:state.activeBatchId,candidateId:value==="daily"?null:Number(value),
+    visualType:item.type,action,heading:item.afterHeading,purpose:item.purpose,
+  })}).catch(()=>{});
+}
+
+function ignoreVisual(id) {
+  const item=visualPlan?.placements?.find((entry)=>entry.id===id);
+  const card=document.querySelector(`[data-visual-id="${CSS.escape(id)}"]`);
+  if(!item||!card)return;
+  recordVisualDecision(item,"ignored");
+  card.remove();
+  toast("已忽略该建议，后续推荐会参考这个选择");
+}
+
 function scrollProgress(element) {
   const distance = element.scrollHeight - element.clientHeight;
   return distance > 0 ? element.scrollTop / distance : 0;
@@ -108,7 +200,16 @@ function setupSynchronizedScrolling() {
 }
 
 function visibleChars(markdown) {
-  return markdown.replace(/^#.*$/gm, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[*_`>#-]/g, "").replace(/\s/g, "").length;
+  return String(markdown || "")
+    .replace(/```(?:mermaid|echarts)\b[\s\S]*?```/gi, "")
+    .replace(/^```[^\r\n]*$/gm, "")
+    .replace(/^#.*$/gm, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`>#-]/g, "")
+    .replace(/\s/g, "")
+    .length;
 }
 
 function renderMarkdown() {
@@ -342,6 +443,8 @@ function selectedDocKind() {
   const el = document.querySelector("input[name=doc-kind]:checked");
   return el?.value || "draft";
 }
+function isDailyDocument() { return document.getElementById("writing-candidate")?.value==="daily"; }
+function storageDocKind() { return isDailyDocument()?`daily-${selectedDocKind()}`:selectedDocKind(); }
 
 function setWritingDeskAvailability(available) {
   const view=document.getElementById("view-editor");
@@ -375,24 +478,37 @@ async function loadWritingDesk() {
     (item) => item.brief_status === "LOCKED" || (item.brief_status == null && item.status === "locked")
   );
   state.documents = documents;
+  const dailyFinal=documents.find((item)=>item.kind==="daily-final"&&item.candidate_row_id==null);
   const select = document.getElementById("writing-candidate");
   if (!select) return;
-  select.innerHTML = state.candidates.length
-    ? state.candidates.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`).join("")
+  const writingOptions=[
+    ...(dailyFinal?[`<option value="daily">早报 · ${escapeHtml(dailyFinal.title||"批次早报")}</option>`]:[]),
+    ...state.candidates.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`),
+  ];
+  select.innerHTML = writingOptions.length
+    ? writingOptions.join("")
     : '<option value="">没有已锁定候选</option>';
-  select.disabled = !state.candidates.length;
-  setWritingDeskAvailability(Boolean(state.candidates.length));
+  select.disabled = !writingOptions.length;
+  if(select.value==="daily"){
+    const finalRadio=document.querySelector('input[name="doc-kind"][value="final"]');
+    if(finalRadio)finalRadio.checked=true;
+  }
+  setWritingDeskAvailability(Boolean(writingOptions.length));
   const ctxEl = document.getElementById("draft-context");
-  if (ctxEl) ctxEl.innerHTML = state.candidates.length
+  if (ctxEl) ctxEl.innerHTML = writingOptions.length
     ? "事实、观点、禁写项不会被压缩"
     : '当前没有可编辑文稿。<a class="primary-button editor-empty-primary" href="#overview">前往热点全景创建选题</a><small>创建后请在文章编辑室锁定候选，再返回这里写作。</small>';
   await loadSelectedDocument();
 }
 
 async function loadSelectedDocument() {
-  const candidateId = Number(document.getElementById("writing-candidate")?.value);
+  visualPlan=null;
+  renderVisualPlan();
+  const candidateValue=document.getElementById("writing-candidate")?.value;
+  const candidateId = Number(candidateValue);
+  const daily=candidateValue==="daily";
   const kind = selectedDocKind();
-  if (!candidateId) {
+  if (!candidateId&&!daily) {
     currentDocument = null;
     editorDirty = false;
     clearAutoSave();
@@ -408,10 +524,10 @@ async function loadSelectedDocument() {
   }
   let docResult = null;
   try {
-    docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${candidateId}&kind=${kind}`);
+    docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${daily?"daily":candidateId}&kind=${daily?`daily-${kind}`:kind}`);
   } catch {}
   currentDocument = docResult?.id ? docResult : null;
-  const candidate = state.candidates.find((item) => item.id === candidateId);
+  const candidate = daily?null:state.candidates.find((item) => item.id === candidateId);
   const titleEl = document.getElementById("article-title");
   const editor = document.getElementById("markdown-editor");
   if (titleEl) titleEl.value = docResult?.title || candidate?.hotspot_title || "";
@@ -423,7 +539,7 @@ async function loadSelectedDocument() {
   clearAutoSave();
   setSaveState("saved",docResult?.updated_at?`已保存 · ${new Date(docResult.updated_at).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`:"尚未保存");
   renderPreflightSummary(editor?.value||"");
-  lastCandidateValue = String(candidateId || "");
+  lastCandidateValue = daily?"daily":String(candidateId || "");
   lastDocKind = kind;
 }
 
@@ -540,8 +656,10 @@ async function restoreRevision() {
 }
 
 async function saveDocument({automatic=false}={}) {
-  const candidateId = Number(document.getElementById("writing-candidate")?.value);
-  if (!candidateId) return toast("先锁定一个文章简报");
+  const candidateValue=document.getElementById("writing-candidate")?.value;
+  const candidateId = Number(candidateValue);
+  const daily=candidateValue==="daily";
+  if (!candidateId&&!daily) return toast("请先选择一篇文稿");
   const content = document.getElementById("markdown-editor")?.value || "";
   const kind = selectedDocKind();
   if (kind === "final" && visibleChars(content) > 2000) return toast("终稿超过 2000 可见字符，暂不能保存为终稿");
@@ -553,7 +671,7 @@ async function saveDocument({automatic=false}={}) {
   try {
     const docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents`, {
       method: "PUT",
-      body: JSON.stringify({ candidateId, kind, title, content, status: kind === "final" ? "finalized" : "draft" }),
+      body: JSON.stringify({ candidateId:daily?null:candidateId, kind:daily?`daily-${kind}`:kind, title, content, status: kind === "final" ? "finalized" : "draft" }),
     });
     if(sequence!==saveSequence)return docResult;
     currentDocument=docResult;
@@ -625,12 +743,15 @@ async function pollJob(id) {
 }
 
 async function runTypeset() {
-  const candidateId = Number(document.getElementById("typeset-candidate")?.value);
-  if (!candidateId) return toast("请先选择一个候选");
+  const candidateValue=document.getElementById("typeset-candidate")?.value;
+  const daily=candidateValue==="daily";
+  const candidateId = Number(candidateValue);
+  if (!candidateId&&!daily) return toast("请先选择一篇终稿");
   const provider = document.getElementById("typeset-provider")?.value || state.models?.defaultProvider;
+  const theme = document.getElementById("typeset-theme")?.value || "auto";
   try {
     const result = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/typeset`, {
-      method: "POST", body: JSON.stringify({ provider, candidateId }),
+      method: "POST", body: JSON.stringify({ provider, candidateId:daily?null:candidateId, documentKind:daily?"daily-final":null, theme }),
     });
     toast("排版任务已启动");
     // 排版任务数分钟：打开进度弹窗，避免页面上无任何可见反馈
@@ -694,6 +815,10 @@ function bindEditor() {
   document.getElementById("restore-revision").addEventListener("click",()=>restoreRevision().catch((error)=>toast(error.message)));
   document.querySelector("[data-close-revisions]").addEventListener("click",()=>document.getElementById("revision-dialog").close());
   document.getElementById("ai-draft").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => aiDraft().catch((error) => toast(error.message))));
+  document.getElementById("plan-article-visuals").addEventListener("click",(event)=>withLoading(event.currentTarget,"正在分析…",()=>planVisuals().catch((error)=>toast(error.message))));
+  document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-insert-visual]");if(button)insertVisual(button.dataset.insertVisual);});
+  document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-preview-visual]");if(button)withLoading(button,"生成中…",()=>previewVisual(button.dataset.previewVisual).catch((error)=>toast(error.message)));});
+  document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-ignore-visual]");if(button)ignoreVisual(button.dataset.ignoreVisual);});
   window.addEventListener("beforeunload",(event)=>{if(!editorDirty)return;event.preventDefault();event.returnValue="";});
   window.addEventListener("keydown",(event)=>{
     if(event.key==="Escape"&&document.body.classList.contains("editor-focus")&&!document.querySelector("dialog[open]")){setFocusMode(false);return;}

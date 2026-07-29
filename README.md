@@ -16,12 +16,38 @@
 
 ## 启动
 
-要求 Node.js 24 或更高版本，不需要安装 npm 依赖。
+要求 Node.js 24 或更高版本，并在首次运行时安装项目依赖。
 
 Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。
 
 ```powershell
 npm start
+```
+
+首次运行或依赖发生变化时，请先在项目根目录安装基础依赖：
+
+```powershell
+npm install
+```
+
+### 可选依赖：Mermaid 图表
+
+普通文章、Markdown 代码块和表格不依赖 Mermaid。只有文章包含 ```` ```mermaid ```` 图表并需要在排版阶段转成 PNG 时，才需要安装 Mermaid CLI：
+
+```powershell
+npm install -D @mermaid-js/mermaid-cli
+```
+
+Mermaid CLI 使用 Puppeteer 驱动 Chromium/Chrome。工作台会依次查找：
+
+1. `PUPPETEER_EXECUTABLE_PATH` 指定的浏览器；
+2. Windows 系统安装的 Google Chrome；
+3. Puppeteer 下载缓存中的 Chrome。
+
+启动脚本会执行 `scripts/check-env.mjs`。缺少 Mermaid CLI 或可用浏览器时只显示 `[警告]`，不会阻止普通文章功能启动；但包含 Mermaid 图表的文章会停止排版，以避免图表被静默丢失。可单独运行以下命令检查环境：
+
+```powershell
+node scripts/check-env.mjs
 ```
 
 浏览器打开 `http://127.0.0.1:4317`。

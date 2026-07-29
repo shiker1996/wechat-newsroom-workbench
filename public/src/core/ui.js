@@ -18,7 +18,7 @@ export function toast(message) {
 }
 export function providerOptions(selected) {
   const providers = window.__models?.providers ?? [];
-  return providers.map((item) =>
+  return providers.filter((item)=>item.enabled!==false).map((item) =>
     `<option value="${escapeHtml(item.name)}" ${item.name === selected ? "selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.model)}${item.configured ? "" : "（未配置）"}</option>`
   ).join("");
 }

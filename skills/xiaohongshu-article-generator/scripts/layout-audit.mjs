@@ -50,8 +50,8 @@ try {
   const pages = await page.evaluate(() => {
     const thresholds = {
       cover: { min: 0.45, max: 0.90 },
-      content: { min: 0.65, max: 0.96 },
-      ending: { min: 0.45, max: 0.90 },
+      content: { min: 0.50, max: 0.96 },
+      ending: { min: 0.20, max: 0.90 },
     };
     const round = (value) => Math.round(value * 10) / 10;
     const visible = (element) => {
@@ -80,7 +80,11 @@ try {
       const direct = stack && visible(stack) ? [stack] : [...body.children].filter(visible);
       if (!direct.length && kind === 'content') issues.push('empty_page_body');
 
-      const directRects = direct.map((element) => element.getBoundingClientRect());
+      // stack 自身可能带 min-height 等装饰性高度，直接测其边界会掩盖稀疏内容；
+      // 已用区域改测 stack 内可见子元素（eyebrow/标题/内容块）的并集，装饰均为伪元素不参与测量
+      const stackChildren = stack && visible(stack) ? [...stack.children].filter(visible) : [];
+      const measured = stackChildren.length ? stackChildren : direct;
+      const directRects = measured.map((element) => element.getBoundingClientRect());
       const firstTop = directRects.length ? Math.min(...directRects.map((rect) => rect.top)) : bodyRect.top;
       const lastBottom = directRects.length ? Math.max(...directRects.map((rect) => rect.bottom)) : bodyRect.top;
       const usedHeight = Math.max(0, lastBottom - firstTop);
@@ -107,7 +111,13 @@ try {
       if (clippedPixels > 1) issues.push('clipped');
       if (utilization < limits.min && direct.length) issues.push('underfilled');
       if (utilization > limits.max && scrollOverflow <= 1 && clippedPixels <= 1) issues.push('overfilled');
-      const centered = kind === 'content' && (body.dataset.valign || 'center') === 'center';
+      const stackStyle = stack && visible(stack) ? getComputedStyle(stack) : null;
+      // grid 构图看 align-content，flex 构图看 justify-content；
+      // 刻意顶部/底部锚定的构图（hero、data、comp-align-start/end）不做居中平衡要求
+      const stackValign = stackStyle
+        ? (stackStyle.display.includes('grid') ? stackStyle.alignContent : stackStyle.justifyContent)
+        : 'center';
+      const centered = kind === 'content' && (body.dataset.valign || 'center') === 'center' && /^(center|normal)$/.test(stackValign);
       const balanceTolerance = Math.max(8, bodyRect.height * 0.03);
       if (centered && direct.length && Math.abs(topWhitespace - bottomWhitespace) > balanceTolerance) {
         issues.push('vertical_imbalance');

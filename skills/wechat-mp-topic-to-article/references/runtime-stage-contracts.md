@@ -44,6 +44,8 @@ brief → fact-base → planning → drafting → draft-quality-gate → title-g
 
 只有实质影响发布的问题才判定失败，不因个人风格偏好失败。返工严格按 issues 修复，保留已核验事实、来源、作者立场与风险边界，不新增事实。
 
+第一人称作者判断或阅读动作（如“我看”“我读完后的判断”）不等于第一人称亲测。只有正文声称作者本人测试、部署或使用产品并得到具体结果，且输入中没有已确认实践证据时，才作为未经核实的亲测拦截。
+
 ## `title-generation`
 
 同时使用总契约与 `title-generator`，根据已经完成的初稿重新生成标题。准确兑现正文，不夸大，默认不超过 28 个汉字。只返回严格 JSON：
@@ -56,7 +58,7 @@ brief → fact-base → planning → drafting → draft-quality-gate → title-g
 
 ## `humanize`
 
-同时使用总契约与 `humanizer-zh`。保留事实、数字、引语、来源、标题、作者观点、素材锚点和风险边界，只输出完整 Markdown，不附评分或修改总结。
+同时使用总契约与 `humanizer-zh`。保留事实、数字、引语、来源、标题、作者观点、素材锚点和风险边界；将“作者判断：”“反方边界：”等元话语标签和模板化结尾改写为自然句式。只输出完整 Markdown，不附评分或修改总结。
 
 ## `review`
 

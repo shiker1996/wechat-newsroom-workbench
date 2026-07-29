@@ -37,20 +37,19 @@ description: 将项目成稿 09-FINAL.md 编排为适合微信公众号编辑器
 
 将预渲染文章作为连续工作文件处理，输出 `09-FINAL.images.md`：
 
-1. 有 Mermaid 围栏时使用 `mermaid-render`
-2. 有支持的内联视觉模块时使用 `wechat-inline-modules-to-images`
-3. 有 ECharts 围栏时使用 `wechat-echarts-blocks-to-images`
-4. 处理已提供的文章图片和结构化配图清单
+1. 有 Mermaid 围栏时执行 `mermaid-render/scripts/render-mermaid.mjs`，渲染为本地 PNG 并替换围栏
+2. 有 ECharts 围栏时执行 `wechat-echarts-blocks-to-images/scripts/render-echarts.mjs`，渲染为本地 PNG 并替换围栏
+3. 处理已提供的文章图片和结构化配图清单
 
-允许最终 HTML 引用项目可解析的本地图片路径。遇到未提供的手动配图，或当前项目没有对应可视化执行器时，明确阻断，不得删除、伪造或跳过内容。
+允许最终 HTML 引用项目可解析的本地图片路径。图表围栏渲染失败、遇到未提供的手动配图，或遇到没有可视化执行器的内联视觉模块（stats-grid、timeline）时，明确阻断，不得删除、伪造或跳过内容。
 
 ### 4. `draft`
 
-同时加载本技能与 `wechat-md-to-draft`，读取图片工作稿、设计方案和设计 tokens，生成 `article.ai.draft.html`。模型输出必须通过标题、章节、链接和图片保真门禁；不通过时可使用确定性 Markdown 转换器，但回退结果仍须通过同一门禁。
+默认走确定性渲染：执行器读取图片工作稿和设计 tokens，用内置 Markdown 转换器直接输出内联样式的 `article.ai.draft.html`，不调用模型。版式由主题决定（`magazine-warm` 暖纸杂志风为默认，`gossip-card` 卡片吃瓜风可选），主题 tokens 作底色、design tokens 叠加；转换器遵循 normalizer SPEC 的正文约定：加粗用 `<span leaf=""><span textstyle="" style="font-weight: bold">` 嵌套形式（列表项加粗前缀后用 `font-weight: normal` 断开），引用块输出 `<section>` 而非 `<blockquote>`（左侧直角 + `border-left`），不使用 `div`、`flex`、绝对定位。`draftMode: 'llm'` 为实验路径：同时加载本技能与 `wechat-md-to-draft`，由模型生成初稿；模型输出必须通过标题、章节、链接和图片保真门禁，不通过时回退到确定性转换器，回退结果仍须通过同一门禁。
 
 ### 5. `normalized`
 
-执行 `wechat-html-normalizer/scripts/normalize-html.mjs`，将样式计算并内联，删除脚本、事件属性、外部样式、`style` 标签和 `div`，输出 `article.ai.html`。不得用模型模拟规范化脚本。
+确定性初稿天生是内联样式，直接作为 `article.ai.html`，无需浏览器内联化。仅 `llm` 实验路径执行 `wechat-html-normalizer/scripts/normalize-html.mjs`，将样式计算并内联，删除脚本、事件属性、外部样式、`style` 标签和 `div`。不得用模型模拟规范化脚本。
 
 ### 6. `gate`
 

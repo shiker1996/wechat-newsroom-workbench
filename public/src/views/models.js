@@ -19,20 +19,21 @@ async function loadModels() {
   window.__models = data;
   const providerSelect = document.getElementById("model-provider");
   if (providerSelect) providerSelect.innerHTML = providerOptions(data.providers?.find((p) => p.configured)?.name || data.defaultProvider);
-  if (!data.providers?.length) {
-    document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无已配置的模型服务商。请编辑 .env 文件后重启工作台。</div>';
+  const available=(data.providers||[]).filter((provider)=>provider.enabled!==false&&provider.configured);
+  if (!available.length) {
+    document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无可用模型。请前往“运行配置 → 模型服务”完成配置。</div>';
     return;
   }
   const grid = document.getElementById("model-cards");
-  grid.innerHTML = data.providers
+  grid.innerHTML = available
     .map((p) => {
       const ok = p.configured;
-      return `<div class="model-card ${ok ? "configured" : "missing"}">
-        <span class="status-pill ${ok ? "ok" : "bad"}">${ok ? "已配置" : "未配置"}</span>
+      return `<article class="model-card configured ${p.name===data.defaultProvider?"default":""}">
+        <span class="status-pill ${ok ? "ok" : "bad"}">${p.enabled===false?"已停用":ok ? "已配置" : "缺少 Key"}</span>
         <h3>${escapeHtml(p.label)}</h3>
         <code>${escapeHtml(p.model)}</code>
-        <dl><dt>上下文窗口</dt><dd>${(p.contextWindow / 1024).toFixed(0)}K</dd><dt>最大输出</dt><dd>${p.maxOutputTokens}</dd></dl>
-      </div>`;
+        <dl><dt>Base URL</dt><dd>${escapeHtml(p.baseUrl)}</dd><dt>上下文窗口</dt><dd>${Math.round(p.contextWindow / 1024)}K</dd><dt>最大输出</dt><dd>${p.maxOutputTokens}</dd></dl>
+      </article>`;
     }).join("");
   document.getElementById("call-summary").textContent = `最近 ${data.calls?.length || 0} 次调用`;
   const list = document.getElementById("model-call-list");

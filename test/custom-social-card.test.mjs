@@ -61,6 +61,15 @@ test('自定义事实基座构建校验类型、要点数量与来源等级', as
   await assert.rejects(()=>buildCustomFactSheet({input:{content_type:'opinion',topic:'x',points:'a\nb\nc'},fetchImpl}),/作者真实体验/);
 });
 
+test('已成功读取的本地项目可作为教程的用户素材上下文', async () => {
+  const fact=await buildCustomFactSheet({input:{
+    content_type:'tutorial',topic:'本地工具教程',
+    points:'第一步\n第二步\n第三步',
+  },hasUserMaterialContext:true,fetchImpl:async()=>({status:'ok'})});
+  assert.equal(fact.has_user_material_context,true);
+  assert.ok(fact.points.every((item)=>item.source_level==='model_suggestion'));
+});
+
 test('自定义事实清单标注来源等级与体验边界', async () => {
   const fact=await buildCustomFactSheet({input:{content_type:'opinion',topic:'观点',thesis:'核心观点',points:'【体验】亲身经历\n【素材】引用 https://example.com/a\n建议项'},fetchImpl:async()=>({status:'ok'})});
   const md=customFactMarkdown(fact);
