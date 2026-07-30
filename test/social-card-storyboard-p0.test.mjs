@@ -99,7 +99,7 @@ test('P1 card-editorial 接收故事板技能并冻结阶段选择',()=>{
 test('P2 图文编辑室展示故事板技能选择并随请求提交',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const source=fs.readFileSync(new URL('../public/src/views/social-editor.js',import.meta.url),'utf8');
-  const system=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
+  const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
   assert.match(html,/id="social-skill-summary"/);
   assert.match(html,/id="social-stage-skills"/);
   assert.match(html,/id="reset-social-skills"/);
@@ -107,7 +107,7 @@ test('P2 图文编辑室展示故事板技能选择并随请求提交',()=>{
   assert.match(source,/SOCIAL_ENTRY_POINTS=\{repository:'social-tool',event:'social-event',custom:'social-custom'\}/);
   assert.match(source,/stageSkills:selectedStageSkills\(document\.getElementById\('social-stage-skills'\)\)/);
   assert.match(source,/现有逐页编辑将被替换/);
-  assert.match(system,/storyboard:"故事板规划"/);
+  assert.match(skills,/storyboard: "故事板规划"/);
 });
 
 test('图文创作页以事实、故事板和交付三阶段组织主路径',()=>{

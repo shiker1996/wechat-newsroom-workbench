@@ -4,21 +4,35 @@
 
 | 页面（视图） | 加载模块 |
 |---|---|
-| 今日值班 (dashboard) | app-core.js（首屏） |
-| 每日批次 (batches) | app-overview.js（首屏） |
-| 热点全景 (overview) | app-overview.js + app-pool-editorial.js |
-| 选题池 (topics) | app-pool-editorial.js（按需） |
-| 编辑室 (editorial) | app-pool-editorial.js（按需） |
-| 文章编辑器 (editor) | app-editor-production.js（按需） |
-| 排版预览 (preview) | app-editor-production.js（按需） |
-| 热点档案 (hotspots) | app-overview.js（首屏） |
-| 产物柜 (artifacts) | app-overview.js（首屏） |
-| 采集控制 (system) | app-models-logs.js（首屏） |
-| 订阅源 (sources) | app-models-logs.js（首屏） |
-| 模型中心 (models) | app-models-logs.js（首屏） |
-| 技能与插件 (skills) | public/src/views/system.js（按需） |
-| 日志 (logs) | app-models-logs.js（首屏） |
-| 内容日历 (calendar) | app-models-logs.js（首屏） |
+| 今日值班 | `public/src/views/dashboard.js` |
+| 每日批次 | `public/src/views/batches.js`、`batch-drawer.js` |
+| 热点全景 | `public/src/views/atlas.js` |
+| 文章池 / 图文池 | `public/src/views/topics.js` |
+| 编辑室 | `public/src/views/editorial.js` |
+| 文章编辑器 | `public/src/views/editor.js` |
+| 排版预览 | `public/src/views/preview.js` |
+| 图文编辑室 | `public/src/views/social-editor.js` |
+| 自主写作 | `public/src/views/tutorial.js` |
+| 批次早报 | `public/src/views/daily.js` |
+| 热点档案 | `public/src/views/hotspots.js` |
+| 产物柜 | `public/src/views/artifacts.js` |
+| 设置与采集 | `public/src/views/system.js` |
+| 技能与插件 | `public/src/views/skills.js` |
+| 订阅源 | `public/src/views/subscriptions.js` |
+| 模型中心 | `public/src/views/models.js` |
+| 日志 | `public/src/views/logs.js` |
+| 内容日历 | `public/src/views/calendar.js` |
+
+---
+
+## 调用约定与安全边界
+
+- 默认地址为 `http://127.0.0.1:4317`，所有接口均位于 `/api` 下；服务只监听回环地址。
+- 普通 JSON 请求使用 `Content-Type: application/json`。流式策划与编辑会接口返回 `application/x-ndjson`，每行一个 `{ type, ... }` 事件。
+- 创建资源通常返回 `201`，启动后台任务通常返回 `202`；输入错误返回 `400`，资源不存在返回 `404`，状态或依赖冲突返回 `409`。
+- 后台任务启动响应包含任务 ID；用 `GET /api/jobs/:id` 轮询。服务重启后逐行内存日志不会恢复，但数据库中的运行审计仍可通过 `GET /api/jobs` 查询。
+- 本 API 面向本机单用户工作台，没有通用登录、会话或公网鉴权。插件安装和备份恢复使用专用确认头，只是防误操作门禁，不是多用户授权机制。
+- 路径参数中的批次 ID、技能 ID、插件 ID 和文件名应 URL 编码。文档中的 `:id` 为路径占位符。
 
 ---
 
@@ -35,6 +49,10 @@
 ### POST /api/batches
 创建新批次 { date, title, note }
 → 每日批次（新建对话框）
+
+### POST /api/batches/breaking
+创建突发批次。请求体可包含 `{ date, title, note, urls, requestedTracks }`；`urls` 可为数组或换行文本，`requestedTracks` 缺省为 `["article"]`。突发批次与普通每日批次隔离。
+→ 突发任务
 
 ### GET /api/batches/:id
 单批次详情（含热点列表、来源记录、产物、AI 运行状态）
@@ -65,13 +83,23 @@
 热点研判（聚类、8+2 预选、脑暴）
 → 每日批次（抽屉面板）
 
+### POST /api/batches/:id/ai/auto
+启动采集后的自动流水线，按当前状态继续打标、事件卡和研判。
+→ 每日批次
+
+### POST /api/batches/:id/ai/event-cards
+为本批次补生成或重建事件事实卡。
+→ 每日批次
+
 ### GET /api/batches/:id/overview
 热点全景数据（事件聚类、热词）
 → 热点全景
 
-### POST /api/batches/:id/hotword-summary/:word
-生成单热词综述
-→ 热点全景
+### GET /api/batches/:id/ranking
+文章池的研判排名与预选结果。
+
+### GET /api/batches/:id/social-ranking
+图文池的独立排名、GitHub 项目发现结果与历史覆盖信息。
 
 ---
 
@@ -134,9 +162,32 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 显式选择不兼容、未启用或缺少必需工具时返回错误。
 实际技能、选择来源和完整阶段 Prompt 会冻结到 generation snapshot。
 
+### GET /api/candidates/:id/similar-social
+查询同仓库或同主题的历史图文覆盖记录。
+→ 图文编辑室
+
+### DELETE /api/candidates/:id/tracks/:track
+只移除候选的指定轨道（`article` 或 `social_cards`）；候选没有其它轨道时一并删除候选。
+
 ### DELETE /api/candidates/:id
 移除候选
 → 选题池
+
+---
+
+## 突发任务
+
+### POST /api/batches/:id/ai/breaking-analysis
+启动突发事件专用分析任务，可选择模型服务商。
+
+### GET /api/batches/:id/breaking-analysis
+读取突发分析、来源、事实边界和当前路线。
+
+### POST /api/batches/:id/breaking-materials
+向突发任务补充材料 URL，`urls` 可为数组或换行文本；材料会进入后续突发分析的来源处理链。
+
+### POST /api/batches/:id/breaking-analysis/route
+确认后续路线与编辑决策，使任务进入文章或图文生产链。
 
 ---
 
@@ -178,6 +229,12 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 查询相似历史文章（基于 eventKey + 标题匹配）
 → 编辑室（历史覆盖提示）
 
+### GET /api/candidates/:id/writer-skills
+返回此候选可用的主写技能、推荐实现、当前默认和不可用原因。
+
+### GET /api/candidates/:id/stage-skills
+返回标题、审稿、自然化和 SEO 阶段的可用技能槽位。
+
 ---
 
 ## 成稿
@@ -192,7 +249,8 @@ AI 起草（单步）{ provider, instructions, existingDraft }
 
 ### POST /api/batches/:id/ai/typeset
 排版 { provider, candidateId, mode, theme }
-- `theme` 可选：`magazine-warm`（默认，暖纸杂志风）、`gossip-card`（卡片吃瓜风）
+- `theme` 可选：`auto`、`magazine-warm`（暖纸杂志风）、`gossip-card`（卡片吃瓜风）、`tech-wire`（暗色终端）、`research-report`（财经印刷）、`career-essay`（书信手账）、`news-digest`（黑白快讯）。
+- `auto` 按候选类别和文章形态选择主题；无法识别时回退 `magazine-warm`。
 → 排版预览
 
 ---
@@ -206,6 +264,15 @@ AI 起草（单步）{ provider, instructions, existingDraft }
 ### PUT /api/batches/:id/documents
 保存文档 { candidateId, kind, title, content, status }
 → 文章编辑器（保存按钮）
+
+### GET /api/documents/:id/revisions
+列出文档版本。
+
+### GET /api/documents/:id/revisions/:version
+读取指定版本。
+
+### POST /api/documents/:id/revisions/:version/restore
+把指定历史版本恢复为当前正文；恢复本身也会形成新版本。
 
 ---
 
@@ -223,6 +290,9 @@ AI 规划配图占位
 保存本地图片 { fileName, mimeType, base64 }
 → 排版预览
 
+### PUT /api/candidates/:id/images/:imageId
+只更新图片来源、版权状态、说明等元数据，不上传文件。
+
 ### GET /api/candidates/:id/images/:imageId/local
 本地图片预览（返回图片文件）
 → 排版预览
@@ -230,6 +300,64 @@ AI 规划配图占位
 ### POST /api/candidates/:id/images/:imageId/cdn
 上传到 CDN
 → 排版预览
+
+### GET /api/batches/:id/daily/images
+读取批次早报配图工作区。
+
+### POST /api/batches/:id/daily/images/:imageId
+保存批次早报本地图片。
+
+### GET /api/batches/:id/daily/images/:imageId/local
+预览批次早报本地图片。
+
+### POST /api/batches/:id/daily/images/:imageId/cdn
+把批次早报图片上传到已配置 CDN。
+
+### POST /api/batches/:id/visual-plan
+根据文稿生成声明式视觉建议，返回建议、复杂度与可执行边界。
+
+### POST /api/visual-preview
+对选定视觉建议生成预览。
+
+### POST /api/visual-decisions
+保存编辑者对视觉建议的接受、拒绝和原因，供后续统计。
+
+---
+
+## 图文故事板与交付
+
+### GET /api/candidates/:id/card-editorial
+读取图文事实基座、门禁、渠道和当前故事板。
+
+### PUT /api/candidates/:id/card-editorial
+保存图文编辑决策与完整故事板。
+
+### PUT /api/candidates/:id/card-pages/:page
+只更新指定页的标题、正文和结构化内容块，不触发渲染。
+
+### PUT /api/candidates/:id/card-pages/:page/layout
+设置或清除指定页的版式 / 构图选择。
+
+### POST /api/candidates/:id/card-channel
+切换 `wechat` / `xiaohongshu` 渠道并持久化到候选轨道与编辑决策。
+
+### POST /api/candidates/:id/repository/inspect
+检查工具图文关联的 GitHub 仓库，生成或刷新仓库事实清单。
+
+### POST /api/candidates/:id/card-lock
+执行事实和编辑门禁，锁定图文故事板。
+
+### POST /api/candidates/:id/ai/social-card
+按已锁定故事板启动整组图文生成，产出文案、HTML、PNG、布局与交付报告。
+
+### GET /api/candidates/:id/social-cards
+读取图文交付状态、图片清单、文案、事实清单和报告。
+
+### GET /api/candidates/:id/social-cards/files/:path
+返回图文工作区内的受控文件；`?download=1` 触发下载。
+
+### GET /api/candidates/:id/social-cards/download
+下载整组图文 ZIP。
 
 ---
 
@@ -247,6 +375,12 @@ AI 规划配图占位
 产物内容预览（返回文件流）
 → 产物柜（点击卡片）
 
+### GET /api/artifacts/:id/preview
+返回适合当前产物类型的预览页或重定向。
+
+### GET /api/artifacts/:id/:assetPath
+读取 HTML 产物引用的相对图片等资产；服务端限制在已索引产物目录内。
+
 ---
 
 ## 内容日历
@@ -259,6 +393,9 @@ AI 规划配图占位
 文章统计（累计/本月/本周、按周分布、按类型分布）
 → 产物柜
 
+### GET /api/calendar
+返回文章和图文合并后的内容日历数据。
+
 ### GET /api/documents/:id/content
 文档正文（返回 text/plain）
 → 内容日历（点击文章标题）、编辑室（历史覆盖提示点击）
@@ -269,6 +406,14 @@ AI 规划配图占位
 
 ### GET /api/models
 模型服务商列表 + 最近调用记录
+→ 模型中心
+
+### POST /api/models/config
+新增或更新运行时模型配置。密钥写入 `.env`，非密钥参数写入本地配置；响应不回传密钥原文。
+→ 模型中心
+
+### DELETE /api/models/config/:provider
+删除用户维护的模型配置；内置配置按实现规则恢复默认或停用。
 → 模型中心
 
 ### POST /api/models/test
@@ -299,13 +444,34 @@ AI 规划配图占位
 测试订阅连接 { kind, value }
 → 订阅源台账
 
+### GET /api/subscriptions/health-history
+查询来源健康历史，支持 `?days=&limit=`。
+
 ---
 
 ## 系统
 
 ### GET /api/system/health
-采集环境检查（Reddit CDP 状态、RSSHub 状态）
+采集环境检查（Reddit CDP、RSSHub、GitHub API 与 Node.js）。`?target=all|reddit|rsshub|github` 可只检查一个目标。
 → 采集控制
+
+### GET /api/system/settings
+读取可在 UI 中维护的应用 / RSSHub 环境变量和解析后的路径。敏感字段只返回 `configured`。
+
+### PUT /api/system/settings
+更新受支持的 `.env` 字段；空值不覆盖现有密钥，`clear: true` 才清除。
+
+### POST /api/system/runtime/:service/:action
+控制 `rsshub|reddit` 的 `start|stop|restart`。仅适用于当前 Windows / PowerShell 本机运行方式。
+
+### GET /api/system/backup
+导出工作台 ZIP 备份。
+
+### POST /api/system/backup/validate
+上传 ZIP 二进制并只做格式、清单、路径和哈希校验，不写入工作区。
+
+### POST /api/system/backup/restore
+恢复已校验的 ZIP；要求请求头 `x-restore-confirm: RESTORE`。恢复前自动保存安全备份。
 
 ### GET /api/system/skills
 返回只读技能注册表，包括技能包版本、角色、适用入口、内容类型、输入输出契约、必需/可选工具和清单校验状态；同时返回插件能力、启停状态、优先级、健康检查和最近执行结果。
@@ -315,7 +481,7 @@ AI 规划配图占位
 返回内置 `SKILL.md` 原文、`skill.json` 结构化契约、来源文件、内容哈希、主/子技能策略归属、历史配置状态，以及该技能可设置的入口/阶段默认范围 `defaultScopes`。
 → 技能与插件
 
-技能写接口 `/versions`、`/dry-run` 和 `/versions/:version/restore` 当前统一返回 `403`。内置技能通过代码仓库修改 `SKILL.md`，不在工作台中在线编辑。
+内置技能的旧在线写接口 `/versions`、`/dry-run` 和 `/versions/:version/restore` 统一返回 `403`。内置技能通过代码仓库修改；第三方技能使用下述技能包管理接口。
 
 ### GET /api/system/skill-entry-defaults
 返回主写入口默认映射 `items` 和文章阶段默认映射 `stageItems`。
@@ -331,6 +497,33 @@ AI 规划配图占位
 
 ### GET /api/creation-entry-points/:entryPoint/stage-skills
 返回指定创作入口的标题、审稿、自然化和 SEO 阶段槽位、当前默认技能、兼容候选及不可用原因，供热点事件、自主写作和批次早报的单次创作配置使用。
+
+### GET /api/creation-entry-points/:entryPoint/skills
+按 `entryPoint`、`contentType` 和可选 `recommendedSkillId` 返回主写技能候选。
+
+### GET /api/system/information-capability-slots
+返回网页抓取、仓库检查、本地项目读取等信息能力槽位及当前插件实现。
+
+### PUT /api/system/information-capability-slots/:slot
+以 `{ "pluginId": "..." }` 设置槽位实现；空字符串恢复默认选择。
+
+### POST /api/system/skill-packages/validate
+预检本地技能包目录，校验清单、契约、路径和冲突，不安装。
+
+### POST /api/system/skill-packages/install
+安装第三方技能包、保存版本并启用。
+
+### PATCH /api/system/skills/:id/status
+启用或停用第三方技能；依赖关系不允许破坏时返回冲突。
+
+### POST /api/system/skills/:id/update
+从技能包记录的来源更新第三方技能。
+
+### DELETE /api/system/skills/:id
+卸载第三方技能；内置技能不可卸载。
+
+### GET /api/system/skill-install-events
+读取技能安装、更新、启停和卸载事件。
 
 ### PATCH /api/system/tool-plugins/:id
 更新插件启用状态或实现优先级 `{ enabled?, priority?, confirmDisable? }`。仍被活动技能使用时，停用需要显式确认。
@@ -356,6 +549,9 @@ AI 规划配图占位
 后台任务实时状态（采集、打标、研判、成稿、排版）
 → 各页面（弹窗轮询）
 
+### GET /api/jobs
+返回最近持久化任务，支持 `?limit=`；用于服务重启后恢复状态提示。
+
 ---
 
 ## 日志
@@ -374,6 +570,8 @@ AI 规划配图占位
 - `POST /api/batches/:id/tutorial-chat/stream`：以 NDJSON 流式返回自主写作策划回复和表单更新；`articleMode` 支持 `experience`（心得经验）和 `tutorial`（使用教程）。教程请求可包含 `draft.localProjectPath`，或在本轮回答中提供绝对目录。
 - `POST /api/tools/local-project/read`：预检用户明确指定的本地项目目录。只读受支持的文本文件，跳过依赖/构建目录、密钥文件、二进制和符号链接，并受文件数、单文件与总字符数限制。
 - `POST /api/batches/:id/custom-articles`：根据对话填好的事实表单创建自主写作项目并启动成稿；旧的 `/tutorials` 路径保留兼容。
+- `GET /api/batches/:id/custom-articles`：列出本批自主写作项目及草稿 / 任务状态；旧的 `/tutorials` 路径保留兼容。
+- `POST /api/candidates/:id/custom-article-runs`：重新执行已有自主写作项目，可沿用上次生成快照或显式改用最新技能。
 - 自主写作项目使用标准文章候选保存 `draft` / `final`，完成后直接出现在文章编辑器和公众号排版页面。
 - 本地项目文件按 `user_material` 进入事实基座，只证明代码或配置存在，不证明已执行成功；成稿不得暴露本机绝对路径。
 ## 受信工具插件管理（P3）

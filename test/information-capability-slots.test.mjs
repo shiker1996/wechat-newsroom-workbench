@@ -50,12 +50,12 @@ test('external information flows call slots instead of binding plugin implementa
 
 test('skills and plugins page shows slot status and supports implementation selection',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-  const system=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
+  const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
   assert.match(html,/id="information-slot-list"/);
   assert.match(html,/id="information-slot-summary"/);
   assert.match(html,/写作所需的信息能力/);
-  assert.match(system,/\/api\/system\/information-capability-slots/);
-  assert.match(system,/data-information-slot/);
-  assert.match(system,/data-connect-information-tool/);
-  assert.match(system,/selectCapabilityTab\("extensions"\)/);
+  assert.match(skills,/\/api\/system\/information-capability-slots/);
+  assert.match(skills,/data-information-slot/);
+  assert.match(skills,/data-connect-information-tool/);
+  assert.match(skills,/selectCapabilityTab\("extensions"\)/);
 });

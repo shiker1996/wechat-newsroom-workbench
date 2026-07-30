@@ -44,8 +44,8 @@ test('运行配置承载模型增删改，模型中心只展示可用模型',()=
   const modelRoutes=fs.readFileSync(new URL('../lib/http/routes/model-routes.mjs',import.meta.url),'utf8');
   for(const id of ['model-base-url','model-name','model-api-key','model-max-token-field','model-json-mode'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(html,/data-config-tab="models"/);
-  assert.match(systemView,/POST"[\s\S]*modelFormPayload/);
-  assert.match(systemView,/method:"DELETE"/);
+  assert.match(systemView,/method: "POST"[\s\S]*modelFormPayload/);
+  assert.match(systemView,/method: "DELETE"/);
   assert.doesNotMatch(modelsView,/modelFormPayload|saveModelConfig|deleteModelConfig/);
   assert.match(modelsView,/filter\(\(provider\)=>provider\.enabled!==false&&provider\.configured\)/);
   assert.match(styles,/\.model-layout \{ display:grid; grid-template-columns:minmax\(0,1fr\) minmax\(250px,270px\)/);
