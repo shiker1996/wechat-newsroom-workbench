@@ -10,7 +10,7 @@ const viewModules = {
   topics: "./views/topics.js", daily: "./views/daily.js", tutorial: "./views/tutorial.js", "social-topics": "./views/topics.js", "social-editor": "./views/social-editor.js", "social-custom": "./views/social-editor.js", "social-event": "./views/social-editor.js", editorial: "./views/editorial.js",
   editor: "./views/editor.js", preview: "./views/preview.js",
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
-  system: "./views/system.js", skills: "./views/system.js", sources: "./views/subscriptions.js",
+  system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
   models: "./views/models.js", logs: "./views/logs.js",
   calendar: "./views/calendar.js",
 };
@@ -22,7 +22,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260728-custom-writing-p1";
+const moduleVersion = "20260730-skills-view-split";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",

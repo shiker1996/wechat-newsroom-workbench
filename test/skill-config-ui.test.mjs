@@ -3,17 +3,17 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-const system=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
+const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
 const main=fs.readFileSync(new URL('../public/src/main.js',import.meta.url),'utf8');
 const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
 const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 
 test('技能与工具页展示工具健康状态',()=>{
   assert.match(html,/id="tool-capability-list"/);
-  assert.match(system,/checked=Boolean\(tool\.health\)/);
-  assert.match(system,/依赖正常/);
-  assert.match(system,/服务尚未返回健康检查结果，请重启工作台服务后刷新/);
-  assert.match(system,/"待检查"/);
+  assert.match(skills,/Boolean\(tool\.health\)/);
+  assert.match(skills,/依赖正常/);
+  assert.match(skills,/服务尚未返回健康检查结果，请重启工作台服务后刷新/);
+  assert.match(skills,/"待检查"/);
 });
 
 test('内置技能详情直接只读展示 SKILL.md',()=>{
@@ -21,8 +21,8 @@ test('内置技能详情直接只读展示 SKILL.md',()=>{
   assert.match(html,/id="skill-markdown-view"/);
   assert.match(html,/id="skill-source-path"/);
   assert.match(html,/id="skill-prompt-hash"/);
-  assert.match(system,/data\.skillMarkdown/);
-  assert.match(system,/data\.sourcePath/);
+  assert.match(skills,/data\.skillMarkdown/);
+  assert.match(skills,/data\.sourcePath/);
   assert.doesNotMatch(html,/id="skill-config-model"|id="skill-gate-suggestion"|id="skill-config-prompt"/);
   assert.match(routes,/readonly:true/);
   assert.match(routes,/skillMarkdown:sourceFile\?fs\.readFileSync/);
@@ -31,28 +31,28 @@ test('内置技能详情直接只读展示 SKILL.md',()=>{
 
 test('技能详情展示关联规则文件且不提供发布恢复操作',()=>{
   assert.match(html,/id="skill-file-list"/);
-  assert.match(system,/index===0\?"主契约":"关联规则"/);
+  assert.match(skills,/index === 0 \? "主契约" : "关联规则"/);
   assert.doesNotMatch(html,/id="skill-publish"|id="skill-save-draft"|id="skill-dry-run"/);
-  assert.doesNotMatch(system,/submitSkillConfig|restoreSkillVersion|skillVersionChanges/);
+  assert.doesNotMatch(skills,/submitSkillConfig|restoreSkillVersion|skillVersionChanges/);
 });
 
 test('技能详情展示结构化角色、入口、输入输出契约和工具需求',()=>{
   assert.match(html,/id="skill-contract-grid"/);
-  assert.match(system,/const kindLabels=/);
-  assert.match(system,/const entryLabels=/);
-  assert.match(system,/data\.requiredCapabilities/);
-  assert.match(system,/data\.optionalCapabilities/);
-  assert.match(system,/data\.inputContract/);
-  assert.match(system,/data\.outputContract/);
-  assert.match(system,/capabilityState/);
+  assert.match(skills,/const kindLabels =/);
+  assert.match(skills,/const entryLabels =/);
+  assert.match(skills,/data\.requiredCapabilities/);
+  assert.match(skills,/data\.optionalCapabilities/);
+  assert.match(skills,/data\.inputContract/);
+  assert.match(skills,/data\.outputContract/);
+  assert.match(skills,/capabilityState/);
 });
 
 test('第三方技能可按创作入口和阶段设置默认',()=>{
-  assert.match(system,/data-skill-default-entry=/);
-  assert.match(system,/data-skill-default-slot=/);
-  assert.match(system,/async function setSkillDefault/);
-  assert.match(system,/skill-stage-defaults/);
-  assert.match(system,/单次手动选择仍具有更高优先级/);
+  assert.match(skills,/data-skill-default-entry=/);
+  assert.match(skills,/data-skill-default-slot=/);
+  assert.match(skills,/async function setSkillDefault/);
+  assert.match(skills,/skill-stage-defaults/);
+  assert.match(skills,/单次手动选择仍具有更高优先级/);
   assert.match(routes,/setSkillStageDefault/);
   assert.match(routes,/defaultScopes/);
 });
@@ -62,21 +62,21 @@ test('技能注册表支持搜索筛选与主从编辑',()=>{
   assert.match(html,/id="skill-search"/);
   assert.match(html,/id="skill-status-filter"/);
   assert.match(html,/id="skill-detail-empty"/);
-  assert.match(system,/function renderSkillList\(/);
-  assert.match(system,/selectedSkillId=id;renderSkillList\(\)/);
+  assert.match(skills,/function renderSkillList\(/);
+  assert.match(skills,/selectedSkillId = id;\s+renderSkillList\(\)/);
 });
 
 test('技能列表严格按 kind 分组且每个技能只出现一次',()=>{
-  assert.match(system,/const SKILL_KIND_GROUPS=/);
+  assert.match(skills,/const SKILL_KIND_GROUPS =/);
   for(const [kind,label] of [
     ["writer","主写作"],["storyboard","故事板"],["title","标题"],["reviewer","审阅"],
     ["humanizer","自然化"],["seo","SEO"],["image-planner","配图规划"],
     ["typesetter","排版"],["stage","阶段技能"],
-  ])assert.match(system,new RegExp(`\\{id:"${kind}",label:"${label}"`));
-  assert.match(system,/function skillKindGroup\(skill\)/);
-  assert.match(system,/grouped\.get\(skillKindGroup\(skill\)\)\.push\(skill\)/);
-  assert.doesNotMatch(system,/function skillKindGroup\(skill\)\{[^}]*entryPoints/s);
-  assert.match(system,/class="skill-purpose-group"/);
+  ])assert.match(skills,new RegExp(`\\{ id: "${kind}", label: "${label}"`));
+  assert.match(skills,/function skillKindGroup\(skill\)/);
+  assert.match(skills,/grouped\.get\(skillKindGroup\(skill\)\)\.push\(skill\)/);
+  assert.doesNotMatch(skills,/function skillKindGroup\(skill\)\s*\{[^}]*entryPoints/s);
+  assert.match(skills,/class="skill-purpose-group"/);
   assert.match(styles,/\.skill-purpose-group>header\{position:sticky;top:0;z-index:2/);
 });
 
@@ -85,26 +85,27 @@ test('技能与工具作为独立一级页面而非运行配置标签',()=>{
   assert.match(html,/<section class="view skill-registry-view" id="view-skills">/);
   assert.doesNotMatch(html,/data-config-tab="skills"/);
   assert.doesNotMatch(html,/id="config-panel-skills"/);
-  assert.match(main,/skills: "\.\/views\/system\.js"/);
+  assert.match(main,/skills: "\.\/views\/skills\.js"/);
   assert.match(main,/skills: "技能与工具"/);
-  assert.match(system,/if\(view==="skills"\)\{[\s\S]*?await loadSkillRegistry\(\)/);
+  assert.match(skills,/export default async function loadSkillsView/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8'),/loadSkillRegistry|openSkillConfig/);
 });
 
 test('技能详情区分主技能和阶段子技能并展示工具最近执行结果',()=>{
   assert.match(html,/id="skill-runtime-policy-note"/);
-  assert.match(system,/const ownsRuntimePolicy=data\.runtimePolicyOwner!==false/);
-  assert.match(system,/子技能：这里展示阶段契约/);
-  assert.match(system,/最近执行：/);
-  assert.match(system,/tool\.recentExecution/);
+  assert.match(skills,/const ownsRuntimePolicy = data\.runtimePolicyOwner !== false/);
+  assert.match(skills,/子技能：这里展示阶段契约/);
+  assert.match(skills,/最近执行：/);
+  assert.match(skills,/tool\.recentExecution/);
 });
 
 test('插件管理支持启停、优先级、依赖检查和执行历史',()=>{
-  assert.match(system,/data-tool-enabled=/);
-  assert.match(system,/data-tool-priority=/);
-  assert.match(system,/data-tool-test=/);
-  assert.match(system,/data-tool-history=/);
-  assert.match(system,/async function updateToolPlugin/);
-  assert.match(system,/async function loadToolHistory/);
+  assert.match(skills,/data-tool-enabled=/);
+  assert.match(skills,/data-tool-priority=/);
+  assert.match(skills,/data-tool-test=/);
+  assert.match(skills,/data-tool-history=/);
+  assert.match(skills,/async function updateToolPlugin/);
+  assert.match(skills,/async function loadToolHistory/);
   assert.match(html,/id="tool-execution-panel"/);
   assert.match(html,/仅记录参数名，不保存输入正文或密钥/);
 });
