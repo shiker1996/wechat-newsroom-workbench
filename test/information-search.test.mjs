@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { attachInformationSearch, wantsInformationSearch } from '../lib/integrations/information-search.mjs';
+import { attachInformationSearch } from '../lib/integrations/information-search.mjs';
 
 function withKey(value, run) {
   const original = process.env.TAVILY_API_KEY;
@@ -29,21 +29,20 @@ function tempRoot() {
   return { root, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
 
-test('wantsInformationSearch only triggers on explicit flags', () => {
-  assert.equal(wantsInformationSearch({}), false);
-  assert.equal(wantsInformationSearch({ enableWebSearch: 'false' }), false);
-  assert.equal(wantsInformationSearch({ enableWebSearch: 'true' }), true);
-  assert.equal(wantsInformationSearch({ enableNewsSearch: true }), true);
-});
-
-test('without flags the fact sheet stays untouched', async () => {
+test('search runs unconditionally; without API key it records notes instead of failing', async () => {
   const { root, cleanup } = tempRoot();
   try {
-    const fact = { topic: '离线笔记方法' };
-    const result = await attachInformationSearch({ fact, input: {}, root, toolContext: {} });
-    assert.deepEqual(result, { attached: [], notes: [] });
-    assert.equal('web_search' in fact, false);
-    assert.equal('news_search' in fact, false);
+    await withKey(undefined, async () => {
+      const fact = { topic: '离线笔记方法' };
+      const result = await attachInformationSearch({ fact, input: {}, root, toolContext: {} });
+      assert.deepEqual(result.attached, []);
+      assert.equal('web_search' in fact, false);
+      assert.equal('news_search' in fact, false);
+      assert.ok(result.notes.some((item) => /TAVILY_API_KEY/.test(item)));
+      assert.ok(result.notes.some((item) => /不阻止创建/.test(item)));
+      assert.ok(result.notes.some((item) => /未配置授权知识库目录|无可用实现/.test(item)));
+      assert.deepEqual(fact.search_notes, result.notes);
+    });
   } finally { cleanup(); }
 });
 
@@ -57,8 +56,8 @@ test('web search attaches normalized findings to the fact sheet', async () => {
       });
       try {
         const fact = { topic: '离线笔记方法' };
-        const result = await attachInformationSearch({ fact, input: { enableWebSearch: 'true' }, root, toolContext: {} });
-        assert.deepEqual(result.attached, ['web_search']);
+        const result = await attachInformationSearch({ fact, input: {}, root, toolContext: {} });
+        assert.deepEqual(result.attached, ['web_search', 'news_search']);
         assert.equal(fact.web_search.query, '离线笔记方法');
         assert.equal(fact.web_search.provider, 'tavily');
         assert.equal(fact.web_search.results.length, 1);
@@ -78,27 +77,11 @@ test('news search requests news topic and keeps provider warnings', async () => 
       const restore = stubFetch({ results: [{ title: '快讯', url: 'https://news.example.com/1', content: '内容' }] }, capture);
       try {
         const fact = { topic: 'AI 行业动态' };
-        const result = await attachInformationSearch({ fact, input: { enableNewsSearch: true }, root, toolContext: {} });
-        assert.deepEqual(result.attached, ['news_search']);
+        const result = await attachInformationSearch({ fact, input: {}, root, toolContext: {} });
+        assert.deepEqual(result.attached, ['web_search', 'news_search']);
         assert.equal(capture.body.topic, 'news');
         assert.ok(fact.news_search.warnings.some((item) => /缺少发布时间/.test(item)));
       } finally { restore(); }
-    });
-  } finally { cleanup(); }
-});
-
-test('search failure is recorded as a note instead of failing creation', async () => {
-  const { root, cleanup } = tempRoot();
-  try {
-    await withKey(undefined, async () => {
-      const fact = { topic: '离线笔记方法' };
-      const result = await attachInformationSearch({ fact, input: { enableWebSearch: true }, root, toolContext: {} });
-      assert.deepEqual(result.attached, []);
-      assert.equal(result.notes.length, 1);
-      assert.match(result.notes[0], /TAVILY_API_KEY/);
-      assert.match(result.notes[0], /不阻止创建/);
-      assert.deepEqual(fact.search_notes, result.notes);
-      assert.equal('web_search' in fact, false);
     });
   } finally { cleanup(); }
 });
@@ -110,15 +93,11 @@ test('creation chains wire search flags into both autonomous writing and custom 
   assert.match(server, /skillId: 'custom-card-storyboard'/);
   assert.match(server, /skillId: ?skillSelection\.selectedSkill/);
   const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
-  assert.match(html, /name="enableWebSearch"/);
-  assert.match(html, /name="enableNewsSearch"/);
-  assert.match(html, /name="enableDocumentSearch"/);
-  assert.match(html, /id="custom-enable-web-search"/);
-  assert.match(html, /id="custom-enable-news-search"/);
-  assert.match(html, /id="custom-enable-document-search"/);
+  assert.equal(html.includes('enableWebSearch'), false, 'creation forms should not carry per-form search toggles');
+  assert.equal(html.includes('custom-enable-web-search'), false);
+  assert.match(html, /信息工具」统一启停/);
   const socialEditor = fs.readFileSync(new URL('../public/src/views/social-editor.js', import.meta.url), 'utf8');
-  assert.match(socialEditor, /enableWebSearch:document\.getElementById\('custom-enable-web-search'\)\.checked/);
-  assert.match(socialEditor, /enableDocumentSearch:document\.getElementById\('custom-enable-document-search'\)\.checked/);
+  assert.equal(socialEditor.includes('custom-enable-web-search'), false);
 });
 
 test('writer and storyboard skills declare search capabilities and material boundaries', () => {

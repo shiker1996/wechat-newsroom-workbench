@@ -95,7 +95,7 @@ test('document search without configured roots degrades to a note', async () => 
       fact, input: { enableDocumentSearch: 'true' }, root: work, toolContext: {}, documentRoots: [],
     });
     assert.deepEqual(result.attached, []);
-    assert.match(result.notes[0], /未配置授权知识库目录/);
+    assert.ok(result.notes.some((item) => /未配置授权知识库目录/.test(item)), JSON.stringify(result.notes));
     assert.equal('document_search' in fact, false);
   } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });

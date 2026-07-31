@@ -378,7 +378,6 @@ function bindCustomSocialForm(){
         points:document.getElementById('custom-points').value,steps:document.getElementById('custom-steps').value,
         items:document.getElementById('custom-items').value,materialUrls:document.getElementById('custom-materials').value,
         limitations:document.getElementById('custom-limitations').value,expected_pages:Number(document.getElementById('custom-expected-pages').value)||6,
-        enableWebSearch:document.getElementById('custom-enable-web-search').checked,enableNewsSearch:document.getElementById('custom-enable-news-search').checked,enableDocumentSearch:document.getElementById('custom-enable-document-search').checked,
       })});
       panel.hidden=true;resetCustomPanel();toast('自定义图文已创建');
       await loadSocialEditor();
