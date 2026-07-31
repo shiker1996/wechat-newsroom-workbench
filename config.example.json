@@ -95,6 +95,7 @@
     }
   },
   "tavily": { "enabled": false, "apiKeyEnv": "TAVILY_API_KEY", "maxResults": 5 },
+  "documentSearch": { "roots": [] },
   "sourceFetch": {
     "upgradeThreshold": 55,
     "rssContentMinChars": 800,

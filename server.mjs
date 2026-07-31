@@ -730,7 +730,7 @@ async function api(request, response, url) {
       const fact = await buildCustomFactSheet({ input, root });
       if (wantsInformationSearch(input)) {
         const toolPolicy = await resolveSkillToolPolicy({ workspaceRoot: root, skillId: 'custom-card-storyboard' });
-        await attachInformationSearch({ fact, input, root, toolContext: { store, batchId, skillId: 'custom-card-storyboard', allowedCapabilities: toolPolicy.allowedCapabilities } });
+        await attachInformationSearch({ fact, input, root, toolContext: { store, batchId, skillId: 'custom-card-storyboard', allowedCapabilities: toolPolicy.allowedCapabilities }, documentRoots: config.documentSearch?.roots || [] });
       }
       const materialUrls = (fact.materials || []).map((item) => item.url);
       const hotspot = store.addManualHotspot(batch.id, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自定义图文（${fact.content_type_label}）`, researchEligible:false });
@@ -849,7 +849,7 @@ async function api(request, response, url) {
       if(fact.materials.some((item)=>item.status!=='ok'))throw new Error(`素材抓取失败：${fact.materials.filter((item)=>item.status!=='ok').map((item)=>item.url).join('、')}`);
       if(wantsInformationSearch(input)){
         const toolPolicy=await resolveSkillToolPolicy({workspaceRoot:root,skillId:skillSelection.selectedSkill});
-        await attachInformationSearch({fact,input,root,toolContext:{store,batchId,skillId:skillSelection.selectedSkill,allowedCapabilities:toolPolicy.allowedCapabilities}});
+        await attachInformationSearch({fact,input,root,toolContext:{store,batchId,skillId:skillSelection.selectedSkill,allowedCapabilities:toolPolicy.allowedCapabilities},documentRoots:config.documentSearch?.roots||[]});
       }
       creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})||creation;
       if(creation?.candidate_row_id){

@@ -24,7 +24,7 @@ test('information slots report connected and missing implementations explicitly'
     assert.equal(items.find((item)=>item.id==='repository').selectedPlugin,'repository-inspector');
     assert.equal(items.find((item)=>item.id==='web-search').selectedPlugin,'tavily-search');
     assert.equal(items.find((item)=>item.id==='news-search').selectedPlugin,'tavily-search');
-    assert.equal(items.find((item)=>item.id==='document').available,false);
+    assert.equal(items.find((item)=>item.id==='document').selectedPlugin,'document-folder-search');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

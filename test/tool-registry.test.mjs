@@ -12,7 +12,7 @@ test('阶段 A 插件通过白名单加载并暴露稳定能力', async () => {
   const registry = await getToolRegistry();
   assert.deepEqual(PHASE_A_PLUGINS, ['local-project-reader', 'mermaid-render', 'echarts-render']);
   assert.deepEqual(registry.listCapabilities().map((item) => item.capability).sort(), [
-    'content.news.search', 'content.repository.inspect', 'content.url.fetch', 'content.web.search', 'diagram.echarts.render', 'diagram.mermaid.render', 'filesystem.project.read', 'image.cdn.upload',
+    'content.document.search', 'content.news.search', 'content.repository.inspect', 'content.url.fetch', 'content.web.search', 'diagram.echarts.render', 'diagram.mermaid.render', 'filesystem.project.read', 'image.cdn.upload',
   ]);
 });
 
@@ -33,7 +33,7 @@ test('阶段 B URL 插件保留抓取方法与来源信息', async () => {
 test('全部工具能力提供标准健康检查结果', async () => {
   const registry=await getToolRegistry();
   const results=await Promise.all(registry.listCapabilities().map((item)=>registry.health(item.capability)));
-  assert.equal(results.length,8);
+  assert.equal(results.length,9);
   for(const result of results)assert.ok(['ok','error'].includes(result.status));
 });
 

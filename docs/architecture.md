@@ -79,7 +79,7 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 ## 工具注册中心（lib/tools/ + plugins/）
 
-- `plugins/` 是内置本地适配器（echarts-render、mermaid-render、repository-inspector、upyun-image-upload、url-fetch、local-project-reader、tavily-search）。
+- `plugins/` 是内置本地适配器（echarts-render、mermaid-render、repository-inspector、upyun-image-upload、url-fetch、local-project-reader、tavily-search、document-folder-search）。
 - `lib/tools/index.mjs` 启动时合并三来源为单例注册中心：内置插件、`data/installed-tool-plugins/` 中启用且**内容哈希一致**的第三方插件、`data/remote-tool-plugins.json` 中启用的远程声明式插件。
 - `registry.mjs`：`resolve(capability)` 按优先级选实现；`execute` 走 输入 schema 校验 → 策略检查 → adapter.execute → 输出 schema 校验 → 执行日志（`tool_executions` 表，标注 provenance 与外部写入授权）。
 - `policy.mjs`：技能能力白名单、`external-write` 需显式授权、路径输入必须落在允许根目录内（realpath 防穿越）。

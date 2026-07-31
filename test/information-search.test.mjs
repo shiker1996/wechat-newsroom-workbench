@@ -112,10 +112,13 @@ test('creation chains wire search flags into both autonomous writing and custom 
   const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.match(html, /name="enableWebSearch"/);
   assert.match(html, /name="enableNewsSearch"/);
+  assert.match(html, /name="enableDocumentSearch"/);
   assert.match(html, /id="custom-enable-web-search"/);
   assert.match(html, /id="custom-enable-news-search"/);
+  assert.match(html, /id="custom-enable-document-search"/);
   const socialEditor = fs.readFileSync(new URL('../public/src/views/social-editor.js', import.meta.url), 'utf8');
   assert.match(socialEditor, /enableWebSearch:document\.getElementById\('custom-enable-web-search'\)\.checked/);
+  assert.match(socialEditor, /enableDocumentSearch:document\.getElementById\('custom-enable-document-search'\)\.checked/);
 });
 
 test('writer and storyboard skills declare search capabilities and material boundaries', () => {
@@ -123,8 +126,10 @@ test('writer and storyboard skills declare search capabilities and material boun
     const manifest = JSON.parse(fs.readFileSync(new URL(`../skills/${id}/skill.json`, import.meta.url), 'utf8'));
     assert.ok(manifest.optionalCapabilities.includes('content.web.search'), `${id} 缺少 content.web.search`);
     assert.ok(manifest.optionalCapabilities.includes('content.news.search'), `${id} 缺少 content.news.search`);
+    assert.ok(manifest.optionalCapabilities.includes('content.document.search'), `${id} 缺少 content.document.search`);
     const skill = fs.readFileSync(new URL(`../skills/${id}/SKILL.md`, import.meta.url), 'utf8');
     assert.match(skill, /web_search/);
+    assert.match(skill, /document_search/);
     assert.match(skill, /来源/);
   }
 });
