@@ -46,6 +46,8 @@
 | 网络服务商（Firecrawl / Tavily / GitHub / 又拍云） | 可选 | 原文抓取升级、搜索补证、项目发现、CDN 上传，未配置时对应功能降级或关闭 |
 | 磁盘空间 | — | 首次安装约需 1–2 GB（npm 依赖 + 技能级 Puppeteer Chromium），运行数据另计 |
 
+**当前仅支持 Windows。** 核心服务本身是标准 Node.js，理论上可在 macOS / Linux 运行，但启动脚本、浏览器采集与验收测试均未在非 Windows 环境验证，请勿当作跨平台软件使用；跨平台可行性评估在开源路线图中（`docs/open-source-readiness.md` P2）。
+
 Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。
 
 ```powershell
