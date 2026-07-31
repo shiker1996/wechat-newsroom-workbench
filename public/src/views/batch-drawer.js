@@ -106,12 +106,13 @@ export async function openBatch(id, mode) {
   const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
       <div class="pipeline-steps"><div data-pipeline-step="collect" class="${stepClass("collect")}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${stepClass("tag")}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${stepClass("eventCards")}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${stepClass("research")}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
       <p>打标覆盖全量热点，生成事件语义指纹、地区、风险和预评估证据；研判随后完成全量聚类、核心 8 + 黑马 2、探索脑暴与临时复排。</p>
+      <p class="muted action-hint">打标、事件卡与研判均调用 LLM（按所选服务商计费）；研判可能使用联网搜索，会向搜索服务商发送查询词。</p>
       <div class="pipeline-actions"><div class="pipeline-next"><small>当前下一步</small>${pipelinePrimaryAction}</div><details class="pipeline-retry-menu"><summary>高级操作</summary><div><button class="ghost-button" data-ai-retag ${!batch.hotspots.length ? "disabled" : ""}>重新打标全部</button><button class="ghost-button" data-ai-event-cards-force ${!ai.tagged ? "disabled" : ""}>重新生成全部事件卡</button><button class="ghost-button" data-ai-research ${ai.tagged < ai.total || !ai.total ? "disabled" : ""}>重新执行事件研判</button></div></details></div>
       ${ai.tagged < ai.total && ai.total ? `<small class="pipeline-gate">还差 ${ai.total - ai.tagged} 条完整语义标注，完成后才能进入事件研判。</small>` : ""}
       ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
     </section>` : "";
   const lifecycleActions = lifecycle === "archived"
-    ? '<button class="outline-button" data-batch-lifecycle="active">重新打开批次</button>'
+    ? '<button class="outline-button" data-batch-lifecycle="active">重新打开批次</button><button class="ghost-button danger" data-batch-delete>彻底删除</button>'
     : lifecycle === "completed"
       ? '<button class="ghost-button" data-batch-lifecycle="active">重新打开</button><button class="primary-button" data-batch-lifecycle="archived">归档批次</button>'
       : '<button class="primary-button" data-batch-lifecycle="completed">标记完成</button>';
@@ -147,6 +148,32 @@ async function updateBatchLifecycle(lifecycleStatus) {
   if(["completed","archived"].includes(lifecycleStatus)&&state.activeBatchId===batch.id)state.activeBatchId="";
   $("#batch-drawer").close();
   toast(`批次已${actionLabel}`);
+  const currentView=document.querySelector(".nav-item.active")?.dataset.view;
+  if(currentView==="batches")await window.go("batches");
+  else await loadOverview();
+}
+
+// 彻底删除已归档批次：先拉取影响范围（数据库计数 + 产物目录）展示，确认后带确认头删除。
+// 不可恢复；可恢复的删除请用「归档」。
+async function deleteBatchPermanently() {
+  const batch=state.currentBatch;
+  if(!batch)return;
+  const impact=await request(`/api/batches/${encodeURIComponent(batch.id)}/delete-impact`);
+  const counts=impact.counts||{};
+  const dirs=(impact.directories||[]).filter((item)=>item.exists&&!item.skipped);
+  const skippedDirs=(impact.directories||[]).filter((item)=>item.skipped);
+  const lines=[
+    `热点 ${counts.hotspots??0} 条 · 候选 ${counts.candidates??0} 个 · 文档 ${counts.documents??0} 篇`,
+    `采集记录 ${(counts.sourceRuns??0)+(counts.subscriptionRuns??0)} 条 · 模型调用审计 ${counts.modelCalls??0} 条（审计脱钩保留）`,
+    dirs.length?`产物目录 ${dirs.length} 个（${dirs.reduce((sum,item)=>sum+item.files,0)} 个文件）将一并删除`:"无产物目录需要删除",
+  ];
+  if(skippedDirs.length)lines.push(`另有 ${skippedDirs.length} 个与其他批次共享的遗留目录将保留`);
+  if(!await confirmAction(`彻底删除批次「${batch.title}」？此操作不可恢复，建议先在「设置与数据」导出备份。\n${lines.join("\n")}`,{confirmText:"彻底删除"}))return;
+  await request(`/api/batches/${encodeURIComponent(batch.id)}`,{method:"DELETE",headers:{"x-admin-confirm":"DELETE-BATCH"}});
+  if(state.activeBatchId===batch.id)state.activeBatchId="";
+  state.currentBatch=null;
+  $("#batch-drawer").close();
+  toast("批次已彻底删除");
   const currentView=document.querySelector(".nav-item.active")?.dataset.view;
   if(currentView==="batches")await window.go("batches");
   else await loadOverview();
@@ -312,6 +339,7 @@ export function bindBatchDrawer() {
     if (event.target.closest("[data-breaking-add-material]")) addBreakingMaterials().catch((error) => toast(error.message));
     const lifecycleButton=event.target.closest("[data-batch-lifecycle]");
     if(lifecycleButton)updateBatchLifecycle(lifecycleButton.dataset.batchLifecycle).catch((error)=>toast(error.message));
+    if (event.target.closest("[data-batch-delete]")) deleteBatchPermanently().catch((error) => toast(error.message));
   });
   $("#new-batch-button").addEventListener("click", openNewBatch);
   $("#dashboard-new").addEventListener("click", openNewBatch);

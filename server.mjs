@@ -35,6 +35,7 @@ import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/even
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
 import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
+import { getBatchDeleteImpact, deleteBatchPermanently } from './lib/domain/batch-deletion.mjs';
 import { routeBreakingAnalysis } from './lib/llm/breaking-analysis-pipeline.mjs';
 import { dailyFocusOptions } from './lib/llm/daily-pipeline.mjs';
 import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, describeCardLayouts, normalizeCardComposition } from './lib/llm/social-card-pipeline.mjs';
@@ -343,6 +344,20 @@ async function api(request, response, url) {
     }
     const updated = store.updateBatch(decodeURIComponent(batchMatch[1]), input);
     return json(response, updated ? 200 : 404, updated ?? { error: '批次不存在' });
+  }
+  const batchDeleteImpactMatch = pathname.match(/^\/api\/batches\/([^/]+)\/delete-impact$/);
+  if (batchDeleteImpactMatch && request.method === 'GET') {
+    const impact = getBatchDeleteImpact(root, store, decodeURIComponent(batchDeleteImpactMatch[1]));
+    return json(response, impact ? 200 : 404, impact ?? { error: '批次不存在' });
+  }
+  if (batchMatch && request.method === 'DELETE') {
+    const batchId = decodeURIComponent(batchMatch[1]);
+    const batch = store.getBatch(batchId);
+    if (!batch) return json(response, 404, { error: '批次不存在' });
+    if ((batch.lifecycle_status || 'active') !== 'archived') return json(response, 409, { error: '只有已归档批次可以彻底删除，请先归档' });
+    if (request.headers['x-admin-confirm'] !== 'DELETE-BATCH') return json(response, 400, { error: '缺少彻底删除确认头 x-admin-confirm: DELETE-BATCH' });
+    const result = deleteBatchPermanently(root, store, batchId);
+    return json(response, 200, { ok: true, ...result });
   }
   const collectMatch = pathname.match(/^\/api\/batches\/([^/]+)\/collect$/);
   if (collectMatch && request.method === 'POST') {

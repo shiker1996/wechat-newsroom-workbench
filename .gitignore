@@ -40,3 +40,4 @@ __pycache__/
 # 外部项目 / 临时文件
 RSSHub/
 todo.md
+dist/

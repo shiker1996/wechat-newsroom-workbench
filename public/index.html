@@ -310,7 +310,7 @@
               <section class="social-score-panel social-stage-panel"><div class="social-score-hero"><span class="kicker">SOCIAL FIT</span><strong id="social-fit-score">—</strong><small>图文适配度</small></div><div id="social-score-parts"></div></section>
             </div>
             <section class="repository-facts-panel social-stage-panel social-storyboard-stage"><div class="social-stage-head social-storyboard-head"><span class="social-stage-number">02</span><div><span class="kicker">CARD STORYBOARD</span><h3>卡片故事板</h3><p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p></div></div><div class="social-control-deck"><details class="creation-skill-settings social-skill-settings"><summary><span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span><em>更换</em></summary><div class="creation-skill-popover"><div class="stage-skill-settings-head"><span>STORYBOARD ROUTE</span><b>选择故事板规划方式</b><small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small></div><div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div><div class="creation-skill-actions"><button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button><button type="button" class="outline-button" id="close-social-skills">完成</button></div></div></details><div class="social-picker-group"><label class="social-theme-picker"><span>发布渠道</span><select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker"><span>构图方式</span><select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker"><span>页面版式</span><select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker"><span>视觉主题</span><select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
-            <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。</p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
+            <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。<span class="muted action-hint">生成调用模型（计费），渲染为本地确定性执行。</span></p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
           </div>
         </div>
@@ -387,6 +387,7 @@
         <section class="ai-writing-bar" aria-labelledby="model-assist-title">
           <div class="assist-heading"><span class="kicker">MODEL ASSIST</span><b id="model-assist-title">AI 改写</b><small>对当前文稿执行一次明确修改</small></div>
           <div class="ai-writing-controls"><select id="draft-provider" aria-label="创作模型"></select><input id="draft-instructions" placeholder="例如：保留结构，把开头改得更直接"><button class="outline-button" id="ai-draft">生成 / 改写</button></div>
+          <small class="muted action-hint">生成 / 改写调用所选模型，按服务商计费。</small>
           <small id="draft-context">事实、观点、禁写项不会被压缩</small>
         </section>
         <section class="visual-planner" id="visual-planner" aria-labelledby="visual-planner-title">
@@ -443,6 +444,7 @@
           <option value="news-digest">黑白快讯</option>
         </select>
         <button class="outline-button" id="run-local-typeset">生成 / 更新排版 HTML</button>
+        <small class="muted action-hint">默认本地确定性渲染（不计费）；选用模型初稿时按服务商计费，图片上传 CDN 属于外部写入。</small>
         <button class="primary-button" id="copy-typeset-html" disabled>复制公众号富文本</button>
         <small id="typeset-status">排版结果保留在本机；生成后可直接复制富文本并粘贴到公众号编辑器。</small>
       </div>
@@ -684,6 +686,9 @@
           <label class="backup-picker">选择备份包<input id="backup-file" type="file" accept=".zip,application/zip"></label>
           <div id="backup-validation" class="backup-validation" role="status">尚未选择备份包</div>
           <button class="ink-button" id="restore-backup" disabled>恢复已校验备份</button>
+          <div class="maintenance-rule"><b>缓存清理</b><span>GitHub API 缓存</span><span>来源正文缓存</span></div>
+          <p>缓存删除后随采集自动重建，不影响数据库与产物。</p>
+          <button class="ghost-button" id="clear-cache">清理采集缓存</button>
         </aside>
       </div>
     </section>

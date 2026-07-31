@@ -48,6 +48,7 @@ npm test
 
 - 漏洞请按 [SECURITY.md](./SECURITY.md) 私下报告，不要先开公开 Issue。
 - 安全核心（密钥处理、备份恢复、确认头、SSRF 防护）的改动需要维护者逐行审阅，不作为新手任务。
+- 建议启用提交前秘密扫描（命中高危密钥模式会阻止提交）：`git config core.hooksPath .githooks`；CI 中也会执行同一脚本（`scripts/secret-scan.mjs`）。
 
 ## 仓库体积约定
 

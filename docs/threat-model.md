@@ -5,7 +5,7 @@
 ## 0. 边界模型
 
 - 工作台 HTTP 服务**硬编码绑定 `127.0.0.1`**（`server.mjs` 末尾 `listen` 字面量），没有任何配置项可以改成 `0.0.0.0`（`config.local.json` / `.env` 均无 host 项）。这是整个系统唯一真实的网络边界：所有 API 都假定调用方是本机用户本人。
-- 两个"确认头"（`x-admin-confirm: TRUSTED-LOCAL-PLUGIN`、`x-restore-confirm: RESTORE`）是**防误触的 UI 语义**，不是鉴权。前端在对应操作前弹确认框，确认后才带头。
+- 确认头（`x-admin-confirm: TRUSTED-LOCAL-PLUGIN`、`x-admin-confirm: DELETE-BATCH`、`x-restore-confirm: RESTORE`）是**防误触的 UI 语义**，不是鉴权。前端在对应操作前弹确认框，确认后才带头。
 - 密钥永不入库、永不回读：LLM Key 在 `~/.codex`（或用户本地配置），远程插件凭据按 profile 哈希存 `.env.remote-plugins`（服务端只写不读回页面）；审计日志只记参数名不记正文（`lib/tools/execution-log.mjs`）。
 
 ## 1. 入口与防护清单

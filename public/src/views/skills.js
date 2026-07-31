@@ -19,11 +19,13 @@ function bindSkills() {
     const versionsButton = event.target.closest("[data-tool-versions]");
     const uninstallButton = event.target.closest("[data-tool-uninstall]");
     const credentialButton = event.target.closest("[data-tool-credential]");
+    const firstRunButton = event.target.closest("[data-tool-first-run]");
     if (testButton) testToolPlugin(testButton.dataset.toolTest, testButton).catch((error) => toast(error.message));
     if (historyButton) loadToolHistory(historyButton.dataset.toolHistory).catch((error) => toast(error.message));
     if (versionsButton) manageToolPluginVersions(versionsButton.dataset.toolVersions).catch((error) => toast(error.message));
     if (uninstallButton) uninstallManagedToolPlugin(uninstallButton.dataset.toolUninstall).catch((error) => toast(error.message));
     if (credentialButton) openRemoteCredential(credentialButton.dataset.toolCredential);
+    if (firstRunButton) confirmRemoteFirstRun(firstRunButton.dataset.toolFirstRun).catch((error) => toast(error.message));
   });
   document.getElementById("tool-capability-list")?.addEventListener("change", (event) => {
     const toggle = event.target.closest("[data-tool-enabled]");
@@ -100,7 +102,7 @@ async function loadSkillRegistry() {
       const detail = !tool.enabled ? "不会参与新任务的能力解析" : checked ? (healthy ? "依赖正常" : (tool.health.error?.message || "依赖不可用")) : "服务尚未返回健康检查结果，请重启工作台服务后刷新";
       const recent = tool.recentExecution;
       const audit = recent ? `最近执行：${recent.status} · ${new Date(recent.finished_at || recent.started_at).toLocaleString("zh-CN")}${recent.error_code ? ` · ${recent.error_code}` : ""}` : "尚无执行记录";
-      const permissionSummary = tool.thirdParty ? `来源：${tool.source?.type || "未声明"} ${tool.source?.url || ""} · 兼容 ${tool.compatibleApp || "未声明"} · 完整性 ${tool.contentHash || "未记录"} · 网络域名 ${(tool.permissions?.networkDomains || []).join("、") || "无"} · 路径 ${(tool.permissions?.pathAccess || []).join("、") || "无"} · 外部写入 ${tool.permissions?.externalWrite ? "是" : "否"}` : "内置受信实现";
+      const permissionSummary = tool.thirdParty ? `来源：${tool.source?.type || "未声明"} ${tool.source?.url || ""} · 兼容 ${tool.compatibleApp || "未声明"} · 完整性 ${tool.contentHash || "未记录"} · 网络域名 ${(tool.permissions?.networkDomains || []).join("、") || "无"} · 路径 ${(tool.permissions?.pathAccess || []).join("、") || "无"} · 外部写入 ${tool.permissions?.externalWrite ? "是" : "否"}${tool.remote ? ` · 端点 ${tool.endpointHost || "未声明"} · 首次执行 ${tool.firstRunConfirmedAt ? "已确认" : "待确认"}` : ""}` : "内置受信实现";
       return `<article class="runtime-model-item tool-plugin-item ${tool.enabled ? "" : "disabled"}">
         <div class="tool-plugin-title"><div><b>${escapeHtml(tool.capability)}</b><small>${escapeHtml(tool.plugin)} @ ${escapeHtml(tool.version)} · ${escapeHtml(tool.riskLevel)}</small></div><em class="${tool.enabled ? (checked ? (healthy ? "ok" : "bad") : "unknown") : "unknown"}">${status}</em></div>
         <small>${escapeHtml(detail)}</small><small>${escapeHtml(audit)}</small>
@@ -110,7 +112,7 @@ async function loadSkillRegistry() {
           ${tool.thirdParty ? "" : `<label>优先级 <input type="number" min="-100" max="100" value="${Number(tool.priority) || 0}" data-tool-priority="${escapeHtml(tool.plugin)}"></label>`}
           <button type="button" class="ghost-button" data-tool-test="${escapeHtml(tool.plugin)}">检查依赖</button>
           <button type="button" class="text-button" data-tool-history="${escapeHtml(tool.capability)}">执行历史</button>
-          ${tool.remote ? `<button type="button" class="text-button" data-tool-credential="${escapeHtml(tool.plugin)}">配置凭据</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">删除连接</button>` : tool.thirdParty ? `<button type="button" class="text-button" data-tool-versions="${escapeHtml(tool.plugin)}">版本与回滚</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">卸载</button>` : ""}
+          ${tool.remote ? `${!tool.firstRunConfirmedAt ? `<button type="button" class="ghost-button" data-tool-first-run="${escapeHtml(tool.plugin)}">确认首次执行</button>` : ""}<button type="button" class="text-button" data-tool-credential="${escapeHtml(tool.plugin)}">配置凭据</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">删除连接</button>` : tool.thirdParty ? `<button type="button" class="text-button" data-tool-versions="${escapeHtml(tool.plugin)}">版本与回滚</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">卸载</button>` : ""}
         </div>
       </article>`;
     }).join("") : '<div class="kv-empty">没有已注册的工具能力。</div>';
@@ -294,6 +296,18 @@ async function uninstallManagedToolPlugin(pluginId) {
     body: JSON.stringify({ confirmImpact: true }),
   });
   toast(remote ? "远程连接已删除" : "工具已卸载，重启工作台后完成卸载");
+  await loadSkillRegistry();
+}
+
+// 首次执行确认（开源清单 3.3）：展示域名与权限摘要，用户确认后该远程插件才允许真实调用。
+async function confirmRemoteFirstRun(pluginId) {
+  const tool = skillRegistryData?.tools.find((item) => item.plugin === pluginId && item.remote);
+  const summary = tool
+    ? `域名：${tool.endpointHost || "未声明"}\n风险等级：${tool.riskLevel}\n外部写入：${tool.permissions?.externalWrite ? "是（会向第三方发送内容）" : "否"}\n凭据：${(tool.permissions?.credentials || []).join("、") || "无"}\n超时：按插件声明（1–30 秒），响应上限 1–2 MB`
+    : "";
+  if (!await confirmAction(`确认允许远程插件「${pluginId}」首次执行？\n${summary}\n确认后，AI 任务调用该插件时会向上述域名发送请求。`, { confirmText: "确认允许" })) return;
+  await request(`/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}/first-run-confirm`, { method: "POST", body: "{}" });
+  toast("首次执行已确认，该插件现在可以被任务调用");
   await loadSkillRegistry();
 }
 

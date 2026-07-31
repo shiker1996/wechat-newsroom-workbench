@@ -77,6 +77,20 @@ function bindBackupActions() {
       button.textContent = original;
     }
   });
+  document.getElementById("clear-cache")?.addEventListener("click", async (event) => {
+    if (!await confirmAction("清理 GitHub API 与来源正文缓存？缓存会随下次采集自动重建，数据库与产物不受影响。", { confirmText: "清理缓存" })) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const result = await request("/api/system/cache/clear", { method: "POST", body: JSON.stringify({ kind: "all" }) });
+      const total = (result.cleared || []).reduce((sum, item) => sum + item.removed, 0);
+      toast("缓存已清理（" + total + " 项）");
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
   document.getElementById("backup-file")?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     const status = document.getElementById("backup-validation");

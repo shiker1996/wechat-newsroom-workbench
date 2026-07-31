@@ -36,6 +36,93 @@
 
 ---
 
+## 可复制调用示例
+
+以下示例假设服务运行在默认地址 `http://127.0.0.1:4317`。curl 示例在 Windows PowerShell 中请使用 `curl.exe`（`curl` 是 `Invoke-WebRequest` 的别名）。
+
+### NDJSON 流（编辑会 / 策划流式接口）
+
+流式接口返回 `application/x-ndjson`，每行一个 `{ "type": ... }` 事件：`delta` 为增量文本，`done` 携带最终结果，`error` 表示失败。
+
+```bash
+curl.exe -N -X POST http://127.0.0.1:4317/api/candidates/1/ai/editorial/stream ^
+  -H "Content-Type: application/json" ^
+  -d "{\"answer\": \"这个选题可以写，重点放在影响面\"}"
+```
+
+输出示例（逐行到达）：
+
+```ndjson
+{"type":"delta","text":"可以写。"}
+{"type":"delta","text":"建议从影响面切入……"}
+{"type":"done","data":{"summary":"..."}}
+```
+
+PowerShell 原生读取流（`Invoke-RestMethod` 会等全部响应，不适合流式）：
+
+```powershell
+$req = [System.Net.Http.HttpRequestMessage]::new('Post', 'http://127.0.0.1:4317/api/candidates/1/ai/editorial/stream')
+$req.Content = [System.Net.Http.StringContent]::new('{"answer":"可以写"}', [Text.Encoding]::UTF8, 'application/json')
+$client = [System.Net.Http.HttpClient]::new()
+$resp = $client.SendAsync($req, 'ResponseHeadersRead').Result
+$reader = [System.IO.StreamReader]::new($resp.Content.ReadAsStreamAsync().Result)
+while (($line = $reader.ReadLine()) -ne $null) { Write-Host $line }
+```
+
+### 后台任务（启动 → 轮询）
+
+启动后台任务返回 `202` 与任务 ID，用 `GET /api/jobs/:id` 轮询状态：
+
+```bash
+# 启动成稿任务（202）
+curl.exe -X POST http://127.0.0.1:4317/api/candidates/1/ai/article ^
+  -H "Content-Type: application/json" -d "{}"
+# => {"id":"<jobId>","type":"article","status":"running",...}
+
+# 轮询单个任务
+curl.exe http://127.0.0.1:4317/api/jobs/<jobId>
+
+# 最近任务列表（服务重启后数据库审计仍可查）
+curl.exe "http://127.0.0.1:4317/api/jobs?limit=10"
+```
+
+```powershell
+$job = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:4317/api/candidates/1/ai/article' -ContentType 'application/json' -Body '{}'
+Invoke-RestMethod -Uri "http://127.0.0.1:4317/api/jobs/$($job.id)"
+```
+
+### 错误响应
+
+错误统一为 `{ "error": "<人类可读原因>" }`，状态码遵循上文约定：
+
+```bash
+curl.exe -X POST http://127.0.0.1:4317/api/candidates/999999/ai/article -H "Content-Type: application/json" -d "{}"
+# HTTP 404
+# {"error":"候选不存在"}
+```
+
+### 确认头（防误操作门禁，非鉴权）
+
+变更类管理路由必须带确认头，否则返回错误。技能 / 插件变更用 `x-admin-confirm: TRUSTED-LOCAL-PLUGIN`：
+
+```bash
+# 卸载一个已安装技能
+curl.exe -X DELETE http://127.0.0.1:4317/api/system/skills/<skillId> ^
+  -H "x-admin-confirm: TRUSTED-LOCAL-PLUGIN"
+```
+
+备份恢复用 `x-restore-confirm: RESTORE`（恢复前服务端自动保存快照）：
+
+```bash
+curl.exe -X POST http://127.0.0.1:4317/api/system/backup/restore ^
+  -H "Content-Type: application/json" -H "x-restore-confirm: RESTORE" ^
+  -d "{\"file\": \"backup-2026-07-31.zip\"}"
+```
+
+> OpenAPI 决策（2026-07-31）：不生成 OpenAPI。路由表以手写本文档为准，`test/api-docs-routes.test.mjs` 在 CI 中双向校验代码路由与文档条目，漂移会直接拦截；引入 OpenAPI 生成器会增加一套需要同步的 schema 维护成本，对本机单用户 API 收益有限。
+
+---
+
 ## 批次管理
 
 ### GET /api/overview
@@ -59,8 +146,16 @@
 → 每日批次（抽屉面板）
 
 ### PATCH /api/batches/:id
-更新批次 { title, status, stage, note }
+更新批次 { title, status, stage, note, lifecycleStatus: active|completed|archived }（归档是可恢复的删除）
 → 每日批次
+
+### GET /api/batches/:id/delete-impact
+彻底删除前的影响范围预览 { batch, counts: { hotspots, candidates, documents, sourceRuns, subscriptionRuns, modelCalls, aiRuns, artifacts }, directories: [{ kind, dir, exists, files, bytes, skipped }] }；与其他批次共享的遗留目录标记 skipped
+→ 每日批次（抽屉面板 · 已归档批次）
+
+### DELETE /api/batches/:id
+彻底删除已归档批次：级联删除子表记录（审计类表脱钩保留）并清理产物目录，不可恢复。仅 `archived` 批次可删（否则 409）；需要请求头 `x-admin-confirm: DELETE-BATCH`
+→ 每日批次（抽屉面板 · 已归档批次）
 
 ---
 
@@ -459,6 +554,10 @@ AI 规划配图占位
 采集环境检查（Reddit CDP、RSSHub、GitHub API 与 Node.js）。`?target=all|reddit|rsshub|github` 可只检查一个目标。
 → 采集控制
 
+### POST /api/system/cache/clear
+清理采集缓存 { kind: 'github-cache' | 'source-cache' | 'all' } → { cleared: [{ kind, removed }] }；缓存随采集自动重建，不影响数据库与产物
+→ 设置与数据（备份与恢复面板）
+
 ### GET /api/system/settings
 读取可在 UI 中维护的应用 / RSSHub 环境变量和解析后的路径。敏感字段只返回 `configured`。
 
@@ -599,6 +698,7 @@ AI 规划配图占位
 - `POST /api/system/remote-tool-plugins/validate`：校验声明式远程 Manifest。
 - `POST /api/system/remote-tool-plugins`：保存远程连接，默认停用。
 - `PATCH /api/system/remote-tool-plugins/:id/status`：即时启用或停用。
+- `POST /api/system/remote-tool-plugins/:id/first-run-confirm`：首次执行确认；确认前该插件的真实调用会被拒绝（`FIRST_RUN_CONFIRM_REQUIRED`），避免“安装即信任所有能力”。
 - `GET|PUT /api/system/remote-tool-plugins/:id/credentials`：查看配置状态或写入/清除隔离凭据；永不返回凭据原文。
 - `POST /api/system/remote-tool-plugins/:id/test`：执行受控连接测试并返回可用性、端点主机和配额状态。
 - `DELETE /api/system/remote-tool-plugins/:id`：删除连接；存在技能依赖时先返回 `409`。

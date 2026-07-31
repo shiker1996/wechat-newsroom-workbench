@@ -36,13 +36,16 @@
 > 扫描记录（2026-07-31）：对全部提交历史与当前工作树执行模式扫描（sk-/ghp_/github_pat_/AIza/tvly-/xox/AKIA/JWT，及 password/secret/api_key/token/cookie 赋值），零真实密钥命中（占位符除外）；`.env`、`config.local.json`、`account-context.json` 从未进入历史；历史 `data/github-cache/*.json` 不含令牌；抽查历史 walkthrough / ux-demo 截图无账号、路径、密钥泄露。密钥无需轮换。
 
 - [x] 对当前工作树和完整 Git 历史执行密钥扫描，覆盖 API Key、Cookie、Token、又拍云凭据、GitHub Token、Firecrawl / Tavily 密钥和远程插件凭据。只检查当前 `.gitignore` 不足以证明历史安全。
-- [ ] 检查并清理可能包含个人信息、真实选题、文章正文、来源缓存、浏览器 Profile、数据库、日志、备份和绝对路径的文件；确认 `data/`、`articles/`、`topics/`、`social-cards/`、`.env`、`config.local.json`、`account-context.json` 均未进入历史。
-  - 2026-07-31 扫描发现：`data/write-assistant.db`（空文件）、`data/rsshub.pid`、`data/github-cache/*.json`、`data/walkthrough-*` 与 `data/ux-demo-*` 截图曾在历史中出现（现已不跟踪）；`articles/`、`topics/`、`social-cards/`、浏览器 Profile、真实数据库从未进入历史。需决定保留历史还是重写清理。
+- [x] 检查并清理可能包含个人信息、真实选题、文章正文、来源缓存、浏览器 Profile、数据库、日志、备份和绝对路径的文件；确认 `data/`、`articles/`、`topics/`、`social-cards/`、`.env`、`config.local.json`、`account-context.json` 均未进入历史。
+  - 2026-07-31 扫描发现：`data/write-assistant.db`（空文件）、`data/rsshub.pid`、`data/github-cache/*.json`、`data/walkthrough-*` 与 `data/ux-demo-*` 截图曾在历史中出现（现已不跟踪）；`articles/`、`topics/`、`social-cards/`、浏览器 Profile、真实数据库从未进入历史。
+  - 2026-07-31 已处理：filter-branch 重写全部历史抹除 `data/` 与 `logs/`（`logs/` 系 c6ae535 误提交的审计产物），tags 0.0.1/0.1.0 一并改写为干净版本，已 force-push（master `6d024bd`）。注意：GitHub 上已合并 PR #1-#3 的 `refs/pull/*` 仍引用旧提交（force-push 无法清除），需联系 GitHub Support 清除或删库重建后才能彻底不可达。
   - `.env.example` 与 `skills/upyun-upload-image/opts.js` 默认值含个人标识 `UPYUN_DOMAIN=img.shiker.tech`、`UPYUN_PREFIX=weedit`，公开前建议改为占位符。
-- [ ] 审核已跟踪的 `.idea/` 和 UX 审计图片。删除只属于个人 IDE 的配置；保留截图时确保没有账号、路径、密钥、未公开内容或第三方受限素材。
-  - 2026-07-31 扫描发现：`.idea/` 9 个文件仍在 HEAD 跟踪（内容均为 `$PROJECT_DIR$` 占位，无敏感信息），建议取消跟踪并加入 `.gitignore`；`docs/ux-audit-2026-07-29/*.png` 在工作树已删除但未提交，历史（1921679）中仍存在。
-- [ ] 提供完全虚构且可公开的 `account-context.example.json`，或者在 README 中明确说明字段格式；不得提交真实账号画像。
-- [ ] 增加提交前秘密扫描规则，并在 CI 中执行。若历史曾泄密，先轮换密钥，再重写历史；两步缺一不可。
+- [x] 审核已跟踪的 `.idea/` 和 UX 审计图片。删除只属于个人 IDE 的配置；保留截图时确保没有账号、路径、密钥、未公开内容或第三方受限素材。
+  - 2026-07-31 处理：`.idea/` 已全部取消跟踪并加入 `.gitignore`（内容均为 `$PROJECT_DIR$` 占位，无敏感信息）；`docs/ux-audit-*` 截图已从工作树删除，历史中留存版本经抽查无账号、路径、密钥泄露，予以保留。
+- [x] 提供完全虚构且可公开的 `account-context.example.json`，或者在 README 中明确说明字段格式；不得提交真实账号画像。
+  - 2026-07-31 处理：新增全字段虚构示例 `account-context.example.json`；README 补充复制为 `account-context.json` 的用法与「请勿提交真实账号画像」提示。
+- [x] 增加提交前秘密扫描规则，并在 CI 中执行。若历史曾泄密，先轮换密钥，再重写历史；两步缺一不可。
+  - 2026-07-31 处理：新增 `.githooks/pre-commit`（`git config core.hooksPath .githooks` 启用，说明见 CONTRIBUTING「安全」节），与 CI 共用 `scripts/secret-scan.mjs`；历史扫描零真实密钥命中，无需轮换；历史重写已完成并推送新仓库。
 
 ### 2.3 安全边界
 
@@ -98,24 +101,42 @@
 
 ### 3.1 发布与版本
 
-- [ ] 决定项目是“源码仓库”还是也发布 npm 包。若不发布 npm 包，可继续 `private: true`，但需在 README 说明；若发布，补齐 `name`、`version`、`license`、`repository`、`bugs`、`homepage`、`engines`、`files` 和发布前校验。
-- [ ] 采用语义化版本，新增 `CHANGELOG.md`，定义数据库 Schema、技能契约、插件 Manifest 和 REST API 的兼容政策。
-- [ ] 建立带校验和的 release 流程，明确升级、降级、备份和恢复步骤。
-- [ ] 为数据库迁移、安装技能版本和插件版本建立跨版本验收样例。
+- [x] 决定项目是“源码仓库”还是也发布 npm 包。若不发布 npm 包，可继续 `private: true`，但需在 README 说明；若发布，补齐 `name`、`version`、`license`、`repository`、`bugs`、`homepage`、`engines`、`files` 和发布前校验。
+- [x] 采用语义化版本，新增 `CHANGELOG.md`，定义数据库 Schema、技能契约、插件 Manifest 和 REST API 的兼容政策。
+- [x] 建立带校验和的 release 流程，明确升级、降级、备份和恢复步骤。
+- [x] 为数据库迁移、安装技能版本和插件版本建立跨版本验收样例。
+
+> 实施记录（2026-07-31）：
+>
+> - 发布策略：纯源码仓库分发，不发布 npm 包（`package.json` 保持 `private: true`），README 新增「发布与版本」一节说明。
+> - 版本与兼容政策：新增 `CHANGELOG.md`（Keep a Changelog + 语义化版本，含 0.0.1 / 0.1.0 历史条目与四类接口兼容政策：数据库只增式幂等迁移、技能 `schemaVersion`/`compatibleApp`、插件 Manifest 同前、REST API 只增不破）。修复一个真实问题：`APP_VERSION` 此前在 3 个包管理器（`lib/skills/package-manager.mjs`、`lib/tools/package-manager.mjs`、`lib/tools/remote-package-manager.mjs`）中硬编码为 `'0.1.0'`，已统一为 `lib/version.mjs` 从 `package.json` 读取，`test/version-compat.test.mjs` 钉死唯一来源。
+> - release 流程：新增 `scripts/release.mjs`（`npm run release`：`git archive HEAD` → `dist/<name>-<version>.zip` + `SHA256SUMS.txt`，工作区有未提交改动时警告；`dist/` 已入 `.gitignore`，实测产物 1.0MB）与 `docs/release.md`（发布 8 步、升级 / 降级 / 备份恢复说明；降级明确「迁移只增不回退，必须恢复升级前备份」）。
+> - 跨版本验收样例：`test/version-compat.test.mjs` 5 例——旧版数据库（batches/hotspots 缺后期列）迁移后结构补全且数据保留、当前契约的技能包 / 插件包通过校验、`compatibleApp >=99.0.0` 明确拒绝、未知 `schemaVersion` 明确拒绝。
 
 ### 3.2 架构与扩展文档
 
-- [ ] 增加架构总览：HTTP 路由、SQLite Store、后台任务、LLM 网关、技能运行时、工具注册中心、文章链和图文链之间的关系。
-- [ ] 把当前设计评审文档分成“现状”“历史决策”“未来计划”，避免读者把已经上线的功能误认为待办。
-- [ ] 给技能包、本地工具插件和远程插件各提供一个最小可运行示例、权限说明、失败语义和版本兼容规则。
-- [ ] 为 NDJSON 流、后台任务、错误响应和确认头补充可复制的 `curl` / PowerShell 示例；视维护成本决定是否生成 OpenAPI。
+- [x] 增加架构总览：HTTP 路由、SQLite Store、后台任务、LLM 网关、技能运行时、工具注册中心、文章链和图文链之间的关系。
+- [x] 把当前设计评审文档分成“现状”“历史决策”“未来计划”，避免读者把已经上线的功能误认为待办。
+- [x] 给技能包、本地工具插件和远程插件各提供一个最小可运行示例、权限说明、失败语义和版本兼容规则。
+- [x] 为 NDJSON 流、后台任务、错误响应和确认头补充可复制的 `curl` / PowerShell 示例；视维护成本决定是否生成 OpenAPI。
+
+> 实施记录（2026-07-31）：
+>
+> - 架构总览：新增 `docs/architecture.md`——启动流程、路由链式注册（六个已抽出模块 + server.mjs 内联路由的过渡形态）、Store（约 25 表、幂等迁移）、后台任务（JobManager / AiJobManager 分工与重启语义）、LLM 网关（多服务商、降级、上下文与输出预算）、技能运行时（内置 skills/ 与第三方 installed-skills 共存、快照复跑）、工具注册中心（三来源合并、策略检查、能力槽位）、文章链与图文链的阶段契约，附目录速查。
+> - 文档分层：新增 `docs/README.md` 索引，把 17 篇文档分为现状（5）/ 历史决策（8）/ 未来计划（5），并约定新文档头部注明类别与状态。
+> - 扩展文档：新增 `docs/extending.md`，覆盖三类扩展示例（`docs/examples/skill-package`、`tool-plugin`、`remote-tool-plugin`）的权限说明、失败语义与版本兼容规则（`schemaVersion` + `compatibleApp`，不兼容安装即拒）。
+> - API 示例：`API.md` 新增「可复制调用示例」——NDJSON 流（curl `-N` 与 PowerShell HttpClient 流式读取）、后台任务启动与轮询、统一错误响应、两种确认头（`x-admin-confirm: TRUSTED-LOCAL-PLUGIN` / `x-restore-confirm: RESTORE`）。OpenAPI 决策：**不生成**，手写 API.md + `test/api-docs-routes.test.mjs` 双向校验兜底，理由已记录在文档内。
 
 ### 3.3 用户可控性
 
-- [ ] 增加数据导出、按批次删除、完整清空和缓存清理说明；删除操作应先展示影响范围并可恢复。
-- [ ] 在 UI 中统一标注会产生费用、会向第三方发送内容或会产生外部写入的操作。
-- [ ] 为模型和信息工具提供超时、重试、并发和预算的安全默认值及说明。
-- [ ] 给远程插件增加域名 / 权限摘要和首次执行确认，避免“安装即信任所有能力”。
+- [x] 增加数据导出、按批次删除、完整清空和缓存清理说明；删除操作应先展示影响范围并可恢复。
+  - 2026-07-31 实施：删除分两级——归档（已有，可恢复）+ 彻底删除（新增，仅已归档批次）：`GET /api/batches/:id/delete-impact` 展示影响范围（各表计数 + 产物目录清单，同日共享的遗留目录标记保留），`DELETE /api/batches/:id` 需 `x-admin-confirm: DELETE-BATCH`，级联删子表、审计表脱钩保留、产物目录一并清理（`lib/domain/batch-deletion.mjs`）；新增 `POST /api/system/cache/clear` 清理 GitHub / 来源缓存（设置页一键操作）；README「数据与产物」补数据生命周期说明（导出 / 两级删除 / 缓存清理 / 完整清空）。新增 `test/batch-deletion.test.mjs` 6 例。
+- [x] 在 UI 中统一标注会产生费用、会向第三方发送内容或会产生外部写入的操作。
+  - 2026-07-31 实施：四处主 AI 操作面加 `action-hint` 标注——批次打标/研判（计费 + 联网搜索外发查询词）、文章编辑器生成/改写（计费）、排版（默认本地确定性渲染不计费；模型初稿计费、CDN 上传属外部写入）、图文生成（计费，渲染本地确定性）；外部写入类原有标注保留（配图页 CDN 按钮、插件卡片的「外部写入 是/否」）。
+- [x] 为模型和信息工具提供超时、重试、并发和预算的安全默认值及说明。
+  - 2026-07-31 实施：新增 `docs/safety-defaults.md`——模型侧（请求 2 分钟超时、16 组输出预算画像、截断/JSON Mode 降级重试、上下文不静默截断、打标与事件卡并发封顶、Tavily 降级、全量调用审计）与信息工具侧（远程插件超时 1–30s 强制、响应 1KB–2MB 钳制、内网拒绝、Firecrawl 计费阈值、CDP/RSSHub 超时、GitHub 限流感知、外部写入三层约束），均注明覆盖方式；默认值经核对已存在于代码，本节为说明性补齐。
+- [x] 给远程插件增加域名 / 权限摘要和首次执行确认，避免“安装即信任所有能力”。
+  - 2026-07-31 实施：工具卡片权限摘要新增端点域名与「首次执行 待确认/已确认」；新增 `POST /api/system/remote-tool-plugins/:id/first-run-confirm` 与执行门禁（`remote-adapter` 在目录中无 `firstRunConfirmedAt` 时拒绝真实调用，返回新注册错误码 `FIRST_RUN_CONFIRM_REQUIRED`，健康检查不受限）；前端「确认首次执行」按钮的弹窗展示域名 / 风险等级 / 外部写入 / 凭据 / 超时摘要。新增 `test/remote-plugin-first-run.test.mjs` 3 例。
 
 ## 4. P2：开源后的持续工作
 
