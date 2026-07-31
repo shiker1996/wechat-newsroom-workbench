@@ -39,8 +39,8 @@ test('complete retries a truncated structured stage once with expanded budget', 
       messages: [{ role: 'user', content: 'plan' }],
     });
     assert.equal(calls.length, 2);
-    assert.equal(calls[0].maxOutputTokens, 6000);
-    assert.equal(calls[1].maxOutputTokens, 10000);
+    assert.equal(calls[0].maxOutputTokens, 14000);
+    assert.equal(calls[1].maxOutputTokens, 18000);
     assert.match(calls[1].messages[0].content, /上一次输出因长度达到上限/);
     assert.deepEqual(result.outputBudget, {
       initial: 6000, retry: 10000, adaptive: true, providerMax: 12000, used: 10000, attempts: 2,

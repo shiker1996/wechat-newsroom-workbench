@@ -26,6 +26,7 @@ import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
 import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/domain/custom-fact-builder.mjs';
+import { createRepositoryCandidate } from './lib/domain/repository-candidate.mjs';
 import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
 import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
 import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from './lib/integrations/local-project-reader.mjs';
@@ -702,6 +703,19 @@ async function api(request, response, url) {
       send({ type: 'error', error: error.message });
     }
     response.end(); return true;
+  }
+  // 手动添加仓库图文候选（工具图文）：输入 GitHub 仓库地址直接立项，核验与故事板走既有流程
+  const repositorySocialMatch = pathname.match(/^\/api\/batches\/([^/]+)\/repository-candidates$/);
+  if (repositorySocialMatch && request.method === 'POST') {
+    const batchId = decodeURIComponent(repositorySocialMatch[1]);
+    if (!store.getBatch(batchId)) return json(response, 404, { error: '批次不存在' });
+    const input = await body(request);
+    try {
+      const candidate = createRepositoryCandidate({ store, batchId, url: input.url, channel: input.channel });
+      return json(response, 201, { candidate });
+    } catch (error) {
+      return json(response, 400, { error: `添加仓库图文失败：${error.message}` });
+    }
   }
   // 创建自定义图文候选（待办 1+6：非仓库类图文，首批教程/清单/观点，渠道编码进 output_mode）
   const customSocialMatch = pathname.match(/^\/api\/batches\/([^/]+)\/custom-social-candidates$/);

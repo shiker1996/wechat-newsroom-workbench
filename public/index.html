@@ -264,7 +264,19 @@
     </section>
 
     <section class="view" id="view-social-editor">
-      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2 id="social-editor-heading">工具图文</h2></div><p id="social-editor-intro">AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><button type="button" class="outline-button" id="create-custom-social" hidden>创建自定义图文</button></div>
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2 id="social-editor-heading">工具图文</h2></div><p id="social-editor-intro">AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><div class="section-intro-actions"><button type="button" class="outline-button" id="create-repository-social" hidden>添加仓库图文</button><button type="button" class="outline-button" id="create-custom-social" hidden>创建自定义图文</button></div></div>
+      <div id="repository-social-panel" class="repository-quickadd" hidden>
+        <span class="kicker">REPOSITORY</span>
+        <div class="repository-quickadd-row">
+          <input id="repository-social-url" type="url" placeholder="https://github.com/owner/repo" aria-label="GitHub 仓库地址" autocomplete="off" spellcheck="false">
+          <div class="repository-channel-segment" role="group" aria-label="发布渠道">
+            <button type="button" data-channel="wechat" class="active">公众号</button><button type="button" data-channel="xiaohongshu">小红书</button>
+          </div>
+          <button type="button" class="primary-button" id="repository-social-submit" disabled>添加</button>
+          <button type="button" class="repository-quickadd-close" id="repository-social-cancel" aria-label="关闭">×</button>
+        </div>
+        <p class="repository-quickadd-hint" id="repository-social-hint">粘贴 GitHub 仓库地址，核验与故事板流程与自动候选一致</p>
+      </div>
       <div id="custom-social-panel" class="repository-facts-panel custom-social-panel" hidden>
         <div class="workspace-head"><div><span class="kicker">CUSTOM CONTENT</span><h3>创建自定义图文（教程 / 清单 / 观点）</h3></div></div>
         <section class="editorial-chat custom-social-chat">
@@ -666,7 +678,7 @@
                   <label>模型名称<input id="model-name" required placeholder="gpt-4.1"></label>
                   <label>API Key<input id="model-api-key" type="password" autocomplete="off" placeholder="留空保持现值"></label>
                   <label>上下文窗口<input id="model-context-window" type="number" min="4096" value="128000"></label>
-                  <label>最大输出 Token<input id="model-max-output" type="number" min="256" value="8192"><small>这是模型能力上限，不是每次调用量。系统会按阶段分配预算，遇到截断时自动扩容重试一次。</small></label>
+                  <label>最大输出 Token<input id="model-max-output" type="number" min="256" placeholder="16384"><small>可选，留空默认 16384。填该模型 API 的真实输出上限即可，不是每次调用量：系统按阶段分配预算（开启推理的阶段自动追加推理余量），截断时自动扩容重试一次。</small></label>
                   <label>Token 参数<select id="model-max-token-field"><option value="max_tokens">max_tokens</option><option value="max_completion_tokens">max_completion_tokens</option></select></label>
                   <label>打标分组<input id="model-tagging-chunk" type="number" min="1" max="20" value="6"></label>
                   <label>打标并发<input id="model-tagging-concurrency" type="number" min="1" max="20" value="4"></label>

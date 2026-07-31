@@ -227,7 +227,7 @@ function resetModelForm() {
   document.getElementById("model-existing-id").value = "";
   document.getElementById("model-id").disabled = false;
   document.getElementById("model-context-window").value = "128000";
-  document.getElementById("model-max-output").value = "8192";
+  document.getElementById("model-max-output").value = "";
   document.getElementById("model-tagging-chunk").value = "6";
   document.getElementById("model-tagging-concurrency").value = "4";
   document.getElementById("model-json-mode").checked = true;
@@ -247,7 +247,7 @@ function editModelConfig(id) {
   document.getElementById("model-name").value = provider.model || "";
   document.getElementById("model-api-key").value = "";
   document.getElementById("model-context-window").value = provider.contextWindow || 128000;
-  document.getElementById("model-max-output").value = provider.maxOutputTokens || 8192;
+  document.getElementById("model-max-output").value = provider.maxOutputTokens || "";
   document.getElementById("model-max-token-field").value = provider.maxTokensField || "max_tokens";
   document.getElementById("model-tagging-chunk").value = provider.taggingChunkSize || 6;
   document.getElementById("model-tagging-concurrency").value = provider.taggingConcurrency || 4;
@@ -267,7 +267,7 @@ function modelFormPayload() {
     model: document.getElementById("model-name").value,
     apiKey: document.getElementById("model-api-key").value,
     contextWindow: Number(document.getElementById("model-context-window").value),
-    maxOutputTokens: Number(document.getElementById("model-max-output").value),
+    maxOutputTokens: Number(document.getElementById("model-max-output").value) || undefined,
     maxTokensField: document.getElementById("model-max-token-field").value,
     taggingChunkSize: Number(document.getElementById("model-tagging-chunk").value),
     taggingConcurrency: Number(document.getElementById("model-tagging-concurrency").value),

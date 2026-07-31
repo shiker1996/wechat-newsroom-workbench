@@ -60,6 +60,8 @@
         "taggingChunkSize": 8,
         "taggingConcurrency": 6,
         "supportsJsonMode": true,
+        "supportsThinkingToggle": true,
+        "thinkingReserveTokens": 8000,
         "enabled": true
       },
       "minimax": {

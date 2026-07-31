@@ -1,16 +1,41 @@
 # 写作专属 Agents 平台开发记录
 
 > 文档性质：内部工程复盘  
-> 记录范围：项目启动至 2026-07-29  
+> 记录范围：项目启动至 2026-07-31  
 > 统计口径：当前 Git 仓库与工作区代码快照
 
-## 1. 项目定位的变化
+## 1. 项目缘起、目标与定位
 
-### 初始定位
+### 1.1 缘起：为什么做这个项目
+
+本项目起源于 openclaw 的编排技能（如 `hotspot-to-topics-orchestrated`）。在通用工具协作平台上执行这类编排技能时，暴露了两个绕不开的问题：
+
+- **长链路总会中断**：编排技能要求多步骤连续自主执行，而通用 Agent 平台无法保证全程不中断，一次失败往往意味着从头再来；
+- **Token 消耗不可控**：热点抓取与总结在对话上下文中进行，每轮都携带大量原始内容，成本随轮次快速膨胀。
+
+结论是需要一个专门的应用：把流程状态、中间产物和人工确认点沉淀到本地数据库与文件中，让 AI 调用成为可恢复、可审计、可单独重跑的阶段任务，而不是一段随时会断的对话。
+
+### 1.2 目标：写作专属 Agents 平台
+
+本项目的目标从一开始就很明确：做一个聚焦写作能力的 Agents 平台。其他 Agents 平台的通用模式一概不用，不追求大而全，做到专而精——只把热点采集、事实研判、编辑决策、成稿、排版、图文交付这条写作链路做深做透。
+
+### 1.3 思路转折历程
+
+整个过程是边实践边思考，主线经历了五次转折：
+
+1. **第一版：采集 + 评分 + 脑暴选题**（2026-07-20 项目初始化）。通过 RSS、浏览器抓取技能规定的数据源，对拉取的热点排名评分，从排名最高的十条热点中脑暴产生选题。此时小红书图文与「热点采集写公众号文章」是两条完全无关的链路，图文只能根据 GitHub 仓库生成相应的介绍图文。见 [2026-07-20-project-init.md](2026-07-20-project-init.md)。
+2. **技能执行器与编排器**。后续考虑功能拓展时，参考现有 AI 工作流平台，优先做了技能执行器和编排器，并将提示词从编排器中拆分出来放到单独的技能中。见 [typeset-pipeline-optimization-plan.md](typeset-pipeline-optimization-plan.md)。
+3. **热点到选题的升级**。从单热点评分改进为「热点—事件—维度」聚合：一个维度聚合多个事件，一个事件聚合多个热点来源。维度从 5W1H 产生（Who / What / Where / When / Why / How）；事件聚合时更关注 who、where、what，即主体、地点和动作，从而更全局地看清热点背后的事件。见 [optional-feature-implementation-roadmap.md](optional-feature-implementation-roadmap.md)、[event-deep-fetch-and-fact-base-plan.md](event-deep-fetch-and-fact-base-plan.md)。
+4. **双内容池与图文生产**。热点选题优化后，开始做小红书图文生产。见 [dual-content-pools-and-social-card-pipeline.md](dual-content-pools-and-social-card-pipeline.md)；随后继续拓展自定义图文等能力，见 [optional-feature-todos.md](optional-feature-todos.md)、[custom-content-and-xiaohongshu-design.md](custom-content-and-xiaohongshu-design.md)。
+5. **技能化与插件化改造**。整体功能完善后，才进行功能的技能化和插件化改造，把内置能力开放为可安装、可替换的扩展。见 [social-card-storyboard-skill-extension-plan.md](social-card-storyboard-skill-extension-plan.md)、[skill-and-tool-extension-plan.md](skill-and-tool-extension-plan.md)。
+
+### 1.4 定位的变化
+
+#### 初始定位
 
 项目最初是一套本地优先的公众号编辑工作台，目标是把热点采集、选题、编辑确认、文章生成和排版交付放进同一个工作环境。
 
-### 当前定位
+#### 当前定位
 
 项目已经演化为面向写作工程的专属 Agents 平台：
 
@@ -447,7 +472,10 @@
 - capability 信息能力槽位；
 - generation snapshot 和工具执行审计；
 - 技能与工具独立管理页面；
-- 主要页面的桌面端与全屏布局收敛。
+- 主要页面的桌面端与全屏布局收敛；
+- 批次归档与彻底删除两级数据生命周期、GitHub 与来源正文缓存清理；
+- 安全默认值文档、费用 / 数据外发 / 外部写入的 UI 标注、远程插件权限摘要与首次执行确认；
+- 开源治理闭环：MIT 许可证、SECURITY 与商标声明、第三方材料清单、CI（Windows + Node 24）、README 美化。
 
 ### 已规划、待实施
 

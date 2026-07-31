@@ -22,8 +22,9 @@ test('information slots report connected and missing implementations explicitly'
     const items=await listInformationCapabilitySlots(root);
     assert.equal(items.find((item)=>item.id==='web-page').available,true);
     assert.equal(items.find((item)=>item.id==='repository').selectedPlugin,'repository-inspector');
-    assert.equal(items.find((item)=>item.id==='web-search').available,false);
-    assert.equal(items.find((item)=>item.id==='news-search').available,false);
+    assert.equal(items.find((item)=>item.id==='web-search').selectedPlugin,'tavily-search');
+    assert.equal(items.find((item)=>item.id==='news-search').selectedPlugin,'tavily-search');
+    assert.equal(items.find((item)=>item.id==='document').available,false);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

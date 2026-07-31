@@ -231,6 +231,11 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 要点按行解析，【体验】/【素材】/【建议】前缀标注来源等级；素材链接创建时抓取；轨道 output_mode 写入 wechat-custom-cards 或 xiaohongshu-custom-cards
 → 图文编辑室（创建自定义图文）
 
+### POST /api/batches/:id/repository-candidates
+手动添加仓库图文候选 { url: GitHub 仓库地址, channel: wechat|xiaohongshu }
+URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工热点建立 social_cards 候选，轨道 output_mode 写入 wechat-tool-cards 或 xiaohongshu-tool-cards；后续仓库核验、故事板与生成走工具图文既有流程
+→ 图文编辑室（添加仓库图文）
+
 ### GET /api/creation-entry-points/:entryPoint/social-card-stage-skills
 查询图文故事板技能槽位。`entryPoint` 为 `social-tool`、`social-event` 或 `social-custom`；
 `contentType` 查询参数分别使用 `repository`、`event` 或 `tutorial|list|opinion`。
