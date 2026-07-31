@@ -1,5 +1,7 @@
 # 后续工作事项
 
+> 状态速览（2026-07-31）：已知问题 3 项全部闭环；开源前置工作全部完成，仓库待翻 Public。剩余待办：项目日志完善（`project-development-record.md` 仍笼统）、技能插件扩展点两项（规划池，未启动）。
+
 ## 已知问题
 
 1. ~~智能构图问题~~（已修复 2026-07-31）：P-03 页面 text-block 中长 URL 未折行，溢出所在列被相邻列 list-block 遮盖。根因是生成 CSS 中 `.content-block p/h2` 缺少 `overflow-wrap:anywhere` 且网格项缺 `min-width:0`（`lib/llm/social-card-pipeline.mjs`）；grid-column 分配本身无误。同时给 `skills/xiaohongshu-article-generator/scripts/layout-audit.mjs` 增加 `horizontal_overflow` 横向溢出检测，堵住审计盲区。
@@ -9,6 +11,8 @@
 ## 开源前置工作
 
 见：[open-source-readiness.md](open-source-readiness.md)
+
+**已全部闭环（2026-07-31）**：P0（密钥与隐私清理）✅、P1（许可证、安全文档、数据流向）✅、P2 已评审（Dependabot 配置与 Windows-only 显著标注完成，遥测明确不做，其余 4 条标注暂缓理由）。CI 已上线并在 master 全绿，README 已完成美化（徽章、快读段、功能总览表格、目录，`6e8da05`），测试 446 全过。仓库当前为私有，待手动翻 Public。
 
 ## 项目日志更新
 
