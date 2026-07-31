@@ -64,8 +64,8 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     'repository/xiaohongshu':'0c748cb81c0779d93d865a6c80388df95899c5064a0e3f89f497a4a80e4973b5',
     'event/wechat':'4f10b9aa901f480fdf40a7e5ad780299ac9511b7646e3252683dd060465b704f',
     'event/xiaohongshu':'73ce4a8d8573f269e6a9b142b379c168e4162a34fccc963936ef17799a3e1384',
-    'custom/wechat':'3b2db6e540d737bbcde65e94eecd3e6b43b1f33ff46f8c1a2ce3c0568dfabb11',
-    'custom/xiaohongshu':'0000dfa6b4154dd5642054eccb5721e3a3286923b7caf61fc2a65597df22b705',
+    'custom/wechat':'49e7ab119e60cbc6294d12b6cf5386e1090be89befeeabfcb9ca578172859baf',
+    'custom/xiaohongshu':'755b79810bdc52a35415ebb019fbd7b2660a1adbe7ab7a4ad01fecb15adcbf82',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');

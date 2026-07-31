@@ -228,6 +228,7 @@
         <label data-mode-field="tutorial">实际步骤（每行一步，至少 2 步）<textarea name="steps" rows="6"></textarea></label>
         <div class="tutorial-grid"><label data-mode-field="tutorial">前置条件<textarea name="prerequisites" rows="4"></textarea></label><label data-mode-field="tutorial">预期结果<textarea name="expected_results" rows="4"></textarea></label><label data-mode-field="tutorial">常见错误与处理<textarea name="common_errors" rows="4"></textarea></label><label>限制与未验证项<textarea name="limitations" rows="4"></textarea></label></div>
         <label>资料链接（每行一个；抓取失败会阻止成稿）<textarea name="materialUrls" rows="3"></textarea></label>
+        <div class="gate-strip"><label><input type="checkbox" name="enableWebSearch" value="true"> 联网搜索补充资料（调用第三方搜索 API，产生费用，查询词会发送给服务商）</label><label><input type="checkbox" name="enableNewsSearch" value="true"> 新闻时效检索（带发布时间与来源的新闻结果）</label></div>
           </div>
         </details>
         <div class="tutorial-actions">
@@ -302,6 +303,7 @@
         <label class="custom-social-block" data-custom-only="list">清单条目（每行一条，至少 3 条）<textarea id="custom-items" rows="3"></textarea></label>
         <label class="custom-social-block">素材链接（每行一个 URL，创建时抓取，全部成功才能通过门禁）<textarea id="custom-materials" rows="2" placeholder="https://…"></textarea></label>
         <label class="custom-social-block">限制说明<textarea id="custom-limitations" rows="2" placeholder="可选：适用范围、未验证内容等"></textarea></label>
+        <div class="custom-social-block gate-strip"><label><input type="checkbox" id="custom-enable-web-search"> 联网搜索补充资料（调用第三方搜索 API，产生费用，查询词会发送给服务商）</label><label><input type="checkbox" id="custom-enable-news-search"> 新闻时效检索（带发布时间与来源的新闻结果）</label></div>
           </div>
         </details>
         <div class="editorial-actions"><button type="button" class="primary-button" id="custom-social-submit">创建并进入图文编辑室</button><button type="button" class="text-button" id="custom-social-cancel">取消</button></div>

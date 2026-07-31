@@ -31,6 +31,7 @@ import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
 import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
 import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from './lib/integrations/local-project-reader.mjs';
 import { resolveSkillToolPolicy } from './lib/skills/pipeline-runtime.mjs';
+import { attachInformationSearch, wantsInformationSearch } from './lib/integrations/information-search.mjs';
 import { resolveArticleStageSkills, resolveEntryWriterSkill } from './lib/skills/entry-routing.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
@@ -727,6 +728,10 @@ async function api(request, response, url) {
     const outputMode = String(input.channel || '').trim() === 'xiaohongshu' ? 'xiaohongshu-custom-cards' : 'wechat-custom-cards';
     try {
       const fact = await buildCustomFactSheet({ input, root });
+      if (wantsInformationSearch(input)) {
+        const toolPolicy = await resolveSkillToolPolicy({ workspaceRoot: root, skillId: 'custom-card-storyboard' });
+        await attachInformationSearch({ fact, input, root, toolContext: { store, batchId, skillId: 'custom-card-storyboard', allowedCapabilities: toolPolicy.allowedCapabilities } });
+      }
       const materialUrls = (fact.materials || []).map((item) => item.url);
       const hotspot = store.addManualHotspot(batch.id, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自定义图文（${fact.content_type_label}）`, researchEligible:false });
       if (!hotspot) throw new Error('手工热点创建失败');
@@ -842,6 +847,10 @@ async function api(request, response, url) {
       if(articleMode==='experience'&&!fact.thesis)throw new Error('心得经验文章需要明确核心观点');
       if(articleMode==='experience'&&!fact.points.some((item)=>item.source_level==='author_experience'))throw new Error('心得经验文章至少需要一条【体验】要点');
       if(fact.materials.some((item)=>item.status!=='ok'))throw new Error(`素材抓取失败：${fact.materials.filter((item)=>item.status!=='ok').map((item)=>item.url).join('、')}`);
+      if(wantsInformationSearch(input)){
+        const toolPolicy=await resolveSkillToolPolicy({workspaceRoot:root,skillId:skillSelection.selectedSkill});
+        await attachInformationSearch({fact,input,root,toolContext:{store,batchId,skillId:skillSelection.selectedSkill,allowedCapabilities:toolPolicy.allowedCapabilities}});
+      }
       creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})||creation;
       if(creation?.candidate_row_id){
         const candidate=store.getCandidate(creation.candidate_row_id);
