@@ -107,8 +107,21 @@ try {
         );
       }
       clippedPixels = Math.max(0, clippedPixels);
+      // 列间遮盖：未折行文本（如长 URL）会把自身盒撑出所在列，压住相邻列内容；
+      // clipped 只对照页面边界，捕捉不到这种列内溢出；这里量元素相对父盒的横向超出
+      let horizontalOverflowPixels = 0;
+      for (const element of descendants) {
+        if (!element.textContent?.trim()) continue;
+        if (getComputedStyle(element).overflowX !== 'visible') continue;
+        const parent = element.parentElement;
+        if (!parent || parent === body) continue;
+        const rect = element.getBoundingClientRect();
+        const parentRect = parent.getBoundingClientRect();
+        horizontalOverflowPixels = Math.max(horizontalOverflowPixels, rect.right - parentRect.right, parentRect.left - rect.left);
+      }
       if (scrollOverflow > 1) issues.push('overflow');
       if (clippedPixels > 1) issues.push('clipped');
+      if (horizontalOverflowPixels > 2) issues.push('horizontal_overflow');
       if (utilization < limits.min && direct.length) issues.push('underfilled');
       if (utilization > limits.max && scrollOverflow <= 1 && clippedPixels <= 1) issues.push('overfilled');
       const stackStyle = stack && visible(stack) ? getComputedStyle(stack) : null;
@@ -154,6 +167,7 @@ try {
         verticalBalanceDelta: round(Math.abs(topWhitespace - bottomWhitespace)),
         overflowPixels: round(scrollOverflow),
         clippedPixels: round(clippedPixels),
+        horizontalOverflowPixels: round(horizontalOverflowPixels),
         issues: [...new Set(issues)],
       };
     });

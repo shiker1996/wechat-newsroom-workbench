@@ -60,12 +60,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'fba0b7e0498f4a49402ab7a86eed1540b87b2342922e37c264235b91c3d5fca6',
-    'repository/xiaohongshu':'b7aef229dc12d8c62c1beca7502fed086bad09550461c10051116be1b3b5283b',
-    'event/wechat':'c64984bdbc0b49167f105db26df0135c17ee2426c39f8e8825a4ab91efdee24d',
-    'event/xiaohongshu':'5c8910d5d25e5df5c13531524cef321f9a6f99d375ca804aa2a511c2596843df',
-    'custom/wechat':'5b60b9d13ee37bc38950e9fd2809cb792ac43739538081926fd5ed4918159182',
-    'custom/xiaohongshu':'33eabe317c573271d45cf15a6941a9b45bc8c99234903f249bc346afa4c97a65',
+    'repository/wechat':'d8e8a0132b5f0307bfc123056adac1a2627341fbe313733e16b15467905f39be',
+    'repository/xiaohongshu':'0c748cb81c0779d93d865a6c80388df95899c5064a0e3f89f497a4a80e4973b5',
+    'event/wechat':'4f10b9aa901f480fdf40a7e5ad780299ac9511b7646e3252683dd060465b704f',
+    'event/xiaohongshu':'73ce4a8d8573f269e6a9b142b379c168e4162a34fccc963936ef17799a3e1384',
+    'custom/wechat':'3b2db6e540d737bbcde65e94eecd3e6b43b1f33ff46f8c1a2ce3c0568dfabb11',
+    'custom/xiaohongshu':'0000dfa6b4154dd5642054eccb5721e3a3286923b7caf61fc2a65597df22b705',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
@@ -75,7 +75,8 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
       workspaceRoot:root,skillId:skillIds[contentType],
       skillPrompt:bundle.prompt,contentType,channelMode,
     });
-    assert.equal(sha256(prompt),expected,key);
+    // 提示词快照对换行符不敏感：Windows 工作树 CRLF 与仓库 LF 语义相同
+    assert.equal(sha256(prompt.replace(/\r\n/g,'\n')),expected,key);
   }
 });
 

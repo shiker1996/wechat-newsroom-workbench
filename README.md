@@ -22,9 +22,29 @@
 
 接口清单见 [API.md](./API.md)。计划将仓库公开前需要完成的治理、安全和发布工作见 [docs/open-source-readiness.md](./docs/open-source-readiness.md)。
 
+## 安全边界（务必先读）
+
+- **本项目仅供本机可信用户使用，不支持公网或局域网部署。** HTTP 服务的监听地址在代码中固定为 `127.0.0.1`（`server.mjs`），没有任何配置项可以改为 `0.0.0.0` 或其它主机；请勿自行修改绑定地址后暴露到网络。
+- 服务**没有登录、会话、CSRF 防护或多用户权限隔离**。任何能访问本机回环地址的进程都能调用全部 API，包括读取本地文件、执行 AI 任务和触发外部写入。
+- `x-admin-confirm`、`x-restore-confirm` 请求头只是**本机防误操作确认**（防止误点恢复备份、安装插件等破坏性按钮），**不是鉴权手段**，不防御任何主动攻击者。
+- 安全问题的报告渠道、支持版本和响应预期见 [SECURITY.md](./SECURITY.md)；各第三方服务的数据流向（发送什么、何时发送、如何删除）见 [docs/data-flow.md](./docs/data-flow.md)。
+
 ## 启动
 
 要求 Windows、Node.js 24 或更高版本。当前 Reddit 专用浏览器、RSSHub 生命周期和快捷启动脚本使用 PowerShell；核心 Node.js 服务只监听 `127.0.0.1`，没有面向公网部署所需的登录与多用户权限系统。
+
+### 支持矩阵
+
+| 组件 | 必要性 | 说明 |
+|---|---|---|
+| Windows 10/11 + PowerShell | 必需 | 启动、停止、Reddit 浏览器和 RSSHub 管理脚本均为 PowerShell；其它系统需自行替换脚本 |
+| Node.js ≥ 24 | 必需 | 数据库使用 Node 内置的 `node:sqlite`（无需编译原生模块）；低于 24 无法启动 |
+| LLM 服务商（DeepSeek / MiniMax / Kimi 任一） | 必需 | 至少配置一个 API Key 才能跑通成稿链；全部缺失时界面可打开但 AI 功能降级报错 |
+| Python 3 | 可选 | 热点原文本地抓取回退；自动发现 `py`/`python`/Codex 内置 Python，找不到可用 `WRITE_ASSISTANT_PYTHON` 指定 |
+| Chrome / Chromium | 可选 | Reddit 采集走 CDP 专用浏览器；技能级渲染（图文转图、排版截图）由技能目录内的 Puppeteer 自带 Chromium |
+| RSSHub 本地实例 | 可选 | 默认从 `RSSHub/` 目录启动；也可用 `directFeeds` 直连订阅或只采集 Reddit |
+| 网络服务商（Firecrawl / Tavily / GitHub / 又拍云） | 可选 | 原文抓取升级、搜索补证、项目发现、CDN 上传，未配置时对应功能降级或关闭 |
+| 磁盘空间 | — | 首次安装约需 1–2 GB（npm 依赖 + 技能级 Puppeteer Chromium），运行数据另计 |
 
 Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。
 
@@ -37,6 +57,8 @@ npm start
 ```powershell
 npm ci
 ```
+
+`npm ci`/`npm install` 会通过 `postinstall` 级联安装技能目录内的独立依赖（`skills/*/package.json`，如 ECharts 与 Puppeteer）。离线或下载失败只影响对应渲染功能，可稍后在技能目录内单独执行 `npm install` 补齐。
 
 开发时可使用 `npm run dev` 监听服务端和 `lib` 目录变更。提交前至少执行：
 
@@ -230,6 +252,10 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 
 工作台不会在重新索引时改写或删除历史文章。备份包含数据库、运行配置状态、技能包与插件目录等受支持数据；恢复是显式破坏性操作，必须先校验备份并提交确认头，服务端会先保存恢复前快照。
 
+数据库使用 Node.js 24 内置的 `node:sqlite` 驱动（WAL 模式，启动命令已带 `--disable-warning=ExperimentalWarning` 抑制实验性提示），不依赖任何原生编译模块。运行期生成的目录：`data/`（数据库、来源与 GitHub 缓存、工具执行审计、技能包版本档案）、`articles/`、`topics/`、`social-cards/`（流水线产物）、`logs/`（运行日志），这些目录都被 `.gitignore` 排除，不会进入仓库。
+
+备份包内含数据库快照、运行配置状态、技能包与插件目录，清单逐文件记录大小与 SHA-256（`schemaVersion: 1`）。彻底删除数据：先停止服务，再删除上述目录和根目录 `.env` 即可；LLM 与插件凭据不写入数据库。升级兼容：启动时自动执行幂等建表迁移，旧版本直接启动即可；跨大版本恢复备份时强制校验清单版本与文件哈希，恢复前自动保存快照，失败可回滚。
+
 ## 当前边界
 
 当前生产链已经把两个技能的关键契约内置进工作台，并对确定性排版步骤直接调用技能脚本：
@@ -251,3 +277,9 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 来源图和资料图已经接入配图工作台。Mermaid 与声明式 ECharts 围栏可在排版链中转成 PNG；转换失败会保留原围栏并阻止正式交付，转换成功后仍需取得 HTTPS 图片地址。可执行脚本式 ECharts 配置会被拒绝。后台任务在服务重启后仍保留数据库审计记录，但内存中的逐行实时日志不会恢复。
 
 当前版本定位为单机、本地可信用户工具：只监听回环地址，没有账号、租户隔离、CSRF 防护或公网 API 鉴权。不要直接把端口暴露到局域网或互联网。正式开源与公开发布前的缺口见 [docs/open-source-readiness.md](./docs/open-source-readiness.md)。
+
+## 许可证与商标
+
+本项目代码以 [MIT 许可证](./LICENSE) 开源，第三方材料的来源与许可证见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+「见字」是本项目的名称，其文字标识与界面中的「见」字印章样式仅用于标识本项目的官方版本。代码可按 MIT 自由使用、修改和再分发，但修改版或衍生产品在公开分发时不得使用「见字」名称或印章样式暗示与本项目存在官方关联或背书。

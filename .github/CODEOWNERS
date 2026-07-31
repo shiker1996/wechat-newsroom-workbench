@@ -1,0 +1,11 @@
+# 默认由项目维护者审阅全部变更
+* @shiker1996
+
+# 安全核心必须维护者逐行审阅
+/lib/tools/remote-adapter.mjs @shiker1996
+/lib/tools/remote-credentials.mjs @shiker1996
+/lib/artifacts/backup-archive.mjs @shiker1996
+/lib/http/routes/system-routes.mjs @shiker1996
+/collectors/rsshub.mjs @shiker1996
+/plugins/url-fetch/ @shiker1996
+/scripts/cold-start-acceptance.sh @shiker1996

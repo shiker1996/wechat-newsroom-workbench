@@ -1,2 +1,34 @@
 ## 当前运行阶段：README 到工具图文故事板
-只依据已核验仓库事实和 README 生成图文决策，不得虚构体验、效果、性能、价格、权限或数字。故事板必须让读者明确回答：它是什么、解决什么具体问题、核心功能如何工作、怎样开始、适合谁、有什么限制。禁止用 GitHub topics 代替功能解释。返回严格 JSON：{"target_reader":"","pain_point":"","tool_positioning":"","must_highlight":"","must_disclose":"","getting_started":"","forbidden_claims":"","recommended_pages":4到7,"card_plan":[{"kind":"cover|problem|capability|quickstart|scenario|limitation|ending","title":"具体、有信息量的页标题","goal":"用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'复制命令即可安装该组件，无需额外配置。'、'相比手动实现，这个库把底层样板代码封装成一条链式 API。'","evidence":["直接支持内容的 README 或仓库事实"],"content_blocks":[{"type":"{{REPOSITORY_BLOCK_TYPES}}","title":"可选小标题","content":"文字，或 list 类型使用换行分隔；单块不超过 160 字，禁止出现'让读者...'、'本页旨在...'等指令描述"}]}]}。每页 2–4 个内容块，能力页必须写出 README 中的具体能力和工作方式，快速上手页保留真实命令，限制页明确未核验项。must_disclose 必须说明“基于项目文档整理，未实际运行”以及未知权限、网络和成熟度。
+
+只依据已核验仓库事实和 README 生成图文决策，不得虚构体验、效果、性能、价格、权限或数字。故事板必须让读者明确回答：它是什么、解决什么具体问题、核心功能如何工作、怎样开始、适合谁、有什么限制。禁止用 GitHub topics 代替功能解释。
+
+返回严格 JSON：
+
+```json
+{
+  "target_reader": "",
+  "pain_point": "",
+  "tool_positioning": "",
+  "must_highlight": "",
+  "must_disclose": "",
+  "getting_started": "",
+  "forbidden_claims": "",
+  "recommended_pages": 4到7,
+  "card_plan": [
+    {
+      "kind": "cover|problem|capability|quickstart|scenario|limitation|ending",
+      "title": "具体、有信息量的页标题",
+      "goal": "用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'读者理解...'、'读者了解...'、'本页旨在...'；正确示例：'复制命令即可安装该组件，无需额外配置。'、'相比手动实现，这个库把底层样板代码封装成一条链式 API。'",
+      "evidence": ["直接支持内容的 README 或仓库事实"],
+      "content_blocks": [
+        {"type": "{{REPOSITORY_BLOCK_TYPES}}", "title": "可选小标题", "content": "文字，或 list 类型使用换行分隔；单块不超过 160 字，禁止出现'让读者...'、'本页旨在...'等指令描述"}
+      ]
+    }
+  ]
+}
+```
+
+补充要求：
+
+- 每页 2–4 个内容块，能力页必须写出 README 中的具体能力和工作方式，快速上手页保留真实命令，限制页明确未核验项。
+- must_disclose 必须说明“基于项目文档整理，未实际运行”以及未知权限、网络和成熟度。

@@ -169,6 +169,10 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 ### DELETE /api/candidates/:id/tracks/:track
 只移除候选的指定轨道（`article` 或 `social_cards`）；候选没有其它轨道时一并删除候选。
 
+### POST /api/candidates/:id/tracks
+护栏路由：文章池与图文池使用独立评分，不支持候选跨池添加，统一返回 `409`。
+→ 选题池
+
 ### DELETE /api/candidates/:id
 移除候选
 → 选题池
@@ -524,6 +528,11 @@ AI 规划配图占位
 
 ### GET /api/system/skill-install-events
 读取技能安装、更新、启停和卸载事件。
+
+### POST /api/system/skills/:id/versions
+### POST /api/system/skills/:id/versions/:version/restore
+### POST /api/system/skills/:id/dry-run
+内置技能只读护栏：第三方技能包已改用独立的安装/更新/卸载路由，以上历史管理端点统一返回 `403`，内置技能请通过代码仓库修改 `SKILL.md`。
 
 ### PATCH /api/system/tool-plugins/:id
 更新插件启用状态或实现优先级 `{ enabled?, priority?, confirmDisable? }`。仍被活动技能使用时，停用需要显式确认。

@@ -169,7 +169,11 @@ function selectCapabilityTab(tab) {
 async function submitSkillDirectory(install) {
   const directory = document.getElementById("skill-package-directory").value.trim();
   if (!directory) throw new Error("请输入技能包目录");
-  const result = await request(`/api/system/skill-packages/${install ? "install" : "validate"}`, { method: "POST", body: JSON.stringify({ directory }) });
+  if (install && !await confirmAction("仅管理员可以安装技能包。确认该技能包已完成代码审查？", { confirmText: "受信安装" })) return;
+  const result = await request(`/api/system/skill-packages/${install ? "install" : "validate"}`, {
+    method: "POST", headers: install ? { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" } : {},
+    body: JSON.stringify({ directory }),
+  });
   toast(install ? `已安装 ${result.name || result.id}` : `校验通过：${result.manifest?.name || result.manifest?.id}`);
   if (install) await loadSkillRegistry();
 }
@@ -227,7 +231,8 @@ async function saveRemoteCredential() {
 
 async function submitSkillZip(file, input) {
   if (!file) return;
-  const response = await fetch("/api/system/skill-packages/install", { method: "POST", headers: { "content-type": "application/zip" }, body: file });
+  if (!await confirmAction("仅管理员可以安装技能包。确认该技能包已完成代码审查？", { confirmText: "受信安装" })) { input.value = ""; return; }
+  const response = await fetch("/api/system/skill-packages/install", { method: "POST", headers: { "content-type": "application/zip", "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: file });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "安装失败");
   toast(`已安装 ${result.name || result.id}`);
@@ -240,9 +245,9 @@ async function manageSkillPackage(button) {
   const action = button.dataset.skillPackageAction;
   if (action === "uninstall") {
     if (!await confirmAction(`卸载 ${id}？历史版本和审计记录会保留。`, { confirmText: "卸载" })) return;
-    await request(`/api/system/skills/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await request(`/api/system/skills/${encodeURIComponent(id)}`, { method: "DELETE", headers: { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" } });
   } else {
-    await request(`/api/system/skills/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status: action }) });
+    await request(`/api/system/skills/${encodeURIComponent(id)}/status`, { method: "PATCH", headers: { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: JSON.stringify({ status: action }) });
   }
   toast(action === "enabled" ? "技能已启用" : action === "disabled" ? "技能已停用" : "技能已卸载");
   selectedSkillId = "";

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 缓存 Puppeteer Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json', 'skills/**/package.json') }}
+          restore-keys: puppeteer-${{ runner.os }}-
+
+      - name: 安装依赖（含技能级联）
+        run: npm ci
+
+      - name: 构建校验
+        run: npm run build
+
+      - name: 全量测试
+        run: npm test
+        # 覆盖浏览器渲染层（布局审计、ECharts、浏览器内联化），Chromium 来自 postinstall 下载，
+        # 不依赖真实 API Key、用户 Chrome Profile、RSSHub 常驻进程或外部 CDN 写入。
+
+      - name: 校验示例技能包与工具插件
+        run: |
+          node scripts/validate-skill-package.mjs docs/examples/skill-package
+          node scripts/validate-tool-plugin.mjs docs/examples/tool-plugin
+
+      - name: 依赖漏洞扫描
+        run: npm audit --audit-level=high --omit=dev
+
+      - name: 许可证扫描
+        run: node scripts/license-scan.mjs
+
+      - name: 秘密扫描
+        run: node scripts/secret-scan.mjs

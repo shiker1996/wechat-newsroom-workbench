@@ -15,7 +15,7 @@
     "stopScript": "scripts/rsshub-stop.ps1",
     "pidFile": "data/rsshub.pid",
     "startupTimeoutMs": 180000,
-    "keepAlive": false,
+    "keepAlive": true,
     "maxAgeHours": 168,
     "allowUndated": true,
     "concurrency": 5,
@@ -30,8 +30,18 @@
       "/jiemian/lists/65?limit=30",
       "/anthropic/engineering?limit=30",
       "/anthropic/news?limit=30",
-      "/36kr/hot-list?limit=30"
+      "/36kr/hot-list?limit=30",
+      "/github/trending/daily/any?limit=30",
+      "/github/trending/weekly/any?limit=30",
+      "/github/trending/monthly/any?limit=30"
     ]
+  },
+  "githubDiscovery": {
+    "enabled": true,
+    "createdWithinDays": 30,
+    "minStars": 1000,
+    "limit": 30,
+    "cacheTtlMs": 1800000
   },
   "llm": {
     "defaultProvider": "deepseek",
@@ -47,6 +57,8 @@
         "contextWindow": 1000000,
         "maxOutputTokens": 8192,
         "maxTokensField": "max_tokens",
+        "taggingChunkSize": 8,
+        "taggingConcurrency": 6,
         "supportsJsonMode": true,
         "enabled": true
       },
@@ -58,8 +70,11 @@
         "contextWindow": 204800,
         "maxOutputTokens": 2048,
         "maxTokensField": "max_completion_tokens",
+        "taggingChunkSize": 2,
+        "taggingConcurrency": 4,
         "supportsJsonMode": true,
-        "enabled": true
+        "enabled": true,
+        "webSearchConfig": { "payloadKey": "enable_web_search", "payloadValue": true }
       },
       "kimi": {
         "label": "Kimi",
@@ -69,9 +84,19 @@
         "contextWindow": 262144,
         "maxOutputTokens": 8192,
         "maxTokensField": "max_tokens",
+        "taggingChunkSize": 8,
+        "taggingConcurrency": 6,
         "supportsJsonMode": true,
-        "enabled": true
+        "enabled": true,
+        "webSearchConfig": { "payloadKey": "enable_search", "payloadValue": true }
       }
     }
+  },
+  "tavily": { "enabled": false, "apiKeyEnv": "TAVILY_API_KEY", "maxResults": 5 },
+  "sourceFetch": {
+    "upgradeThreshold": 55,
+    "rssContentMinChars": 800,
+    "rssFallbackMinChars": 200,
+    "githubMinChars": 200
   }
 }

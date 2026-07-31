@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { skipBrowser } from './helpers/tiers.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput, defaultTypesetTheme } from '../lib/llm/typeset-pipeline.mjs';
@@ -254,6 +255,7 @@ test('theme auto 时按候选映射主题：八卦候选走 gossip-card', { time
 });
 
 test('draftMode llm 保留模型初稿路径并走浏览器内联化', async (t) => {
+  if (skipBrowser(t)) return;
   const { root, artifacts, modelRequests, store, gateway } = createTypesetFixture(t);
   const result = await runTypesetPipeline({ gateway, store, batchId:'batch-1', candidateId:1, provider:'fake', workspaceRoot:root, skillsWorkspaceRoot:process.cwd(), draftMode:'llm' });
   const html = fs.readFileSync(result.finalHtml, 'utf8');

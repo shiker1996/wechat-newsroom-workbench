@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
 import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
+import { skipBrowser } from './helpers/tiers.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -134,7 +135,8 @@ test('杂志分栏按内容块顺序排布 div 与 aside',()=>{
   assert.doesNotMatch(html,/content-block:nth-of-type/);
 });
 
-test('11 项紧凑清单通过真实浏览器布局审计',async()=>{
+test('11 项紧凑清单通过真实浏览器布局审计',async(t)=>{
+  if (skipBrowser(t)) return;
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-dense-list-'));
   try{
     const htmlPath=path.join(dir,'design.html');
@@ -178,7 +180,8 @@ test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
   assert.match(storyboardPrompt,/num 不超过 6 个字符/);
 });
 
-test('确定性故事板 HTML 通过真实浏览器布局审计', async () => {
+test('确定性故事板 HTML 通过真实浏览器布局审计', async (t) => {
+  if (skipBrowser(t)) return;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'social-card-layout-'));
   const htmlPath = path.join(dir, 'design.html');
   const reportPath = path.join(dir, 'report.json');
@@ -413,7 +416,8 @@ test('智能构图不再叠加旧模板骨架，语义版式仅保留为数据�
   assert.match(html,/page-ending\.overlap-title-card h1\{background:var\(--surface\);color:var\(--ink\)\}/);
 });
 
-test('智能构图多角色与受控装饰通过真实浏览器布局审计',async()=>{
+test('智能构图多角色与受控装饰通过真实浏览器布局审计',async(t)=>{
+  if (skipBrowser(t)) return;
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'smart-composition-audit-'));
   try{
     const pages=[
@@ -438,7 +442,8 @@ test('智能构图多角色与受控装饰通过真实浏览器布局审计',asy
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('布局审计以真实内容边界测量，稀疏内容页标记 underfilled',async()=>{
+test('布局审计以真实内容边界测量，稀疏内容页标记 underfilled',async(t)=>{
+  if (skipBrowser(t)) return;
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sparse-page-audit-'));
   try{
     const htmlPath=path.join(dir,'sparse.html'),reportPath=path.join(dir,'report.json');

@@ -29,6 +29,9 @@ _*.log
 Thumbs.db
 .DS_Store
 
+# IDE
+.idea/
+
 # Python
 __pycache__/
 *.pyc

@@ -127,6 +127,24 @@ test('历史重试复用快照中的 Prompt、模型和工具版本', async () =
   assert.equal(snapshots[0].snapshot.reusedFromSnapshotId,9);
 });
 
+test('历史快照中的空白名单视为未配置，不阻断重试', async () => {
+  const snapshots=[];const original={
+    id:11,batch_id:'batch-1',candidate_row_id:2,snapshot:{
+      schemaVersion:1,purpose:'social-cards-repository',modelProvider:'default',model:'model-default',
+      skills:[{id:'xiaohongshu-article-generator',version:'builtin',config:null,promptHash:'sha256:p',prompt:'生成 Prompt',files:[],fallback:false}],
+      tools:[{capability:'content.url.fetch',plugin:'url-fetch',version:'1.0.0'}],
+      skillConfig:{defaultModel:'',allowedTools:[],gates:null,version:null,configHash:''},
+    },
+  };
+  const store={getGenerationSnapshot:()=>original,saveGenerationSnapshot:(item)=>{snapshots.push(item);return{id:12};}};
+  const gateway={config:{defaultProvider:'default',providers:{default:{model:'model-default'}}}};
+  const bundle={skillName:'xiaohongshu-article-generator',prompt:'当前 Prompt',hash:'current',files:[],fallback:false,config:null};
+  const runtime=await prepareSkillRun({gateway,store,batchId:'batch-1',candidateId:2,purpose:'social-cards-repository',bundles:[bundle],snapshotId:11});
+  assert.equal(runtime.allowedCapabilities,null);
+  assert.deepEqual(runtime.tools.map((item)=>item.capability),['content.url.fetch']);
+  assert.equal(snapshots[0].snapshot.skillConfig.allowedTools,null);
+});
+
 test('模型调用通过绑定网关精确携带 generation snapshot', async () => {
   const {bindGenerationSnapshot}=await import('../lib/skills/pipeline-runtime.mjs');
   const calls=[];

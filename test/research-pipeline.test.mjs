@@ -76,14 +76,15 @@ test('成稿线前置：F 低于 55 的候选不进入选题池', () => {
 });
 
 test('账号契合：命中内容支柱类目的维度组获得加分', () => {
-  const focused=focusedCategories();
+  const accountContext={contentPillars:['AI 行业热点：技术动态与战略观察']};
+  const focused=focusedCategories(accountContext);
   assert.ok(focused.has('🤖 AI/技术动态') || focused.has('🏢 大厂战略'));
   const clusters=clusterItems([
     hotspot(1,'AI 事件','openai|发布模型'),
     hotspot(2,'AI 事件二','anthropic|发布模型'),
   ]);
   const ranking=preselection(clusters);
-  const pool=selectDimensionPool(clusters, ranking);
+  const pool=selectDimensionPool(clusters, ranking, { accountContext });
   const group=pool.groups.find((item)=>item.dimension==='who'&&item.key==='openai');
   assert.equal(group.accountFit,6);
 });

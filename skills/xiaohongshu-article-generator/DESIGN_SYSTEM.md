@@ -3,6 +3,8 @@
 **版本：** v3.0.0
 **描述：** 6 套设计哲学，每套包含配色、CSS 类名、布局规范
 
+> 署名说明：`tokyo-night` 主题的命名与部分色值参考自 [enkia/tokyo-night](https://github.com/enkia/tokyo-night)（MIT），`solarized` 主题的命名与部分色值参考自 [altercation/solarized](https://github.com/altercation/solarized)（MIT）。其余主题为原创。
+
 ---
 
 ## 快速索引

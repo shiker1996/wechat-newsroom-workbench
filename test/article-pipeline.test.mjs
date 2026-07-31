@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { articleLengthStatus, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
 import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
@@ -117,7 +118,7 @@ test('阶段子技能从项目 skills 目录加载', () => {
   for (const skillName of ['title-generator','humanizer-zh','article-reviewer','seo-keyword-scoring','seo-content-optimizer','article-image-placeholders','wechat-mp-composite']) {
     const bundle = loadSkillBundle({ workspaceRoot: process.cwd(), skillName });
     assert.equal(bundle.fallback, false, skillName);
-    assert.match(bundle.files[0], /write-assistant[\\/]skills[\\/]/);
+    assert.ok(bundle.files[0].startsWith(path.join(process.cwd(),'skills',skillName)), skillName+' 应从项目 skills 目录加载：'+bundle.files[0]);
     assert.match(bundle.hash, /^[a-f0-9]{64}$/);
   }
 });

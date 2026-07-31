@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { skipBrowser } from './helpers/tiers.mjs';
 
 const execFileAsync = promisify(execFile);
 const MERMAID_SCRIPT = path.resolve('skills/mermaid-render/scripts/render-mermaid.mjs');
@@ -52,6 +53,7 @@ test('mermaid 语法错误时保留原围栏并报告失败', { timeout: 120000 
 });
 
 test('echarts 围栏渲染为 PNG 并替换为图片引用', { timeout: 120000 }, async (t) => {
+  if (skipBrowser(t)) return;
   const dir = tempDir(t);
   const input = path.join(dir, 'in.md');
   const output = path.join(dir, 'out.md');
@@ -69,6 +71,7 @@ test('echarts 围栏渲染为 PNG 并替换为图片引用', { timeout: 120000 }
 });
 
 test('echarts 非 JSON 配置被拒绝并保留围栏', { timeout: 120000 }, async (t) => {
+  if (skipBrowser(t)) return;
   const dir = tempDir(t);
   const input = path.join(dir, 'in.md');
   const output = path.join(dir, 'out.md');

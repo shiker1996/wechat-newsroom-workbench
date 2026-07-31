@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { discoverGitHubRepositories } from './github-discovery.mjs';
+import { privateIp } from '../lib/tools/remote-adapter.mjs';
 
 function decodeXml(value = '') {
   return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -62,18 +63,6 @@ async function probe(url, timeoutMs = 5000) {
   }
 }
 
-function isPrivateAddress(address) {
-  if (net.isIPv4(address)) {
-    const [a, b] = address.split('.').map(Number);
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254)
-      || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-  }
-  const normalized = address.toLowerCase();
-  return normalized === '::1' || normalized === '::' || normalized.startsWith('fc')
-    || normalized.startsWith('fd') || normalized.startsWith('fe8') || normalized.startsWith('fe9')
-    || normalized.startsWith('fea') || normalized.startsWith('feb');
-}
-
 async function assertPublicFeedUrl(value) {
   let url;
   try { url = new URL(value); } catch { throw new Error('请输入完整的 RSS/Atom URL'); }
@@ -83,7 +72,7 @@ async function assertPublicFeedUrl(value) {
   const addresses = net.isIP(url.hostname)
     ? [{ address: url.hostname }]
     : await dns.lookup(url.hostname, { all: true });
-  if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new Error('订阅地址解析到了本机或内网');
+  if (!addresses.length || addresses.some(({ address }) => privateIp(address))) throw new Error('订阅地址解析到了本机或内网');
   return url;
 }
 
