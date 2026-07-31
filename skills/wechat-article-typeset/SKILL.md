@@ -41,7 +41,7 @@ description: 将项目成稿 09-FINAL.md 编排为适合微信公众号编辑器
 2. 有 ECharts 围栏时执行 `wechat-echarts-blocks-to-images/scripts/render-echarts.mjs`，渲染为本地 PNG 并替换围栏
 3. 处理已提供的文章图片和结构化配图清单
 
-允许最终 HTML 引用项目可解析的本地图片路径。图表围栏渲染失败、遇到未提供的手动配图，或遇到没有可视化执行器的内联视觉模块（stats-grid、timeline）时，明确阻断，不得删除、伪造或跳过内容。
+允许最终 HTML 引用项目可解析的本地图片路径。图表围栏渲染失败或遇到未提供的手动配图时，明确阻断，不得删除、伪造或跳过内容。
 
 ### 4. `draft`
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "公众号内联模块转图片"
-  short_description: "将统计卡片和时间线等显式模块截图为 PNG"
-  default_prompt: "使用 $wechat-inline-modules-to-images 将文章中的内联模块转成图片。"

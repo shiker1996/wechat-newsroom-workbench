@@ -23,7 +23,7 @@
 - `wechat-article-typeset`：公众号排版总编排契约
 - `wechat-md-render`、`magazine-design-advisor`、`wechat-md-to-draft`：预渲染、杂志设计和 HTML 初稿
 - `wechat-html-normalizer`、`wechat-html-check-no-div`：HTML 净化和最终门禁
-- `mermaid-render`、`wechat-inline-modules-to-images`、`wechat-echarts-blocks-to-images`：可视化转图契约
+- `mermaid-render`、`wechat-echarts-blocks-to-images`：可视化转图契约
 - `html-pages-to-images`、`upyun-upload-image`：截图和经授权的图片上传依赖
 
 默认加载路径为 `<workspaceRoot>/skills`。只有显式设置 `CODEX_SKILLS_ROOT` 时才会使用外部技能目录覆盖项目版本。

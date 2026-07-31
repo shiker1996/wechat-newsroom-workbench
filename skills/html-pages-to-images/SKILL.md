@@ -1,6 +1,6 @@
 ---
 name: html-pages-to-images
-description: 使用本地 Chromium/Puppeteer 将可信 HTML 文件中匹配 CSS 选择器的多个元素逐一截图为 PNG。适用于图表、卡片、页面或公众号内联模块批量转图，并由 wechat-inline-modules-to-images 或 wechat-echarts-blocks-to-images 间接调用。不上传图片、不改写 Markdown，不应渲染不可信 HTML。
+description: 使用本地 Chromium/Puppeteer 将可信 HTML 文件中匹配 CSS 选择器的多个元素逐一截图为 PNG。适用于图表、卡片、页面或公众号内联模块批量转图，并由 wechat-echarts-blocks-to-images 间接调用。不上传图片、不改写 Markdown，不应渲染不可信 HTML。
 ---
 
 # HTML 元素批量截图
