@@ -459,3 +459,11 @@ test('布局审计以真实内容边界测量，稀疏内容页标记 underfille
     assert.ok(report.pages[0].utilization<50,JSON.stringify(report.pages[0]));
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('copy stage requires topic tags on both channels and delivery validation flags missing tags', () => {
+  const source = fs.readFileSync(path.join(process.cwd(), 'lib/llm/social-card-pipeline.mjs'), 'utf8');
+  assert.ok(source.includes('末尾带 6–8 个话题标签'), 'xiaohongshu channel should require tags');
+  assert.ok(source.includes('末尾带 6–8 个准确话题标签'), 'wechat channel should require tags');
+  assert.ok(!source.includes('不使用话题标签'), 'wechat channel must not forbid tags');
+  assert.ok(source.includes('配套文案话题标签不足'), 'delivery validation should flag missing tags');
+});
