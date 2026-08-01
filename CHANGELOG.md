@@ -18,6 +18,7 @@
 ### Fixed
 
 - 模型请求超时不再误报「未返回文本内容」：网关识别 AbortController 中断并给出明确超时提示，默认 `requestTimeoutMs` 提升至 5 分钟以适配推理模型长输出
+- 对齐 DeepSeek 最新接口定义：`content_filter` / `insufficient_system_resource` 两种 finish_reason 报出明确错误（此前会被当作正常结果拿到半截内容）；provider 新增可选 `reasoningEffort` 透传（thinking 开启时生效）
 - RSSHub 依赖安装改用 `--legacy-peer-deps` 修复其 eslint peer 冲突；克隆成功但依赖未装时可续装
 
 ### Added
