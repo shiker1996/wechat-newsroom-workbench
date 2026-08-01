@@ -15,7 +15,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 模型请求超时不再误报「未返回文本内容」：网关识别 AbortController 中断并给出明确超时提示，默认 `requestTimeoutMs` 提升至 5 分钟以适配推理模型长输出
+- RSSHub 依赖安装改用 `--legacy-peer-deps` 修复其 eslint peer 冲突；克隆成功但依赖未装时可续装
+
 ### Added
+
+- 批次早报生成记录：页面展示最近任务状态（执行中 / 失败原因 / 完成时间），失败与中断可一键重试，刷新页面自动续接执行中的任务
 
 - 文章配图可生成类别：IMG-DATA 结构化占位（事件线 / 数据卡，数据必须来自正文）、确定性单图渲染管线、配图工作台一键生成与放大查看
 - 首次安装引导：`npm run setup` / `setup-workbench.cmd` 交互向导（依赖、配置、LLM Key），RSSHub 缺失时可自动从 GitHub 浅克隆并安装依赖，附 Linux/macOS `.sh` 对应脚本
