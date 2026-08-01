@@ -405,6 +405,10 @@ AI 规划配图占位
 上传到 CDN
 → 排版预览
 
+### POST /api/candidates/:id/images/:imageId/generate
+可生成占位（`IMG-DATA`，timeline / datacard）确定性生成本地 PNG；仅本地写入，上传仍需显式调用 `/cdn`
+→ 排版预览（配图工作台「生成图片」）
+
 ### GET /api/batches/:id/daily/images
 读取批次早报配图工作区。
 
