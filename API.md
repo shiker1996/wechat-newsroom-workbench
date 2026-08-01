@@ -37,13 +37,14 @@
 ### 主题目录
 
 - `GET /api/themes?target=article|social`：按目标列出已发布主题，包含默认主题、来源、版本、哈希和固定样稿预览色。
-- `GET /api/themes/:id`：读取单个主题的公开元数据；可用 `target=article|social` 校验目标兼容性。
+- `GET /api/themes/:id`：读取单个主题的公开元数据；用户主题同时返回五项发布兼容报告、`full/read-only` 编辑模式和目标配方目录。可用 `target=article|social` 校验目标兼容性。
 - `GET /api/themes/manage`：列出当前工作区的用户主题，包括草稿和归档状态。
 - `POST /api/themes`：创建用户主题草稿。
+- `POST /api/themes/preview`：对请求中的未保存文章或图文主题定义执行严格校验，并用正式生产编译器返回固定样稿 HTML、`usageMap` 和可选字段影响高亮；不写入草稿。
 - `POST /api/themes/:id/clone`：复制内置或已发布用户主题为新草稿。
 - `PUT /api/themes/:id/draft`：保存结构化主题草稿。
-- `POST /api/themes/:id/validate`：执行 Schema、枚举、数值、颜色和对比度校验。
-- `POST /api/themes/:id/preview`：返回固定样稿预览数据。
+- `POST /api/themes/:id/validate`：执行与发布相同的 Schema、对比度、编译覆盖、固定样稿 HTML 和布局结构五项门禁，问题包含字段与样稿节点。
+- `POST /api/themes/:id/preview`：使用用户主题草稿或请求中的临时定义返回正式编译固定样稿。
 - `POST /api/themes/:id/publish`：发布新的不可变主题版本。
 - `POST /api/themes/:id/archive`：归档用户主题，保留历史版本。
 - `GET /api/themes/:id/versions`：读取版本历史。
