@@ -43,6 +43,16 @@ test('inspectSetup 幂等：缺失项 pending，补齐后 done', () => {
     fs.writeFileSync(path.join(dir, '.env'), 'DEEPSEEK_API_KEY=sk-abc12345\n');
     fs.mkdirSync(path.join(dir, 'RSSHub', 'lib'), { recursive: true });
 
+    const partial = inspectSetup(dir);
+    assert.equal(partial.deps, 'done');
+    assert.equal(partial.config, 'done');
+    assert.equal(partial.env, 'done');
+    assert.equal(partial.rsshub, 'deps-missing');
+
+    // 与 rsshub-start.ps1 一致：本地 tsx 运行时存在才算就绪
+    fs.mkdirSync(path.join(dir, 'RSSHub', 'node_modules', 'tsx', 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'RSSHub', 'node_modules', 'tsx', 'dist', 'cli.mjs'), '');
+
     const after = inspectSetup(dir);
     assert.equal(after.deps, 'done');
     assert.equal(after.config, 'done');
@@ -66,7 +76,7 @@ test('inspectSetup 识别无 Key 的 .env 为 no-key', () => {
 test('RSSHub 缺失时安装引导提供 GitHub 浅克隆并安装依赖', () => {
   const source = fs.readFileSync(new URL('../scripts/setup.mjs', import.meta.url), 'utf8');
   assert.match(source, /git['"], \['clone', '--depth', '1', 'https:\/\/github\.com\/DIYgod\/RSSHub\.git', 'RSSHub'/);
-  assert.match(source, /npm['"], \['install'\], \{ cwd: path\.join\(root, 'RSSHub'\)/);
+  assert.match(source, /npm['"], \['install', '--legacy-peer-deps'\], \{ cwd: path\.join\(root, 'RSSHub'\)/);
 });
 
 test('readEnvFile 忽略注释并剥离引号', () => {

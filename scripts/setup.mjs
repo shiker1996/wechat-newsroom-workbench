@@ -45,13 +45,15 @@ export function inspectSetup(root) {
   const envPath = path.join(root, '.env');
   const env = readEnvFile(envPath);
   const envHasKey = LLM_KEYS.some((k) => (env[k] || '').trim());
-  const hasRsshub = fs.existsSync(path.join(root, 'RSSHub', 'lib'));
+  const rsshubCloned = fs.existsSync(path.join(root, 'RSSHub', 'lib'));
+  // 与 scripts/rsshub-start.ps1 的运行前提一致：本地 tsx 运行时存在才算就绪。
+  const rsshubReady = rsshubCloned && fs.existsSync(path.join(root, 'RSSHub', 'node_modules', 'tsx', 'dist', 'cli.mjs'));
   return {
     nodeOk: Number(process.versions.node.split('.')[0]) >= 24,
     deps: hasDeps ? 'done' : 'pending',
     config: hasConfig ? 'done' : 'pending',
     env: !fs.existsSync(envPath) ? 'pending' : envHasKey ? 'done' : 'no-key',
-    rsshub: hasRsshub ? 'done' : 'optional-missing',
+    rsshub: rsshubReady ? 'done' : rsshubCloned ? 'deps-missing' : 'optional-missing',
   };
 }
 
@@ -111,7 +113,18 @@ async function main() {
   } else console.log('\n[3/4] .env 已配置 LLM Key，跳过。');
 
   // 4. RSSHub（可选）：缺失时直接从 GitHub 浅克隆并安装依赖。
-  if (status.rsshub === 'optional-missing') {
+  // eslint 10 与 eslint-nibble 的 peer 声明冲突，统一加 --legacy-peer-deps。
+  const installRsshubDeps = () => {
+    console.log('  安装 RSSHub 依赖（首次约数分钟）……');
+    const install = spawnSync('npm', ['install', '--legacy-peer-deps'], { cwd: path.join(root, 'RSSHub'), stdio: 'inherit', shell: process.platform === 'win32' });
+    if (install.status !== 0) console.error('  [警告] RSSHub 依赖安装失败，可稍后进入 RSSHub/ 目录手动执行 npm install --legacy-peer-deps。');
+    else console.log('  RSSHub 已就位。');
+  };
+  if (status.rsshub === 'deps-missing') {
+    console.log('\n[4/4] RSSHub 目录已克隆，但依赖未安装，热点采集功能不可用（可选）。');
+    if (await confirm('  现在安装 RSSHub 依赖？(Y/n) ')) installRsshubDeps();
+    else console.log('  已跳过。需要时可重跑本向导，或进入 RSSHub/ 目录执行 npm install --legacy-peer-deps。');
+  } else if (status.rsshub === 'optional-missing') {
     console.log('\n[4/4] 未找到 RSSHub 目录，热点采集功能不可用（可选）。');
     if (await confirm('  现在从 GitHub 克隆 RSSHub 并安装依赖？(Y/n) ')) {
       const gitCheck = spawnSync('git', ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' });
@@ -122,10 +135,8 @@ async function main() {
         if (clone.status !== 0) {
           console.error('  [警告] RSSHub 克隆失败（网络原因可稍后重跑本向导，幂等）。');
         } else {
-          console.log('  克隆完成，安装 RSSHub 依赖（首次约数分钟）……');
-          const install = spawnSync('npm', ['install'], { cwd: path.join(root, 'RSSHub'), stdio: 'inherit', shell: process.platform === 'win32' });
-          if (install.status !== 0) console.error('  [警告] RSSHub 依赖安装失败，可稍后进入 RSSHub/ 目录手动执行 npm install。');
-          else console.log('  RSSHub 已就位。');
+          console.log('  克隆完成。');
+          installRsshubDeps();
         }
       }
     } else console.log('  已跳过。需要时可重跑本向导，或手动克隆 https://github.com/DIYgod/RSSHub 到 RSSHub/ 目录。');
