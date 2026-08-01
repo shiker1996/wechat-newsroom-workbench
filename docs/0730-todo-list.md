@@ -1,6 +1,6 @@
 # 后续工作事项
 
-> 状态速览（2026-08-01）：已知问题 3 项全部闭环；开源前置工作全部完成，仓库已翻 Public（shiker1996/wechat-newsroom-workbench）；项目日志已完善。三个信息工具能力全部实现并接入自主写作与自定义图文（检索自动执行、工具页统一启停）。技能调用链可视化已评估不实施（见对应章节）。文章配图接入图文确定性生成链已完成（IMG-DATA 可生成占位 + 工作台一键生成）。当前待办——安装引导 CLI；热点事实补充接入搜索（待评估）。
+> 状态速览（2026-08-01）：已知问题 3 项全部闭环；开源前置工作全部完成，仓库已翻 Public（shiker1996/wechat-newsroom-workbench）；项目日志已完善。三个信息工具能力全部实现并接入自主写作与自定义图文（检索自动执行、工具页统一启停）。技能调用链可视化已评估不实施（见对应章节）。文章配图接入图文确定性生成链已完成（IMG-DATA 可生成占位 + 工作台一键生成）。安装引导 CLI 已完成（`npm run setup`）。当前待办——热点事实补充接入搜索（待评估）。
 
 ## 已知问题
 
@@ -145,13 +145,13 @@
 
 ## 2026-08-01 新增待办
 
-### 安装引导 CLI（首次安装向导）
+### 安装引导 CLI（首次安装向导）✅ 已完成（2026-08-01）
 
 背景：首次安装时环境监测会提示四项问题（缺 `config.local.json`、缺 `.env`、缺 RSSHub 目录、缺 `node_modules`），但只提示不引导，用户需要手动逐项修复。缺少一个安装引导 CLI 帮助用户完成初始化。
 
-建议方向：
+实际落地：
 
-1. 提供 `npm run setup`（或 `node scripts/setup.mjs`）交互式向导：逐项检测 → 给出修复动作 → 用户确认后执行。
-2. 覆盖现有四类检测：复制 `config.example.json` → `config.local.json`；复制 `.env.example` → `.env` 并引导填入至少一个 LLM API Key（可校验格式、跳过留空）；检测 RSSHub 目录并给出恢复/跳过选项；`npm install` 依赖安装。
-3. 幂等可重跑：已完成的项跳过，只处理缺失项；非交互模式（`--yes` 全默认）供 CI/文档引用。
-4. README 快速开始段落同步改为以 setup 向导为入口。
+1. `scripts/setup.mjs`（`npm run setup`）交互式向导：逐项检测 → 给出修复动作 → 用户确认后执行；覆盖依赖安装（`npm install`）、`config.example.json` → `config.local.json`、`.env.example` → `.env` 并逐项引导填入 LLM Key（格式校验、可跳过）、RSSHub 缺失提示（无法自动恢复时指向 README）。
+2. 幂等可重跑：已完成项自动跳过；`--yes` 非交互模式全按默认处理；结束时自动调用 `check-env.mjs` 输出最终状态。
+3. 纯函数（`buildEnvContent` / `isValidApiKey` / `inspectSetup` / `readEnvFile`）导出供测试，`test/setup.test.mjs` 6 项覆盖。
+4. README 启动段落已改为以 setup 向导为首次入口。

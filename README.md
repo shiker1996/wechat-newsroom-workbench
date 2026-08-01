@@ -68,13 +68,21 @@
 
 **当前仅支持 Windows。** 核心服务本身是标准 Node.js，理论上可在 macOS / Linux 运行，但启动脚本、浏览器采集与验收测试均未在非 Windows 环境验证，请勿当作跨平台软件使用；跨平台可行性评估在开源路线图中（`docs/open-source-readiness.md` P2）。
 
-Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。
+Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。根目录另附 `start-workbench.sh` / `stop-workbench.sh` / `setup-workbench.sh`（对应 `scripts/*.sh`），供 macOS / Linux 尝试，未在非 Windows 环境验证。
+
+首次克隆后建议先跑安装引导，逐项检测并修复依赖、配置文件、LLM Key 和 RSSHub（幂等可重跑；`--yes` 非交互全默认）。Windows 也可直接双击 `setup-workbench.cmd`：
+
+```powershell
+npm run setup
+```
+
+之后日常启动：
 
 ```powershell
 npm start
 ```
 
-首次运行或依赖发生变化时，请先在项目根目录安装依赖。已有锁文件时推荐：
+首次运行或依赖发生变化时，也可以手动安装依赖。已有锁文件时推荐：
 
 ```powershell
 npm ci
