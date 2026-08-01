@@ -47,6 +47,21 @@ test('批次早报第二步在宽屏使用覆盖确认与成稿配置双区布�
   assert.match(styles,/@media\(max-width:1050px\).*?\.daily-production-grid\{grid-template-columns:1fr\}/s);
 });
 
+test('批次早报展示最近生成记录，失败可重试、执行中可续接',()=>{
+  assert.match(html,/id="daily-job-history"/);
+  // 服务端在 GET daily 中附带 ai_runs 里 type=daily 的最近记录
+  assert.match(server,/listAiRuns\(batchId,30\)\.filter\(\(job\)=>job\.type==='daily'\)/);
+  // 前端渲染记录、失败重试、执行中续接轮询
+  assert.match(daily,/function renderJobs\(\)/);
+  assert.match(daily,/data-daily-retry/);
+  assert.match(daily,/find\(\(job\)=>job\.status==="running"\)/);
+  assert.match(daily,/catch\(error\)\{dailyGenerating=false;setDailyStage\(2\);await refreshJobs\(\);throw error;\}/);
+  // 任务创建时持久化 focuses，重试可从记录恢复选择
+  const manager=fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs',import.meta.url),'utf8');
+  assert.match(manager,/type==='daily'&&Array\.isArray\(focuses\)&&focuses\.length[\s\S]*?result_json:JSON\.stringify\(\{focuses\}\)/);
+  assert.match(daily,/job\?\.focuses/);
+});
+
 test('autonomous writing uses the same creation configuration interaction as hotspot articles',()=>{
   assert.match(html,/id="tutorial-creation-skill-settings"/);
   assert.match(html,/id="tutorial-skill-summary"/);

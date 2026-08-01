@@ -505,7 +505,10 @@ async function api(request, response, url) {
       }
     } catch {}
     const documents=store.listDocuments(batchId).filter((item)=>item.kind==='daily-draft'||item.kind==='daily-final');
-    return json(response,200,{batch:{id:batch.id,title:batch.title,batchDate:batch.batch_date,batchType:batch.batch_type},eventCards,focusOptions,documents});
+    const jobs=store.listAiRuns(batchId,30).filter((job)=>job.type==='daily').slice(0,5)
+      .map((job)=>{let focuses=[];try{const parsed=JSON.parse(job.result_json||'{}');if(Array.isArray(parsed.focuses))focuses=parsed.focuses;}catch{}
+      return {id:job.id,status:job.status,progress:job.progress,error:job.error,provider:job.provider,focuses,createdAt:job.created_at,updatedAt:job.updated_at};});
+    return json(response,200,{batch:{id:batch.id,title:batch.title,batchDate:batch.batch_date,batchType:batch.batch_type},eventCards,focusOptions,documents,jobs});
   }
   if (dailyMatch && request.method === 'POST') {
     const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
