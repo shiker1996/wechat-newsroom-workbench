@@ -18,7 +18,7 @@
 ### Added
 
 - 文章配图可生成类别：IMG-DATA 结构化占位（事件线 / 数据卡，数据必须来自正文）、确定性单图渲染管线、配图工作台一键生成与放大查看
-- 首次安装引导：`npm run setup` / `setup-workbench.cmd` 交互向导（依赖、配置、LLM Key、RSSHub），附 Linux/macOS `.sh` 对应脚本
+- 首次安装引导：`npm run setup` / `setup-workbench.cmd` 交互向导（依赖、配置、LLM Key），RSSHub 缺失时可自动从 GitHub 浅克隆并安装依赖，附 Linux/macOS `.sh` 对应脚本
 - 编辑室两步备料：进入候选编辑室先幂等抓取全部事件来源原文再解锁对话，失败来源提示不阻断，可跳过
 - 本地段落检索插件 `local-passage-retrieval`（`content.passage.retrieve`）：编辑室长正文按「头部 + BM25 相关段落」摘录注入，替代全量截断，检索不可用时自动回退
 - 能力槽位体系推广到注册表全部能力：固定 6 个信息槽位之外的工具能力（段落检索、图表渲染、图床上传）自动生成槽位卡片，可在「技能与工具」页统一查看状态并切换偏好实现

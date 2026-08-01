@@ -110,10 +110,25 @@ async function main() {
     } else console.log('  未填写 Key，AI 功能暂不可用；Tavily/又拍云等可选配置可稍后手动补充。');
   } else console.log('\n[3/4] .env 已配置 LLM Key，跳过。');
 
-  // 4. RSSHub（可选，无法自动恢复时仅提示）
+  // 4. RSSHub（可选）：缺失时直接从 GitHub 浅克隆并安装依赖。
   if (status.rsshub === 'optional-missing') {
     console.log('\n[4/4] 未找到 RSSHub 目录，热点采集功能不可用（可选）。');
-    console.log('  本向导无法自动恢复 RSSHub；如需该功能请按 README 恢复 RSSHub/ 目录后重跑环境检测。');
+    if (await confirm('  现在从 GitHub 克隆 RSSHub 并安装依赖？(Y/n) ')) {
+      const gitCheck = spawnSync('git', ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' });
+      if (gitCheck.status !== 0) {
+        console.log('  未找到 git，无法自动克隆。请安装 git 后重跑本向导，或手动克隆 https://github.com/DIYgod/RSSHub 到 RSSHub/ 目录。');
+      } else {
+        const clone = spawnSync('git', ['clone', '--depth', '1', 'https://github.com/DIYgod/RSSHub.git', 'RSSHub'], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
+        if (clone.status !== 0) {
+          console.error('  [警告] RSSHub 克隆失败（网络原因可稍后重跑本向导，幂等）。');
+        } else {
+          console.log('  克隆完成，安装 RSSHub 依赖（首次约数分钟）……');
+          const install = spawnSync('npm', ['install'], { cwd: path.join(root, 'RSSHub'), stdio: 'inherit', shell: process.platform === 'win32' });
+          if (install.status !== 0) console.error('  [警告] RSSHub 依赖安装失败，可稍后进入 RSSHub/ 目录手动执行 npm install。');
+          else console.log('  RSSHub 已就位。');
+        }
+      }
+    } else console.log('  已跳过。需要时可重跑本向导，或手动克隆 https://github.com/DIYgod/RSSHub 到 RSSHub/ 目录。');
   } else console.log('\n[4/4] RSSHub 目录已就位，跳过。');
 
   rl?.close();

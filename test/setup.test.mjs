@@ -63,6 +63,12 @@ test('inspectSetup 识别无 Key 的 .env 为 no-key', () => {
   }
 });
 
+test('RSSHub 缺失时安装引导提供 GitHub 浅克隆并安装依赖', () => {
+  const source = fs.readFileSync(new URL('../scripts/setup.mjs', import.meta.url), 'utf8');
+  assert.match(source, /git['"], \['clone', '--depth', '1', 'https:\/\/github\.com\/DIYgod\/RSSHub\.git', 'RSSHub'/);
+  assert.match(source, /npm['"], \['install'\], \{ cwd: path\.join\(root, 'RSSHub'\)/);
+});
+
 test('readEnvFile 忽略注释并剥离引号', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-test-'));
   try {

@@ -70,7 +70,7 @@
 
 Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。根目录另附 `start-workbench.sh` / `stop-workbench.sh` / `setup-workbench.sh`（对应 `scripts/*.sh`），供 macOS / Linux 尝试，未在非 Windows 环境验证。
 
-首次克隆后建议先跑安装引导，逐项检测并修复依赖、配置文件、LLM Key 和 RSSHub（幂等可重跑；`--yes` 非交互全默认）。Windows 也可直接双击 `setup-workbench.cmd`：
+首次克隆后建议先跑安装引导，逐项检测并修复依赖、配置文件、LLM Key 和 RSSHub（缺失时可直接从 GitHub 克隆；幂等可重跑；`--yes` 非交互全默认）。Windows 也可直接双击 `setup-workbench.cmd`：
 
 ```powershell
 npm run setup
