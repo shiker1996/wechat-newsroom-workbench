@@ -348,6 +348,10 @@
             <div class="editorial-focus-grid">
             <section class="editorial-chat">
               <div class="editorial-chat-head"><div><span class="kicker">AI EDITORIAL MEETING</span><h4>一次只讨论一个关键问题</h4></div><div class="editorial-chat-tools"><select id="editorial-provider" aria-label="编辑会模型"></select></div></div>
+              <div id="editorial-prepare" class="editorial-prepare" hidden>
+                <span id="editorial-prepare-text"></span>
+                <span class="editorial-prepare-actions"><button type="button" class="ink-button" id="run-editorial-prepare">备料：抓取原文</button><button type="button" class="text-button" id="skip-editorial-prepare">跳过，直接对话</button></span>
+              </div>
               <div id="editorial-messages" class="editorial-messages"></div>
               <div class="editorial-reply"><textarea id="editorial-answer" rows="3" placeholder="回答当前问题；首次进入时可以留空，让 AI 先提问"></textarea><button type="button" class="ink-button" id="send-editorial-answer">发送回答 / 让 AI 提问</button></div>
               <small>AI 只整理明确回答并继续追问；不会把沉默、临时建议或模型推断写成作者决定。</small>
@@ -572,7 +576,7 @@
       </section>
       </div>
       <section class="information-slot-panel" data-capability-section="tools" hidden>
-        <div class="information-slot-heading"><div><span class="kicker">WRITING RESEARCH</span><b>写作所需的信息能力</b><small>绿色表示创作时可以直接使用；未连接的能力不会影响其他已就绪能力。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
+        <div class="information-slot-heading"><div><span class="kicker">TOOL CAPABILITIES</span><b>工具能力与实现切换</b><small>每张卡片是一项能力；有多个实现时可指定偏好，留空则由系统按优先级选择。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
         <div class="information-slot-grid" id="information-slot-list"><div class="kv-empty">正在读取信息能力…</div></div>
       </section>
       <details class="tool-capability-disclosure" data-capability-section="tools" hidden>
