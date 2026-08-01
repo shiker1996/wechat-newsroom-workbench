@@ -30,9 +30,19 @@ test('阶段 1 模型 JSON 格式错误只执行一次结构修复',async()=>{
 });
 
 test('阶段 1 确定性修复颜色格式、数值边界与步进并记录差异',()=>{
-  const candidate=candidateFrom('magazine-warm');candidate.tokens.colors.accent='#abc';candidate.tokens.typography.letterSpacingEm=.024;candidate.tokens.shape.radiusPx=99;
+  const candidate=candidateFrom('magazine-warm');candidate.tokens.colors.accent='#369';candidate.tokens.typography.letterSpacingEm=.024;candidate.tokens.shape.radiusPx=99;
   const result=normalizeAiThemeCandidate(candidate,{target:'article'});
-  assert.equal(result.candidate.tokens.colors.accent,'#AABBCC');assert.equal(result.candidate.tokens.typography.letterSpacingEm,.025);assert.equal(result.candidate.tokens.shape.radiusPx,32);assert.ok(result.repairs.some((item)=>item.field==='tokens.shape.radiusPx'));
+  assert.equal(result.candidate.tokens.colors.accent,'#336699');assert.equal(result.candidate.tokens.typography.letterSpacingEm,.025);assert.equal(result.candidate.tokens.shape.radiusPx,32);assert.ok(result.repairs.some((item)=>item.field==='tokens.shape.radiusPx'));
+});
+
+test('深色科技主题自动协调代码背景、亮强调色与反白文字的对比度',async()=>{
+  const candidate=candidateFrom('ice-blue');
+  Object.assign(candidate.tokens.colors,{background:'#07111F',surface:'#10233A',page:'#0B1728',text:'#EAF2FF',muted:'#91A4BD',accent:'#32D6FF',accentSecondary:'#7C8CFF',line:'#23415F',inverseText:'#FFFFFF',codeBackground:'#050B14'});
+  const result=await generateAiThemeCandidate({gateway:gatewayFor([JSON.stringify(candidate)]),input:input('social')});
+  assert.equal(result.audit.valid,true);
+  assert.equal(result.definition.tokens.colors.inverseText,'#FFFFFF');
+  assert.notEqual(result.definition.tokens.colors.accent,'#32D6FF');
+  assert.ok(result.repairs.some((item)=>item.field==='tokens.colors.accent'&&item.reason.includes('反白组件')));
 });
 
 test('AI 图文候选收紧字号与间距上限并自动降低组合密度',()=>{

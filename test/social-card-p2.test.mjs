@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledPageIndexes } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -483,7 +483,7 @@ test('纯 underfilled 页面启用有界舒展排版，结构或溢出问题不�
   assert.match(html,/density-normal density-expanded/);
   assert.match(html,/data-density-adjustment="expanded"/);
   assert.match(html,/data-density-adjustment="none"/);
-  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 3px\);padding-block:6px\}/);
+  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 3px\);padding-block:8px\}/);
 });
 
 test('智能构图中的四项同级指标使用二乘二网格',()=>{
@@ -557,4 +557,29 @@ test('渲染保留全部内容块和对象型列表的标题正文',()=>{
   assert.match(html,/blocks-5/);
   assert.match(html,/正文5/);
   assert.match(html,/内存：降低 40%/);
+});
+
+test('underfilled density adjustment uses bounded relaxed and expanded tiers',()=>{
+  assert.equal(underfilledDensityTier({kind:'content',utilization:49,issues:['underfilled']}),'relaxed');
+  assert.equal(underfilledDensityTier({kind:'content',utilization:47.9,issues:['underfilled']}),'expanded');
+  assert.equal(underfilledDensityTier({kind:'cover',utilization:40,issues:['underfilled']}),null);
+  assert.equal(underfilledDensityTier({kind:'ending',utilization:40,issues:['underfilled']}),null);
+  assert.equal(underfilledDensityTier({kind:'content',utilization:45,issues:['underfilled','overflow']}),null);
+
+  const html=renderStoryboardHtml({
+    topic:'Density tiers',
+    relaxedDensityPages:new Set([0]),
+    expandedDensityPages:new Set([1]),
+    pages:[
+      {kind:'content',title:'Relaxed',content_blocks:[{type:'text',content:'Body'}]},
+      {kind:'content',title:'Expanded',content_blocks:[{type:'text',content:'Body'}]},
+      {kind:'content',title:'Normal',content_blocks:[{type:'text',content:'Body'}]},
+    ],
+  });
+  assert.match(html,/density-normal density-relaxed/);
+  assert.match(html,/density-normal density-expanded/);
+  assert.match(html,/data-density-adjustment="relaxed"/);
+  assert.match(html,/data-density-adjustment="expanded"/);
+  assert.match(html,/data-density-adjustment="none"/);
+  assert.match(html,/\.page\.density-relaxed \.content-block\{padding-block:3px\}/);
 });
