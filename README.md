@@ -68,36 +68,18 @@
 
 **当前仅支持 Windows。** 核心服务本身是标准 Node.js，理论上可在 macOS / Linux 运行，但启动脚本、浏览器采集与验收测试均未在非 Windows 环境验证，请勿当作跨平台软件使用；跨平台可行性评估在开源路线图中（`docs/open-source-readiness.md` P2）。
 
-Windows 可直接双击根目录的 `start-workbench.cmd`。脚本会检查 Node.js 版本和已有服务，按需在后台启动工作台，健康检查通过后自动打开浏览器。根目录另附 `start-workbench.sh` / `stop-workbench.sh` / `setup-workbench.sh`（对应 `scripts/*.sh`），供 macOS / Linux 尝试，未在非 Windows 环境验证。
+### 快速上手（Windows）
 
-首次克隆后建议先跑安装引导，逐项检测并修复依赖、配置文件、LLM Key 和 RSSHub（缺失时可直接从 GitHub 克隆；幂等可重跑；`--yes` 非交互全默认）。Windows 也可直接双击 `setup-workbench.cmd`：
+只需要两个脚本：
 
-```powershell
-npm run setup
-```
+1. **安装**：双击 `setup-workbench.cmd`（或 `npm run setup`）。交互向导会依次装好依赖、创建配置、引导填写 LLM Key、克隆并安装 RSSHub；缺什么会提示，失败可重跑（幂等）。
+2. **启动**：双击 `start-workbench.cmd`（或 `npm start`）。健康检查通过后自动打开浏览器；重复运行会提示“已经在运行”，不会起第二份服务。
 
-之后日常启动：
+macOS / Linux 可尝试 `setup-workbench.sh` 与 `start-workbench.sh`，未在非 Windows 环境验证。
 
-```powershell
-npm start
-```
+### 开发
 
-首次运行或依赖发生变化时，也可以手动安装依赖。已有锁文件时推荐：
-
-```powershell
-npm ci
-```
-
-`npm ci`/`npm install` 会通过 `postinstall` 级联安装技能目录内的独立依赖（`skills/*/package.json`，如 ECharts 与 Puppeteer）。离线或下载失败只影响对应渲染功能，可稍后在技能目录内单独执行 `npm install` 补齐。
-
-开发时可使用 `npm run dev` 监听服务端和 `lib` 目录变更。提交前至少执行：
-
-```powershell
-npm run build
-npm test
-```
-
-`npm run build` 是语法、前端入口和本地 import 完整性校验，不会生成独立发布包。
+`npm run dev` 监听服务端和 `lib` 目录变更；提交前至少执行 `npm run build`（语法与前端入口校验）和 `npm test`。依赖安装走 `npm ci`，`postinstall` 会级联安装技能目录内的独立依赖（如 ECharts 与 Puppeteer），离线或下载失败只影响对应渲染功能，可稍后在技能目录内单独 `npm install` 补齐。
 
 ### 可选依赖：Mermaid 图表
 
@@ -119,9 +101,7 @@ Mermaid CLI 使用 Puppeteer 驱动 Chromium/Chrome。工作台会依次查找�
 node scripts/check-env.mjs
 ```
 
-浏览器打开 `http://127.0.0.1:4317`。
-
-如果重复运行启动命令，工作台会提示“已经在运行”并正常退出，不需要再启动第二份服务。SQLite 的实验性警告已在 npm 脚本中隐藏；它不是运行错误。
+浏览器打开 `http://127.0.0.1:4317`。SQLite 的实验性警告已在 npm 脚本中隐藏；它不是运行错误。
 
 需要修改端口、RSSHub 路由、模型参数或内容目录时，把 `config.example.json` 复制为 `config.local.json` 后修改。该文件不会进入 Git。工作台的“设置与数据”页面也可维护 `.env` 中受支持的运行参数、控制 Reddit/RSSHub 进程并导出或恢复备份。
 账号定位（名称、读者画像、内容支柱、风格约束等）把 `account-context.example.json` 复制为 `account-context.json` 后按自己的账号修改，字段含义见示例文件与 `lib/domain/account-context.mjs`；该文件不会进入 Git，请勿提交真实账号画像。
@@ -257,6 +237,8 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 6. 如果把 `keepAlive` 配为 `false`，采集任务只会停止由本次任务启动的 RSSHub，不会停止原本就在运行的实例。
 
 默认路由包括晚点、TechCrunch、虎嗅、Solidot、ReadHub、界面、Anthropic、36Kr 热榜，以及 GitHub Trending 的日/周/月榜；还会按配置执行 GitHub 新项目发现。实际路由以 `config.local.json` 覆盖后的运行配置为准。
+
+`RSSHub/` 目录不随本仓库分发。缺失时可运行 `npm run setup` 从 GitHub 浅克隆并安装依赖；手动安装时注意 RSSHub 当前的 eslint peer 依赖冲突，需在其目录内执行 `npm install --legacy-peer-deps`（普通 `npm install` 会报 ERESOLVE）。
 
 ## 数据与产物
 
