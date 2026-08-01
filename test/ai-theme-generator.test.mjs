@@ -35,6 +35,13 @@ test('阶段 1 确定性修复颜色格式、数值边界与步进并记录差�
   assert.equal(result.candidate.tokens.colors.accent,'#AABBCC');assert.equal(result.candidate.tokens.typography.letterSpacingEm,.025);assert.equal(result.candidate.tokens.shape.radiusPx,32);assert.ok(result.repairs.some((item)=>item.field==='tokens.shape.radiusPx'));
 });
 
+test('AI 图文候选收紧字号与间距上限并自动降低组合密度',()=>{
+  const candidate=candidateFrom('ice-blue');Object.assign(candidate.tokens.typography,{bodyPx:18,h1Px:44,h2Px:28,captionPx:15,lineHeight:2.1});Object.assign(candidate.tokens.spacing,{articlePaddingPx:40,sectionPx:48,paragraphPx:28,cardGapPx:28});
+  const result=normalizeAiThemeCandidate(candidate,{target:'social'}),tokens=result.candidate.tokens;
+  assert.ok(tokens.typography.bodyPx<=13);assert.ok(tokens.typography.h1Px<=34);assert.ok(tokens.typography.h2Px<=18);assert.ok(tokens.typography.captionPx<=11);assert.ok(tokens.typography.lineHeight<=1.55);assert.ok(tokens.spacing.articlePaddingPx<=28);assert.ok(tokens.spacing.sectionPx<=28);assert.ok(tokens.spacing.paragraphPx<=12);assert.ok(tokens.spacing.cardGapPx<=14);
+  assert.ok(result.repairs.some((item)=>item.reason.includes('组合密度')));
+});
+
 test('AI 候选修复模型常见的颜色别名、缺失枚举和误放行为字段',async()=>{
   const candidate=candidateFrom('magazine-warm'),colors=candidate.tokens.colors,behavior=candidate.targetConfig.behavior;
   colors.codeText=colors.inverseText;colors.border=colors.line;delete colors.inverseText;delete colors.line;delete candidate.tokens.typography.family;delete candidate.tokens.typography.headingFamily;delete candidate.tokens.shape.shadow;

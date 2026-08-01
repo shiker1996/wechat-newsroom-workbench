@@ -19,6 +19,13 @@ test('阶段 5 发布失败定位具体字段和固定样稿节点',()=>{
   const report=auditThemeForPublish(definition,{target:'article'});assert.equal(report.valid,false);const issue=report.issues.find((item)=>item.code==='LOW_CONTRAST'&&item.specimenNode==='code');assert.equal(issue.field,'tokens.colors.inverseText');assert.throws(()=>assertThemePublishable(definition,{target:'article'}),/code 样稿节点/);
 });
 
+test('图文用户主题限制视觉参数上限并阻止多项参数同时偏大',()=>{
+  const tooLarge=userCopy(socialThemeDefinition('ice-blue'),'social-too-large');tooLarge.tokens.typography.h1Px=35;
+  const rangeReport=auditThemeForPublish(tooLarge,{target:'social'});assert.ok(rangeReport.issues.some((item)=>item.field==='tokens.typography.h1Px'&&item.code==='OUT_OF_RANGE'));
+  const dense=userCopy(socialThemeDefinition('ice-blue'),'social-too-dense');Object.assign(dense.tokens.typography,{bodyPx:13,h1Px:34,h2Px:18,captionPx:11,lineHeight:1.55});Object.assign(dense.tokens.spacing,{articlePaddingPx:28,sectionPx:28,paragraphPx:12,cardGapPx:14});
+  const densityReport=auditThemeForPublish(dense,{target:'social'});assert.ok(densityReport.issues.some((item)=>item.field==='tokens.spacing.sectionPx'&&item.code==='SOCIAL_DENSITY_BUDGET'));
+});
+
 test('阶段 5 旧结构主题只生成兼容报告而不迁移定义',()=>{
   const legacy=userCopy(articleThemeDefinition('magazine-warm'),'legacy-theme');delete legacy.tokens.typography.h1Px;const before=JSON.stringify(legacy),report=auditThemeForPublish(legacy,{target:'article'});assert.equal(report.compatible,false);assert.equal(report.checks.schema,false);assert.equal(JSON.stringify(legacy),before);assert.ok(report.issues.some((item)=>item.field==='tokens.typography.h1Px'));
 });

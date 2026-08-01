@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledPageIndexes } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -263,7 +263,7 @@ test('智能构图按页面语义推断角色并规范化最小 DSL',()=>{
   assert.equal(inferCardPageRole({kind:'capability',content_blocks:[]}),'feature');
   const normalized=normalizeCardComposition({kind:'risk',composition:{id:'free-html',columns:'absolute'}});
   assert.equal(normalized.role,'risk');
-  assert.deepEqual(normalized.composition,{id:'risk-sidebar',columns:'split-narrow',flow:'alternate',alignment:'center',decoration:'stamp',overlap:'accent-edge'});
+  assert.deepEqual(normalized.composition,{id:'risk-sidebar',columns:'single',flow:'stack',alignment:'center',decoration:'stamp',overlap:'accent-edge'});
   assert.equal(normalized.fallback,true);
 });
 
@@ -299,7 +299,7 @@ test('故事板构图 id 合法时部分接受并按注册变体补齐字段',()
   assert.equal(normalized.fallback,false);
   assert.equal(normalized.source,'storyboard');
   const decision=resolveCardCompositionDecision(page,{compositionMode:'smart',pageIndex:1,seed:'s'});
-  assert.match(decision.reason,/按注册变体补齐/);
+  assert.match(decision.reason,/按内容关系修正列宽或补齐非法字段/);
 });
 
 test('内容块体量悬殊时降级为单列，体量均衡时保留分列',()=>{
@@ -317,7 +317,7 @@ test('内容块体量悬殊时降级为单列，体量均衡时保留分列',()=
   const balanced={kind:'risk',composition:{id:'risk-sidebar',columns:'split-narrow',flow:'alternate',alignment:'center',decoration:'stamp',overlap:'accent-edge'},content_blocks:[{type:'text',content:'不执行自由 HTML，装饰来自白名单'},{type:'note',content:'构图参数受枚举与角色双重约束'}]};
   const kept=normalizeCardComposition(balanced,{pageIndex:3,seed:'seed-1'}).composition;
   assert.equal(kept.id,'risk-sidebar');
-  assert.equal(kept.columns,'split-narrow');
+  assert.equal(kept.columns,'split-wide');
   assert.equal(kept.flow,'alternate');
   // 表格块字数少但行数多：6 行对比表 vs 一句话笔记，表格应被判为大块
   const tableHeavy={kind:'positions',content_blocks:[
@@ -466,4 +466,95 @@ test('copy stage requires topic tags on both channels and delivery validation fl
   assert.ok(source.includes('末尾带 6–8 个准确话题标签'), 'wechat channel should require tags');
   assert.ok(!source.includes('不使用话题标签'), 'wechat channel must not forbid tags');
   assert.ok(source.includes('配套文案话题标签不足'), 'delivery validation should flag missing tags');
+});
+
+test('纯 underfilled 页面启用有界舒展排版，结构或溢出问题不启用',()=>{
+  const report={pages:[
+    {page:1,issues:['underfilled']},
+    {page:2,issues:['underfilled','vertical_imbalance']},
+    {page:3,issues:['underfilled','overflow']},
+    {page:4,issues:['clipped']},
+  ]};
+  assert.deepEqual(underfilledPageIndexes(report,new Set([1])),[0]);
+  const html=renderStoryboardHtml({topic:'舒展排版',expandedDensityPages:new Set([0]),pages:[
+    {kind:'capability',title:'内容较少',content_blocks:[{type:'text',title:'第一块',content:'已有正文'},{type:'text',title:'第二块',content:'已有正文'}]},
+    {kind:'capability',title:'普通页面',content_blocks:[{type:'text',content:'正文'}]},
+  ]});
+  assert.match(html,/density-normal density-expanded/);
+  assert.match(html,/data-density-adjustment="expanded"/);
+  assert.match(html,/data-density-adjustment="none"/);
+  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 3px\);padding-block:6px\}/);
+});
+
+test('智能构图中的四项同级指标使用二乘二网格',()=>{
+  const html=renderStoryboardHtml({topic:'四项指标',compositionMode:'smart',pages:[{kind:'problem',title:'内存对比',content_blocks:[{type:'text',content:'问题说明'},{type:'list',content:'Claude Code: 386.6 MB\nCursor Agent: 214.9 MB\nOpenCode: 371.5 MB\nGitHub Copilot CLI: 333.3 MB'}]}]});
+  assert.match(html,/composition-smart[^\"]*items-4/);
+  assert.match(html,/\.composition-smart\.items-4 \.list-block ul\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+});
+
+test('性能小数不会被误判成编号步骤',()=>{
+  const page={kind:'capability',role:'data',title:'内存效率优势',content_blocks:[
+    {type:'text',title:'内存对比',content:'jcode: 27.8 MB\nClaude Code: 386.6 MB'},
+    {type:'text',title:'启动速度',content:'jcode: 14 ms\nClaude Code: 3436.9 ms'},
+    {type:'text',title:'扩展性',content:'jcode 增加约 10.4 MB，而 Claude Code 增加约 212.7 MB。'},
+  ]};
+  const html=renderStoryboardHtml({topic:'小数识别',pages:[page],compositionMode:'smart'});
+  assert.match(html,/data-layout="editorial"/);
+  assert.doesNotMatch(html,/steps-block|第 \d+ 步/);
+  assert.match(html,/jcode: 27\.8 MB/);
+  assert.match(html,/Claude Code 增加约 212\.7 MB/);
+});
+
+test('三个快速开始内容块的前两块同类且体量接近时固定等宽并由末块补齐第二行',()=>{
+  const page={kind:'quickstart',content_blocks:[
+    {type:'code',title:'macOS / Linux',content:'tool install'},
+    {type:'code',title:'Windows',content:'tool.exe install'},
+    {type:'list',title:'登录方式',content:'GitHub\nGoogle\n邮箱'},
+  ]};
+  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(page,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'split-even');assert.equal(composition.flow,'alternate');}
+  const html=renderStoryboardHtml({topic:'三块构图',pages:[page],compositionMode:'smart'});
+  assert.match(html,/blocks-3[^\"]*comp-cols-split-even[^\"]*comp-flow-alternate[^\"]*tri-span-last/);
+  assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-first:not\(\.comp-cols-single\) \.content-block:first-of-type\{grid-column:1\/-1\}/);
+  assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-last:not\(\.comp-cols-single\) \.content-block:last-child\{grid-column:1\/-1\}/);
+});
+
+test('只有明确主辅关系才使用非等宽列且列宽方向由内容顺序决定',()=>{
+  const mainFirst={kind:'risk',content_blocks:[{type:'text',content:'主要能力说明'},{type:'note',content:'补充使用提醒'}]},auxiliaryFirst={kind:'risk',content_blocks:[{type:'note',content:'补充使用提醒'},{type:'text',content:'主要能力说明'}]},unclear={kind:'concept',content_blocks:[{type:'text',content:'第一种说明'},{type:'code',content:'run demo'}]};
+  assert.equal(normalizeCardComposition(mainFirst,{seed:'a'}).composition.columns,'split-wide');
+  assert.equal(normalizeCardComposition(auxiliaryFirst,{seed:'b'}).composition.columns,'split-narrow');
+  assert.equal(normalizeCardComposition(unclear,{seed:'c'}).composition.columns,'single');
+});
+
+test('内容悬殊或密集时固定单列，稳定种子只切换同列宽的视觉变体',()=>{
+  const imbalanced={kind:'concept',content_blocks:[{type:'text',content:'这是一段明显更长的主要内容，用于解释背景、限制、适用条件和完整操作过程，长度远高于其余两个内容块，继续分列会导致一侧拥挤。'.repeat(2)},{type:'note',content:'短备注'},{type:'code',content:'run'}]},dense={kind:'feature',content_blocks:[{type:'list',items:Array.from({length:9},(_,index)=>`项目 ${index+1}`)}]},peers={kind:'feature',content_blocks:[{type:'text',content:'同级能力一'},{type:'text',content:'同级能力二'}]};
+  assert.equal(normalizeCardComposition(imbalanced,{seed:'a'}).composition.columns,'single');
+  assert.equal(normalizeCardComposition(dense,{seed:'b'}).composition.columns,'single');
+  const decisions=Array.from({length:20},(_,index)=>normalizeCardComposition(peers,{seed:`visual-${index}`} ).composition);
+  assert.deepEqual(new Set(decisions.map((item)=>item.columns)),new Set(['split-even']));
+  assert.equal(new Set(decisions.map((item)=>item.id)).size,2);
+});
+
+test('布局内容修复只允许改写现有文字，不得新增重复块或列表项',()=>{
+  const original=[{kind:'capability',title:'核心能力',goal:'解释能力',evidence:['README'],content_blocks:[{type:'text',title:'记忆系统',content:'自动检索记忆'},{type:'list',title:'协作机制',content:'消息传递\n冲突检查'}]}];
+  const rewritten=structuredClone(original);rewritten[0].content_blocks[0].content='自动检索相关记忆，并把已确认的上下文注入当前对话';rewritten[0].content_blocks[1].content='代理间消息传递\n自动检查文件冲突';
+  assert.deepEqual(cardPlanRepairStructureIssues(original,rewritten),[]);
+  const addedBlock=structuredClone(rewritten);addedBlock[0].content_blocks.push({type:'list',title:'记忆特点',content:'自动检索'});
+  assert.ok(cardPlanRepairStructureIssues(original,addedBlock).some((issue)=>issue.includes('内容块数量')));
+  const addedItem=structuredClone(rewritten);addedItem[0].content_blocks[1].content+='\n并行协作';
+  assert.ok(cardPlanRepairStructureIssues(original,addedItem).some((issue)=>issue.includes('列表条目数量')));
+});
+
+test('accent-edge 不再横向移动首个内容块',()=>{
+  const page={kind:'risk',composition:{id:'risk-sidebar',columns:'single',flow:'stack',alignment:'center',decoration:'stamp',overlap:'accent-edge'},content_blocks:[{type:'text',content:'第一块'},{type:'note',content:'第二块'}]};
+  const html=renderStoryboardHtml({topic:'对齐',pages:[page],compositionMode:'smart'});
+  assert.match(html,/\.composition-smart\.overlap-accent-edge \.content-block:nth-child\(3\)\{transform:none;margin-right:0\}/);
+});
+
+test('渲染保留全部内容块和对象型列表的标题正文',()=>{
+  const content_blocks=Array.from({length:5},(_,index)=>({type:'text',title:`内容${index+1}`,content:`正文${index+1}`}));
+  content_blocks[2]={type:'list',title:'指标',items:[{title:'内存',content:'降低 40%'}]};
+  const html=renderStoryboardHtml({topic:'内容完整性',pages:[{kind:'content',title:'完整页面',content_blocks}]});
+  assert.match(html,/blocks-5/);
+  assert.match(html,/正文5/);
+  assert.match(html,/内存：降低 40%/);
 });

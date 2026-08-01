@@ -11,8 +11,9 @@ test('阶段 3 主题中心持续开放完整字体字阶、间距和形状字�
 });
 
 test('阶段 3 数值控件提供同步滑杆、精确输入、单位和 Schema 边界',()=>{
-  assert.match(ui,/type="range" min="\$\{a\}" max="\$\{b\}" step="\$\{step\}"/);
-  assert.match(ui,/type="number" min="\$\{a\}" max="\$\{b\}" step="\$\{step\}"/);
+  assert.match(ui,/type="range" min="\$\{min\}" max="\$\{max\}" step="\$\{step\}"/);
+  assert.match(ui,/type="number" min="\$\{min\}" max="\$\{max\}" step="\$\{step\}"/);
+  assert.match(ui,/socialTokenLimits=\{bodyPx:\[9,13\],h1Px:\[22,34\]/);
   assert.match(ui,/document\.querySelectorAll\(`#user-theme-form \[data-token-pair=/);
   for(const range of ["['bodyPx','正文字号','number',9,18", "['h1Px','一级标题','number',22,44", "['articlePaddingPx','页面内边距','number',0,40", "['radiusPx','圆角','number',0,32", "['borderWidthPx','边线宽度','number',0,8"])assert.ok(ui.includes(range),range);
 });
