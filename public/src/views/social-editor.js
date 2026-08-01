@@ -159,7 +159,7 @@ export async function openSocialEditor(id) {
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
   renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';document.getElementById('social-visual-style').dispatchEvent(new Event('theme-ui-sync'));syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {

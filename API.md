@@ -34,6 +34,25 @@
 - 本 API 面向本机单用户工作台，没有通用登录、会话或公网鉴权。插件安装和备份恢复使用专用确认头，只是防误操作门禁，不是多用户授权机制。
 - 路径参数中的批次 ID、技能 ID、插件 ID 和文件名应 URL 编码。文档中的 `:id` 为路径占位符。
 
+### 主题目录
+
+- `GET /api/themes?target=article|social`：按目标列出已发布主题，包含默认主题、来源、版本、哈希和固定样稿预览色。
+- `GET /api/themes/:id`：读取单个主题的公开元数据；可用 `target=article|social` 校验目标兼容性。
+- `GET /api/themes/manage`：列出当前工作区的用户主题，包括草稿和归档状态。
+- `POST /api/themes`：创建用户主题草稿。
+- `POST /api/themes/:id/clone`：复制内置或已发布用户主题为新草稿。
+- `PUT /api/themes/:id/draft`：保存结构化主题草稿。
+- `POST /api/themes/:id/validate`：执行 Schema、枚举、数值、颜色和对比度校验。
+- `POST /api/themes/:id/preview`：返回固定样稿预览数据。
+- `POST /api/themes/:id/publish`：发布新的不可变主题版本。
+- `POST /api/themes/:id/archive`：归档用户主题，保留历史版本。
+- `GET /api/themes/:id/versions`：读取版本历史。
+- `POST /api/themes/:id/versions/:version/restore`：从历史版本创建新草稿。
+- `POST /api/themes/import`：导入安全 JSON，并且只创建用户草稿；重复 ID 与未知 Schema 会被拒绝。
+- `GET /api/themes/:id/export`：导出规范主题 JSON；用户主题可用 `draft=1` 导出当前草稿。
+- `GET /api/themes/:id/usage`：读取总使用次数、涉及批次、最近使用时间及版本级统计。
+- `GET /api/themes/:id/archive-impact`：归档前检查历史版本和任务引用影响。
+
 ---
 
 ## 可复制调用示例

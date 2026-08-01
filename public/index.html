@@ -57,20 +57,27 @@
         </div>
       </details>
       <details class="nav-group" data-nav-group="system">
-        <summary><span>05</span><b>资产与审计</b><small>产物 · 模型 · 技能 · 日志</small></summary>
+        <summary><span>05</span><b>资产与审计</b><small>产物 · 日志</small></summary>
         <div class="nav-group-items">
           <button class="nav-item" data-view="artifacts">产物中心</button>
-          <button class="nav-item" data-view="models">模型中心</button>
-          <button class="nav-item" data-view="skills">技能与工具</button>
           <button class="nav-item" data-view="logs">任务日志</button>
         </div>
       </details>
     </nav>
+    <div class="rail-utility-group" aria-label="扩展与定制">
+      <div class="rail-utility-label"><span>EXTEND</span><b>扩展与定制</b></div>
+      <button class="nav-utility" data-view="skills"><span class="nav-utility-mark">S</span><span><b>技能与工具</b><small>能力 · 插件 · 连接</small></span></button>
+      <button class="nav-utility" data-view="themes"><span class="nav-utility-mark">T</span><span><b>主题中心</b><small>选择 · 预览 · 管理</small></span></button>
+      <button class="nav-utility" data-view="models"><span class="nav-utility-mark">M</span><span><b>模型运行</b><small>可用性 · 诊断 · 调用记录</small></span></button>
+    </div>
+    <div class="rail-utility-group rail-maintenance-group" aria-label="系统维护">
+      <div class="rail-utility-label"><span>SYSTEM</span><b>系统维护</b></div>
+      <button class="nav-utility" data-view="system"><span class="nav-utility-mark">⚙</span><span><b>运行与配置</b><small>服务 · 环境 · 备份</small></span><i id="nav-runtime-indicator">●</i></button>
+    </div>
     <div class="rail-foot">
       <span class="pulse-dot"></span>
       <div><b>LOCAL FIRST</b><small>数据留在本机</small></div>
     </div>
-    <button class="nav-utility" data-view="system"><span class="nav-utility-mark">⚙</span><span><b>运行与配置</b><small>服务 · 环境 · 备份</small></span><i id="nav-runtime-indicator">●</i></button>
   </aside>
 
   <main class="shell">
@@ -324,7 +331,7 @@
               <section class="repository-facts-panel social-stage-panel social-facts-stage"><div class="social-stage-head"><span class="social-stage-number">01</span><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3><p>先确认事实和素材边界，再让 AI 规划页面。</p></div><div class="social-stage-actions"><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
               <section class="social-score-panel social-stage-panel"><div class="social-score-hero"><span class="kicker">SOCIAL FIT</span><strong id="social-fit-score">—</strong><small>图文适配度</small></div><div id="social-score-parts"></div></section>
             </div>
-            <section class="repository-facts-panel social-stage-panel social-storyboard-stage"><div class="social-stage-head social-storyboard-head"><span class="social-stage-number">02</span><div><span class="kicker">CARD STORYBOARD</span><h3>卡片故事板</h3><p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p></div></div><div class="social-control-deck"><details class="creation-skill-settings social-skill-settings"><summary><span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span><em>更换</em></summary><div class="creation-skill-popover"><div class="stage-skill-settings-head"><span>STORYBOARD ROUTE</span><b>选择故事板规划方式</b><small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small></div><div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div><div class="creation-skill-actions"><button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button><button type="button" class="outline-button" id="close-social-skills">完成</button></div></div></details><div class="social-picker-group"><label class="social-theme-picker"><span>发布渠道</span><select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker"><span>构图方式</span><select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker"><span>页面版式</span><select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker"><span>视觉主题</span><select id="social-visual-style"><option value="neon">霓虹终端</option><option value="tokyo-night">东京之夜</option><option value="brutalist">野兽派</option><option value="solarized">极光配色</option><option value="retro-terminal">复古终端</option><option value="paper-craft">纸艺暖调</option><option value="charcoal">极简炭黑</option><option value="peach">雾桃白桃</option><option value="orange">落日橙界</option><option value="ice-blue">冰川冷调</option><option value="mocha">摩卡原木</option><option value="lavender">芋泥暮色</option><option value="crimson">赤焰硬核</option><option value="bone-white">月白清灰</option></select></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="repository-facts-panel social-stage-panel social-storyboard-stage"><div class="social-stage-head social-storyboard-head"><span class="social-stage-number">02</span><div><span class="kicker">CARD STORYBOARD</span><h3>卡片故事板</h3><p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p></div></div><div class="social-control-deck"><details class="creation-skill-settings social-skill-settings"><summary><span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span><em>更换</em></summary><div class="creation-skill-popover"><div class="stage-skill-settings-head"><span>STORYBOARD ROUTE</span><b>选择故事板规划方式</b><small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small></div><div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div><div class="creation-skill-actions"><button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button><button type="button" class="outline-button" id="close-social-skills">完成</button></div></div></details><div class="social-picker-group"><label class="social-theme-picker"><span>发布渠道</span><select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker"><span>构图方式</span><select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker"><span>页面版式</span><select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker"><span>视觉主题</span><select id="social-visual-style"><option value="ice-blue">正在加载主题…</option></select><button type="button" class="theme-picker-trigger" id="social-theme-trigger" data-theme-picker="social"><span>视觉主题</span><b>正在加载…</b></button><div id="social-theme-preview" class="theme-catalog-preview" hidden></div><small id="social-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
             <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。<span class="muted action-hint">生成调用模型（计费），渲染为本地确定性执行。</span></p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
           </div>
@@ -455,13 +462,9 @@
         <select id="typeset-provider" aria-label="排版设计模型"></select>
         <select id="typeset-theme" aria-label="排版主题">
           <option value="auto">自动（按文章类型）</option>
-          <option value="magazine-warm">暖纸杂志风</option>
-          <option value="gossip-card">卡片吃瓜风</option>
-          <option value="tech-wire">暗色终端</option>
-          <option value="research-report">财经印刷</option>
-          <option value="career-essay">书信手账</option>
-          <option value="news-digest">黑白快讯</option>
         </select>
+        <button type="button" class="theme-picker-trigger" id="typeset-theme-trigger" data-theme-picker="article"><span>排版主题</span><b>自动匹配</b></button>
+        <div id="typeset-theme-preview" class="theme-catalog-preview" hidden></div><small id="typeset-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small>
         <button class="outline-button" id="run-local-typeset">生成 / 更新排版 HTML</button>
         <small class="muted action-hint">默认本地确定性渲染（不计费）；选用模型初稿时按服务商计费，图片上传 CDN 属于外部写入。</small>
         <button class="primary-button" id="copy-typeset-html" disabled>复制公众号富文本</button>
@@ -661,7 +664,7 @@
           <div class="config-tabbar" role="tablist" aria-label="配置文件">
             <button type="button" class="active" role="tab" aria-selected="true" aria-controls="config-panel-app" data-config-tab="app"><span>01</span><b>工作台配置</b><small>抓取 · 图片 · 运行</small></button>
             <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-rsshub" data-config-tab="rsshub"><span>02</span><b>RSSHub KV</b><small>平台 Token · 代理 · 扩展变量</small></button>
-            <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-models" data-config-tab="models"><span>03</span><b>模型服务</b><small>端点 · 模型 · 密钥 · 能力</small></button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-models" data-config-tab="models"><span>03</span><b>模型接入</b><small>端点 · 模型 · 密钥 · 能力</small></button>
           </div>
           <div class="config-panel active" id="config-panel-app" role="tabpanel" data-config-panel="app">
             <div class="config-panel-heading"><div><span class="kicker">WORKBENCH.ENV</span><h4>工作台服务</h4></div><p>按用途展开需要修改的配置组。</p></div>
@@ -672,7 +675,7 @@
             <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div>
           </div>
           <div class="config-panel" id="config-panel-models" role="tabpanel" data-config-panel="models" hidden>
-            <div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型服务配置</h4></div><p>保存后即时进入模型网关；密钥只写入服务端环境文件。</p></div>
+            <div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型接入配置</h4></div><p>保存后即时进入模型网关；密钥只写入服务端环境文件。</p></div>
             <div class="runtime-model-list" id="runtime-model-list"></div>
             <section class="model-config-panel">
               <div class="panel-head"><div><span class="kicker">PROVIDER SETTINGS</span><h3 id="model-config-title">新增模型配置</h3></div><button class="outline-button" type="button" id="new-model-config">＋ 新增</button></div>
@@ -710,6 +713,16 @@
           <button class="ghost-button" id="clear-cache">清理采集缓存</button>
         </aside>
       </div>
+
+    </section>
+
+    <section class="view theme-center-view" id="view-themes">
+      <div class="section-intro"><div><span class="kicker">THEME LIBRARY</span><h2>主题中心</h2></div><p>先从视觉卡片中找到方向，再复制为自己的主题。内置主题保持稳定，我的主题按版本发布。</p></div>
+      <div class="theme-library-launch"><button type="button" data-theme-browser="article"><span>ARTICLE THEMES</span><b>浏览文章排版</b><small>6 套主题 · 支持自动匹配</small></button><button type="button" data-theme-browser="social"><span>SOCIAL THEMES</span><b>浏览图文视觉</b><small>14 套主题 · 版式与配色独立</small></button></div>
+      <section class="theme-manager-panel">
+        <div class="theme-manager-head"><div><span class="kicker">THEME STUDIO</span><h3>我的主题</h3><p>从内置主题复制后，以表单方式调整；已发布版本保持不可变。</p></div><div class="theme-clone-bar"><select id="theme-clone-source" aria-label="复制来源主题"></select><input id="theme-clone-id" placeholder="主题 ID，如 my-editorial"><input id="theme-clone-label" placeholder="主题名称"><button class="ink-button" id="clone-theme">复制并编辑</button><label class="theme-import-button">导入 JSON<input id="import-theme-file" type="file" accept="application/json,.json"></label></div></div>
+        <div class="theme-manager-layout"><aside id="user-theme-list" class="user-theme-list"><div class="empty-state">正在读取用户主题…</div></aside><form id="user-theme-form" class="user-theme-form" hidden onsubmit="return false"><div class="theme-editor-head"><div><h4 id="user-theme-editor-title">主题编辑器</h4><small id="user-theme-editor-meta"></small><small id="user-theme-usage"></small></div><button type="button" class="text-button" id="archive-user-theme">归档</button></div><div class="theme-editor-fields"><label>名称<input name="label" maxlength="30" required></label><label class="wide">描述<input name="description" maxlength="160" required></label></div><div id="user-theme-colors" class="theme-color-grid"></div><div id="user-theme-live-preview" class="user-theme-live-preview"></div><div class="theme-version-row"><select id="user-theme-versions" aria-label="历史版本"><option>暂无已发布版本</option></select><button type="button" class="ghost-button" id="restore-user-theme" disabled>恢复为草稿</button></div><div class="theme-editor-actions"><button type="button" class="text-button" id="export-user-theme">导出 JSON</button><button type="button" class="outline-button" id="validate-user-theme">保存并校验</button><button type="button" class="primary-button" id="publish-user-theme">发布新版本</button></div></form></div>
+      </section>
     </section>
 
     <section class="view" id="view-sources">
@@ -758,7 +771,7 @@
     </section>
 
     <section class="view" id="view-models">
-      <div class="section-intro"><div><span class="kicker">OPENAI-COMPATIBLE GATEWAY</span><h2>模型中心</h2></div><p>通过 OpenAI 兼容协议自助接入任意模型服务。API Key 仅保存在服务端环境文件中，浏览器只能看到配置状态。</p></div>
+      <div class="section-intro"><div><span class="kicker">MODEL OPERATIONS</span><h2>模型运行</h2></div><p>查看当前可用模型、执行最小连接诊断并追踪调用记录。新增或修改服务请前往“运行与配置 → 模型接入”。</p></div>
       <div class="model-layout">
         <section>
           <div class="model-grid" id="model-cards"></div>
@@ -769,13 +782,10 @@
           </article>
         </section>
         <aside class="model-actions-panel">
-          <span class="kicker">ACTIVE ROUTE</span><h3>调用控制</h3>
+          <span class="kicker">CONNECTION DIAGNOSTICS</span><h3>连接诊断</h3>
           <label>服务商<select id="model-provider"></select></label>
           <button class="ghost-button" id="test-model">最小请求测试连接</button>
-          <hr>
-          <label>本次打标条数<input id="tag-limit" type="number" min="1" max="300" value="60"></label>
-          <button class="primary-button" id="ai-tag-batch">AI 打标当前批次</button>
-          <p class="fine-print">会把所选热点的标题、来源和链接发送给第三方模型并产生费用。系统会按模型输出上限每 4–10 条分组；若 JSON 被截断会继续拆分重试，通过结构校验后才写入数据库。</p>
+          <p class="fine-print">测试只发送最小提示词并产生少量模型费用，用于确认端点、密钥和模型名称是否可用。内容生产操作请回到对应批次或编辑室执行。</p>
         </aside>
       </div>
       <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span id="call-summary"></span></div><div id="model-call-list"></div></section>
@@ -845,6 +855,7 @@
   <dialog id="writing-goal-dialog" class="modal"><form id="writing-goal-form"><div class="modal-head"><div><span class="kicker">WRITING TARGET</span><h2>设置写作目标</h2></div><button type="button" class="close-button" data-close-writing-goal aria-label="关闭">×</button></div><label>目标可见字数<input id="writing-goal-input" type="number" min="200" max="10000" step="100" required></label><p class="fine-print">目标仅用于进度反馈；草稿和终稿可以分别设置，不改变保存与终稿门禁规则。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-writing-goal>取消</button><button type="submit" class="ink-button">保存目标</button></div></form></dialog>
   <dialog id="preflight-dialog" class="modal preflight-dialog"><div class="preflight-dialog-body"><div class="modal-head"><div><span class="kicker">PUBLISH READINESS</span><h2>发布前检查</h2></div><button type="button" class="close-button" data-close-preflight aria-label="关闭">×</button></div><div class="preflight-hero"><b id="preflight-title">正在检查当前文稿</b><span id="preflight-summary"></span></div><div id="preflight-list" class="preflight-list"></div><p class="fine-print">检查结果仅用于发布前确认，不会自动修改正文，也不会影响草稿自动保存。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-preflight>稍后处理</button><button type="button" class="ink-button" id="preflight-primary">查看待处理项</button></div></div></dialog>
   <dialog id="quality-dialog" class="modal quality-dialog"><div class="quality-dialog-body"><div class="modal-head"><div><span class="kicker">QUALITY REVIEW</span><h2>文稿质量检查</h2></div><button type="button" class="close-button" data-close-quality aria-label="关闭">×</button></div><p id="quality-summary" class="quality-summary"></p><div id="quality-issue-list" class="quality-issue-list"></div><div class="modal-actions"><button type="button" class="ink-button" data-close-quality>完成检查</button></div></div></dialog>
+  <dialog id="theme-picker-dialog" class="theme-picker-dialog"><div class="theme-picker-shell"><div class="theme-picker-head"><div><span class="kicker">VISUAL THEME</span><h2 id="theme-picker-title">选择主题</h2><p>颜色只是第一眼，版式语气与内容类型同样重要。</p></div><button type="button" class="close-button" id="close-theme-picker" aria-label="关闭主题选择">×</button></div><div class="theme-picker-tabs" role="tablist"><button type="button" class="active" data-theme-filter="all">全部</button><button type="button" data-theme-filter="builtin">内置主题</button><button type="button" data-theme-filter="user">我的主题</button></div><div id="theme-picker-grid" class="theme-picker-grid"></div><div class="theme-picker-foot"><span id="theme-picker-selection">请选择一个主题</span><button type="button" class="primary-button" id="confirm-theme-picker">使用此主题</button></div></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="/vendor/markdown-it.min.js"></script>
   <script type="module" src="/src/main.js"></script>

@@ -16,6 +16,9 @@ function bindPreview() {
     loadImageWorkspace(id).catch((error) => toast(error.message));
   });
   document.getElementById("refresh-preview").addEventListener("click", () => loadProductionPreview().catch((error) => toast(error.message)));
+  document.addEventListener("typeset:completed", () => {
+    loadProductionPreview().catch((error) => toast(error.message));
+  });
   document.getElementById("preview-reindex").addEventListener("click", async (event) => {
     await withLoading(event.currentTarget, "正在扫描…", () => reindex().catch((error) => toast(error.message)));
     await loadProductionPreview().catch((error) => toast(error.message));

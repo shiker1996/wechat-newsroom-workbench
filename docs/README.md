@@ -42,3 +42,4 @@
 | [optional-feature-implementation-roadmap.md](./optional-feature-implementation-roadmap.md) | 可选功能实施路线图（部分批次已完成） |
 | [event-deep-fetch-and-fact-base-plan.md](./event-deep-fetch-and-fact-base-plan.md) | 事件精选深抓与事实基座升级计划 |
 | [typeset-pipeline-optimization-plan.md](./typeset-pipeline-optimization-plan.md) | 排版流水线优化方案（P2 待实施） |
+| [article-and-social-theme-json-plan.md](./article-and-social-theme-json-plan.md) | 文章排版与图文视觉主题 JSON 化、版本化及用户自定义主题实施方案 |

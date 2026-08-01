@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let bound = false;
@@ -8,9 +8,6 @@ function bindModels() {
   if (bound) return;
   bound = true;
   document.getElementById("test-model").addEventListener("click", () => testModel().catch((error) => toast(error.message)));
-  document.getElementById("ai-tag-batch").addEventListener("click", (event) => {
-    withLoading(event.currentTarget, "正在打标…", () => aiTagBatch().catch((error) => toast(error.message)));
-  });
 }
 
 async function loadModels() {
@@ -21,7 +18,7 @@ async function loadModels() {
   if (providerSelect) providerSelect.innerHTML = providerOptions(data.providers?.find((p) => p.configured)?.name || data.defaultProvider);
   const available=(data.providers||[]).filter((provider)=>provider.enabled!==false&&provider.configured);
   if (!available.length) {
-    document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无可用模型。请前往“运行配置 → 模型服务”完成配置。</div>';
+    document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无可用模型。请前往“运行与配置 → 模型接入”完成配置。</div>';
     return;
   }
   const grid = document.getElementById("model-cards");
@@ -59,21 +56,6 @@ async function testModel() {
   } finally { if (btn) { btn.disabled = false; btn.textContent = "测试连接"; } }
 }
 
-// AI 打标当前批次（自 editor.js 迁入，读取 #tag-limit；后台任务经 main.js 轮询通知结果）
-async function aiTagBatch() {
-  const provider = document.getElementById("model-provider")?.value || state.models?.defaultProvider;
-  if (!provider) return toast("请先在模型中心配置至少一个服务商");
-  if (!state.activeBatchId) return toast("请先选择一个批次");
-  // 确认=强制覆盖重打；取消=中止操作（此前取消会变成"非强制继续"，语义被篡改）
-  if (!await confirmAction("重新打标将覆盖本批次全部已有语义标注，是否继续？", { confirmText: "重新打标" })) return;
-  const limit = Number(document.getElementById("tag-limit")?.value) || undefined;
-  try {
-    await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/ai/tag`, {
-      method: "POST", body: JSON.stringify({ provider, background: true, force: true, limit }),
-    });
-    toast("重新打标已启动");
-  } catch (err) { toast(err.message); }
-}
 export default async function loadModelsView() {
   bindModels();
   return loadModels();

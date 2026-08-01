@@ -222,8 +222,8 @@ test('图文文案由模型生成，HTML 根据故事板确定性组装', () => 
   assert.ok(html.includes('page-inner'));
   assert.match(html,/<pre><code>npm i demo<\/code><\/pre>/);
   assert.match(html, /\.page-ending \.note-block h2[^}]*color:inherit/);
-  assert.match(html, /\.theme-palette \.page-ending \.note-block[^}]*color:var\(--ink\)/);
-  assert.match(html, /\.theme-palette \.page-ending \.highlight-block h2[^}]*color:var\(--ink\)/);
+  assert.match(html, /\.theme-ice-blue \.page-ending \.note-block[^}]*color:var\(--ink\)/);
+  assert.match(html, /\.page-ending \.highlight-block h2[^}]*color:inherit/);
 });
 
 test('故事板渲染支持设计系统的完整视觉主题',()=>{
@@ -394,10 +394,10 @@ test('安全回退优先单列稳定变体且支持按页启用',()=>{
 
 test('暗色主题下标题卡对比度与步骤文本断行有保障',()=>{
   const html=renderStoryboardHtml({topic:'暗色主题',pages:[{kind:'cover',title:'封面',content_blocks:[{type:'text',content:'说明'}]}],visualStyle:'neon',compositionMode:'smart'});
-  assert.match(html,/\.composition-smart\.overlap-title-card h1\{[^}]*color:var\(--ink,#102033\)/);
+  assert.match(html,/\.composition-smart\.overlap-title-card h1\{[^}]*color:var\(--ink\)/);
   assert.match(html,/\.step p\{[^}]*overflow-wrap:anywhere/);
   assert.match(html,/\.step h3\{[^}]*overflow-wrap:anywhere/);
-  assert.match(html,/body\.theme-neon\{--ink:#eafff7;--muted:#9bd8c2;--surface:#0c1c17;--accent:#55ffb6/);
+  assert.match(html,/\.theme-neon\{--bg:#050809;--page:#07100e;--surface:#0c1c17;--ink:#eafff7;--muted:#9bd8c2;--accent:#55ffb6/);
   // 卡片内不再重复渲染页码，decor-index-line 只保留短装饰线
   assert.match(html,/\.decor-index-line \.page-content-stack:before\{content:"";/);
   assert.doesNotMatch(html,/attr\(data-card-index\)/);

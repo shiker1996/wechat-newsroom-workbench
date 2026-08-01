@@ -51,6 +51,7 @@ import { handleSystemRoutes } from './lib/http/routes/system-routes.mjs';
 import { handleMediaRoutes } from './lib/http/routes/media-routes.mjs';
 import { handleArticleRoutes } from './lib/http/routes/article-routes.mjs';
 import { handleSocialCardRoutes } from './lib/http/routes/social-card-routes.mjs';
+import { handleThemeRoutes } from './lib/http/routes/theme-routes.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
@@ -281,6 +282,7 @@ async function api(request, response, url) {
     return json(response, 200, store.overview());
   }
   if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
+  if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body })) return;
   if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json })) return;
   if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
     binaryBody, createWorkbenchBackup })) return;
