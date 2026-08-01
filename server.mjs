@@ -282,7 +282,7 @@ async function api(request, response, url) {
     return json(response, 200, store.overview());
   }
   if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
-  if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body })) return;
+  if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body, models })) return;
   if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json })) return;
   if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
     binaryBody, createWorkbenchBackup })) return;

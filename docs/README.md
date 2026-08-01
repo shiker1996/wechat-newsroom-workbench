@@ -45,3 +45,4 @@
 | [article-and-social-theme-json-plan.md](./article-and-social-theme-json-plan.md) | 文章排版与图文视觉主题 JSON 化、版本化及用户自定义主题实施方案 |
 | [theme-config-editor-expansion-plan.md](./theme-config-editor-expansion-plan.md) | 主题完整样式配置、生产级实时预览与发布门禁扩展方案 |
 | [theme-style-capability-inventory.md](./theme-style-capability-inventory.md) | 现有 20 套主题视觉能力清单、配置消费矩阵与阶段 0 基线 |
+| [ai-theme-creation-extension-plan.md](./ai-theme-creation-extension-plan.md) | 主题中心 AI 创建主题、候选确认、受控生成与发布治理扩展方案 |

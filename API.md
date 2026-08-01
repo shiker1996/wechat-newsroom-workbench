@@ -40,6 +40,8 @@
 - `GET /api/themes/:id`：读取单个主题的公开元数据；用户主题同时返回五项发布兼容报告、`full/read-only` 编辑模式和目标配方目录。可用 `target=article|social` 校验目标兼容性。
 - `GET /api/themes/manage`：列出当前工作区的用户主题，包括草稿和归档状态。
 - `POST /api/themes`：创建用户主题草稿。
+- `POST /api/themes/ai/generate`：根据文章/图文视觉描述生成短期 AI 主题候选，执行结构化输出修复、确定性规范化、五项发布审计、正式样稿编译及与内置/用户主题的视觉相似度比较；响应包含最近主题、差异摘要和重新生成建议，候选默认 15 分钟过期且不写入主题草稿。
+- `POST /api/themes/ai/candidates/:candidateId/create`：确认服务端短期候选并创建用户主题草稿；只接受可选名称和描述，不接受前端回传主题定义，成功后候选立即失效。
 - `POST /api/themes/preview`：对请求中的未保存文章或图文主题定义执行严格校验，并用正式生产编译器返回固定样稿 HTML、`usageMap` 和可选字段影响高亮；不写入草稿。
 - `POST /api/themes/:id/clone`：复制内置或已发布用户主题为新草稿。
 - `PUT /api/themes/:id/draft`：保存结构化主题草稿。
