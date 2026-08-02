@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { buildAiThemeMessages, normalizeAiThemeCandidate } from '../lib/themes/ai-theme-generator.mjs';
 import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
+import { renderStoryboardHtml, normalizeCoverTitleLines } from '../lib/llm/social-card-pipeline.mjs';
 import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -77,8 +78,21 @@ test('四种配方形成可辨认的标题版式语言',()=>{
   assert.match(css.poster,/text-shadow:3px 3px 0 var\(--accent2\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
   assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--ink\)/);
   const html=compileThemePreview({target:'social',definition:themeWithCoverTitle('highlight-block')}).html;
-  assert.equal((html.match(/class="cover-title-line"/g)||[]).length,2);
+  assert.equal((html.match(/class="cover-title-line"/g)||[]).length,3);
+  const twoLine=renderStoryboardHtml({topic:'封面标题十一个字刚好',visualStyle:'neon',pages:[{kind:'cover',title:'封面标题十一个字刚好',content_blocks:[]}]});
+  assert.equal((twoLine.match(/class="cover-title-line"/g)||[]).length,2);
   assert.match(html.replace(/<[^>]+>/g,''),/如何把复杂的技术内容讲得清楚又准确/);
+});
+
+test('封面标题 AI 语义断行：校验、优先使用与代码兜底',()=>{
+  assert.deepEqual(normalizeCoverTitleLines('用 LangChain 编排智能体工作流',['用 LangChain','编排智能体工作流']),['用 LangChain','编排智能体工作流']);
+  assert.equal(normalizeCoverTitleLines('轻量级工作流编排引擎',['轻量级','引擎']),null);
+  assert.equal(normalizeCoverTitleLines('轻量级工作流编排引擎',['轻量级工作流编排引擎']),null);
+  assert.equal(normalizeCoverTitleLines('轻量级工作流编排引擎',['轻量级','','工作流编排引擎']),null);
+  const ai=renderStoryboardHtml({topic:'用 LangChain 编排智能体工作流',visualStyle:'neon',coverTitleLines:['用 LangChain','编排智能体工作流'],pages:[{kind:'cover',title:'用 LangChain 编排智能体工作流',content_blocks:[]}]});
+  assert.ok(ai.includes('<span class="cover-title-line">用 LangChain</span><span class="cover-title-line">编排智能体工作流</span>'));
+  const fallback=renderStoryboardHtml({topic:'轻量级工作流编排引擎',visualStyle:'neon',coverTitleLines:['轻量级','引擎'],pages:[{kind:'cover',title:'轻量级工作流编排引擎',content_blocks:[]}]});
+  assert.equal((fallback.match(/class="cover-title-line"/g)||[]).length,2);
 });
 
 test('正式长标题样稿可预览且封面字段聚焦到封面标题',()=>{
