@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"editorial-room","name":"公众号编辑会","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"event_fact_cards","outputContract":"editorial_decision","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

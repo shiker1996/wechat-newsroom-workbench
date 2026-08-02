@@ -17,6 +17,7 @@
 | [data-flow.md](./data-flow.md) | 第三方服务数据流：发送什么、何时发送、保存多久、如何删除 |
 | [release.md](./release.md) | 发布、升级、降级、备份恢复流程 |
 | [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线 |
+| [configuration.md](./configuration.md) | 配置项参考：`.env`、`config.local.json`、`account-context.json`（含选题评分）、技能覆盖层 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |
 

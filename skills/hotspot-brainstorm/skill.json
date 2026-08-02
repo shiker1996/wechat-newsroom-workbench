@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"hotspot-brainstorm","name":"热点探索脑暴","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"topic_candidates","outputContract":"exploration_cards","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
