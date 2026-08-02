@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -486,6 +486,21 @@ test('纯 underfilled 页面启用有界舒展排版，结构或溢出问题不�
   assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 5px\);padding-block:14px\}/);
   assert.match(html,/\.page\.density-expanded\.blocks-1 \.page-content-stack,\.page\.density-expanded\.blocks-2 \.page-content-stack\{gap:calc\(var\(--card-gap\) \+ 24px\)\}/);
   assert.match(html,/\.page\.density-expanded\.blocks-1 \.content-block,\.page\.density-expanded\.blocks-2 \.content-block\{padding-block:22px\}/);
+});
+
+test('布局审计轮次穷尽的失败信息带逐页明细与故事板编辑指引',()=>{
+  const message=layoutAuditFailureMessage({pages:[
+    {page:2,valid:false,kind:'content',utilization:96.8,issues:['overfilled']},
+    {page:6,valid:false,kind:'content',utilization:47.4,issues:['underfilled']},
+    {page:7,valid:true,kind:'ending',utilization:30,issues:[]},
+  ]},5);
+  assert.match(message,/布局审计 5 轮后仍未通过/);
+  assert.match(message,/P2 内容过多（版面利用率 96\.8%）/);
+  assert.match(message,/P6 内容不足（版面利用率 47\.4%）/);
+  assert.ok(!message.includes('P7'));
+  assert.match(message,/02 卡片故事板/);
+  assert.match(message,/内容不足的页：补充内容块、增加列表条目或扩写段落/);
+  assert.match(message,/内容放不下的页：删减、拆分或缩短文字/);
 });
 
 test('智能构图中的四项同级指标使用二乘二网格',()=>{
