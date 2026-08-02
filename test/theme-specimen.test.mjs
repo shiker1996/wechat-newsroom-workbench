@@ -26,3 +26,9 @@ test('图文主题预览不再维护背景、画布和内容表面的第二套�
   assert.match(manager,/target:active\.target/);
   assert.match(manager,/input\.closest\('label'\)\?\.querySelector\('code'\)\?\.replaceChildren\(input\.value\.toUpperCase\(\)\)/);
 });
+
+test('图文主题编辑器区分外围背景与图文页背景，消除背景字段歧义',()=>{
+  assert.match(manager,/background:'外围背景（卡片外）'/);
+  assert.match(manager,/page:'图文页背景'/);
+  assert.match(manager,/active\.target==='social'\?\{\.\.\.labels/);
+});
