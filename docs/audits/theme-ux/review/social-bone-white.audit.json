@@ -1,0 +1,95 @@
+{
+  "file": "E:\\Documents\\write-assistant\\docs\\audits\\theme-ux\\review\\social-bone-white.html",
+  "pageCount": 5,
+  "valid": false,
+  "pages": [
+    {
+      "page": 1,
+      "kind": "cover",
+      "valid": false,
+      "utilization": 35.3,
+      "target": "45-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 213.8,
+      "topWhitespace": 195.5,
+      "bottomWhitespace": 195.6,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 2,
+      "kind": "content",
+      "valid": true,
+      "utilization": 77.1,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 466.4,
+      "topWhitespace": 69.3,
+      "bottomWhitespace": 69.3,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 3,
+      "kind": "content",
+      "valid": false,
+      "utilization": 45.7,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 276.7,
+      "topWhitespace": 97.6,
+      "bottomWhitespace": 230.6,
+      "verticalBalanceDelta": 133,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 4,
+      "kind": "content",
+      "valid": false,
+      "utilization": 36.4,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 220.3,
+      "topWhitespace": 97.6,
+      "bottomWhitespace": 287,
+      "verticalBalanceDelta": 189.5,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 5,
+      "kind": "ending",
+      "valid": false,
+      "utilization": 11.4,
+      "target": "20-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 69.1,
+      "topWhitespace": 267.9,
+      "bottomWhitespace": 267.9,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    }
+  ]
+}
