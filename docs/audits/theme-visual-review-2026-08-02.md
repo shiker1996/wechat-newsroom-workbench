@@ -134,6 +134,17 @@ b. 或把配方明确定义为"封面构图"，另设内容页构图配方。方
 - 新增 `test/theme-skeleton-contrast.test.mjs`（5 项）：骨架类名全页型、editorial-split 封面排除、浅色/深色代码面板文字色回退、正常主题不受影响。
 - 全量 632 项测试通过。
 
+### P1 已修复：同骨架组内第二层差异（2026-08-02 第二轮）
+
+修复后证据见 [review-layer2/](./theme-ux/review-layer2/)（逐页 PNG 与配方分配表）。
+
+- terminal-rail 组：retro-terminal 眉题改 `underline`、列表改 `hard-card`（显式 `components.list.textColorRole=inverseText`，黑字亮绿底保证可读）；tokyo-night 封面承载改 `statement`、眉题改 `stamp`；neon 保持 metric + outlined 作为组内原型。三者封面在缩略尺寸下即可区分（`social-neon-p1-cover.png` / `social-retro-terminal-p1-cover.png` / `social-tokyo-night-p1-cover.png`）。
+- impact-band 组：orange 眉题改 `stamp`，与 crimson（`accent` + hard-card）拉开；brutalist、charcoal 原有差异保持。
+- editorial-split 组：solarized 封面承载改 `statement`，与 bone-white 的 `lead` 导语形成承载物差异。
+- stacked 组：lavender 眉题改 `plain`、peach 眉题改 `underline`，两者此前除配色外完全一致。
+- 前置改动：`skeleton`/`coverSupport`/`rhythm` 已从编译器硬编码映射迁移为 14+6 个主题 JSON 的显式字段（编译器仅保留默认值兜底），本轮组内差异直接落在这些显式字段上。
+- 回归：全量 638 项测试通过。
+
 ### 生产事故核查：2026-08-02-r2xerv 布局审计失败
 
 同一份失败故事板（`social-cards/2026-08-02-r2xerv-c007/card-plan.json`）分别用当前代码与 HEAD 代码渲染审计：
