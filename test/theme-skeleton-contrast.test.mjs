@@ -45,6 +45,18 @@ test('editorial-split 骨架服从管线单列决策：3 块与 comp-cols-single
   assert.match(gridRule,/:not\(\.blocks-3\)/);assert.match(gridRule,/:not\(\.comp-cols-single\)/);
 });
 
+test('表面配方的页面底色消费 page token，图文页背景可调',()=>{
+  const ice=compileSocialTheme(socialThemeDefinition('ice-blue'));
+  assert.match(ice.css,/\.page\{background:linear-gradient\(145deg,var\(--page\)/);
+  assert.doesNotMatch(ice.css,/linear-gradient\(145deg,#f9fcff/);
+  const neon=compileSocialTheme(socialThemeDefinition('neon'));
+  assert.match(neon.css,/\.page\{background-color:var\(--page\)/);
+  assert.doesNotMatch(neon.css,/\.page\{background-color:var\(--bg\)/);
+  const brutalist=compileSocialTheme(socialThemeDefinition('brutalist'));
+  assert.match(brutalist.css,/\.page\{background:color-mix\(in srgb,var\(--page\) 82%/);
+  assert.doesNotMatch(brutalist.css,/\.page\{background:color-mix\(in srgb,var\(--surface\) 82%/);
+});
+
 test('浅色代码面板的文章主题代码文字回退为正文色',()=>{
   const html=articleHtml('research-report');
   assert.match(html,/<code style="[^"]*background:#F2F4F6;color:#1A1A1A/i);
