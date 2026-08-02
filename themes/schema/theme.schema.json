@@ -65,6 +65,18 @@
       "type": "object", "additionalProperties": false, "required": ["recipes", "behavior"],
       "properties": {
         "recipes": { "type": "object", "additionalProperties": { "type": "string" } },
+        "components": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "title": { "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"], "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
+            "lead": { "type": "object", "additionalProperties": false, "required": ["sizeScale", "colorRole"], "properties": { "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
+            "quote": { "type": "object", "additionalProperties": false, "required": ["textColorRole", "surfaceRole", "borderColorRole"], "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "surfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] } } },
+            "list": { "type": "object", "additionalProperties": false, "required": ["textColorRole", "markerColorRole"], "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "markerColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
+            "table": { "type": "object", "additionalProperties": false, "required": ["headerTextColorRole", "headerSurfaceRole", "borderColorRole"], "properties": { "headerTextColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "headerSurfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] } } },
+            "code": { "type": "object", "additionalProperties": false, "required": ["textColorRole", "surfaceRole"], "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "surfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] } } },
+            "imageCaption": { "type": "object", "additionalProperties": false, "required": ["sizeScale", "colorRole"], "properties": { "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } }
+          }
+        },
         "behavior": {
           "type": "object", "additionalProperties": false, "required": ["justify", "highlightStrong", "numberSections"],
           "properties": { "justify": { "type": "boolean" }, "highlightStrong": { "enum": ["accent", "ink"] }, "numberSections": { "type": "boolean" } }
@@ -75,6 +87,71 @@
       "type": "object", "additionalProperties": false, "required": ["recipes", "effects"],
       "properties": {
         "recipes": { "type": "object", "additionalProperties": { "type": "string" } },
+        "components": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "coverTitle": {
+              "type": "object", "additionalProperties": false,
+              "required": ["fontFamily", "fontWeight", "sizeScale", "colorRole", "borderColorRole"],
+              "properties": {
+                "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] },
+                "fontWeight": { "enum": [500, 600, 700, 800, 900] },
+                "sizeScale": { "enum": ["compact", "standard", "display"] },
+                "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] },
+                "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] }
+              }
+            },
+            "eyebrow": {
+              "type": "object", "additionalProperties": false,
+              "required": ["fontFamily", "fontWeight", "colorRole"],
+              "properties": {
+                "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] },
+                "fontWeight": { "enum": [500, 600, 700, 800, 900] },
+                "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }
+              }
+            },
+            "lead": {
+              "type": "object", "additionalProperties": false,
+              "required": ["sizeScale", "colorRole"],
+              "properties": {
+                "sizeScale": { "enum": ["compact", "standard", "display"] },
+                "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }
+              }
+            },
+            "statValue": {
+              "type": "object", "additionalProperties": false, "required": ["fontFamily", "fontWeight", "sizeScale", "colorRole"],
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "fontWeight": { "enum": [500, 600, 700, 800, 900] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+            },
+            "statLabel": {
+              "type": "object", "additionalProperties": false, "required": ["sizeScale", "colorRole"],
+              "properties": { "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+            },
+            "step": {
+              "type": "object", "additionalProperties": false, "required": ["titleColorRole", "bodyColorRole", "markerSurfaceRole"],
+              "properties": { "titleColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "bodyColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "markerSurfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] } }
+            },
+            "compareTable": {
+              "type": "object", "additionalProperties": false, "required": ["headerTextColorRole", "headerSurfaceRole", "bodyTextColorRole", "borderColorRole"],
+              "properties": { "headerTextColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "headerSurfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "bodyTextColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] } }
+            },
+            "list": {
+              "type": "object", "additionalProperties": false, "required": ["textColorRole", "surfaceRole", "borderColorRole", "borderWeight"],
+              "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "surfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] }, "borderWeight": { "enum": ["inherit", "none", "thin", "medium", "heavy"] } }
+            },
+            "note": {
+              "type": "object", "additionalProperties": false, "required": ["textColorRole", "surfaceRole", "borderColorRole", "borderWeight"],
+              "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "surfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] }, "borderWeight": { "enum": ["inherit", "none", "thin", "medium", "heavy"] } }
+            },
+            "contentTitle": {
+              "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"],
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+            },
+            "endingTitle": {
+              "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"],
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+            }
+          }
+        },
         "effects": {
           "type": "object", "additionalProperties": false, "required": ["texture", "decorationOpacity", "contentTiltDeg"],
           "properties": {

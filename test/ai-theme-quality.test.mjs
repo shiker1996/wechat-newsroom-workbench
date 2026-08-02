@@ -13,7 +13,7 @@ test('阶段 3 相同主题被判定为过于相似并建议重新生成',()=>{
 
 test('阶段 3 差异摘要覆盖配色、字阶、形状与组件配方',()=>{
   const candidate=structuredClone(warm);candidate.id='ai-candidate-different';candidate.tokens.colors.accent='#0066CC';candidate.tokens.typography.h1Px=40;candidate.tokens.shape.radiusPx=24;candidate.article.recipes.quote='dark-block';
-  const comparison=compareAiThemeCandidate(candidate,[warm]);assert.deepEqual(comparison.differences.map((item)=>item.group),['配色','字体与字阶','形状与层次','组件配方']);assert.ok(comparison.similarity<1);
+  const comparison=compareAiThemeCandidate(candidate,[warm]);assert.deepEqual(comparison.differences.map((item)=>item.group),['配色','字体与字阶','形状与层次','组件配方','组件细节']);assert.ok(comparison.similarity<1);
 });
 
 test('阶段 3 文章与图文提示词提供不同排版目标并携带内置视觉签名',()=>{

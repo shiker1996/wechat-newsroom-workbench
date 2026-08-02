@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "target": "social",
+  "aspects": ["font", "size", "color", "surface", "border", "shadow"],
+  "elements": {
+    "coverTitle": {
+      "label": "封面主标题", "specimenRole": "cover-title", "selector": ".page-cover h1",
+      "currentSources": {
+        "font": ["token:tokens.typography.headingFamily", "recipe:social.recipes.coverTitle"],
+        "size": ["token:tokens.typography.h1Px", "recipe:social.recipes.coverTitle"],
+        "color": ["token:tokens.colors.text", "recipe:social.recipes.coverTitle"],
+        "surface": ["recipe:social.recipes.coverTitle"], "border": ["recipe:social.recipes.coverTitle"], "shadow": ["not-applicable"]
+      }
+    },
+    "contentTitle": {
+      "label": "内容页主标题", "specimenRole": "content-title", "selector": ".page:not(.page-cover):not(.page-ending) h1",
+      "currentSources": {
+        "font": ["token:tokens.typography.headingFamily"], "size": ["token:tokens.typography.h1Px"], "color": ["token:tokens.colors.text"],
+        "surface": ["not-applicable"], "border": ["not-applicable"], "shadow": ["not-applicable"]
+      }
+    },
+    "endingTitle": {
+      "label": "结尾页主标题", "specimenRole": "ending-title", "selector": ".page-ending h1",
+      "currentSources": {
+        "font": ["token:tokens.typography.headingFamily"], "size": ["token:tokens.typography.h1Px"], "color": ["token:tokens.colors.inverseText"],
+        "surface": ["recipe:social.recipes.ending"], "border": ["recipe:social.recipes.ending"], "shadow": ["recipe:social.recipes.ending"]
+      }
+    },
+    "eyebrow": {
+      "label": "眉题", "specimenRole": "eyebrow", "selector": ".eyebrow",
+      "currentSources": {
+        "font": ["token:tokens.typography.family", "recipe:social.recipes.eyebrow"], "size": ["token:tokens.typography.captionPx"],
+        "color": ["token:tokens.colors.accentSecondary", "recipe:social.recipes.eyebrow"], "surface": ["recipe:social.recipes.eyebrow"],
+        "border": ["recipe:social.recipes.eyebrow"], "shadow": ["not-applicable"]
+      }
+    },
+    "lead": {
+      "label": "导语", "specimenRole": "lead", "selector": ".lead",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["fixed:13px"], "color": ["token:tokens.colors.muted"],
+        "surface": ["not-applicable"], "border": ["not-applicable"], "shadow": ["not-applicable"]
+      }
+    },
+    "contentHeading": {
+      "label": "内容块标题", "specimenRole": "content-heading", "selector": ".content-block h2",
+      "currentSources": {
+        "font": ["token:tokens.typography.headingFamily"], "size": ["token:tokens.typography.h2Px"], "color": ["token:tokens.colors.accent"],
+        "surface": ["not-applicable"], "border": ["not-applicable"], "shadow": ["not-applicable"]
+      }
+    },
+    "body": {
+      "label": "正文", "specimenRole": "body", "selector": ".content-block p",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["token:tokens.typography.bodyPx"], "color": ["token:tokens.colors.text"],
+        "surface": ["not-applicable"], "border": ["not-applicable"], "shadow": ["not-applicable"]
+      }
+    },
+    "statValue": {
+      "label": "数据卡数字", "specimenRole": "stat-value", "selector": ".stat b",
+      "currentSources": {
+        "font": ["token:tokens.typography.headingFamily"], "size": ["fixed:19px"], "color": ["token:tokens.colors.accent"],
+        "surface": ["token:tokens.colors.surface"], "border": ["token:tokens.colors.line", "fixed:1px"], "shadow": ["not-applicable"]
+      }
+    },
+    "statLabel": {
+      "label": "数据卡标签", "specimenRole": "stat-label", "selector": ".stat span",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["fixed:9px"], "color": ["token:tokens.colors.muted"],
+        "surface": ["token:tokens.colors.surface"], "border": ["token:tokens.colors.line", "fixed:1px"], "shadow": ["not-applicable"]
+      }
+    },
+    "step": {
+      "label": "步骤组件", "specimenRole": "step", "selector": ".step",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["fixed:11px"], "color": ["token:tokens.colors.text", "token:tokens.colors.muted", "token:tokens.colors.inverseText"],
+        "surface": ["token:tokens.colors.accent"], "border": ["not-applicable"], "shadow": ["not-applicable"]
+      }
+    },
+    "compareTable": {
+      "label": "对比表", "specimenRole": "compare-table", "selector": ".compare-block table",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["fixed:9px", "fixed:11px"],
+        "color": ["token:tokens.colors.text", "token:tokens.colors.inverseText"], "surface": ["token:tokens.colors.accent"],
+        "border": ["token:tokens.colors.line", "fixed:1px"], "shadow": ["not-applicable"]
+      }
+    },
+    "code": {
+      "label": "代码面板", "specimenRole": "code", "selector": ".code-block pre",
+      "currentSources": {
+        "font": ["fixed:mono"], "size": ["token:tokens.typography.captionPx"], "color": ["token:tokens.colors.inverseText", "recipe:social.recipes.code"],
+        "surface": ["token:tokens.colors.codeBackground", "recipe:social.recipes.code"], "border": ["token:tokens.colors.line", "token:tokens.shape.borderWidthPx", "recipe:social.recipes.code"],
+        "shadow": ["token:tokens.shape.shadow", "recipe:social.recipes.code"]
+      }
+    },
+    "contentFrame": {
+      "label": "内容框", "specimenRole": "content-stack", "selector": ".page-content-stack",
+      "currentSources": {
+        "font": ["not-applicable"], "size": ["not-applicable"], "color": ["not-applicable"],
+        "surface": ["token:tokens.colors.surface", "recipe:social.recipes.surface"],
+        "border": ["token:tokens.colors.line", "token:tokens.shape.borderWidthPx", "recipe:social.recipes.frame"],
+        "shadow": ["token:tokens.shape.shadow", "recipe:social.recipes.frame"]
+      }
+    },
+    "list": {
+      "label": "列表卡片", "specimenRole": "list", "selector": ".page li",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["token:tokens.typography.bodyPx"], "color": ["token:tokens.colors.text"],
+        "surface": ["token:tokens.colors.surface", "token:tokens.colors.accent", "recipe:social.recipes.list"],
+        "border": ["token:tokens.colors.line", "token:tokens.shape.borderWidthPx", "recipe:social.recipes.list"],
+        "shadow": ["recipe:social.recipes.list"]
+      }
+    },
+    "note": {
+      "label": "提示卡", "specimenRole": "note", "selector": ".note-block",
+      "currentSources": {
+        "font": ["token:tokens.typography.family"], "size": ["token:tokens.typography.bodyPx"], "color": ["token:tokens.colors.text"],
+        "surface": ["token:tokens.colors.surface", "token:tokens.colors.accentSecondary"],
+        "border": ["token:tokens.colors.accent", "fixed:3px"], "shadow": ["not-applicable"]
+      }
+    }
+  },
+  "plannedFields": {
+    "social.components.coverTitle.fontFamily": {"phase":"P1", "status":"implemented", "specimenRole":"cover-title"},
+    "social.components.coverTitle.fontWeight": {"phase":"P1", "status":"implemented", "specimenRole":"cover-title"},
+    "social.components.coverTitle.sizeScale": {"phase":"P1", "status":"implemented", "specimenRole":"cover-title"},
+    "social.components.coverTitle.colorRole": {"phase":"P1", "status":"implemented", "specimenRole":"cover-title"},
+    "social.components.coverTitle.borderColorRole": {"phase":"P1", "status":"implemented", "specimenRole":"cover-title"},
+    "social.components.eyebrow.fontFamily": {"phase":"P1", "status":"implemented", "specimenRole":"eyebrow"},
+    "social.components.eyebrow.fontWeight": {"phase":"P1", "status":"implemented", "specimenRole":"eyebrow"},
+    "social.components.eyebrow.colorRole": {"phase":"P1", "status":"implemented", "specimenRole":"eyebrow"},
+    "social.components.lead.sizeScale": {"phase":"P1", "status":"implemented", "specimenRole":"lead"},
+    "social.components.lead.colorRole": {"phase":"P1", "status":"implemented", "specimenRole":"lead"},
+    "social.components.statValue.fontFamily": {"phase":"P2", "status":"implemented", "specimenRole":"stat-value"},
+    "social.components.statValue.fontWeight": {"phase":"P2", "status":"implemented", "specimenRole":"stat-value"},
+    "social.components.statValue.sizeScale": {"phase":"P2", "status":"implemented", "specimenRole":"stat-value"},
+    "social.components.statValue.colorRole": {"phase":"P2", "status":"implemented", "specimenRole":"stat-value"},
+    "social.components.statLabel.sizeScale": {"phase":"P2", "status":"implemented", "specimenRole":"stat-label"},
+    "social.components.statLabel.colorRole": {"phase":"P2", "status":"implemented", "specimenRole":"stat-label"},
+    "social.components.step.titleColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"step"},
+    "social.components.step.bodyColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"step"},
+    "social.components.step.markerSurfaceRole": {"phase":"P2", "status":"implemented", "specimenRole":"step"},
+    "social.components.compareTable.headerTextColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"compare-table"},
+    "social.components.compareTable.headerSurfaceRole": {"phase":"P2", "status":"implemented", "specimenRole":"compare-table"},
+    "social.components.compareTable.bodyTextColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"compare-table"},
+    "social.components.compareTable.borderColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"compare-table"},
+    "social.components.list.textColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"list"},
+    "social.components.list.surfaceRole": {"phase":"P2", "status":"implemented", "specimenRole":"list"},
+    "social.components.list.borderColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"list"},
+    "social.components.list.borderWeight": {"phase":"P2", "status":"implemented", "specimenRole":"list"},
+    "social.components.note.textColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"note"},
+    "social.components.note.surfaceRole": {"phase":"P2", "status":"implemented", "specimenRole":"note"},
+    "social.components.note.borderColorRole": {"phase":"P2", "status":"implemented", "specimenRole":"note"},
+    "social.components.note.borderWeight": {"phase":"P2", "status":"implemented", "specimenRole":"note"},
+    "social.components.contentTitle.fontFamily": {"phase":"P3", "status":"implemented", "specimenRole":"content-title"},
+    "social.components.contentTitle.sizeScale": {"phase":"P3", "status":"implemented", "specimenRole":"content-title"},
+    "social.components.contentTitle.colorRole": {"phase":"P3", "status":"implemented", "specimenRole":"content-title"},
+    "social.components.endingTitle.fontFamily": {"phase":"P3", "status":"implemented", "specimenRole":"ending-title"},
+    "social.components.endingTitle.sizeScale": {"phase":"P3", "status":"implemented", "specimenRole":"ending-title"},
+    "social.components.endingTitle.colorRole": {"phase":"P3", "status":"implemented", "specimenRole":"ending-title"}
+  }
+}

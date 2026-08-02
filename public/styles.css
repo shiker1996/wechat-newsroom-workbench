@@ -964,6 +964,7 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 #social-theme-trigger{width:100%;height:35px}
 .typeset-toolbar #typeset-theme-trigger{width:170px;height:44px}
 @media(max-width:780px){#social-theme-trigger,.typeset-toolbar #typeset-theme-trigger{width:100%}}
+.theme-component-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.theme-component-card{min-width:0;margin:0;padding:12px;border:1px solid var(--line);background:color-mix(in srgb,var(--paper) 86%,white)}.theme-component-card legend{display:grid;gap:3px;padding:0 6px}.theme-component-card legend b{font:700 13px var(--display)}.theme-component-card legend small{color:var(--muted);font-size:9px;line-height:1.45}.theme-component-card>div{display:grid;gap:8px}.theme-component-card .theme-token-field{grid-template-columns:1fr}.theme-component-card select{width:100%}@media(max-width:900px){.theme-component-grid{grid-template-columns:1fr}}
 
 /* Theme specimens expose actual hierarchy instead of a color-only thumbnail. */
 .theme-picker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
