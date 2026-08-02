@@ -505,17 +505,31 @@ test('性能小数不会被误判成编号步骤',()=>{
   assert.match(html,/Claude Code 增加约 212\.7 MB/);
 });
 
-test('三个快速开始内容块的前两块同类且体量接近时固定等宽并由末块补齐第二行',()=>{
-  const page={kind:'quickstart',content_blocks:[
+test('三个内容块回归单列避免半栏破碎构图，四个及以上同级块才使用等宽双列',()=>{
+  const three={kind:'quickstart',content_blocks:[
     {type:'code',title:'macOS / Linux',content:'tool install'},
     {type:'code',title:'Windows',content:'tool.exe install'},
-    {type:'list',title:'登录方式',content:'GitHub\nGoogle\n邮箱'},
+    {type:'code',title:'验证安装',content:'tool --version'},
   ]};
-  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(page,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'split-even');assert.equal(composition.flow,'alternate');}
-  const html=renderStoryboardHtml({topic:'三块构图',pages:[page],compositionMode:'smart'});
-  assert.match(html,/blocks-3[^\"]*comp-cols-split-even[^\"]*comp-flow-alternate[^\"]*tri-span-last/);
+  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(three,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'single');assert.equal(composition.flow,'stack');}
+  const four={kind:'capability',content_blocks:[
+    {type:'text',title:'能力一',content:'同级能力说明一'},
+    {type:'text',title:'能力二',content:'同级能力说明二'},
+    {type:'text',title:'能力三',content:'同级能力说明三'},
+    {type:'text',title:'能力四',content:'同级能力说明四'},
+  ]};
+  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(four,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'split-even');assert.equal(composition.flow,'alternate');}
+  const html=renderStoryboardHtml({topic:'四块构图',pages:[four],compositionMode:'smart'});
+  assert.match(html,/blocks-4[^"]*comp-cols-split-even[^"]*comp-flow-alternate/);
+  // 跨栏补齐规则保留，但只在非单列时生效
   assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-first:not\(\.comp-cols-single\) \.content-block:first-of-type\{grid-column:1\/-1\}/);
   assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-last:not\(\.comp-cols-single\) \.content-block:last-child\{grid-column:1\/-1\}/);
+});
+
+test('块内列表的双列网格只在单列页面启用，避免与分列页面嵌套出四列',()=>{
+  const html=renderStoryboardHtml({topic:'列表网格',pages:[{kind:'capability',content_blocks:[{type:'list',title:'要点',items:['一','二','三','四','五','六','七']}]}],compositionMode:'smart'});
+  assert.match(html,/\.composition-smart\.comp-cols-single\.items-7 \.list-block ul/);
+  assert.doesNotMatch(html,/\.composition-smart\.items-7 \.list-block ul/);
 });
 
 test('只有明确主辅关系才使用非等宽列且列宽方向由内容顺序决定',()=>{
