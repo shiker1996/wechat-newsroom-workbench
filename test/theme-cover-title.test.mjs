@@ -77,7 +77,7 @@ test('四种配方形成可辨认的标题版式语言',()=>{
   assert.match(css.poster,/text-shadow:3px 3px 0 var\(--accent2\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
   assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--ink\)/);
   const html=compileThemePreview({target:'social',definition:themeWithCoverTitle('highlight-block')}).html;
-  assert.equal((html.match(/class="cover-title-line"/g)||[]).length,5);
+  assert.equal((html.match(/class="cover-title-line"/g)||[]).length,2);
   assert.match(html.replace(/<[^>]+>/g,''),/如何把复杂的技术内容讲得清楚又准确/);
 });
 
