@@ -87,6 +87,16 @@ test('P1 发布门禁拒绝组件低对比色和超出固定画布密度预算�
   const dense=userTheme();Object.assign(dense.tokens.typography,{h1Px:34,h2Px:18,bodyPx:13});dense.social.components.coverTitle.sizeScale='display';assert.throws(()=>validateThemeDefinition(dense,{expectedTarget:'social'}),(error)=>error.issues.some((item)=>item.code==='SOCIAL_COMPONENT_DENSITY_BUDGET'));
 });
 
+test('强调色块配方下封面标题文字低对比时门禁给出可操作提示，编辑器随配方联动文字颜色',()=>{
+  const stale=userTheme();stale.social.recipes.coverTitle='highlight-block';stale.social.components.coverTitle.colorRole='text';
+  const report=auditThemeForPublish(stale,{target:'social'});
+  const hit=report.issues.find((item)=>item.field==='social.components.coverTitle.colorRole'&&item.code==='LOW_COMPONENT_CONTRAST');
+  assert.ok(hit,'应检出强调色块下的低对比文字');
+  assert.match(hit.message,/反色/);assert.match(hit.message,/恢复配方推荐值/);
+  const source=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
+  assert.match(source,/social\.recipes\.coverTitle/);assert.match(source,/highlight-block'&&colorRole\.value==='text'/);assert.match(source,/colorRole\.value='inverseText'/);
+});
+
 test('P1 旧主题无 components 时保持配方默认效果并可继续编译',()=>{
   const legacy=structuredClone(socialThemeDefinition('mocha'));delete legacy.hash;delete legacy.file;delete legacy.social.components;assert.doesNotThrow(()=>validateThemeDefinition(legacy,{expectedTarget:'social'}));const resolved=resolveSocialComponents(legacy);assert.equal(resolved.coverTitle.fontFamily,'serif');assert.equal(resolved.coverTitle.colorRole,'text');assert.match(compileSocialTheme(legacy).css,/\.page-cover h1/);
 });
