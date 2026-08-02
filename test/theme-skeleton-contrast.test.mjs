@@ -27,8 +27,22 @@ test('图文骨架类名作用于封面、内容页和结尾页',()=>{
 
 test('editorial-split 双栏构图只作用于非封面页，封面保持底部锚定',()=>{
   const compiled=compileSocialTheme(socialThemeDefinition('bone-white'));
-  assert.match(compiled.css,/\.skeleton-editorial-split:not\(\.page-cover\) \.page-content-stack\{display:grid/);
+  assert.match(compiled.css,/\.skeleton-editorial-split:not\(\.page-cover\):not\(\.blocks-1\):not\(\.blocks-3\):not\(\.comp-cols-single\) \.page-content-stack\{display:grid/);
   assert.doesNotMatch(compiled.css,/\.skeleton-editorial-split \.page-content-stack\{display:grid/);
+});
+
+test('editorial-split 骨架服从管线单列决策：3 块与 comp-cols-single 页面不启用双栏',()=>{
+  const html=renderStoryboardHtml({topic:'测试主题',repository:'example/repo',visualStyle:'solarized',contentType:'repository',channelMode:'xiaohongshu',compositionMode:'smart',pages:[
+    {kind:'content',title:'三块页面',content_blocks:[{type:'steps',title:'步骤',items:[{title:'一',content:'x'}]},{type:'list',title:'清单',items:['a','b']},{type:'note',title:'提示',content:'z'}]},
+    {kind:'content',title:'两块页面',content_blocks:[{type:'list',title:'清单一',items:['a','b']},{type:'list',title:'清单二',items:['c','d']}]},
+  ]});
+  const pages=[...html.matchAll(/<section class="([^"]*)"[^>]*data-page-number="(\d)"/g)];
+  assert.match(pages[0][1],/blocks-3/);assert.match(pages[0][1],/comp-cols-single/);
+  assert.match(pages[1][1],/blocks-2/);assert.doesNotMatch(pages[1][1],/comp-cols-single/);
+  const css=html.match(/<style[^>]*>([\s\S]*?)<\/style>/)?.[1]||'';
+  const gridRule=css.match(/\.skeleton-editorial-split[^{]*\{display:grid[^}]*\}/)?.[0]||'';
+  assert.ok(gridRule,'应存在 editorial-split 双栏规则');
+  assert.match(gridRule,/:not\(\.blocks-3\)/);assert.match(gridRule,/:not\(\.comp-cols-single\)/);
 });
 
 test('浅色代码面板的文章主题代码文字回退为正文色',()=>{
