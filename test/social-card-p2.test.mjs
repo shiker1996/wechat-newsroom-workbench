@@ -483,7 +483,9 @@ test('纯 underfilled 页面启用有界舒展排版，结构或溢出问题不�
   assert.match(html,/density-normal density-expanded/);
   assert.match(html,/data-density-adjustment="expanded"/);
   assert.match(html,/data-density-adjustment="none"/);
-  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 3px\);padding-block:8px\}/);
+  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 5px\);padding-block:14px\}/);
+  assert.match(html,/\.page\.density-expanded\.blocks-1 \.page-content-stack,\.page\.density-expanded\.blocks-2 \.page-content-stack\{gap:calc\(var\(--card-gap\) \+ 24px\)\}/);
+  assert.match(html,/\.page\.density-expanded\.blocks-1 \.content-block,\.page\.density-expanded\.blocks-2 \.content-block\{padding-block:22px\}/);
 });
 
 test('智能构图中的四项同级指标使用二乘二网格',()=>{
