@@ -10,12 +10,7 @@
 
 ## 截图证据
 
-- [01-theme-center.png](./theme-ux/01-theme-center.png)：主题中心总览
-- [02-article-theme-picker.png](./theme-ux/02-article-theme-picker.png)：文章主题选择器
-- [03-social-theme-picker.png](./theme-ux/03-social-theme-picker.png)：图文主题选择器
-- [04-article-live-magazine-warm.png](./theme-ux/04-article-live-magazine-warm.png)：文章正式编译样稿
-- [05-social-live-preview.png](./theme-ux/05-social-live-preview.png)：主题编辑器中的图文正式样稿
-- [06-social-live-canvas.png](./theme-ux/06-social-live-canvas.png)：图文正式画布截取
+> 原始截图已从仓库移除以减小体积（2026-08-02，git 历史仍可追溯）；需要时可在本地工作台重新截取：主题中心总览、文章主题选择器、图文主题选择器、文章正式编译样稿、主题编辑器图文样稿、图文正式画布。
 
 ## 步骤与健康度
 
@@ -37,7 +32,7 @@
 
 ### P1：图文封面下半部分普遍留白过大
 
-证据：[06-social-live-canvas.png](./theme-ux/06-social-live-canvas.png) 中，封面标题和眉题集中在上半部，卡片下半部大面积空白；在 14 套主题的正式截图中都能观察到相同现象，只是颜色和装饰不同。
+证据：正式画布截图中，封面标题和眉题集中在上半部，卡片下半部大面积空白；在 14 套主题的正式截图中都能观察到相同现象，只是颜色和装饰不同。
 
 影响：封面视觉重心偏上，主题配方没有充分利用封面作为“第一张叙事页”的机会。
 
