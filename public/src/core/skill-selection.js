@@ -36,7 +36,7 @@ export async function loadStageSkillControls(container, url) {
       <span><b>${escapeHtml(slot.name)}</b><small>${escapeHtml(slot.kind)} · ${escapeHtml(slot.inputContract)} → ${escapeHtml(slot.outputContract)}</small></span>
       <select data-stage-skill="${escapeHtml(slot.id)}" aria-label="${escapeHtml(slot.name)}技能">
         <option value="">使用默认技能</option>
-        ${slot.items.filter((item)=>item.available&&!item.isDefault).map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${item.thirdParty?"已安装":"内置"}</option>`).join("")}
+        ${slot.items.filter((item)=>item.available).map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${item.isDefault?"工作区默认":item.thirdParty?"已安装":"内置"}</option>`).join("")}
         ${slot.items.filter((item)=>!item.available).map((item)=>`<option value="${escapeHtml(item.id)}" disabled>${escapeHtml(item.name)} · ${escapeHtml(item.unavailableReason)}</option>`).join("")}
       </select>
     </label>`).join("");

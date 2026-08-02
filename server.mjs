@@ -464,7 +464,7 @@ async function api(request, response, url) {
       provider:input.provider,type:input.force?'retag':'tag',force:Boolean(input.force) }));
     const result = await tagBatch({ gateway: models, store, batchId: decodeURIComponent(tagMatch[1]),
       provider: input.provider, limit: input.limit, force:Boolean(input.force),
-      maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))) });
+      maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))), workspaceRoot: config.workspaceRoot });
     try {
       const cardResult = await ensureBatchEventCards({ gateway: models, store, batchId: decodeURIComponent(tagMatch[1]),
         provider: input.provider, workspaceRoot: config.workspaceRoot, maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))), regenerate: Boolean(input.force) });

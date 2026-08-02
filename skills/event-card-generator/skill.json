@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"event-card-generator","name":"事件事实卡生成","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"event_clusters","outputContract":"event_fact_cards","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

@@ -106,6 +106,7 @@ node scripts/check-env.mjs
 需要修改端口、RSSHub 路由、模型参数或内容目录时，把 `config.example.json` 复制为 `config.local.json` 后修改。该文件不会进入 Git。工作台的“设置与数据”页面也可维护 `.env` 中受支持的运行参数、控制 Reddit/RSSHub 进程并导出或恢复备份。
 账号定位（名称、读者画像、内容支柱、风格约束等）把 `account-context.example.json` 复制为 `account-context.json` 后按自己的账号修改，字段含义见示例文件与 `lib/domain/account-context.mjs`；该文件不会进入 Git，请勿提交真实账号画像。
 临时并行验收可在 `.env` 设置 `WORKBENCH_PORT=4318`；日常运行保持默认 `4317` 即可。
+全部配置项（`.env`、`config.local.json`、`account-context.json` 含选题评分参数、技能覆盖层）的字段说明见 [docs/configuration.md](./docs/configuration.md)；技能包与工具插件的编写和安装见 [docs/extending.md](./docs/extending.md)。
 
 ## 接入大模型
 

@@ -42,11 +42,11 @@
   },
   "recipes": {
     "article": {
-      "frame":"complete", "kicker":"complete", "h1":"complete", "h2":"complete", "lead":"complete",
+      "frame":"complete", "rhythm":"complete", "kicker":"complete", "h1":"complete", "h2":"complete", "lead":"complete",
       "quote":"complete", "divider":"complete", "list":"complete", "table":"complete", "image":"complete"
     },
     "social": {
-      "surface":"complete", "frame":"complete", "decoration":"complete", "eyebrow":"complete",
+      "surface":"complete", "frame":"complete", "decoration":"complete", "eyebrow":"complete", "coverTitle":"complete", "skeleton":"complete", "coverSupport":"complete",
       "ending":"complete", "list":"complete", "code":"complete"
     }
   },

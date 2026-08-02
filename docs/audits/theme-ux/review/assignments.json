@@ -1,0 +1,272 @@
+{
+  "social": {
+    "bone-white": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "circle",
+        "eyebrow": "underline",
+        "coverTitle": "editorial",
+        "ending": "accent-fill",
+        "list": "outlined-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "brutalist": {
+      "recipes": {
+        "surface": "brutalist",
+        "frame": "brutalist-frame",
+        "decoration": "orbit",
+        "eyebrow": "stamp",
+        "coverTitle": "poster",
+        "ending": "hard-fill",
+        "list": "hard-card",
+        "code": "hard-panel"
+      },
+      "pages": 5
+    },
+    "charcoal": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "circle",
+        "eyebrow": "plain",
+        "coverTitle": "classic",
+        "ending": "accent-fill",
+        "list": "outlined-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "crimson": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "poster",
+        "ending": "accent-fill",
+        "list": "hard-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "ice-blue": {
+      "recipes": {
+        "surface": "base",
+        "frame": "soft-orbit",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "classic",
+        "ending": "dark-fill",
+        "list": "soft-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "lavender": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "soft-blur",
+        "eyebrow": "accent",
+        "coverTitle": "classic",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "mocha": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "editorial",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "neon": {
+      "recipes": {
+        "surface": "neon",
+        "frame": "neon-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "highlight-block",
+        "ending": "accent-fill",
+        "list": "outlined-card",
+        "code": "terminal-panel"
+      },
+      "pages": 5
+    },
+    "orange": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "poster",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "paper-craft": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "paper-offset",
+        "eyebrow": "stamp",
+        "coverTitle": "editorial",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "peach": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "soft-blur",
+        "eyebrow": "accent",
+        "coverTitle": "classic",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "retro-terminal": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "scanlines",
+        "eyebrow": "accent",
+        "coverTitle": "highlight-block",
+        "ending": "accent-fill",
+        "list": "outlined-card",
+        "code": "terminal-panel"
+      },
+      "pages": 5
+    },
+    "solarized": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "editorial",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    },
+    "tokyo-night": {
+      "recipes": {
+        "surface": "palette",
+        "frame": "palette-frame",
+        "decoration": "orbit",
+        "eyebrow": "accent",
+        "coverTitle": "highlight-block",
+        "ending": "accent-fill",
+        "list": "tinted-card",
+        "code": "dark-panel"
+      },
+      "pages": 5
+    }
+  },
+  "article": {
+    "career-essay": {
+      "recipes": {
+        "frame": "letter-frame",
+        "kicker": "center-label",
+        "h1": "serif-display",
+        "h2": "cn-number",
+        "lead": "rule-bottom",
+        "quote": "quote-marks",
+        "divider": "stars",
+        "list": "default",
+        "table": "tinted-header",
+        "image": "plain"
+      }
+    },
+    "gossip-card": {
+      "recipes": {
+        "frame": "gossip-frame",
+        "kicker": "none",
+        "h1": "gossip-title",
+        "h2": "eyebrow-border",
+        "lead": "none",
+        "quote": "dark-block",
+        "divider": "hairline",
+        "list": "default",
+        "table": "tinted-header",
+        "image": "rounded"
+      }
+    },
+    "magazine-warm": {
+      "recipes": {
+        "frame": "warm-frame",
+        "kicker": "chip",
+        "h1": "editorial-serif",
+        "h2": "numbered-rule",
+        "lead": "rule-bottom",
+        "quote": "warm-card",
+        "divider": "ornament",
+        "list": "default",
+        "table": "tinted-header",
+        "image": "plain"
+      }
+    },
+    "news-digest": {
+      "recipes": {
+        "frame": "news-frame",
+        "kicker": "chip",
+        "h1": "invert-block",
+        "h2": "invert-tag",
+        "lead": "none",
+        "quote": "plain-bar",
+        "divider": "thick-bar",
+        "list": "news-panel",
+        "table": "ink-header",
+        "image": "plain"
+      }
+    },
+    "research-report": {
+      "recipes": {
+        "frame": "report-frame",
+        "kicker": "center-label",
+        "h1": "center-double",
+        "h2": "center-double",
+        "lead": "rule-bottom",
+        "quote": "boxed",
+        "divider": "rule-mark",
+        "list": "default",
+        "table": "ink-header",
+        "image": "framed"
+      }
+    },
+    "tech-wire": {
+      "recipes": {
+        "frame": "terminal-frame",
+        "kicker": "mono-line",
+        "h1": "terminal-title",
+        "h2": "terminal",
+        "lead": "none",
+        "quote": "terminal-panel",
+        "divider": "mono-comment",
+        "list": "chevron",
+        "table": "dark-header",
+        "image": "plain"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"hotspot-tagging","name":"热点语义标注与预评估","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"hotspot_batch","outputContract":"hotspot_tags","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -483,7 +483,24 @@ test('纯 underfilled 页面启用有界舒展排版，结构或溢出问题不�
   assert.match(html,/density-normal density-expanded/);
   assert.match(html,/data-density-adjustment="expanded"/);
   assert.match(html,/data-density-adjustment="none"/);
-  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 3px\);padding-block:8px\}/);
+  assert.match(html,/\.page\.density-expanded \.content-block\{gap:calc\(var\(--paragraph-gap\) \+ 5px\);padding-block:14px\}/);
+  assert.match(html,/\.page\.density-expanded\.blocks-1 \.page-content-stack,\.page\.density-expanded\.blocks-2 \.page-content-stack\{gap:calc\(var\(--card-gap\) \+ 24px\)\}/);
+  assert.match(html,/\.page\.density-expanded\.blocks-1 \.content-block,\.page\.density-expanded\.blocks-2 \.content-block\{padding-block:22px\}/);
+});
+
+test('布局审计轮次穷尽的失败信息带逐页明细与故事板编辑指引',()=>{
+  const message=layoutAuditFailureMessage({pages:[
+    {page:2,valid:false,kind:'content',utilization:96.8,issues:['overfilled']},
+    {page:6,valid:false,kind:'content',utilization:47.4,issues:['underfilled']},
+    {page:7,valid:true,kind:'ending',utilization:30,issues:[]},
+  ]},5);
+  assert.match(message,/布局审计 5 轮后仍未通过/);
+  assert.match(message,/P2 内容过多（版面利用率 96\.8%）/);
+  assert.match(message,/P6 内容不足（版面利用率 47\.4%）/);
+  assert.ok(!message.includes('P7'));
+  assert.match(message,/02 卡片故事板/);
+  assert.match(message,/内容不足的页：补充内容块、增加列表条目或扩写段落/);
+  assert.match(message,/内容放不下的页：删减、拆分或缩短文字/);
 });
 
 test('智能构图中的四项同级指标使用二乘二网格',()=>{
@@ -505,17 +522,31 @@ test('性能小数不会被误判成编号步骤',()=>{
   assert.match(html,/Claude Code 增加约 212\.7 MB/);
 });
 
-test('三个快速开始内容块的前两块同类且体量接近时固定等宽并由末块补齐第二行',()=>{
-  const page={kind:'quickstart',content_blocks:[
+test('三个内容块回归单列避免半栏破碎构图，四个及以上同级块才使用等宽双列',()=>{
+  const three={kind:'quickstart',content_blocks:[
     {type:'code',title:'macOS / Linux',content:'tool install'},
     {type:'code',title:'Windows',content:'tool.exe install'},
-    {type:'list',title:'登录方式',content:'GitHub\nGoogle\n邮箱'},
+    {type:'code',title:'验证安装',content:'tool --version'},
   ]};
-  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(page,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'split-even');assert.equal(composition.flow,'alternate');}
-  const html=renderStoryboardHtml({topic:'三块构图',pages:[page],compositionMode:'smart'});
-  assert.match(html,/blocks-3[^\"]*comp-cols-split-even[^\"]*comp-flow-alternate[^\"]*tri-span-last/);
+  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(three,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'single');assert.equal(composition.flow,'stack');}
+  const four={kind:'capability',content_blocks:[
+    {type:'text',title:'能力一',content:'同级能力说明一'},
+    {type:'text',title:'能力二',content:'同级能力说明二'},
+    {type:'text',title:'能力三',content:'同级能力说明三'},
+    {type:'text',title:'能力四',content:'同级能力说明四'},
+  ]};
+  for(let index=0;index<20;index+=1){const composition=normalizeCardComposition(four,{pageIndex:4,seed:`seed-${index}`}).composition;assert.equal(composition.columns,'split-even');assert.equal(composition.flow,'alternate');}
+  const html=renderStoryboardHtml({topic:'四块构图',pages:[four],compositionMode:'smart'});
+  assert.match(html,/blocks-4[^"]*comp-cols-split-even[^"]*comp-flow-alternate/);
+  // 跨栏补齐规则保留，但只在非单列时生效
   assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-first:not\(\.comp-cols-single\) \.content-block:first-of-type\{grid-column:1\/-1\}/);
   assert.match(html,/\.composition-smart\.blocks-3\.comp-flow-alternate\.tri-span-last:not\(\.comp-cols-single\) \.content-block:last-child\{grid-column:1\/-1\}/);
+});
+
+test('块内列表的双列网格只在单列页面启用，避免与分列页面嵌套出四列',()=>{
+  const html=renderStoryboardHtml({topic:'列表网格',pages:[{kind:'capability',content_blocks:[{type:'list',title:'要点',items:['一','二','三','四','五','六','七']}]}],compositionMode:'smart'});
+  assert.match(html,/\.composition-smart\.comp-cols-single\.items-7 \.list-block ul/);
+  assert.doesNotMatch(html,/\.composition-smart\.items-7 \.list-block ul/);
 });
 
 test('只有明确主辅关系才使用非等宽列且列宽方向由内容顺序决定',()=>{

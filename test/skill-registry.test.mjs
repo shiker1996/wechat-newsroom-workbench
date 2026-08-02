@@ -69,8 +69,8 @@ test('Store 持久化历史 generation snapshot，不受后续对象修改影响
 test('全部内置技能都提供有效的结构化清单', () => {
   const skillsRoot=path.join(process.cwd(),'skills');
   const directories=fs.readdirSync(skillsRoot,{withFileTypes:true}).filter((item)=>item.isDirectory());
-  assert.equal(directories.length,29);
-  for(const id of ['repository-card-storyboard','event-card-storyboard','custom-card-storyboard']){
+  assert.equal(directories.length,34);
+  for(const id of ['repository-card-storyboard','event-card-storyboard','custom-card-storyboard','hotspot-tagging','hotspot-brainstorm','hotspot-synthesis','event-card-generator','editorial-room']){
     assert.ok(directories.some((item)=>item.name===id));
   }
   assert.ok(directories.some((item)=>item.name==='xiaohongshu-article-generator'));
