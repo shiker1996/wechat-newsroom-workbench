@@ -55,6 +55,9 @@ test('表面配方的页面底色消费 page token，图文页背景可调',()=>
   const brutalist=compileSocialTheme(socialThemeDefinition('brutalist'));
   assert.match(brutalist.css,/\.page\{background:color-mix\(in srgb,var\(--page\) 82%/);
   assert.doesNotMatch(brutalist.css,/\.page\{background:color-mix\(in srgb,var\(--surface\) 82%/);
+  const grid=structuredClone(socialThemeDefinition('ice-blue'));delete grid.hash;delete grid.file;grid.social.effects.texture='grid';
+  const gridCss=compileSocialTheme(grid).css;
+  assert.ok(gridCss.includes('.page{background-color:var(--page);background-image:linear-gradient'),'grid 纹理不能把 .page 背景冲成透明');
 });
 
 test('浅色代码面板的文章主题代码文字回退为正文色',()=>{
