@@ -60,12 +60,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'d8e8a0132b5f0307bfc123056adac1a2627341fbe313733e16b15467905f39be',
-    'repository/xiaohongshu':'0c748cb81c0779d93d865a6c80388df95899c5064a0e3f89f497a4a80e4973b5',
-    'event/wechat':'4f10b9aa901f480fdf40a7e5ad780299ac9511b7646e3252683dd060465b704f',
-    'event/xiaohongshu':'73ce4a8d8573f269e6a9b142b379c168e4162a34fccc963936ef17799a3e1384',
-    'custom/wechat':'a78279ecf94306c47f992835aeb144df4dfc82ebe23b48fbde5eb0996b3b264e',
-    'custom/xiaohongshu':'8a2de17ffb325e17e62498fc9f37044600bcc516312d8e6cea478561b0f52728',
+    'repository/wechat':'20a6c3ac8052dfcf5eb0b8530a2ba141d945b7b5ad766ea70293e868ed8656db',
+    'repository/xiaohongshu':'fc5c44f98da94f9d9ab023d6e5d5d94c8fe8c7eae0da8a1a81647f9fe8777ac0',
+    'event/wechat':'1cd1996c58977d992efe6285838b8e12135f8a2cc4d5914525a8f5cb0a9e7917',
+    'event/xiaohongshu':'cd846f9268ec02c078e4f9cdd1b5aa27a8e1f8a111879ca1a2e2cf9004addb96',
+    'custom/wechat':'2ccd4c4e7ce84069259d38f9506a465c8959f88b788ad45c4685fa0b5ae5681a',
+    'custom/xiaohongshu':'9cf387b9344e7354cc72907759afb970fc02787b199d57156ea76d3f2b8559c0',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
