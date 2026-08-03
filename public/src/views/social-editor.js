@@ -166,7 +166,12 @@ async function analyzeEditorial(candidateId=selectedId) {
   if(!candidateId)return; const data=await request(`/api/candidates/${candidateId}/ai/card-editorial`,{method:'POST',body:JSON.stringify({
     stageSkills:selectedStageSkills(document.getElementById('social-stage-skills')),
   })});
-  if(candidateId===selectedId){renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
+  if(candidateId===selectedId){
+    const reasoning=typeof data.reasoning==='string'&&data.reasoning.trim()?data.reasoning:'';
+    renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);
+    const preview=document.getElementById('card-plan-preview');
+    if(preview&&reasoning)preview.insertAdjacentHTML('afterbegin',`<details class="thinking-box"><summary>思考过程</summary><div class="thinking-text">${escapeHtml(reasoning)}</div></details>`);
+    renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
 function renderStoryboardLoading(message){document.getElementById("card-plan-preview").innerHTML=`<div class="storyboard-loading"><span class="storyboard-spinner"></span><div><b>${escapeHtml(message)}</b><small>${selectedContentType==='event'?'正在读取事实、主张、时间线和来源风险，请勿重复点击。':'正在读取 README、提取能力并规划逐页内容，请勿重复点击。'}</small></div></div>`;}
@@ -311,8 +316,8 @@ function bindCustomSocialForm(){
     if(!messages||!button)return;
     messages.querySelector('.editorial-chat-empty')?.remove();
     if(answer)messages.insertAdjacentHTML('beforeend',`<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll('\n','<br>')}</p></div>`);
-    const sm=document.createElement('div');sm.className='editorial-message assistant streaming';sm.innerHTML='<b>AI 策划 · 实时回应</b><p></p>';messages.append(sm);messages.scrollTop=messages.scrollHeight;
-    const st=sm.querySelector('p');
+    const sm=document.createElement('div');sm.className='editorial-message assistant streaming';sm.innerHTML='<b>AI 策划 · 实时回应</b><details class="thinking-box" hidden><summary>思考过程</summary><div class="thinking-text"></div></details><p class="reply-text"></p>';messages.append(sm);messages.scrollTop=messages.scrollHeight;
+    const st=sm.querySelector('.reply-text');const thinkingText=sm.querySelector('.thinking-text');const thinkingBox=sm.querySelector('.thinking-box');
     button.disabled=true;button.textContent='AI 正在回应…';
     try{
       const response=await fetch(`/api/batches/${encodeURIComponent(batch.id)}/custom-social-chat/stream`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({provider:document.getElementById('custom-chat-provider')?.value||'',answer,draft:collectDraft(),history:chat.history})});
@@ -322,9 +327,10 @@ function bindCustomSocialForm(){
       const consume=(line)=>{
         if(!line.trim())return;
         const event=JSON.parse(line);
+        if(event.type==='thinking'){if(thinkingBox){thinkingBox.hidden=false;thinkingBox.open=true;}if(thinkingText){thinkingText.textContent+=event.text||'';thinkingText.scrollTop=thinkingText.scrollHeight;}}
         if(event.type==='delta'&&st)st.textContent+=event.text||'';
         if(event.type==='error')throw new Error(event.error||'策划助手调用失败');
-        if(event.type==='done')done=event.data||{};
+        if(event.type==='done'){done=event.data||{};if(thinkingBox)thinkingBox.open=false;}
         messages.scrollTop=messages.scrollHeight;
       };
       while(true){const{done:end,value}=await reader.read();if(end)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split(/\r?\n/);buffer=parts.pop()||'';for(const line of parts)consume(line);}
