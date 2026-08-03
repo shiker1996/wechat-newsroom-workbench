@@ -72,3 +72,16 @@ test('content_filter 与 insufficient_system_resource 报出明确错误', async
     });
   }
 });
+
+test('finish_reason=length 且内容为空时按截断报错，不把空串传给下游', async () => {
+  await withServer((req, res) => {
+    req.resume();
+    req.on('end', () => res.end(JSON.stringify({ choices: [{ message: { content: '' }, finish_reason: 'length' }], usage: {} })));
+  }, async (port) => {
+    const gateway = makeGateway(port);
+    await assert.rejects(
+      gateway.complete({ purpose: 'article-drafting-pipeline', messages: [{ role: 'user', content: 'hi' }] }),
+      /输出达到上限且未返回内容/,
+    );
+  });
+});

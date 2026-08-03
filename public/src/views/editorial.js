@@ -275,6 +275,9 @@ async function loadSimilarArticles(id) {
 }
 
 function renderEditorialReadiness() {
+  // 与 lib/domain/open-questions.mjs 保持一致：模型常把"没有未决问题"写成
+  // "无"或"无。……（补充说明）"，按清零处理；不误伤"无版权数据能否使用？"这类真问题。
+  const isNoneOpenQuestions = (value) => !value || /^(?:无|没有了?|暂无|无未决问题|none|n\/a)(?:[。．.，,、：:；;\s]|$)/i.test(value);
   const gate = document.getElementById("editorial-production-gate");
   if (!gate) return;
   const form = document.getElementById("editorial-form");
@@ -283,7 +286,7 @@ function renderEditorialReadiness() {
   const checks = [
     { label: "锁定命题", field: "thesis", ok: Boolean(text("thesis")) },
     { label: "事实基座", field: "confirmed_facts", ok: Boolean(text("confirmed_facts")) },
-    { label: "未决问题清零", field: "open_questions", ok: !text("open_questions") },
+    { label: "未决问题清零", field: "open_questions", ok: isNoneOpenQuestions(text("open_questions")) },
     { label: "可以立即写作", field: "next_action", ok: text("next_action") === "WRITE_NOW" },
     { label: "实践证据", field: "confirmed_experiences", ok: !form.elements.experience_required?.checked || Boolean(text("confirmed_experiences")) },
   ];
