@@ -703,6 +703,7 @@ async function api(request, response, url) {
         history: Array.isArray(input.history) ? input.history.slice(-40) : [],
         answer: String(input.answer || ''),
         onText: (text) => send({ type: 'delta', text }),
+        onThinking: (text) => send({ type: 'thinking', text }),
       });
       send({ type: 'done', data: { reply: result.reply, formUpdates: result.formUpdates, ready: result.ready, usage: result.usage, model: result.model } });
     } catch (error) {
@@ -784,7 +785,7 @@ async function api(request, response, url) {
     response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
     const send=(event)=>response.write(`${JSON.stringify(event)}\n`);
     try{
-      const result=await runTutorialChatStream({gateway:models,store,provider:input.provider,batchId,draft,history:Array.isArray(input.history)?input.history:[],answer:String(input.answer||''),projectContext,projectReadError,onText:(text)=>send({type:'delta',text})});
+      const result=await runTutorialChatStream({gateway:models,store,provider:input.provider,batchId,draft,history:Array.isArray(input.history)?input.history:[],answer:String(input.answer||''),projectContext,projectReadError,onText:(text)=>send({type:'delta',text}),onThinking:(text)=>send({type:'thinking',text})});
       send({type:'done',data:{...result,project:projectContext?{root:projectContext.root,summary:projectContext.summary,files:projectContext.files.map((item)=>item.path),truncated:projectContext.truncated}:null,projectReadError}});
     }catch(error){send({type:'error',error:error.message});}
     response.end();return true;

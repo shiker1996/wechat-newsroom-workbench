@@ -11,6 +11,9 @@ account-context.json
 # Generated data
 data/
 
+# Generated logs
+logs/
+
 # Generated articles
 articles/
 topics/
