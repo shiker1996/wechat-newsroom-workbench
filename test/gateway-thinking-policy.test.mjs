@@ -7,7 +7,7 @@ test('thinkingEnabledFor 按用途裁决：结构化抽取关闭，对话/写作
     'hotspot-tagging', 'event-card', 'hotspot-brainstorm-explore',
     'article-quality-gate-drafting', 'daily-quality-gate-seo', 'tutorial-quality-gate-review',
     'article-title-generation', 'daily-title-generation', 'tutorial-title-generation',
-    'article-fact-base', 'article-image-plan', 'article-visual-plan', 'article-visual-plan-mobile-retry',
+    'article-fact-base', 'article-planning', 'article-image-plan', 'article-visual-plan', 'article-visual-plan-mobile-retry',
     'magazine-design', 'social-card-copy', 'social-card-editorial', 'social-card-layout-repair',
     'connection-test',
   ]) {
@@ -15,7 +15,7 @@ test('thinkingEnabledFor 按用途裁决：结构化抽取关闭，对话/写作
   }
   for (const purpose of [
     'editorial-room', 'tutorial-chat', 'custom-social-chat',
-    'breaking-analysis', 'hotspot-synthesis-provisional', 'article-planning',
+    'breaking-analysis', 'hotspot-synthesis-provisional',
     'article-drafting-pipeline', 'article-humanize', 'article-review', 'article-seo',
     'daily-drafting', 'tutorial-drafting', 'typeset-html',
   ]) {
