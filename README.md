@@ -70,12 +70,12 @@
 
 ### 快速上手（Windows）
 
-只需要两个脚本：
+只需要两个脚本（电脑上没有安装 Node.js 也可以，脚本会自动下载独立运行时到 `.node-runtime/`，不改动系统环境）：
 
 1. **安装**：双击 `setup-workbench.cmd`（或 `npm run setup`）。交互向导会依次装好依赖、创建配置、引导填写 LLM Key、克隆并安装 RSSHub；缺什么会提示，失败可重跑（幂等）。
 2. **启动**：双击 `start-workbench.cmd`（或 `npm start`）。健康检查通过后自动打开浏览器；重复运行会提示“已经在运行”，不会起第二份服务。
 
-macOS / Linux 可尝试 `setup-workbench.sh` 与 `start-workbench.sh`，未在非 Windows 环境验证。
+macOS / Linux 可尝试 `setup-workbench.sh` 与 `start-workbench.sh`（同样支持 Node.js 缺失时自动安装），未在非 Windows 环境验证。
 
 ### 开发
 
