@@ -27,12 +27,6 @@ updates:
       day: monday
     open-pull-requests-limit: 3
   - package-ecosystem: npm
-    directory: /skills/wechat-inline-modules-to-images
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-  - package-ecosystem: npm
     directory: /skills/xiaohongshu-article-generator
     schedule:
       interval: weekly

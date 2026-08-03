@@ -1,0 +1,7 @@
+{
+  "id":"tavily-search","name":"Tavily 搜索","version":"1.0.0",
+  "capabilities":["content.web.search","content.news.search"],"entry":"./adapter.mjs","riskLevel":"network-read",
+  "inputSchema":{"type":"object","required":["query"],"additionalProperties":false,"properties":{"query":{"type":"string"},"maxResults":{"type":"integer"},"timeRange":{"type":"string","enum":["day","week","month","year"]}}},
+  "outputSchema":{"type":"object","required":["results"],"properties":{"results":{"type":"array","items":{"type":"object","required":["title","url","snippet"],"properties":{"title":{"type":"string"},"url":{"type":"string"},"snippet":{"type":"string"},"source":{"type":"string"},"publishedAt":{"type":"string"}}}},"answer":{"type":"string"}}},
+  "healthCheck":true,"enabledByDefault":true
+}

@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast } from "../core/ui.js";
+import { escapeHtml, formatDate, toast } from "../core/ui.js";
 
 let bound = false;
 function bindLogs() {
@@ -21,7 +21,7 @@ async function loadLogs(logType) {
   const list = document.getElementById("log-list");
   list.innerHTML = logs.length
     ? logs.map((item) => {
-        const ts = (item.ts || "").slice(0, 19).replace("T", " ");
+        const ts = formatDate(item.ts, { year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false });
         const sc =
           item.status === "completed" || item.status === "ok" || item.status === "success" ? "ok"
           : item.status === "failed" || item.status === "error" ? "bad"

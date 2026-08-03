@@ -39,7 +39,7 @@
 - [x] 检查并清理可能包含个人信息、真实选题、文章正文、来源缓存、浏览器 Profile、数据库、日志、备份和绝对路径的文件；确认 `data/`、`articles/`、`topics/`、`social-cards/`、`.env`、`config.local.json`、`account-context.json` 均未进入历史。
   - 2026-07-31 扫描发现：`data/write-assistant.db`（空文件）、`data/rsshub.pid`、`data/github-cache/*.json`、`data/walkthrough-*` 与 `data/ux-demo-*` 截图曾在历史中出现（现已不跟踪）；`articles/`、`topics/`、`social-cards/`、浏览器 Profile、真实数据库从未进入历史。
   - 2026-07-31 已处理：filter-branch 重写全部历史抹除 `data/` 与 `logs/`（`logs/` 系 c6ae535 误提交的审计产物），tags 0.0.1/0.1.0 一并改写为干净版本，已 force-push（master `6d024bd`）。注意：GitHub 上已合并 PR #1-#3 的 `refs/pull/*` 仍引用旧提交（force-push 无法清除），需联系 GitHub Support 清除或删库重建后才能彻底不可达。
-  - `.env.example` 与 `skills/upyun-upload-image/opts.js` 默认值含个人标识 `UPYUN_DOMAIN=img.shiker.tech`、`UPYUN_PREFIX=weedit`，公开前建议改为占位符。
+  - ~~`.env.example` 与 `skills/upyun-upload-image/opts.js` 默认值含个人标识 `UPYUN_DOMAIN=img.shiker.tech`、`UPYUN_PREFIX=weedit`~~（已处理 2026-07-31）：两处均已改为空值/占位符（`example.com`、`uploads`），真实配置只存在于本地 `skills/upyun-upload-image/.env`（不跟踪）。
 - [x] 审核已跟踪的 `.idea/` 和 UX 审计图片。删除只属于个人 IDE 的配置；保留截图时确保没有账号、路径、密钥、未公开内容或第三方受限素材。
   - 2026-07-31 处理：`.idea/` 已全部取消跟踪并加入 `.gitignore`（内容均为 `$PROJECT_DIR$` 占位，无敏感信息）；`docs/ux-audit-*` 截图已从工作树删除，历史中留存版本经抽查无账号、路径、密钥泄露，予以保留。
 - [x] 提供完全虚构且可公开的 `account-context.example.json`，或者在 README 中明确说明字段格式；不得提交真实账号画像。

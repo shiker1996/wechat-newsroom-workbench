@@ -45,7 +45,7 @@
   },
   "llm": {
     "defaultProvider": "deepseek",
-    "requestTimeoutMs": 120000,
+    "requestTimeoutMs": 300000,
     "safetyReserveTokens": 2048,
     "recentMessageCount": 8,
     "providers": {
@@ -55,11 +55,13 @@
         "model": "deepseek-v4-flash",
         "apiKeyEnv": "DEEPSEEK_API_KEY",
         "contextWindow": 1000000,
-        "maxOutputTokens": 8192,
+        "maxOutputTokens": 16384,
         "maxTokensField": "max_tokens",
         "taggingChunkSize": 8,
         "taggingConcurrency": 6,
         "supportsJsonMode": true,
+        "supportsThinkingToggle": true,
+        "thinkingReserveTokens": 8000,
         "enabled": true
       },
       "minimax": {
@@ -82,7 +84,7 @@
         "model": "kimi-k2.6",
         "apiKeyEnv": "MOONSHOT_API_KEY",
         "contextWindow": 262144,
-        "maxOutputTokens": 8192,
+        "maxOutputTokens": 16384,
         "maxTokensField": "max_tokens",
         "taggingChunkSize": 8,
         "taggingConcurrency": 6,
@@ -93,6 +95,7 @@
     }
   },
   "tavily": { "enabled": false, "apiKeyEnv": "TAVILY_API_KEY", "maxResults": 5 },
+  "documentSearch": { "roots": [] },
   "sourceFetch": {
     "upgradeThreshold": 55,
     "rssContentMinChars": 800,

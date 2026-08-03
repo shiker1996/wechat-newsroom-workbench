@@ -1,0 +1,28 @@
+{
+  "requests": [
+    {
+      "name": "深色技术长文",
+      "input": {
+        "target": "article",
+        "prompt": "适合技术深度文章的深色终端主题，保持克制并优先保证长文阅读舒适度。",
+        "preferences": { "scene": "technology", "tone": ["restrained", "futuristic"], "brightness": "dark", "readingPriority": "long-form" }
+      }
+    },
+    {
+      "name": "温暖编辑感图文",
+      "input": {
+        "target": "social",
+        "prompt": "适合职场经验分享的温暖编辑感图文主题，信息清晰，装饰不要抢正文。",
+        "preferences": { "scene": "career", "tone": ["warm", "editorial"], "brightness": "light", "accentColor": "#A35D2F", "readingPriority": "density" }
+      }
+    }
+  ],
+  "expectations": {
+    "targets": ["article", "social"],
+    "candidateTopFields": ["label", "description", "tags", "tokens", "targetConfig", "designSummary"],
+    "systemOwnedFields": ["schemaVersion", "id", "version", "targets", "status", "source", "basedOn"],
+    "forbidArbitraryCode": true,
+    "persistBeforeConfirmation": false
+  }
+}
+

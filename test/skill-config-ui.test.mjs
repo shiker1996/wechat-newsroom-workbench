@@ -81,7 +81,7 @@ test('技能列表严格按 kind 分组且每个技能只出现一次',()=>{
 });
 
 test('技能与工具作为独立一级页面而非运行配置标签',()=>{
-  assert.match(html,/class="nav-item" data-view="skills">技能与工具<\/button>/);
+  assert.match(html,/class="nav-utility" data-view="skills">[\s\S]*?<b>技能与工具<\/b>/);
   assert.match(html,/<section class="view skill-registry-view" id="view-skills">/);
   assert.doesNotMatch(html,/data-config-tab="skills"/);
   assert.doesNotMatch(html,/id="config-panel-skills"/);

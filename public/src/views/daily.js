@@ -70,6 +70,31 @@ function renderLatest(documents) {
   document.getElementById("daily-result-title").textContent=final.title||"早报终稿";
   document.getElementById("daily-result-content").textContent=final.content||"";
 }
+function jobStatusLabel(status) {
+  return { running: "执行中", completed: "已完成", failed: "失败", interrupted: "已中断" }[status] || status;
+}
+function renderJobs() {
+  const box = document.getElementById("daily-job-history");
+  if (!box) return;
+  const jobs = (dailyData?.jobs || []).slice(0, 3);
+  if (!jobs.length) { box.innerHTML = ""; return; }
+  box.innerHTML = jobs.map((job) => {
+    const time = String(job.updatedAt || job.createdAt || "").replace("T", " ").slice(5, 16);
+    const failed = job.status === "failed" || job.status === "interrupted";
+    const detail = failed
+      ? `<span class="daily-job-error">${escapeHtml(job.error || job.progress || "生成失败")}</span>`
+      : escapeHtml(job.progress || "");
+    const retry = failed ? `<button type="button" class="outline-button daily-job-retry" data-daily-retry="${escapeHtml(job.id)}">重试</button>` : "";
+    return `<div class="daily-job-item ${escapeHtml(job.status)}"><div><b>${jobStatusLabel(job.status)}</b> · ${escapeHtml(time)}<small>${detail}</small></div>${retry}</div>`;
+  }).join("");
+}
+async function refreshJobs() {
+  const batch = state.batches.find((item) => item.id === state.activeBatchId);
+  if (!batch) return;
+  const data = await request(`/api/batches/${encodeURIComponent(batch.id)}/daily`);
+  dailyData = { ...(dailyData || {}), jobs: data.jobs || [] };
+  renderJobs();
+}
 async function pollJob(id) {
   const status=document.getElementById("daily-job-status");
   while(true){
@@ -95,7 +120,7 @@ async function generateDaily() {
   const job=await request(`/api/batches/${encodeURIComponent(batch.id)}/daily`,{method:"POST",body:JSON.stringify({provider,focuses,stageSkills})});
   dailyGenerating=true;setDailyStage(2);
   document.getElementById("daily-job-status").textContent="关系维度早报任务已提交…";
-  try{await pollJob(job.id);}catch(error){dailyGenerating=false;setDailyStage(2);throw error;}
+  try{await pollJob(job.id);}catch(error){dailyGenerating=false;setDailyStage(2);await refreshJobs();throw error;}
 }
 function bind() {
   if(bound)return;bound=true;
@@ -129,6 +154,23 @@ function bind() {
     if(target===2&&selectedFocuses.size)setDailyStage(2);
     if(target===3&&dailyHasFinal)setDailyStage(3);
   });
+  document.getElementById("daily-job-history").addEventListener("click", (event) => {
+    const retryButton = event.target.closest("[data-daily-retry]");
+    if (!retryButton) return;
+    if (![...selectedFocuses.values()].length) {
+      // 优先用任务记录里的 focuses 恢复选择，避免失败后还要手动重选
+      const job = (dailyData?.jobs || []).find((item) => item.id === retryButton.dataset.dailyRetry);
+      const restored = (job?.focuses || [])
+        .map((focus) => (dailyData?.focusOptions || []).find((item) => item.dimension === focus.dimension && item.key === focus.key))
+        .filter(Boolean);
+      if (!restored.length) { toast("请先在第 1 步重新选择阅读视角，再重试生成"); setDailyStage(1); return; }
+      selectedFocuses = new Map(restored.map((item) => [focusId(item), item]));
+      renderOptions();
+      toast(`已恢复上次选择：${restored.map((item) => item.label).join("、")}`);
+    }
+    setDailyStage(2);
+    generateDaily().catch((error) => toast(error.message));
+  });
   document.getElementById("generate-daily").addEventListener("click",(event)=>withLoading(event.currentTarget,"生成中…",()=>generateDaily().catch((error)=>{toast(error.message);throw error;})));
   document.getElementById("copy-daily-result").addEventListener("click",async()=>{
     await navigator.clipboard.writeText(document.getElementById("daily-result-content").textContent||"");toast("早报 Markdown 已复制");
@@ -145,6 +187,13 @@ async function loadDaily() {
     "/api/creation-entry-points/batch-daily/stage-skills");
   renderLatest(dailyData.documents||[]);
   renderOptions();
+  renderJobs();
   if(!dailyHasFinal)setDailyStage(1);
+  const runningJob=(dailyData.jobs||[]).find((job)=>job.status==="running");
+  if(runningJob&&!dailyGenerating){
+    dailyGenerating=true;setDailyStage(2);
+    document.getElementById("daily-job-status").textContent=runningJob.progress||"早报任务执行中…";
+    pollJob(runningJob.id).catch((error)=>{dailyGenerating=false;toast(error.message);refreshJobs();});
+  }
 }
 export default loadDaily;

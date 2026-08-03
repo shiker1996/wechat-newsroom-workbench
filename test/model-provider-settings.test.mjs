@@ -36,7 +36,7 @@ test('网关接受 Base URL 或完整 chat completions 地址',()=>{
   assert.ok(source.includes('/\\/chat\\/completions$/i.test(value)'));
 });
 
-test('运行配置承载模型增删改，模型中心只展示可用模型',()=>{
+test('模型接入承载增删改，模型运行只负责诊断与观测',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
   const modelsView=fs.readFileSync(new URL('../public/src/views/models.js',import.meta.url),'utf8');
@@ -44,9 +44,13 @@ test('运行配置承载模型增删改，模型中心只展示可用模型',()=
   const modelRoutes=fs.readFileSync(new URL('../lib/http/routes/model-routes.mjs',import.meta.url),'utf8');
   for(const id of ['model-base-url','model-name','model-api-key','model-max-token-field','model-json-mode'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(html,/data-config-tab="models"/);
+  assert.match(html,/data-config-tab="models"><span>03<\/span><b>模型接入<\/b>/);
+  assert.match(html,/data-view="models">[\s\S]*?<b>模型运行<\/b>/);
   assert.match(systemView,/method: "POST"[\s\S]*modelFormPayload/);
   assert.match(systemView,/method: "DELETE"/);
   assert.doesNotMatch(modelsView,/modelFormPayload|saveModelConfig|deleteModelConfig/);
+  assert.doesNotMatch(html,/id="ai-tag-batch"|id="tag-limit"/);
+  assert.doesNotMatch(modelsView,/aiTagBatch|\/ai\/tag/);
   assert.match(modelsView,/filter\(\(provider\)=>provider\.enabled!==false&&provider\.configured\)/);
   assert.match(styles,/\.model-layout \{ display:grid; grid-template-columns:minmax\(0,1fr\) minmax\(250px,270px\)/);
   assert.match(styles,/@media \(max-width:1280px\) \{ \.model-layout \{ grid-template-columns:minmax\(0,1fr\)/);

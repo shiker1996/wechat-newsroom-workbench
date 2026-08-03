@@ -162,6 +162,13 @@ test('本地排版默认走确定性渲染，不调用模型生成 HTML，跳过
   assert.deepEqual(executions.map((item) => item.stage), ['rendered','design','images','draft','normalized','gate']);
   assert.deepEqual(executions.map((item) => item.skill), TYPESET_STAGE_CONTRACT.map((item) => item.skill));
   assert.match(executions.find((item) => item.stage === 'draft').detail, /确定性渲染/);
+  assert.match(executions.find((item) => item.stage === 'draft').detail, /magazine-warm@1\.0\.0/);
+  const themeSnapshot=JSON.parse(fs.readFileSync(result.themeSnapshot,'utf8'));
+  assert.deepEqual(result.theme,{id:themeSnapshot.id,version:themeSnapshot.version,hash:themeSnapshot.hash});
+  assert.equal(themeSnapshot.id,'magazine-warm');
+  assert.equal(themeSnapshot.version,'1.0.0');
+  assert.match(themeSnapshot.hash,/^sha256:[0-9a-f]{64}$/);
+  assert.ok(artifacts.some((item)=>item.name==='article-theme-snapshot.json'));
   assert.match(executions.find((item) => item.stage === 'normalized').detail, /跳过浏览器内联化/);
   // 确定性主路径只调用一次模型（design tokens），不再请求 typeset-html
   assert.deepEqual(modelRequests.map((item) => item.purpose), ['magazine-design']);

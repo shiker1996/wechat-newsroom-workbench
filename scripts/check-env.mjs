@@ -56,7 +56,9 @@ if (!fs.existsSync(envPath)) {
 
 // 5. RSSHub 目录（热点采集依赖；缺失不阻断启动）
 if (!fs.existsSync(path.join(root, 'RSSHub', 'lib'))) {
-  warnings.push('未找到 RSSHub 目录，热点采集功能不可用。如需该功能请恢复 RSSHub/ 目录。');
+  warnings.push('未找到 RSSHub 目录，热点采集功能不可用。可运行 npm run setup 自动从 GitHub 克隆，或手动恢复 RSSHub/ 目录。');
+} else if (!fs.existsSync(path.join(root, 'RSSHub', 'node_modules', 'tsx', 'dist', 'cli.mjs'))) {
+  warnings.push('RSSHub 已克隆但依赖未安装，热点采集功能不可用。可运行 npm run setup，或进入 RSSHub/ 目录执行 npm install --legacy-peer-deps。');
 }
 
 // 6. Mermaid 图表渲染（可选能力，不阻断普通文章启动）

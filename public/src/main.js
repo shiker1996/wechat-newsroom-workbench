@@ -4,6 +4,7 @@ import { request } from "./core/http.js";
 import { toast } from "./core/ui.js";
 import { bindBatchDrawer } from "./views/batch-drawer.js";
 import loadOverview from "./views/dashboard.js";
+import { hydrateThemePickers } from "./core/theme-catalog.js";
 
 const viewModules = {
   dashboard: "./views/dashboard.js", batches: "./views/batches.js", overview: "./views/atlas.js",
@@ -11,6 +12,7 @@ const viewModules = {
   editor: "./views/editor.js", preview: "./views/preview.js",
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
   system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
+  themes: "./views/theme-manager.js",
   models: "./views/models.js", logs: "./views/logs.js",
   calendar: "./views/calendar.js",
 };
@@ -22,20 +24,20 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260730-skills-view-split";
+const moduleVersion = "20260801-theme-experience";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
   topics: "文章选题池", daily: "批次早报", tutorial: "自主写作", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "热点事件创作", editor: "文章编辑器",
   preview: "公众号排版", hotspots: "热点档案", artifacts: "产物中心",
-  system: "运行与配置中心", skills: "技能与工具", sources: "采集源", models: "模型中心",
+  system: "运行与配置中心", themes: "主题中心", skills: "技能与工具", sources: "采集源", models: "模型运行",
   logs: "任务日志", calendar: "内容日历",
 };
 
 async function go(view) {
   if (!(view in titles)) return;
   if(view!=="editor")document.body.classList.remove("editor-focus");
-  const previousView = document.querySelector(".nav-item.active")?.dataset.view;
+  const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
   const isViewChange = previousView !== view;
   var bs = document.getElementById("batch-switcher");
   if (bs) bs.style.display = ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","artifacts"].includes(view) ? "block" : "none";
@@ -84,6 +86,7 @@ async function go(view) {
 
 async function init() {
   window.go = go;
+  await hydrateThemePickers();
   try {
     const res = await request("/api/models");
     window.__models = res;
@@ -129,7 +132,7 @@ function bindGlobal() {
   });
   window.addEventListener("hashchange", () => {
     const view = location.hash.slice(1);
-    if (view in titles && !document.querySelector(".nav-item.active")?.matches(`[data-view="${view}"]`)) {
+    if (view in titles && !document.querySelector(".nav-item.active,.nav-utility.active")?.matches(`[data-view="${view}"]`)) {
       navigatingFromHistory = true;
       go(view).finally(() => { navigatingFromHistory = false; });
     }

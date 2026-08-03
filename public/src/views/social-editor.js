@@ -66,6 +66,8 @@ function applyModeLayout(){
   document.getElementById('social-editor-heading').textContent=layout.heading;
   document.getElementById('social-editor-intro').textContent=layout.intro;
   document.getElementById('create-custom-social').hidden=currentMode!=='custom';
+  document.getElementById('create-repository-social').hidden=currentMode!=='tools';
+  if(currentMode!=='tools')document.getElementById('repository-social-panel').hidden=true;
   if(currentMode!=='custom')document.getElementById('custom-social-panel').hidden=true;
   const empty=document.getElementById('social-editor-empty');
   if(empty)empty.innerHTML=layout.empty;
@@ -157,7 +159,7 @@ export async function openSocialEditor(id) {
   inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
   reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
   renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';document.getElementById('social-visual-style').dispatchEvent(new Event('theme-ui-sync'));syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
@@ -385,5 +387,71 @@ function bindCustomSocialForm(){
   });
 }
 bindCustomSocialForm();
+
+function bindRepositorySocialForm(){
+  const toggle=document.getElementById('create-repository-social');
+  const panel=document.getElementById('repository-social-panel');
+  const input=document.getElementById('repository-social-url');
+  const hint=document.getElementById('repository-social-hint');
+  const submit=document.getElementById('repository-social-submit');
+  if(!toggle||!panel||!input||!hint||!submit)return;
+  const DEFAULT_HINT='粘贴 GitHub 仓库地址，核验与故事板流程与自动候选一致';
+  let channel='wechat';
+  const parseRepo=(value)=>{
+    try{
+      const url=new URL(String(value||'').trim());
+      if(url.hostname.toLowerCase()!=='github.com')return null;
+      const [owner,repo]=url.pathname.split('/').filter(Boolean);
+      if(!owner||!repo)return null;
+      return `${owner}/${repo.replace(/\.git$/i,'')}`;
+    }catch{return null;}
+  };
+  const validate=()=>{
+    const raw=input.value.trim();
+    const repo=parseRepo(raw);
+    input.classList.toggle('invalid',Boolean(raw)&&!repo);
+    submit.disabled=!repo;
+    hint.className='repository-quickadd-hint';
+    if(!raw)hint.textContent=DEFAULT_HINT;
+    else if(repo){hint.textContent=`✓ 将添加仓库 ${repo}`;hint.classList.add('ok');}
+    else{hint.textContent='地址格式应为 https://github.com/owner/repo';hint.classList.add('error');}
+    return repo;
+  };
+  const close=()=>{panel.hidden=true;input.value='';validate();toggle.focus();};
+  toggle.addEventListener('click',()=>{
+    panel.hidden=!panel.hidden;
+    if(!panel.hidden){validate();input.focus();}
+  });
+  panel.querySelectorAll('.repository-channel-segment button').forEach((button)=>{
+    button.addEventListener('click',()=>{
+      channel=button.dataset.channel;
+      panel.querySelectorAll('.repository-channel-segment button').forEach((item)=>item.classList.toggle('active',item===button));
+    });
+  });
+  input.addEventListener('input',validate);
+  panel.addEventListener('keydown',(event)=>{
+    if(event.key==='Escape'){event.preventDefault();close();}
+    if(event.key==='Enter'&&!submit.disabled){event.preventDefault();submit.click();}
+  });
+  document.getElementById('repository-social-cancel')?.addEventListener('click',close);
+  submit.addEventListener('click',async()=>{
+    const batch=state.batches.find((item)=>item.id===state.activeBatchId);
+    if(!batch){toast('请先选择批次');return;}
+    const repo=validate();if(!repo)return;
+    submit.disabled=true;submit.textContent='正在添加…';
+    try{
+      const data=await request(`/api/batches/${encodeURIComponent(batch.id)}/repository-candidates`,{method:'POST',body:JSON.stringify({url:input.value.trim(),channel})});
+      panel.hidden=true;input.value='';validate();
+      toast('仓库图文已添加，请执行仓库核验后规划故事板');
+      await loadSocialEditor();
+      if(data.candidate?.id)await openSocialEditor(data.candidate.id);
+    }catch(error){
+      hint.textContent=error.message;hint.className='repository-quickadd-hint error';
+      toast(error.message);
+    }
+    finally{submit.disabled=!parseRepo(input.value.trim());submit.textContent='添加';}
+  });
+}
+bindRepositorySocialForm();
 
 export default loadSocialEditor;

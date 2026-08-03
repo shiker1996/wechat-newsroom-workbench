@@ -738,6 +738,9 @@ async function pollJob(id) {
       state.jobTimer = setTimeout(() => pollJob(id), 1200);
     } else {
       toast(job.status === "completed" ? (job.type === "article" ? "完整成稿链已完成" : job.type === "typeset" ? "公众号排版 HTML 已完成" : "AI 打标完成") : `任务失败：${job.error || "未取得有效结果"}`);
+      if (job.status === "completed" && job.type === "typeset") {
+        document.dispatchEvent(new CustomEvent("typeset:completed", { detail: { job } }));
+      }
     }
   } catch (err) { toast(err.message); }
 }
