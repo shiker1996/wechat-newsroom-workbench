@@ -117,7 +117,8 @@ function bindGlobal() {
       const chat = immersiveButton.closest(".editorial-chat");
       if (chat) {
         const active = chat.classList.toggle("immersive");
-        immersiveButton.textContent = active ? "退出沉浸式" : "沉浸式对话";
+        immersiveButton.title = active ? "退出沉浸式" : "沉浸式对话";
+        immersiveButton.setAttribute("aria-pressed", String(active));
       }
     }
     if (event.target.closest("[data-close-batch-dialog]")) document.getElementById("batch-dialog").close();
@@ -150,7 +151,7 @@ function bindGlobal() {
     document.querySelectorAll(".editorial-chat.immersive").forEach((chat) => {
       chat.classList.remove("immersive");
       const btn = chat.querySelector("[data-immersive-chat]");
-      if (btn) btn.textContent = "沉浸式对话";
+      if (btn) { btn.title = "沉浸式对话"; btn.setAttribute("aria-pressed", "false"); }
     });
   });
 }
