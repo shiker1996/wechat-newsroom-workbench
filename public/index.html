@@ -222,7 +222,7 @@
         </section>
         <div id="tutorial-writing-workspace" class="tutorial-writing-workspace" hidden>
         <section class="editorial-chat">
-          <div class="editorial-chat-head"><div><span class="kicker">AI WRITING PLANNER</span><h3>通过对话建立自主写作事实基座</h3></div><div class="editorial-chat-tools"><select id="tutorial-provider" name="provider" aria-label="自主写作策划与成稿模型"></select></div></div>
+          <div class="editorial-chat-head"><div><span class="kicker">AI WRITING PLANNER</span><h3>通过对话建立自主写作事实基座</h3></div><div class="editorial-chat-tools"><select id="tutorial-provider" name="provider" aria-label="自主写作策划与成稿模型"></select><button type="button" class="chat-immersive-toggle" data-immersive-chat="tutorial">沉浸式对话</button></div></div>
           <div id="tutorial-chat-messages" class="editorial-messages"><div class="editorial-chat-empty"><b id="tutorial-empty-title">从一段真实经历开始</b><span id="tutorial-empty-copy">不必先想好结构，说清楚发生了什么、你的感受或判断即可。</span><div class="tutorial-starters"><button type="button" data-tutorial-starter="我想复盘一次真实经历，帮我梳理其中最值得分享的经验。">复盘一次经历</button><button type="button" data-tutorial-starter="我使用一个工具或方法一段时间了，想整理真实感受和适用边界。">分享使用心得</button></div></div></div>
           <div class="editorial-reply"><textarea id="tutorial-chat-input" rows="2" placeholder="例如：E:\Documents\write-assistant 这个我自己开发的工具想写一篇使用教程"></textarea><button type="button" class="ink-button" id="tutorial-chat-send">发送</button></div>
           <small>在对话中直接提供本地目录，AI 会自动调用只读项目工具；依赖目录、密钥、二进制和符号链接会被跳过，代码内容不等于已实际运行成功。</small>
@@ -289,7 +289,7 @@
       <div id="custom-social-panel" class="repository-facts-panel custom-social-panel" hidden>
         <div class="workspace-head"><div><span class="kicker">CUSTOM CONTENT</span><h3>创建自定义图文（教程 / 清单 / 观点）</h3></div></div>
         <section class="editorial-chat custom-social-chat">
-          <div class="editorial-chat-head"><div><span class="kicker">AI PLANNER</span><h4>对话策划：AI 帮你把想法填成完整方案</h4></div><div class="editorial-chat-tools"><select id="custom-chat-provider" aria-label="策划助手模型"></select></div></div>
+          <div class="editorial-chat-head"><div><span class="kicker">AI PLANNER</span><h4>对话策划：AI 帮你把想法填成完整方案</h4></div><div class="editorial-chat-tools"><select id="custom-chat-provider" aria-label="策划助手模型"></select><button type="button" class="chat-immersive-toggle" data-immersive-chat="custom">沉浸式对话</button></div></div>
           <div id="custom-chat-messages" class="editorial-messages"><div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div></div>
           <div class="editorial-reply"><textarea id="custom-chat-input" rows="2" placeholder="回答 AI 的问题；也可以直接描述想做的主题、类型和渠道"></textarea><button type="button" class="ink-button" id="custom-chat-send">发送</button></div>
           <small>AI 填写的只是草稿，创建前可在下方表单随时修改；【建议】级内容成稿时只能写成建议口吻。</small>
@@ -355,7 +355,7 @@
             <div class="similar-hint" id="similar-articles" hidden></div><div class="editorial-title"><span id="editorial-candidate-id"></span><span id="editorial-composite-badge" class="composite-badge" hidden>综合选题</span><h3 id="editorial-hotspot-title"></h3></div>
             <div class="editorial-focus-grid">
             <section class="editorial-chat">
-              <div class="editorial-chat-head"><div><span class="kicker">AI EDITORIAL MEETING</span><h4>一次只讨论一个关键问题</h4></div><div class="editorial-chat-tools"><select id="editorial-provider" aria-label="编辑会模型"></select></div></div>
+              <div class="editorial-chat-head"><div><span class="kicker">AI EDITORIAL MEETING</span><h4>一次只讨论一个关键问题</h4></div><div class="editorial-chat-tools"><select id="editorial-provider" aria-label="编辑会模型"></select><button type="button" class="chat-immersive-toggle" data-immersive-chat="editorial">沉浸式对话</button></div></div>
               <div id="editorial-prepare" class="editorial-prepare" hidden>
                 <span id="editorial-prepare-text"></span>
                 <span class="editorial-prepare-actions"><button type="button" class="ink-button" id="run-editorial-prepare">备料：抓取原文</button><button type="button" class="text-button" id="skip-editorial-prepare">跳过，直接对话</button></span>
