@@ -747,7 +747,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 .custom-social-panel{margin-bottom:18px}
 .custom-social-panel label{display:block;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.08em;margin-top:12px}
-.custom-social-panel input,.custom-social-panel select,.custom-social-panel textarea{width:100%;margin-top:7px;border:1px solid var(--line);background:rgba(255,255,255,.48);padding:10px;color:var(--ink);font-weight:400;letter-spacing:0;resize:vertical}
+.custom-social-panel .custom-social-form-details input,.custom-social-panel .custom-social-form-details select,.custom-social-panel .custom-social-form-details textarea{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.48);padding:10px;color:var(--ink);font-weight:400;letter-spacing:0;resize:vertical}
 .custom-social-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 14px}
 .custom-social-panel .editorial-actions{margin-top:16px}
 @media(max-width:760px){.custom-social-grid{grid-template-columns:1fr}}
