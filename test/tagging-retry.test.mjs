@@ -79,8 +79,13 @@ test('打标 JSON 截断时标记 invalid_output 并自动拆分重试', async (
     if(rows.length>1)return {callId:1,content:'{"items":[',finishReason:'length',model:'test',context:{compressed:false,afterTokens:10},usage:{completion_tokens:5000}};
     return {callId:calls,content:JSON.stringify({items:[{id:rows[0].id,category:'🤖 AI/技术动态',marketScope:'全球性',chinaRelevance:8,relevanceReason:'相关',riskLevel:'低',score:80,eventKey:`事件${rows[0].id}`,preScores:{conflict:10}}]}),finishReason:'stop',model:'test',context:{compressed:false,afterTokens:10},usage:{completion_tokens:100}};
   }};
+  const thinkingCalls=[];
+  const origComplete=gateway.complete.bind(gateway);
+  gateway.complete=async(input)=>{if(input.thinking)thinkingCalls.push(input);return origComplete(input);};
   const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
-  assert.equal(calls,3); assert.equal(updated.length,2); assert.equal(result.updated,2);
+  // 截断后先开 thinking 重试一次（仍失败），再进入拆分逻辑：1 + 1 + 2 = 4 次调用
+  assert.equal(calls,4); assert.equal(thinkingCalls.length,1);
+  assert.equal(updated.length,2); assert.equal(result.updated,2);
   assert.equal(invalid[0].status,'invalid_output'); assert.match(invalid[0].error,/截断/);
 });
 
@@ -150,4 +155,26 @@ test('超过有效时间窗口的旧闻跳过打标，不发送给模型', async
   assert.equal(result.updated,1);
   assert.equal(result.skippedStale,1);
   assert.ok(progress.some((m)=>m.includes('已跳过 1 条')));
+});
+
+test('模型回显输入（0 条有效标注）时自动开启 thinking 重试', async () => {
+  const hotspots=[1,2].map((id)=>({id,title:`热点${id}`,source:'rsshub',url:`https://example.com/${id}`,raw_json:'{}'}));
+  const updated=[]; let calls=0; const thinkingFlags=[];
+  const store={
+    getBatch(){return {hotspots};},
+    updateModelCall(){},
+    updateHotspotTags(id){updated.push(id);},
+  };
+  const gateway={config:{defaultProvider:'deepseek',providers:{deepseek:{maxOutputTokens:8192,taggingChunkSize:2}}},async complete(input){
+    calls+=1; thinkingFlags.push(Boolean(input.thinking));
+    const rows=JSON.parse(input.messages[1].content);
+    if(!input.thinking)return {callId:calls,content:JSON.stringify({items:rows}),finishReason:'stop',model:'test',context:{compressed:false,afterTokens:10},usage:{}};
+    return {callId:calls,content:JSON.stringify({items:rows.map((row)=>({id:row.id,eventKey:`事件${row.id}`,preScores:{conflict:10}}))}),finishReason:'stop',model:'test',context:{compressed:false,afterTokens:10},usage:{}};
+  }};
+  const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
+  assert.equal(calls,2);
+  assert.deepEqual(thinkingFlags,[false,true]);
+  assert.deepEqual(updated,[1,2]);
+  assert.equal(result.updated,2);
+  assert.equal(result.failed,0);
 });
