@@ -12,9 +12,9 @@ function Test-Workbench {
   } catch { return $false }
 }
 
-$node = Get-Command node.exe -ErrorAction SilentlyContinue
-if (-not $node) { throw "Node.js not found. Please install Node.js 24 or newer: https://nodejs.org/" }
-& $node.Source (Join-Path (Join-Path $projectRoot 'scripts') 'check-env.mjs')
+. (Join-Path $PSScriptRoot 'ensure-node.ps1')
+$nodePath = Ensure-Node -ProjectRoot $projectRoot
+& $nodePath (Join-Path (Join-Path $projectRoot 'scripts') 'check-env.mjs')
 if ($LASTEXITCODE -ne 0) { throw "Environment check failed. See messages above." }
 
 if (-not (Test-Workbench)) {
@@ -28,7 +28,7 @@ if (-not (Test-Workbench)) {
   }
   $logDirectory = Join-Path $projectRoot 'logs'
   New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-  Start-Process -WindowStyle Hidden -FilePath $node.Source -ArgumentList '--disable-warning=ExperimentalWarning','server.mjs' `
+  Start-Process -WindowStyle Hidden -FilePath $nodePath -ArgumentList '--disable-warning=ExperimentalWarning','server.mjs' `
     -WorkingDirectory $projectRoot `
     -RedirectStandardOutput (Join-Path $logDirectory 'workbench.log') `
     -RedirectStandardError (Join-Path $logDirectory 'workbench.error.log')

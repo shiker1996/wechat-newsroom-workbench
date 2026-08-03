@@ -18,7 +18,9 @@ HEALTH="${ADDRESS}api/overview"
 
 health_ok() { curl -fsS --max-time 2 "$HEALTH" >/dev/null 2>&1; }
 
-command -v node >/dev/null 2>&1 || { echo "未找到 Node.js，请安装 24 或更高版本: https://nodejs.org/" >&2; exit 1; }
+# shellcheck source=ensure-node.sh
+. "$(dirname "$0")/ensure-node.sh"
+ensure_node || exit 1
 node scripts/check-env.mjs || { echo "环境检测未通过，请根据上方提示处理（或运行 scripts/setup.mjs）。" >&2; exit 1; }
 
 if ! health_ok; then
