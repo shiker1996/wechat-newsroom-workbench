@@ -5,7 +5,9 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   INFORMATION_CAPABILITY_SLOTS,
+  executeCapabilityWithPreference,
   listInformationCapabilitySlots,
+  preferredPluginForCapability,
   setInformationCapabilitySlot,
 } from '../lib/tools/capability-slots.mjs';
 
@@ -22,8 +24,9 @@ test('information slots report connected and missing implementations explicitly'
     const items=await listInformationCapabilitySlots(root);
     assert.equal(items.find((item)=>item.id==='web-page').available,true);
     assert.equal(items.find((item)=>item.id==='repository').selectedPlugin,'repository-inspector');
-    assert.equal(items.find((item)=>item.id==='web-search').available,false);
-    assert.equal(items.find((item)=>item.id==='news-search').available,false);
+    assert.equal(items.find((item)=>item.id==='web-search').selectedPlugin,'tavily-search');
+    assert.equal(items.find((item)=>item.id==='news-search').selectedPlugin,'tavily-search');
+    assert.equal(items.find((item)=>item.id==='document').selectedPlugin,'document-folder-search');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
@@ -33,7 +36,7 @@ test('slot implementation preference is validated and persisted',async()=>{
     const selected=await setInformationCapabilitySlot(root,'web-page','url-fetch');
     assert.equal(selected.preferredPlugin,'url-fetch');
     assert.equal(selected.selectedPlugin,'url-fetch');
-    await assert.rejects(setInformationCapabilitySlot(root,'web-page','repository-inspector'),/不实现该信息能力/);
+    await assert.rejects(setInformationCapabilitySlot(root,'web-page','repository-inspector'),/不实现该能力/);
     const cleared=await setInformationCapabilitySlot(root,'web-page','');
     assert.equal(cleared.preferredPlugin,'');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
@@ -48,12 +51,46 @@ test('external information flows call slots instead of binding plugin implementa
   assert.match(repository,/executeInformationCapabilitySlot\('repository'/);
 });
 
+test('slot list covers every registered capability, not only the fixed six',async()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'all-capability-slots-'));
+  try{
+    const items=await listInformationCapabilitySlots(root);
+    const ids=items.map((item)=>item.id);
+    // 固定 6 个信息槽位仍在
+    for(const id of ['web-page','web-search','news-search','repository','document','local-project'])assert.ok(ids.includes(id));
+    // 其余注册能力以能力名自动生成槽位
+    assert.ok(ids.includes('content.passage.retrieve'));
+    assert.ok(ids.includes('diagram.mermaid.render'));
+    assert.ok(ids.includes('image.cdn.upload'));
+    const passage=items.find((item)=>item.id==='content.passage.retrieve');
+    assert.equal(passage.stage,'工具能力');
+    assert.equal(passage.selectedPlugin,'local-passage-retrieval');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('capability-level preference can be set by capability id and honored on execute',async()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'capability-pref-'));
+  try{
+    const selected=await setInformationCapabilitySlot(root,'content.passage.retrieve','local-passage-retrieval');
+    assert.equal(selected.preferredPlugin,'local-passage-retrieval');
+    assert.equal(preferredPluginForCapability(root,'content.passage.retrieve'),'local-passage-retrieval');
+    await assert.rejects(setInformationCapabilitySlot(root,'content.passage.retrieve','url-fetch'),/不实现该能力/);
+    await assert.rejects(setInformationCapabilitySlot(root,'no.such.capability','url-fetch'),/未知能力槽位/);
+    const result=await executeCapabilityWithPreference(root,'content.passage.retrieve',{documents:[{id:'a',content:'测试内容 '.repeat(100)}],query:'测试'});
+    assert.equal(result.status,'ok');
+    assert.equal(result.provenance.plugin,'local-passage-retrieval');
+    // 固定槽位的偏好同样能被能力级查询命中
+    await setInformationCapabilitySlot(root,'web-page','url-fetch');
+    assert.equal(preferredPluginForCapability(root,'content.url.fetch'),'url-fetch');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('skills and plugins page shows slot status and supports implementation selection',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
   assert.match(html,/id="information-slot-list"/);
   assert.match(html,/id="information-slot-summary"/);
-  assert.match(html,/写作所需的信息能力/);
+  assert.match(html,/工具能力与实现切换/);
   assert.match(skills,/\/api\/system\/information-capability-slots/);
   assert.match(skills,/data-information-slot/);
   assert.match(skills,/data-connect-information-tool/);

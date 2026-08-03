@@ -1,0 +1,93 @@
+{
+  "file": "E:\\Documents\\write-assistant\\docs\\audits\\theme-ux\\review\\social-paper-craft.html",
+  "pageCount": 5,
+  "valid": false,
+  "pages": [
+    {
+      "page": 1,
+      "kind": "cover",
+      "valid": true,
+      "utilization": 80.1,
+      "target": "45-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 484.7,
+      "topWhitespace": 60.4,
+      "bottomWhitespace": 59.8,
+      "verticalBalanceDelta": 0.6,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 2,
+      "kind": "content",
+      "valid": true,
+      "utilization": 78.6,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 475.4,
+      "topWhitespace": 64.7,
+      "bottomWhitespace": 64.8,
+      "verticalBalanceDelta": 0.1,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 3,
+      "kind": "content",
+      "valid": false,
+      "utilization": 46.5,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 281.6,
+      "topWhitespace": 96.6,
+      "bottomWhitespace": 226.7,
+      "verticalBalanceDelta": 130.2,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 4,
+      "kind": "content",
+      "valid": false,
+      "utilization": 37.2,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 225.2,
+      "topWhitespace": 96.6,
+      "bottomWhitespace": 283.2,
+      "verticalBalanceDelta": 186.6,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 5,
+      "kind": "ending",
+      "valid": false,
+      "utilization": 12.1,
+      "target": "20-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 73.5,
+      "topWhitespace": 265.3,
+      "bottomWhitespace": 266.1,
+      "verticalBalanceDelta": 0.8,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    }
+  ]
+}

@@ -1,1 +1,0 @@
-{"schemaVersion":1,"id":"wechat-inline-modules-to-images","name":"公众号内联模块转图","version":"1.0.0","kind":"stage","entryPoints":["wechat-typeset"],"contentTypes":["wechat_article"],"inputContract":"rendered_markdown","outputContract":"rendered_markdown","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

@@ -15,7 +15,28 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 模型请求超时不再误报「未返回文本内容」：网关识别 AbortController 中断并给出明确超时提示，默认 `requestTimeoutMs` 提升至 5 分钟以适配推理模型长输出
+- 对齐 DeepSeek 最新接口定义：`content_filter` / `insufficient_system_resource` 两种 finish_reason 报出明确错误（此前会被当作正常结果拿到半截内容）；provider 新增可选 `reasoningEffort` 透传（thinking 开启时生效）
+- RSSHub 依赖安装改用 `--legacy-peer-deps` 修复其 eslint peer 冲突；克隆成功但依赖未装时可续装
+
 ### Added
+
+- 主题体系：文章排版与图文主题 JSON 化（注册表 + 主题目录 + 基线校验）；主题编辑器、样式能力清单与覆盖率校验、发布门禁与生产级实时预览；主题中心 AI 创建主题（候选确认、受控发布）；封面标题 / 骨架 / 节奏 / 封面承载配方从编译器硬编码迁移为主题 JSON 显式字段，骨架支持全页型与同骨架组内第二层视觉差异，主题选择器按内容场景与阅读密度辅助决策
+- 图文密度与封面标题：故事板密度预算（规划阶段确定性裁剪块数与列表条目）、稀疏页确定性兜底、布局修复失败信息带明细与故事板编辑指引；封面标题强调色块 AI 语义断行，公众号封面标题规则对齐小红书 TITLE_GUIDE
+- 选题链 prompt 全面技能化：热点打标、事件卡、探索脑暴、综合研判、编辑会 5 个选题阶段技能（`hotspot-tagging` / `event-card-generator` / `hotspot-brainstorm` / `hotspot-synthesis` / `editorial-room`），经标准技能运行时加载并支持配置覆盖层与 prompt 哈希快照，代码保留内联 fallback；编辑会账号上下文改为 `{{ACCOUNT_CONTEXT}}` 占位符注入
+- 选题评分参数可配置：`account-context.json` 新增 `scoring` 段，F=H×h+B×b+P×p-S 权重、账号契合加分、分类偏好、pBase/hBase 基分均可按键覆盖，非法值回退默认；选题报告公式文案跟随实际权重
+- 成稿技能变现配合规则：增长与承接契约新增「留言引导与变现配合」（结尾具体留言引导问题、商业词汇自然覆盖、文中广告发布侧位置建议），早报 / 教程 / 自主写作链同步留言引导要求
+- 配置项参考文档 `docs/configuration.md`：汇总 `.env`、`config.local.json`、`account-context.json`（含评分参数）与技能覆盖层全部配置字段
+
+- 批次早报生成记录：页面展示最近任务状态（执行中 / 失败原因 / 完成时间），失败与中断可一键重试，刷新页面自动续接执行中的任务
+
+- 文章配图可生成类别：IMG-DATA 结构化占位（事件线 / 数据卡，数据必须来自正文）、确定性单图渲染管线、配图工作台一键生成与放大查看
+- 首次安装引导：`npm run setup` / `setup-workbench.cmd` 交互向导（依赖、配置、LLM Key），RSSHub 缺失时可自动从 GitHub 浅克隆并安装依赖，附 Linux/macOS `.sh` 对应脚本
+- 编辑室两步备料：进入候选编辑室先幂等抓取全部事件来源原文再解锁对话，失败来源提示不阻断，可跳过
+- 本地段落检索插件 `local-passage-retrieval`（`content.passage.retrieve`）：编辑室长正文按「头部 + BM25 相关段落」摘录注入，替代全量截断，检索不可用时自动回退
+- 能力槽位体系推广到注册表全部能力：固定 6 个信息槽位之外的工具能力（段落检索、图表渲染、图床上传）自动生成槽位卡片，可在「技能与工具」页统一查看状态并切换偏好实现
 
 - 开源前置整理：MIT 许可证与 `THIRD_PARTY_NOTICES.md`、`SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、Issue / PR 模板、CODEOWNERS
 - CI（GitHub Actions）：`npm ci`、构建、全量测试、示例技能包 / 插件校验、依赖漏洞与许可证扫描、秘密扫描

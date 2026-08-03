@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createThemeRegistry } from "../lib/themes/theme-registry.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = path.join(root, "public");
@@ -46,6 +47,13 @@ const sourceFiles = [
   ...walk(path.join(publicDir, "src"), new Set([".js"])),
 ];
 let ok = true;
+try {
+  const themes = createThemeRegistry({ builtinRoot:path.join(root, "themes") });
+  console.log(`主题校验完成：${themes.list({ target:"article" }).length} 个文章主题，${themes.list({ target:"social" }).length} 个图文主题`);
+} catch (error) {
+  console.error(`  内置主题校验失败：${error.message}`);
+  ok = false;
+}
 const packageBytes = fs.readFileSync(path.join(root, "package.json"));
 if (packageBytes[0] === 0xef && packageBytes[1] === 0xbb && packageBytes[2] === 0xbf) {
   console.error("  package.json 含 UTF-8 BOM，会导致部分排版依赖解析失败");

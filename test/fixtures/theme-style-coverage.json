@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-08-01",
+  "themeIds": {
+    "article": ["career-essay", "gossip-card", "magazine-warm", "news-digest", "research-report", "tech-wire"],
+    "social": ["bone-white", "brutalist", "charcoal", "crimson", "ice-blue", "lavender", "mocha", "neon", "orange", "paper-craft", "peach", "retro-terminal", "solarized", "tokyo-night"]
+  },
+  "tokens": {
+    "colors": {
+      "background": {"article":"complete","social":"complete"},
+      "surface": {"article":"complete","social":"complete"},
+      "page": {"article":"not_applicable","social":"complete"},
+      "text": {"article":"complete","social":"complete"},
+      "muted": {"article":"complete","social":"complete"},
+      "accent": {"article":"complete","social":"complete"},
+      "accentSecondary": {"article":"complete","social":"complete"},
+      "line": {"article":"complete","social":"complete"},
+      "inverseText": {"article":"complete","social":"complete"},
+      "codeBackground": {"article":"complete","social":"complete"}
+    },
+    "typography": {
+      "family": {"article":"complete","social":"complete"},
+      "headingFamily": {"article":"complete","social":"complete"},
+      "bodyPx": {"article":"complete","social":"complete"},
+      "h1Px": {"article":"complete","social":"complete"},
+      "h2Px": {"article":"complete","social":"complete"},
+      "captionPx": {"article":"complete","social":"complete"},
+      "lineHeight": {"article":"complete","social":"complete"},
+      "letterSpacingEm": {"article":"complete","social":"complete"}
+    },
+    "spacing": {
+      "articlePaddingPx": {"article":"complete","social":"complete"},
+      "sectionPx": {"article":"complete","social":"complete"},
+      "paragraphPx": {"article":"complete","social":"complete"},
+      "cardGapPx": {"article":"complete","social":"complete"}
+    },
+    "shape": {
+      "radiusPx": {"article":"complete","social":"complete"},
+      "borderWidthPx": {"article":"complete","social":"complete"},
+      "shadow": {"article":"complete","social":"complete"}
+    }
+  },
+  "recipes": {
+    "article": {
+      "frame":"complete", "rhythm":"complete", "kicker":"complete", "h1":"complete", "h2":"complete", "lead":"complete",
+      "quote":"complete", "divider":"complete", "list":"complete", "table":"complete", "image":"complete"
+    },
+    "social": {
+      "surface":"complete", "frame":"complete", "decoration":"complete", "eyebrow":"complete", "coverTitle":"complete", "skeleton":"complete", "coverSupport":"complete",
+      "ending":"complete", "list":"complete", "code":"complete"
+    }
+  },
+  "effects": {
+    "article": {"justify":"complete", "highlightStrong":"complete", "numberSections":"complete"},
+    "social": {"texture":"complete", "decorationOpacity":"complete", "contentTiltDeg":"complete"}
+  }
+}

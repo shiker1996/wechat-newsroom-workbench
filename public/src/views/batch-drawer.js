@@ -229,8 +229,8 @@ export async function startCollection() {
 
 export async function startBatchAi(type) {
   const provider = $("#batch-ai-provider")?.value;
-  if (!provider) return toast("请先在模型中心配置服务商");
-  // 重打会覆盖全部已有语义标注，先确认（此前无防呆，与模型中心同操作不同待遇）
+  if (!provider) return toast("请先在运行与配置 → 模型接入中配置服务商");
+  // 重打会覆盖全部已有语义标注，因此在批次工作流中统一执行二次确认。
   if (type === "retag" && !await confirmAction("重新打标将覆盖本批次全部已有语义标注，是否继续？", { confirmText: "重新打标" })) return;
   if (type === "event-cards-force" && !await confirmAction("这会覆盖本批次全部已有事件卡并重新调用模型，是否继续？", { confirmText: "重新生成全部" })) return;
   const path = type === "research" ? "research" : type === "event-cards" || type === "event-cards-force" ? "event-cards" : "tag";
@@ -242,7 +242,7 @@ export async function startBatchAi(type) {
 
 export async function startBreakingAnalysis() {
   const provider = $("#batch-ai-provider")?.value;
-  if (!provider) return toast("请先在模型中心配置服务商");
+  if (!provider) return toast("请先在运行与配置 → 模型接入中配置服务商");
   const job = await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/ai/breaking-analysis`, { method: "POST", body: JSON.stringify({ provider }) });
   showJobConsole("突发素材分析任务已入队…");
   pollJob(job.id);

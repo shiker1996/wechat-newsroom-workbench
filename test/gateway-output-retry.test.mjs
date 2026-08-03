@@ -39,6 +39,7 @@ test('complete retries a truncated structured stage once with expanded budget', 
       messages: [{ role: 'user', content: 'plan' }],
     });
     assert.equal(calls.length, 2);
+    // article-planning 已关闭 thinking，不再追加推理余量，预算即输出预算本身
     assert.equal(calls[0].maxOutputTokens, 6000);
     assert.equal(calls[1].maxOutputTokens, 10000);
     assert.match(calls[1].messages[0].content, /上一次输出因长度达到上限/);

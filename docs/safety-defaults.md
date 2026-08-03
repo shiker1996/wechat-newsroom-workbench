@@ -6,7 +6,7 @@
 
 | 护栏 | 默认值 | 覆盖方式 |
 |---|---|---|
-| 单次请求超时 | `requestTimeoutMs: 120000`（2 分钟） | `config.local.json` |
+| 单次请求超时 | `requestTimeoutMs: 300000`（5 分钟；推理模型长输出较慢，超时错误会明确提示） | `config.local.json` |
 | 输出预算 | 按用途 16 组画像（如 typeset-html 8000/12000、editorial-room 3500/6000，`lib/llm/output-budget.mjs`） | 代码内画像 |
 | 截断重试 | `finishReason=length` 时带「压缩输出」提示自动重试一次；adaptive 画像自动扩容重试 | 不可关闭 |
 | JSON Mode 降级 | 服务商返回 400/422 时自动去掉 `response_format` 重试（`lib/llm/gateway.mjs`） | `llm.providers.*.supportsJsonMode` |

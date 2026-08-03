@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, selectDimensionPool, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../lib/llm/research-pipeline.mjs';
+import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../lib/llm/research-pipeline.mjs';
 
 function hotspot(id, title, eventKey, source='rsshub') {
   return { id, title, source, url:`https://example.com/${id}`, category:'🤖 AI/技术动态', market_scope:'全球性', score:80,
@@ -285,4 +285,40 @@ test('选题报告合并维度候选一节', () => {
   assert.match(withDimensions, /主体动态 \| Kimi近期动态 \| 94 \| 中 \| 3/);
   const without = markdownRanked(scored, { items: [], metaNarratives: [], combination: {} });
   assert.ok(!without.includes('维度候选'));
+});
+
+test('评分权重可通过 scoring 配置覆盖', () => {
+  const source={candidateId:'C001',title:'事件',category:'🤖 AI/技术动态',poolRole:'核心8条',credibleScoop:0,riskLevel:'低'};
+  const cards=[{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
+    hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
+  const synthesis={items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]};
+  const defaults=scoreCards(cards,synthesis)[0];
+  assert.equal(defaults.f,62.4);
+  // H=69,B=80,P=40,S=5：默认 69×.6+80×.25+40×.15-5=62.4；自定义权重只改聚合比例
+  const custom=resolveScoring({scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
+  const adjusted=scoreCards(cards,synthesis,custom)[0];
+  assert.equal(adjusted.h,69); assert.equal(adjusted.b,80); assert.equal(adjusted.p,40); assert.equal(adjusted.s,5);
+  assert.equal(adjusted.f,Number((69*0.5+80*0.3+40*0.2-5).toFixed(1)));
+});
+
+test('scoring 覆盖分类偏好与账号契合加分，非法值回退默认', () => {
+  const scoring=resolveScoring({scoring:{categoryPreference:{'📰 综合资讯':-8},accountFitBonus:12,weights:{h:'abc'}}});
+  assert.equal(scoring.categoryPreference['📰 综合资讯'],-8);
+  assert.equal(scoring.categoryPreference['🏢 大厂战略'],6);
+  assert.equal(scoring.accountFitBonus,12);
+  assert.equal(scoring.weights.h,0.6);
+  const events=clusterItems([hotspot(1,'A报道','主体|发布|模型')]);
+  const ranking=preselection(events,'2026-07-23',scoring);
+  assert.equal(ranking[0].categoryPreference,4);
+  const pool=selectDimensionPool(events,ranking,{accountContext:{contentPillars:['AI 行业热点：x'],scoring:{accountFitBonus:12}}});
+  assert.equal(pool.groups.find((g)=>g.accountFit>0).accountFit,12);
+});
+
+test('选题报告公式文案跟随实际权重', () => {
+  const source={candidateId:'C001',title:'事件',category:'🤖 AI/技术动态',poolRole:'核心8条',credibleScoop:0,riskLevel:'低'};
+  const scored=scoreCards([{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
+    hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}],{items:[]});
+  const custom=resolveScoring({scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}},[],custom),/F = H×50% \+ B×30% \+ P×20% - S/);
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}}),/F = H×60% \+ B×25% \+ P×15% - S/);
 });

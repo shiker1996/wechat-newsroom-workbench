@@ -1,0 +1,8 @@
+{
+  "id":"document-folder-search","name":"本地知识库检索","version":"1.0.0",
+  "capabilities":["content.document.search"],"entry":"./adapter.mjs","riskLevel":"read-only",
+  "pathInputs":["root"],
+  "inputSchema":{"type":"object","required":["query","root"],"additionalProperties":false,"properties":{"query":{"type":"string"},"root":{"type":"string"},"maxResults":{"type":"integer"}}},
+  "outputSchema":{"type":"object","required":["documents"],"properties":{"documents":{"type":"array","items":{"type":"object","required":["docId","title","snippet","scope"],"properties":{"docId":{"type":"string"},"title":{"type":"string"},"snippet":{"type":"string"},"lineRange":{"type":"string"},"scope":{"type":"string"},"score":{"type":"number"}}}}}},
+  "healthCheck":true,"enabledByDefault":true
+}

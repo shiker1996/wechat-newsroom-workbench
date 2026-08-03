@@ -1,0 +1,93 @@
+{
+  "file": "E:\\Documents\\write-assistant\\docs\\audits\\theme-ux\\review\\social-brutalist.html",
+  "pageCount": 5,
+  "valid": false,
+  "pages": [
+    {
+      "page": 1,
+      "kind": "cover",
+      "valid": true,
+      "utilization": 78.9,
+      "target": "45-90%",
+      "bodyHeight": 596.9,
+      "usedHeight": 470.9,
+      "topWhitespace": 62.2,
+      "bottomWhitespace": 63.8,
+      "verticalBalanceDelta": 1.7,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 2,
+      "kind": "content",
+      "valid": true,
+      "utilization": 81.4,
+      "target": "50-96%",
+      "bodyHeight": 596.9,
+      "usedHeight": 485.9,
+      "topWhitespace": 54.8,
+      "bottomWhitespace": 56.3,
+      "verticalBalanceDelta": 1.5,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 3,
+      "kind": "content",
+      "valid": false,
+      "utilization": 47.3,
+      "target": "50-96%",
+      "bodyHeight": 596.9,
+      "usedHeight": 282.2,
+      "topWhitespace": 98.1,
+      "bottomWhitespace": 216.6,
+      "verticalBalanceDelta": 118.5,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 4,
+      "kind": "content",
+      "valid": false,
+      "utilization": 37.8,
+      "target": "50-96%",
+      "bodyHeight": 596.9,
+      "usedHeight": 225.8,
+      "topWhitespace": 98.1,
+      "bottomWhitespace": 273,
+      "verticalBalanceDelta": 174.9,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 5,
+      "kind": "ending",
+      "valid": false,
+      "utilization": 12.6,
+      "target": "20-90%",
+      "bodyHeight": 596.9,
+      "usedHeight": 75.2,
+      "topWhitespace": 259.8,
+      "bottomWhitespace": 261.9,
+      "verticalBalanceDelta": 2.1,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    }
+  ]
+}

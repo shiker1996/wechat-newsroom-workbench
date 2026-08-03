@@ -26,10 +26,12 @@ import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
 import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from './lib/domain/custom-fact-builder.mjs';
+import { createRepositoryCandidate } from './lib/domain/repository-candidate.mjs';
 import { runCustomSocialChatStream } from './lib/llm/custom-social-chat.mjs';
 import { runTutorialChatStream } from './lib/llm/tutorial-chat.mjs';
 import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from './lib/integrations/local-project-reader.mjs';
 import { resolveSkillToolPolicy } from './lib/skills/pipeline-runtime.mjs';
+import { attachInformationSearch } from './lib/integrations/information-search.mjs';
 import { resolveArticleStageSkills, resolveEntryWriterSkill } from './lib/skills/entry-routing.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
 import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
@@ -49,6 +51,7 @@ import { handleSystemRoutes } from './lib/http/routes/system-routes.mjs';
 import { handleMediaRoutes } from './lib/http/routes/media-routes.mjs';
 import { handleArticleRoutes } from './lib/http/routes/article-routes.mjs';
 import { handleSocialCardRoutes } from './lib/http/routes/social-card-routes.mjs';
+import { handleThemeRoutes } from './lib/http/routes/theme-routes.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
@@ -279,6 +282,7 @@ async function api(request, response, url) {
     return json(response, 200, store.overview());
   }
   if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
+  if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body, models })) return;
   if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json })) return;
   if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
     binaryBody, createWorkbenchBackup })) return;
@@ -460,7 +464,7 @@ async function api(request, response, url) {
       provider:input.provider,type:input.force?'retag':'tag',force:Boolean(input.force) }));
     const result = await tagBatch({ gateway: models, store, batchId: decodeURIComponent(tagMatch[1]),
       provider: input.provider, limit: input.limit, force:Boolean(input.force),
-      maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))) });
+      maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))), workspaceRoot: config.workspaceRoot });
     try {
       const cardResult = await ensureBatchEventCards({ gateway: models, store, batchId: decodeURIComponent(tagMatch[1]),
         provider: input.provider, workspaceRoot: config.workspaceRoot, maxAgeHours: batchMaxAgeHours(store.getBatch(decodeURIComponent(tagMatch[1]))), regenerate: Boolean(input.force) });
@@ -503,7 +507,10 @@ async function api(request, response, url) {
       }
     } catch {}
     const documents=store.listDocuments(batchId).filter((item)=>item.kind==='daily-draft'||item.kind==='daily-final');
-    return json(response,200,{batch:{id:batch.id,title:batch.title,batchDate:batch.batch_date,batchType:batch.batch_type},eventCards,focusOptions,documents});
+    const jobs=store.listAiRuns(batchId,30).filter((job)=>job.type==='daily').slice(0,5)
+      .map((job)=>{let focuses=[];try{const parsed=JSON.parse(job.result_json||'{}');if(Array.isArray(parsed.focuses))focuses=parsed.focuses;}catch{}
+      return {id:job.id,status:job.status,progress:job.progress,error:job.error,provider:job.provider,focuses,createdAt:job.created_at,updatedAt:job.updated_at};});
+    return json(response,200,{batch:{id:batch.id,title:batch.title,batchDate:batch.batch_date,batchType:batch.batch_type},eventCards,focusOptions,documents,jobs});
   }
   if (dailyMatch && request.method === 'POST') {
     const batchId=decodeURIComponent(dailyMatch[1]),batch=store.getBatch(batchId);
@@ -703,6 +710,19 @@ async function api(request, response, url) {
     }
     response.end(); return true;
   }
+  // 手动添加仓库图文候选（工具图文）：输入 GitHub 仓库地址直接立项，核验与故事板走既有流程
+  const repositorySocialMatch = pathname.match(/^\/api\/batches\/([^/]+)\/repository-candidates$/);
+  if (repositorySocialMatch && request.method === 'POST') {
+    const batchId = decodeURIComponent(repositorySocialMatch[1]);
+    if (!store.getBatch(batchId)) return json(response, 404, { error: '批次不存在' });
+    const input = await body(request);
+    try {
+      const candidate = createRepositoryCandidate({ store, batchId, url: input.url, channel: input.channel });
+      return json(response, 201, { candidate });
+    } catch (error) {
+      return json(response, 400, { error: `添加仓库图文失败：${error.message}` });
+    }
+  }
   // 创建自定义图文候选（待办 1+6：非仓库类图文，首批教程/清单/观点，渠道编码进 output_mode）
   const customSocialMatch = pathname.match(/^\/api\/batches\/([^/]+)\/custom-social-candidates$/);
   if (customSocialMatch && request.method === 'POST') {
@@ -713,6 +733,8 @@ async function api(request, response, url) {
     const outputMode = String(input.channel || '').trim() === 'xiaohongshu' ? 'xiaohongshu-custom-cards' : 'wechat-custom-cards';
     try {
       const fact = await buildCustomFactSheet({ input, root });
+              const toolPolicy = await resolveSkillToolPolicy({ workspaceRoot: root, skillId: 'custom-card-storyboard' });
+        await attachInformationSearch({ fact, input, root, toolContext: { store, batchId, skillId: 'custom-card-storyboard', allowedCapabilities: toolPolicy.allowedCapabilities }, documentRoots: config.documentSearch?.roots || [] });
       const materialUrls = (fact.materials || []).map((item) => item.url);
       const hotspot = store.addManualHotspot(batch.id, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自定义图文（${fact.content_type_label}）`, researchEligible:false });
       if (!hotspot) throw new Error('手工热点创建失败');
@@ -828,6 +850,8 @@ async function api(request, response, url) {
       if(articleMode==='experience'&&!fact.thesis)throw new Error('心得经验文章需要明确核心观点');
       if(articleMode==='experience'&&!fact.points.some((item)=>item.source_level==='author_experience'))throw new Error('心得经验文章至少需要一条【体验】要点');
       if(fact.materials.some((item)=>item.status!=='ok'))throw new Error(`素材抓取失败：${fact.materials.filter((item)=>item.status!=='ok').map((item)=>item.url).join('、')}`);
+              const toolPolicy=await resolveSkillToolPolicy({workspaceRoot:root,skillId:skillSelection.selectedSkill});
+        await attachInformationSearch({fact,input,root,toolContext:{store,batchId,skillId:skillSelection.selectedSkill,allowedCapabilities:toolPolicy.allowedCapabilities},documentRoots:config.documentSearch?.roots||[]});
       creation=store.findCustomArticleRequest(batchId,{requestId,fingerprint})||creation;
       if(creation?.candidate_row_id){
         const candidate=store.getCandidate(creation.candidate_row_id);

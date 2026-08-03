@@ -30,6 +30,14 @@ function bindEditorial() {
     document.querySelector(".creation-skill-settings")?.removeAttribute("open");
   });
   document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message)));
+  document.getElementById("run-editorial-prepare")?.addEventListener("click", () => prepareEditorialSources().catch((error) => {
+    toast(error.message);
+    if (state.editorialCandidate) updateEditorialPrepareGate(state.editorialCandidate);
+  }));
+  document.getElementById("skip-editorial-prepare")?.addEventListener("click", () => {
+    editorialPrepareState.skipped = true;
+    if (state.editorialCandidate) updateEditorialPrepareGate(state.editorialCandidate);
+  });
   document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
   document.addEventListener("click", (event) => {
     const editCandidate = event.target.closest("[data-edit-candidate]");
@@ -212,9 +220,11 @@ async function openEditorial(id) {
       : '<div class="editorial-chat-empty">尚未开始编辑会。点击"让 AI 提问"。</div>';
     messages.scrollTop = messages.scrollHeight;
   }
+  if (editorialPrepareState.candidateId !== candidate.id) editorialPrepareState = { candidateId: candidate.id, skipped: false };
   state.editorialCandidate = candidate;
   editorialDirty = false;
   renderEditorialReadiness();
+  updateEditorialPrepareGate(candidate);
   loadSimilarArticles(id);
 }
 
@@ -265,6 +275,9 @@ async function loadSimilarArticles(id) {
 }
 
 function renderEditorialReadiness() {
+  // 与 lib/domain/open-questions.mjs 保持一致：模型常把"没有未决问题"写成
+  // "无"或"无。……（补充说明）"，按清零处理；不误伤"无版权数据能否使用？"这类真问题。
+  const isNoneOpenQuestions = (value) => !value || /^(?:无|没有了?|暂无|无未决问题|none|n\/a)(?:[。．.，,、：:；;\s]|$)/i.test(value);
   const gate = document.getElementById("editorial-production-gate");
   if (!gate) return;
   const form = document.getElementById("editorial-form");
@@ -273,7 +286,7 @@ function renderEditorialReadiness() {
   const checks = [
     { label: "锁定命题", field: "thesis", ok: Boolean(text("thesis")) },
     { label: "事实基座", field: "confirmed_facts", ok: Boolean(text("confirmed_facts")) },
-    { label: "未决问题清零", field: "open_questions", ok: !text("open_questions") },
+    { label: "未决问题清零", field: "open_questions", ok: isNoneOpenQuestions(text("open_questions")) },
     { label: "可以立即写作", field: "next_action", ok: text("next_action") === "WRITE_NOW" },
     { label: "实践证据", field: "confirmed_experiences", ok: !form.elements.experience_required?.checked || Boolean(text("confirmed_experiences")) },
   ];
@@ -297,6 +310,52 @@ function renderEditorialReadiness() {
   if (hint) hint.textContent = ready ? "点击后会保存当前决策、锁定文章简报，并运行完整成稿链。" : `还需完成：${checks.filter((c) => !c.ok).map((c) => c.label).join("、")}`;
   const btn = document.getElementById("start-editorial-production");
   if (btn) { btn.hidden = !ready; btn.textContent = locked ? "重新运行完整成稿链" : "确认简报并开始成稿"; }
+}
+
+// 编辑室两步走：先备料（抓取全部事件来源原文），再开始对话。
+// 后端 POST /api/candidates/:id/source 默认 force:false，已有快照的来源零成本跳过。
+let editorialPrepareState = { candidateId: null, skipped: false };
+
+function editorialSourceGaps(candidate) {
+  let missing = 0, failed = 0;
+  for (const event of candidate.events || []) {
+    for (const h of event.hotspots || []) {
+      if (!h.sourceDoc) missing += 1;
+      else if (h.sourceDoc.status !== "ok" && h.sourceDoc.status !== "partial") failed += 1;
+    }
+  }
+  return { missing, failed };
+}
+
+function updateEditorialPrepareGate(candidate) {
+  const gate = document.getElementById("editorial-prepare");
+  const answer = document.getElementById("editorial-answer");
+  const send = document.getElementById("send-editorial-answer");
+  if (!gate || !candidate) return;
+  const gaps = editorialSourceGaps(candidate);
+  const blocked = gaps.missing > 0 && !editorialPrepareState.skipped;
+  gate.hidden = !blocked;
+  if (blocked) {
+    const text = document.getElementById("editorial-prepare-text");
+    if (text) text.textContent = `本选题还有 ${gaps.missing} 个来源未抓取原文${gaps.failed ? `（另有 ${gaps.failed} 个抓取失败，可在对话中补充链接）` : ""}。建议先备料，AI 编辑将基于完整原文提问。`;
+  }
+  if (answer) {
+    answer.disabled = blocked;
+    answer.placeholder = blocked ? "备料完成后即可开始对话" : "回答当前问题；首次进入时可以留空，让 AI 先提问";
+  }
+  if (send) send.disabled = blocked;
+}
+
+async function prepareEditorialSources() {
+  const candidate = state.editorialCandidate;
+  if (!candidate) return;
+  const button = document.getElementById("run-editorial-prepare");
+  const text = document.getElementById("editorial-prepare-text");
+  if (text) text.textContent = "正在抓取来源原文，来源较多时需要几十秒…";
+  await withLoading(button, "正在抓取…", () =>
+    request(`/api/candidates/${candidate.id}/source`, { method: "POST", body: JSON.stringify({ force: false }) }));
+  await openEditorial(candidate.id);
+  toast("备料完成，可以开始对话");
 }
 
 async function sendEditorialAnswer() {

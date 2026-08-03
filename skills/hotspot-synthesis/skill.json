@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"hotspot-synthesis","name":"热点综合研判","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"exploration_cards","outputContract":"synthesis_corrections","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

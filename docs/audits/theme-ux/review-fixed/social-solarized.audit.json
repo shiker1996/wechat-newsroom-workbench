@@ -1,0 +1,91 @@
+{
+  "file": "E:\\Documents\\write-assistant\\docs\\audits\\theme-ux\\review-fixed\\social-solarized.html",
+  "pageCount": 5,
+  "valid": false,
+  "pages": [
+    {
+      "page": 1,
+      "kind": "cover",
+      "valid": true,
+      "utilization": 79.7,
+      "target": "45-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 482.3,
+      "topWhitespace": 61.3,
+      "bottomWhitespace": 61.3,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 2,
+      "kind": "content",
+      "valid": true,
+      "utilization": 52.1,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 314.9,
+      "topWhitespace": 145,
+      "bottomWhitespace": 145,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 3,
+      "kind": "content",
+      "valid": true,
+      "utilization": 53.3,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 322.5,
+      "topWhitespace": 141.2,
+      "bottomWhitespace": 141.2,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 4,
+      "kind": "content",
+      "valid": false,
+      "utilization": 48.8,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 295.1,
+      "topWhitespace": 154.9,
+      "bottomWhitespace": 154.9,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 5,
+      "kind": "ending",
+      "valid": false,
+      "utilization": 10.8,
+      "target": "20-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 65.1,
+      "topWhitespace": 269.9,
+      "bottomWhitespace": 269.9,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    }
+  ]
+}

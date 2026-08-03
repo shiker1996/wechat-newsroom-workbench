@@ -1,0 +1,93 @@
+{
+  "file": "E:\\Documents\\write-assistant\\docs\\audits\\theme-ux\\review\\social-peach.html",
+  "pageCount": 5,
+  "valid": false,
+  "pages": [
+    {
+      "page": 1,
+      "kind": "cover",
+      "valid": true,
+      "utilization": 79.7,
+      "target": "45-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 482.3,
+      "topWhitespace": 61.3,
+      "bottomWhitespace": 61.3,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 2,
+      "kind": "content",
+      "valid": true,
+      "utilization": 76.1,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 460.4,
+      "topWhitespace": 72.3,
+      "bottomWhitespace": 72.3,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": []
+    },
+    {
+      "page": 3,
+      "kind": "content",
+      "valid": false,
+      "utilization": 44.7,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 270.7,
+      "topWhitespace": 97.6,
+      "bottomWhitespace": 236.6,
+      "verticalBalanceDelta": 139,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 4,
+      "kind": "content",
+      "valid": false,
+      "utilization": 35.4,
+      "target": "50-96%",
+      "bodyHeight": 604.9,
+      "usedHeight": 214.3,
+      "topWhitespace": 97.6,
+      "bottomWhitespace": 293,
+      "verticalBalanceDelta": 195.5,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    },
+    {
+      "page": 5,
+      "kind": "ending",
+      "valid": false,
+      "utilization": 10.4,
+      "target": "20-90%",
+      "bodyHeight": 604.9,
+      "usedHeight": 63.1,
+      "topWhitespace": 270.9,
+      "bottomWhitespace": 270.9,
+      "verticalBalanceDelta": 0,
+      "overflowPixels": 0,
+      "clippedPixels": 0,
+      "horizontalOverflowPixels": 0,
+      "issues": [
+        "underfilled"
+      ]
+    }
+  ]
+}

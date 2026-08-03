@@ -14,6 +14,7 @@ description: 将作者提供的主题、要点和素材规划为教程、清单�
 - `author_experience`：可以作为作者亲历。
 - `user_material`：必须保留来源归属。
 - `model_suggestion`：只能作为建议或参考。
+- 事实基座可能附带 `web_search` / `news_search` 联网检索结果或 `document_search` 本地知识库检索结果：均属于外部资料，按 `user_material` 同等约束处理——可引用其信息但必须保留来源归属（标题与 URL 或文档路径），不得写成作者亲历或已验证事实。
 
 ## 输出
 

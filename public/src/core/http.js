@@ -5,6 +5,6 @@ export async function request(url, options = {}) {
     ...options,
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+  if (!response.ok) { const error=new Error(data.error ?? `HTTP ${response.status}`);error.status=response.status;error.code=data.code||'';error.issues=data.issues||[];throw error; }
   return data;
 }

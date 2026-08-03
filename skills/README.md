@@ -4,6 +4,14 @@
 
 包含：
 
+- `hotspot-tagging`：热点语义标注与全量预评估（选题链打标阶段）
+- `event-card-generator`：事件事实卡生成（选题链事件研判阶段）
+- `hotspot-brainstorm`：热点探索脑暴，生成临时探索卡（选题链脑暴阶段）
+- `hotspot-synthesis`：热点综合研判与竞争修正（选题链复排阶段）
+- `editorial-room`：公众号编辑会主持人，锁定简报前的对话式决策（选题链编辑会阶段）
+
+以上 5 个为选题阶段技能：由代码经 `lib/llm/selection-prompts.mjs` 按名固定加载，不进入创作入口路由；对应模块保留内联 prompt 作为技能缺失时的 fallback。`editorial-room` 的账号上下文位置使用 `{{ACCOUNT_CONTEXT}}` 占位符，由代码注入 `account-context.json` 的格式化内容。
+
 - `wechat-mp-topic-to-article`：公众号成稿总编排契约
 - `wechat-mp-tech-hotspot`：技术热点快评
 - `wechat-mp-tech-deep`：技术原理深解
@@ -23,7 +31,7 @@
 - `wechat-article-typeset`：公众号排版总编排契约
 - `wechat-md-render`、`magazine-design-advisor`、`wechat-md-to-draft`：预渲染、杂志设计和 HTML 初稿
 - `wechat-html-normalizer`、`wechat-html-check-no-div`：HTML 净化和最终门禁
-- `mermaid-render`、`wechat-inline-modules-to-images`、`wechat-echarts-blocks-to-images`：可视化转图契约
+- `mermaid-render`、`wechat-echarts-blocks-to-images`：可视化转图契约
 - `html-pages-to-images`、`upyun-upload-image`：截图和经授权的图片上传依赖
 
 默认加载路径为 `<workspaceRoot>/skills`。只有显式设置 `CODEX_SKILLS_ROOT` 时才会使用外部技能目录覆盖项目版本。
