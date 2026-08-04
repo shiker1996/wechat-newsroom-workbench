@@ -33,7 +33,7 @@ Star 的第一印象来自仓库页，README 顶部决定去留。当前 README 
 
 ### 1. README 顶部加「3 秒钩子」
 
-- [x] 加 2–3 张截图到标题下：`docs/screenshots/` 已有工作台总览 / 热点全景 / 文章选题池 / 图文选题池四张整页截图（`scripts/render-ui-shots.mjs` 可重新生成）。README 顶部随后改为内嵌 2 分钟演示视频（`<video>` 引用 0.2.0 Release 附件 `demo-compressed.mp4`），截图保留作海报与渠道物料。
+- [x] 加 2–3 张截图到标题下：`docs/screenshots/` 已有工作台总览 / 热点全景 / 文章选题池 / 图文选题池四张整页截图（`scripts/render-ui-shots.mjs` 可重新生成）。README 顶部最终采用「演示封面图 + 点击播放链接」（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs`；GitHub README 不支持 `<video>` 标签，实测会被渲染器剥离，故用封面图链接到 CDN mp4）。
 - [x] 标题下加一句「用它做了什么」的成果展示：顶部简介已改成场景导向的「是什么 / 不是什么 / 适合谁」三段。
 - [x] 补「快速看效果」路径：README 新增「快速看效果（演示模式，无需 LLM Key）」小节，附 `npm start -- --demo` 与 `start-workbench.ps1 -Demo` 命令。
 

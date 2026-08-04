@@ -17,7 +17,7 @@
 
 ### Changed
 
-- README 顶部示例由截图改为 2 分钟演示视频（`<video>` 内嵌，引用 `https://img.shiker.tech/project/export-1785841213192.mp4`），截图保留在 `docs/screenshots/` 作海报与渠道物料
+- README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
 
 ## [0.2.0] - 2026-08-04
 
