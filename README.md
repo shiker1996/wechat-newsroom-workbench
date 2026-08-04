@@ -7,8 +7,8 @@
 
 <p align="center">
   <video controls width="760" poster="docs/screenshots/ui-dashboard.png">
-    <source src="https://github.com/shiker1996/wechat-newsroom-workbench/releases/download/0.2.0/demo-compressed.mp4" type="video/mp4">
-    你的浏览器不支持视频预览，可 <a href="https://github.com/shiker1996/wechat-newsroom-workbench/releases/download/0.2.0/demo-compressed.mp4">下载演示视频</a>。
+    <source src="https://img.shiker.tech/project/export-1785841213192.mp4" type="video/mp4">
+    你的浏览器不支持视频预览，可 <a href="https://img.shiker.tech/project/export-1785841213192.mp4">下载演示视频</a>。
   </video>
   <br>
   <small>2 分钟演示：热点全景 → 文章选题池 → 图文选题池（0.2.0，演示模式数据，无需配置模型服务商）</small>
