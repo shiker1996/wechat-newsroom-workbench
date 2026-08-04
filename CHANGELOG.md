@@ -15,6 +15,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 图文主题代码块对比度：`inverseText` 与 `codeBackground` 同色的主题（crimson / orange / charcoal）代码块此前是黑字黑底几乎不可见；新增 `accent-panel`（白字强调色底）与 `ink-panel`（白字深色底）代码配方并切换这三个主题，代码文字改为 `--ink` / `--inverse` 高对比色
+- crimson 列表由「白字黄底」（`hard-card`）改为「白字红底」（新增 `hard-accent` 列表配方），并提升结尾页文字对比度；crimson / orange / charcoal 主题版本升至 1.0.1
+
 ### Changed
 
 - README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
