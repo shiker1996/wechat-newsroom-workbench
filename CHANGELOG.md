@@ -15,6 +15,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-04
+
 ### Fixed
 
 - 模型请求超时不再误报「未返回文本内容」：网关识别 AbortController 中断并给出明确超时提示，默认 `requestTimeoutMs` 提升至 5 分钟以适配推理模型长输出
@@ -45,6 +47,8 @@
 - 冷启动验收脚本（`scripts/cold-start-acceptance.sh`）、示例配置与 API 路由清单双向校验测试
 - 全字段虚构的 `account-context.example.json`
 - 版本兼容验收样例（`test/version-compat.test.mjs`）：旧版数据库幂等迁移、技能包与插件的 `schemaVersion` / `compatibleApp` 判定
+- 演示模式（`--demo` / `WORKBENCH_DEMO=1` / `start-workbench.ps1 -Demo`）：无模型服务商时写入两份虚构演示批次（热点、打标、文章 / 图文选题池、排版与终稿产物），使用独立数据库 `data/demo.db`，跳过 RSSHub 自动启动，浏览型视图完整可用
+- README 视觉物料：`docs/screenshots/` 工作台截图，`scripts/render-ui-shots.mjs` 可重新生成
 
 ### Security
 
@@ -67,6 +71,7 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.1.5...0.2.0
 [0.1.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.0.1...0.1.0
 [0.0.1]: https://github.com/shiker1996/wechat-newsroom-workbench/releases/tag/0.0.1

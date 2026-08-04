@@ -5,11 +5,25 @@
 [![Node.js ≥ 24](https://img.shields.io/badge/Node.js-%E2%89%A5%2024-339933?logo=nodedotjs&logoColor=white)](./package.json)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)](#支持矩阵)
 
+<p align="center">
+  <img src="docs/screenshots/ui-dashboard.png" alt="工作台总览" width="46%">
+  <img src="docs/screenshots/ui-atlas.png" alt="热点全景" width="46%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/ui-topics.png" alt="文章选题池" width="46%">
+  <img src="docs/screenshots/ui-social-topics.png" alt="图文选题池" width="46%">
+</p>
+
 本地优先的中文内容编辑与图文生产工作台。它以每日批次为主线，把热点采集、事实研判、选题、编辑决策、文章成稿、公众号排版和社交图文交付保存在同一个可审计的本地工作区中。
 
-> **是什么**：面向个人公众号作者的本地内容生产工作台——从热点采集到可直接粘贴的公众号富文本，全链路在本机完成，全程留痕可审计。
+> **是什么**：面向个人公众号作者和自媒体人的本地内容生产工作台——从热点采集、事实研判到可直接粘贴的公众号富文本与小红书图文，全链路在本机完成，全程留痕可审计。
 >
 > **不是什么**：不是 SaaS 服务、不是多用户系统、不是跨平台软件。只监听 `127.0.0.1`，仅支持 Windows，仅供本机可信用户使用（见「安全边界」）。
+>
+> **适合谁**：
+> - 公众号 / 小红书作者：不想让 AI 代笔，但需要一套把「选题 → 研判 → 成稿 → 排版 → 图文」串起来的本机流水线。
+> - 内容团队 / 编辑：需要每一次 AI 调用、事实取舍和成稿过程都可审计、可复现。
+> - Node.js 开发者：对技能包、受信工具插件和本地 AI 工作台的可扩展架构感兴趣。
 
 ## 功能总览
 
@@ -74,6 +88,18 @@
 
 1. **安装**：双击 `setup-workbench.cmd`（或 `npm run setup`）。交互向导会依次装好依赖、创建配置、引导填写 LLM Key、克隆并安装 RSSHub；缺什么会提示，失败可重跑（幂等）。
 2. **启动**：双击 `start-workbench.cmd`（或 `npm start`）。健康检查通过后自动打开浏览器；重复运行会提示“已经在运行”，不会起第二份服务。
+
+### 快速看效果（演示模式，无需 LLM Key）
+
+还没配置模型服务商，或只想先看看界面长什么样？用演示模式启动即可：它会写入一份**完全虚构**的演示批次（两个批次、热点、选题池、排版产物），使用独立数据库 `data/demo.db`，不污染真实数据，也不需要 API Key：
+
+```powershell
+npm start -- --demo
+# 或
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\start-workbench.ps1 -Demo
+```
+
+> 演示模式跳过本地 RSSHub 自动启动；所有 AI 生成类操作仍会因未配置服务商而提示，但浏览工作台、热点全景、选题池、主题与产物视图完全可用。
 
 macOS / Linux 可尝试 `setup-workbench.sh` 与 `start-workbench.sh`（同样支持 Node.js 缺失时自动安装），未在非 Windows 环境验证。
 
