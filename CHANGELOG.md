@@ -15,6 +15,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- README 顶部示例由截图改为 2 分钟演示视频（`<video>` 内嵌，托管在 0.2.0 Release 附件），截图保留在 `docs/screenshots/` 作海报与渠道物料
+
 ## [0.2.0] - 2026-08-04
 
 ### Fixed

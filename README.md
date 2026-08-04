@@ -6,12 +6,12 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)](#支持矩阵)
 
 <p align="center">
-  <img src="docs/screenshots/ui-dashboard.png" alt="工作台总览" width="46%">
-  <img src="docs/screenshots/ui-atlas.png" alt="热点全景" width="46%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/ui-topics.png" alt="文章选题池" width="46%">
-  <img src="docs/screenshots/ui-social-topics.png" alt="图文选题池" width="46%">
+  <video controls width="760" poster="docs/screenshots/ui-dashboard.png">
+    <source src="https://github.com/shiker1996/wechat-newsroom-workbench/releases/download/0.2.0/demo-compressed.mp4" type="video/mp4">
+    你的浏览器不支持视频预览，可 <a href="https://github.com/shiker1996/wechat-newsroom-workbench/releases/download/0.2.0/demo-compressed.mp4">下载演示视频</a>。
+  </video>
+  <br>
+  <small>2 分钟演示：热点全景 → 文章选题池 → 图文选题池（0.2.0，演示模式数据，无需配置模型服务商）</small>
 </p>
 
 本地优先的中文内容编辑与图文生产工作台。它以每日批次为主线，把热点采集、事实研判、选题、编辑决策、文章成稿、公众号排版和社交图文交付保存在同一个可审计的本地工作区中。
