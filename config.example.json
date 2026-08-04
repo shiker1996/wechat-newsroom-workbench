@@ -101,5 +101,6 @@
     "rssContentMinChars": 800,
     "rssFallbackMinChars": 200,
     "githubMinChars": 200
-  }
+  },
+  "aiJobs": { "maxConcurrent": 2 }
 }

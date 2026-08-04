@@ -183,7 +183,7 @@ async function runStoryboard({inspect=false}={}){
 }
 
 async function watchSocialJob(jobId,candidateId,button){
-  while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);if(candidateId===selectedId)button.textContent=job.status==='running'?(job.progress||'图文任务执行中…'):'生成整组图文';if(job.status==='running')continue;
+  while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);const active=job.status==='running'||job.status==='queued';if(candidateId===selectedId)button.textContent=active?(job.status==='queued'?'排队等待执行…':(job.progress||'图文任务执行中…')):'生成整组图文';if(active)continue;
     // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
     button.disabled=false;button.textContent=job.status==='completed'?'重新生成整组图文':'生成整组图文';
     if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else toast(`图文生成失败${job.error?`：${job.error}`:''}`);return;

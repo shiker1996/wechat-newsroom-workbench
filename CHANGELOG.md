@@ -23,6 +23,9 @@
 
 ### Changed
 
+- AI 后台任务并发模型：候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥；超出 `aiJobs.maxConcurrent`（默认 2，可配）的任务进入 FIFO 队列以 `queued` 状态等待，不再互相阻塞或报「已有任务运行」
+- 服务重启恢复：`queued` 状态的 AI 任务与 `running` 一并标记为中断，避免残留排队记录
+
 - README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
 
 ## [0.2.0] - 2026-08-04
