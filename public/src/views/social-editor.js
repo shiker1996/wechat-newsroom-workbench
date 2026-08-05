@@ -195,11 +195,12 @@ function locateStoryboardPages(error) {
     const details = article.querySelector('details.storyboard-page-editor');
     if (details) details.open = true;
     article.classList.add('layout-failed-page');
-    if (!article.querySelector('.layout-failed-badge')) {
+    const summary = article.querySelector('details.storyboard-page-editor summary');
+    if (summary && !summary.querySelector('.layout-failed-badge')) {
       const badge = document.createElement('em');
       badge.className = 'layout-failed-badge';
       badge.textContent = '布局审计未通过 · 修改本页后重新生成';
-      article.querySelector('.storyboard-page-copy')?.prepend(badge);
+      summary.appendChild(badge);
     }
   }
   articles[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
