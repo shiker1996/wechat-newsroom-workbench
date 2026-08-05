@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- AI 任务并发重构回归：`AiJobManager.run()` 不再丢失 `candidateId / documentKind / focus / focuses` 等执行参数（此前入队后以空参数执行，成稿/图文等任务 `getCandidate(undefined)` 报「Provided value cannot be bound to SQLite parameter 1」）
 - 语义打标单批模型调用失败（超时 / 空内容 / 网络中断）不再拖垮整个批次：抛错后先翻转 thinking 重试一次，仍失败则把该批热点标记为失败跳过，批次结束后可「继续打标」补打；此前网关抛错会直接失败整个 auto 任务
 - 流式空内容报错补充诊断信息（finishReason + 推理字符数），便于区分「输出预算耗尽」与「内容过滤」
 - 语义打标重试不再把已开启的 thinking 关掉：JSON 截断进入拆分重试时，拆分后的子批继续沿用 thinking（此前拆分路径把 thinking 重置为关闭，导致模型退化问题复现）

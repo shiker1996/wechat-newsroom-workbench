@@ -91,6 +91,18 @@ test('超过并发上限的任务排队，前一任务结束后继续执行', as
   } finally { teardown(ctx); }
 });
 
+test('启动任务时把 candidateId/documentKind/focus 等执行参数传给 run（回归：并发重构丢参）', () => {
+  const ctx = setup();
+  try {
+    const { batch, candidates } = makeCandidates(ctx.store, 1);
+    const mgr = ctx.manager(2);
+    let received = null;
+    mgr.run = (job, options) => { received = options; return Promise.resolve(); };
+    mgr.start({ batchId: batch.id, candidateId: candidates[0].id, type: 'article', focus: 'f', focuses: ['a'], documentKind: 'final' });
+    assert.deepEqual(received, { force: false, candidateId: candidates[0].id, documentKind: 'final', focus: 'f', focuses: ['a'] }, 'run 必须收到候选与文档参数');
+  } finally { teardown(ctx); }
+});
+
 test('队列头部被同互斥键阻塞时，后续无冲突任务可先行', async () => {
   const ctx = setup();
   try {
