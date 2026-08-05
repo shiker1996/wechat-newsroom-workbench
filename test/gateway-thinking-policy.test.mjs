@@ -79,7 +79,7 @@ test('input.thinking 显式指定时覆盖用途策略', async () => {
   }
 });
 
-test('rawComplete 仅在 thinking:false 且 provider 支持开关时下发 thinking 参数', async () => {
+test('rawComplete 按 thinking 状态下发 thinking 参数，推理强度同时顶层与内嵌发送', async () => {
   process.env.TEST_THINKING_KEY = 'secret';
   const payloads = [];
   const originalFetch = globalThis.fetch;
@@ -91,7 +91,7 @@ test('rawComplete 仅在 thinking:false 且 provider 支持开关时下发 think
     llm: {
       defaultProvider: 'test', requestTimeoutMs: 2000, safetyReserveTokens: 32, recentMessageCount: 8,
       providers: {
-        test: { label: 'Test', baseUrl: 'http://unused.test/v1', model: 'mock', apiKeyEnv: 'TEST_THINKING_KEY', contextWindow: 32000, maxOutputTokens: 12000, supportsThinkingToggle: true },
+        test: { label: 'Test', baseUrl: 'http://unused.test/v1', model: 'mock', apiKeyEnv: 'TEST_THINKING_KEY', contextWindow: 32000, maxOutputTokens: 12000, supportsThinkingToggle: true, reasoningEffort: 'low' },
         plain: { label: 'Plain', baseUrl: 'http://unused.test/v1', model: 'mock', apiKeyEnv: 'TEST_THINKING_KEY', contextWindow: 32000, maxOutputTokens: 12000 },
       },
     },
@@ -103,7 +103,9 @@ test('rawComplete 仅在 thinking:false 且 provider 支持开关时下发 think
     const plain = gateway.resolve('plain');
     await gateway.rawComplete({ ...plain, thinking: false, messages: [{ role: 'user', content: 'x' }] });
     assert.deepEqual(payloads[0].thinking, { type: 'disabled' });
-    assert.equal('thinking' in payloads[1], false);
+    assert.equal(payloads[0].reasoning_effort, undefined);
+    assert.deepEqual(payloads[1].thinking, { type: 'enabled', reasoning_effort: 'low' });
+    assert.equal(payloads[1].reasoning_effort, 'low', '推理强度需按 DeepSeek OpenAI SDK 用法顶层下发');
     assert.equal('thinking' in payloads[2], false, '不支持开关的 provider 不应收到 thinking 参数');
   } finally {
     globalThis.fetch = originalFetch;

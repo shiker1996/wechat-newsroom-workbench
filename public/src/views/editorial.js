@@ -479,7 +479,7 @@ async function startEditorialProduction() {
             console.textContent = logs.map((l) => `${l.at.slice(11, 19)}  ${l.message}`).join("\n") || job.progress;
             console.scrollTop = console.scrollHeight;
           }
-          if (job.status === "running") {
+          if (job.status === "running" || job.status === "queued") {
             state.jobTimer = setTimeout(poll, 1200);
           } else {
             toast(job.status === "completed" ? "完整成稿链已完成" : `任务失败：${job.error || "未取得有效结果"}`);

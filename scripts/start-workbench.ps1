@@ -1,4 +1,4 @@
-param([int]$Port = 4317, [switch]$NoBrowser)
+param([int]$Port = 4317, [switch]$NoBrowser, [switch]$Demo)
 
 $ErrorActionPreference = "Stop"
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -28,7 +28,9 @@ if (-not (Test-Workbench)) {
   }
   $logDirectory = Join-Path $projectRoot 'logs'
   New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-  Start-Process -WindowStyle Hidden -FilePath $nodePath -ArgumentList '--disable-warning=ExperimentalWarning','server.mjs' `
+  $argsList = @('--disable-warning=ExperimentalWarning','server.mjs')
+  if ($Demo) { $argsList += '--demo' }
+  Start-Process -WindowStyle Hidden -FilePath $nodePath -ArgumentList $argsList `
     -WorkingDirectory $projectRoot `
     -RedirectStandardOutput (Join-Path $logDirectory 'workbench.log') `
     -RedirectStandardError (Join-Path $logDirectory 'workbench.error.log')

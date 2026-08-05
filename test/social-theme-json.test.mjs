@@ -26,7 +26,7 @@ test('阶段 3 的 14 个图文主题均由 JSON 编译为变量、配方和版�
 test('阶段 3 生成 HTML 只注入当前主题 CSS 和不可变主题引用',()=>{
   const html=renderStoryboardHtml({topic:'JSON 图文主题',visualStyle:'tokyo-night',pages:[{kind:'cover',title:'封面'},{kind:'ending',title:'结束'}]});
   const definition=socialThemeDefinition('tokyo-night',{fallback:false});
-  assert.match(html,/<body class="theme-tokyo-night theme-palette" data-visual-style="tokyo-night" data-theme-version="1\.0\.0" data-theme-hash="sha256:[0-9a-f]{64}"/);
+  assert.match(html,/<body class="theme-tokyo-night theme-palette" data-visual-style="tokyo-night" data-theme-version="1\.0\.1" data-theme-hash="sha256:[0-9a-f]{64}"/);
   assert.match(html,/\.theme-tokyo-night\{--bg:#16161e;--page:#1a1b26;/);
   assert.doesNotMatch(html,/\.theme-solarized\{/);
   assert.ok(html.includes(`data-theme-hash="${definition.hash}"`));
