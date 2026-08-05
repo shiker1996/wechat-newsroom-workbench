@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- 语义打标单批模型调用失败（超时 / 空内容 / 网络中断）不再拖垮整个批次：抛错后先翻转 thinking 重试一次，仍失败则把该批热点标记为失败跳过，批次结束后可「继续打标」补打；此前网关抛错会直接失败整个 auto 任务
+- 流式空内容报错补充诊断信息（finishReason + 推理字符数），便于区分「输出预算耗尽」与「内容过滤」
 - 语义打标重试不再把已开启的 thinking 关掉：JSON 截断进入拆分重试时，拆分后的子批继续沿用 thinking（此前拆分路径把 thinking 重置为关闭，导致模型退化问题复现）
 - 图文主题代码块对比度：`inverseText` 与 `codeBackground` 同色的主题（crimson / orange / charcoal）代码块此前是黑字黑底几乎不可见；新增 `accent-panel`（白字强调色底）与 `ink-panel`（白字深色底）代码配方并切换这三个主题，代码文字改为 `--ink` / `--inverse` 高对比色
 - crimson 列表由「白字黄底」（`hard-card`）改为「白字红底」（新增 `hard-accent` 列表配方），并提升结尾页文字对比度；crimson / orange / charcoal 主题版本升至 1.0.1

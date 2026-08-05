@@ -110,6 +110,29 @@ test('单条热点反复打标失败时跳过并记录，不拖垮整批', async
   assert.deepEqual(result.failedIds,[1]);
 });
 
+test('打标调用抛错（如空内容/超时）时翻转 thinking 重试，仍失败则跳过该批不拖垮整批', async () => {
+  const hotspots=[1,2,3,4].map((id)=>({id,title:`热点${id}`,source:'rsshub',url:`https://example.com/${id}`,raw_json:'{}'}));
+  const updated=[]; let calls=0; const thinkingFlags=[];
+  const store={
+    getBatch(){return {hotspots};},
+    updateModelCall(){},
+    updateHotspotTags(id,tags){updated.push(id);},
+  };
+  const gateway={config:{defaultProvider:'deepseek',providers:{deepseek:{maxOutputTokens:8192,taggingChunkSize:2,taggingConcurrency:2}}},async complete(input){
+    calls+=1; thinkingFlags.push(Boolean(input.thinking));
+    const rows=JSON.parse(input.messages[1].content);
+    if(rows.some((row)=>row.id===1))throw new Error('DeepSeek 未返回流式文本内容（finish=length，推理已产生 3000 字符后内容为空）');
+    return {callId:calls,content:JSON.stringify({items:rows.map((row)=>({id:row.id,eventKey:`事件${row.id}`,preScores:{conflict:10}}))}),finishReason:'stop',model:'test',context:{compressed:false,afterTokens:10},usage:{}};
+  }};
+  const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
+  assert.deepEqual(updated,[3,4]);
+  assert.deepEqual(result.failedIds,[1,2]);
+  assert.equal(result.updated,2);
+  assert.equal(result.failed,2);
+  assert.equal(calls,3, '失败批先无思考再补开 thinking 各一次 + 成功批一次');
+  assert.equal(thinkingFlags.filter(Boolean).length,1, '恰好一次补开 thinking 重试');
+});
+
 test('大批量打标使用持续补位工作池和服务商批次配置', async () => {
   const hotspots=Array.from({length:25},(_,index)=>({id:index+1,title:`热点${index+1}`,source:'rsshub',url:`https://example.com/${index+1}`,raw_json:'{}'}));
   let active=0;let maxActive=0;let calls=0;const updated=[];
