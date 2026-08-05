@@ -182,11 +182,34 @@ async function runStoryboard({inspect=false}={}){
   try{if(inspect&&selectedContentType==='repository'){const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});if(candidateId===selectedId){renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);}}await analyzeEditorial(candidateId);}catch(error){toast(error.message);if(candidateId===selectedId)renderCardPlan([]);}finally{inspectButton.disabled=false;analyzeButton.disabled=false;sourceButton.textContent=original;}
 }
 
+// 布局审计失败时定位到对应故事板页：解析「P\d+」页码，展开该页编辑器并滚动高亮，
+// 让用户直接在「02 卡片故事板」中修改，而不是只看到一段报错文案。
+function locateStoryboardPages(error) {
+  const pages = [...String(error || '').matchAll(/P(\d+)/g)].map((match) => Number(match[1]));
+  if (!pages.length) return;
+  const container = document.getElementById('card-plan-preview');
+  if (!container) return;
+  const articles = pages.map((number) => container.querySelector(`[data-card-page="${number}"]`)).filter(Boolean);
+  if (!articles.length) return;
+  for (const article of articles) {
+    const details = article.querySelector('details.storyboard-page-editor');
+    if (details) details.open = true;
+    article.classList.add('layout-failed-page');
+    if (!article.querySelector('.layout-failed-badge')) {
+      const badge = document.createElement('em');
+      badge.className = 'layout-failed-badge';
+      badge.textContent = '布局审计未通过 · 修改本页后重新生成';
+      article.querySelector('.storyboard-page-copy')?.prepend(badge);
+    }
+  }
+  articles[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function watchSocialJob(jobId,candidateId,button){
   while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);const active=job.status==='running'||job.status==='queued';if(candidateId===selectedId)button.textContent=active?(job.status==='queued'?'排队等待执行…':(job.progress||'图文任务执行中…')):'生成整组图文';if(active)continue;
     // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
     button.disabled=false;button.textContent=job.status==='completed'?'重新生成整组图文':'生成整组图文';
-    if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else toast(`图文生成失败${job.error?`：${job.error}`:''}`);return;
+    if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else{toast(`图文生成失败${job.error?`：${job.error}`:''}`);locateStoryboardPages(job.error);}return;
   }
 }
 
