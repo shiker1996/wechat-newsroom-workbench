@@ -18,6 +18,18 @@ const CARD_ROLE_LABELS={cover:'封面',concept:'概念',feature:'功能',steps:'
 const CARD_COMPOSITION_LABELS={'hero-stack':'主视觉堆叠','hero-frame':'主视觉框景','concept-split':'概念分栏','concept-offset':'概念错位','feature-ledger':'功能账本','feature-stack':'功能纵列','sequence-rail':'步骤轨道','sequence-offset':'步骤错列','metric-board':'数据面板','metric-split':'数据分栏','comparison-board':'对比面板','comparison-split':'对比分栏','evidence-ledger':'证据账本','evidence-frame':'证据框景','timeline-rail':'时间轨道','timeline-offset':'时间错列','risk-sidebar':'风险侧栏','risk-frame':'风险框景','closing-focus':'收束聚焦','closing-note':'收束便笺'};
 const CARD_DECORATION_LABELS={none:'无装饰',orbit:'轨道圆环','index-line':'索引线',stamp:'编辑戳记'};
 const CARD_OVERLAP_LABELS={none:'标准层级','title-card':'标题叠卡','accent-edge':'边缘错位'};
+const CARD_ALLOWED_BLOCK_TYPES=['text','list','code','note','stats','compare','steps','timeline','scenes','highlight'];
+const CARD_STRUCTURED_BLOCK_TYPES=new Set(['stats','compare','steps','timeline','scenes']);
+const CARD_BLOCK_TYPE_LABELS={text:'正文',list:'列表',code:'代码',note:'提示',stats:'数据卡',compare:'对比卡',steps:'步骤卡',timeline:'时间线',scenes:'场景卡',highlight:'亮点'};
+function cardBlockTypeOptions(selected){
+  return CARD_ALLOWED_BLOCK_TYPES.map((type)=>`<option value="${type}"${type===selected?' selected':''}>${CARD_BLOCK_TYPE_LABELS[type]||type}</option>`).join('');
+}
+function cardBlockEditorHtml(block,index){
+  const type=CARD_ALLOWED_BLOCK_TYPES.includes(block?.type)?block.type:'text';
+  const structured=CARD_STRUCTURED_BLOCK_TYPES.has(type);
+  const payload=structured?JSON.stringify({items:block.items||[],headers:block.headers||[],rows:block.rows||[]},null,2):String(block.content||'');
+  return `<fieldset class="storyboard-block-editor" data-storyboard-block="${index}"><legend>内容块 ${index+1}<select data-storyboard-block-type>${cardBlockTypeOptions(type)}</select></legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title||'')}"></label><label>${structured?'结构化内容（JSON）':'正文'}<textarea data-storyboard-block-content rows="${structured?6:3}">${escapeHtml(payload)}</textarea></label><button type="button" class="text-button" data-remove-storyboard-block>删除此块</button></fieldset>`;
+}
 
 function syncCompositionControls(){
   const picker=document.getElementById('social-template-picker');
@@ -124,19 +136,14 @@ function renderCardPlan(value,decisions=currentLayoutDecisions) {
   let plan=[];try{plan=Array.isArray(value)?value:JSON.parse(value||'[]');}catch{}
   currentCardPlan=plan;currentLayoutDecisions=Array.isArray(decisions)?decisions:[];
   const options=(selected)=>Object.entries(CARD_LAYOUT_LABELS).map(([value,label])=>`<option value="${value}"${value===selected?' selected':''}>${label}</option>`).join('');
-  const structuredTypes=new Set(['stats','compare','steps','timeline','scenes']);
-  const blockEditor=(block,blockIndex)=>{
-    const structured=structuredTypes.has(block.type);
-    const payload=structured?JSON.stringify({items:block.items||[],headers:block.headers||[],rows:block.rows||[]},null,2):String(block.content||'');
-    return `<fieldset class="storyboard-block-editor" data-storyboard-block="${blockIndex}"><legend>内容块 ${blockIndex+1} · ${escapeHtml(block.type||'text')}</legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title||'')}"></label><label>${structured?'结构化内容（JSON）':'正文'}<textarea data-storyboard-block-content data-structured="${structured?'true':'false'}" rows="${structured?6:3}">${escapeHtml(payload)}</textarea></label></fieldset>`;
-  };
+  const blockEditor=(block,blockIndex)=>cardBlockEditorHtml(block,blockIndex);
   document.getElementById("card-plan-preview").innerHTML=plan.length?plan.map((page,index)=>{
     const decision=currentLayoutDecisions[index]||{layout:page.layout_style||'auto',source:page.layout_style&&page.layout_style!=='auto'?'manual':'recommended',reason:''};
     const selected=page.layout_style||'auto';
     const control=decision.mode==='smart'
       ? `<span class="layout-status ${escapeHtml(decision.source||'recommended')}">智能构图 · ${escapeHtml(CARD_ROLE_LABELS[decision.role]||decision.role||'内容')} · ${escapeHtml(CARD_COMPOSITION_LABELS[decision.composition?.id]||decision.composition?.id||'默认构图')} · 变体 ${(decision.variantIndex??0)+1}/${decision.variantCount||1}</span><small>${escapeHtml(CARD_DECORATION_LABELS[decision.composition?.decoration]||'无装饰')} · ${escapeHtml(CARD_OVERLAP_LABELS[decision.composition?.overlap]||'标准层级')}</small>`
       : `<label>页面版式<select data-card-page-layout="${index+1}">${options(selected)}</select></label><span class="layout-status ${escapeHtml(decision.source||'recommended')}">${escapeHtml(CARD_LAYOUT_STATUS[decision.source]||'自动推荐')} · ${escapeHtml(CARD_LAYOUT_LABELS[decision.layout]||decision.layout||'')}</span>`;
-    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control">${control}${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
+    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<div class="storyboard-block-add"><select data-add-storyboard-block-type>${cardBlockTypeOptions('text')}</select><button type="button" class="outline-button" data-add-storyboard-block>＋ 添加内容块</button></div><button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control">${control}${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
   }).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`;
 }
 
@@ -182,11 +189,35 @@ async function runStoryboard({inspect=false}={}){
   try{if(inspect&&selectedContentType==='repository'){const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});if(candidateId===selectedId){renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);}}await analyzeEditorial(candidateId);}catch(error){toast(error.message);if(candidateId===selectedId)renderCardPlan([]);}finally{inspectButton.disabled=false;analyzeButton.disabled=false;sourceButton.textContent=original;}
 }
 
+// 布局审计失败时定位到对应故事板页：解析「P\d+」页码，展开该页编辑器并滚动高亮，
+// 让用户直接在「02 卡片故事板」中修改，而不是只看到一段报错文案。
+function locateStoryboardPages(error) {
+  const pages = [...String(error || '').matchAll(/P(\d+)/g)].map((match) => Number(match[1]));
+  if (!pages.length) return;
+  const container = document.getElementById('card-plan-preview');
+  if (!container) return;
+  const articles = pages.map((number) => container.querySelector(`[data-card-page="${number}"]`)).filter(Boolean);
+  if (!articles.length) return;
+  for (const article of articles) {
+    const details = article.querySelector('details.storyboard-page-editor');
+    if (details) details.open = true;
+    article.classList.add('layout-failed-page');
+    const summary = article.querySelector('details.storyboard-page-editor summary');
+    if (summary && !summary.querySelector('.layout-failed-badge')) {
+      const badge = document.createElement('em');
+      badge.className = 'layout-failed-badge';
+      badge.textContent = '布局审计未通过 · 修改本页后重新生成';
+      summary.appendChild(badge);
+    }
+  }
+  articles[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function watchSocialJob(jobId,candidateId,button){
   while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);const active=job.status==='running'||job.status==='queued';if(candidateId===selectedId)button.textContent=active?(job.status==='queued'?'排队等待执行…':(job.progress||'图文任务执行中…')):'生成整组图文';if(active)continue;
     // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
     button.disabled=false;button.textContent=job.status==='completed'?'重新生成整组图文':'生成整组图文';
-    if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else toast(`图文生成失败${job.error?`：${job.error}`:''}`);return;
+    if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else{toast(`图文生成失败${job.error?`：${job.error}`:''}`);locateStoryboardPages(job.error);}return;
   }
 }
 
@@ -224,16 +255,27 @@ if(!window.__socialPageLayoutBound){window.__socialPageLayoutBound=true;
 }
 if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
   document.addEventListener('click',async(event)=>{
+    const remove=event.target.closest('[data-remove-storyboard-block]');
+    if(remove){remove.closest('[data-storyboard-block]')?.remove();return;}
+    const add=event.target.closest('[data-add-storyboard-block]');
+    if(add){
+      const fields=add.closest('.storyboard-page-editor-fields');if(!fields)return;
+      const type=fields.querySelector('[data-add-storyboard-block-type]')?.value||'text';
+      const index=fields.querySelectorAll('[data-storyboard-block]').length;
+      const div=document.createElement('div');div.innerHTML=cardBlockEditorHtml({type},index);
+      fields.querySelector('[data-save-storyboard-page]')?.before(div.firstElementChild);
+      return;
+    }
     const button=event.target.closest('[data-save-storyboard-page]');if(!button||!selectedId)return;
     const pageNumber=Number(button.dataset.saveStoryboardPage),article=button.closest('[data-card-page]');
     const source=currentCardPlan[pageNumber-1];if(!source||!article)return;
     const contentBlocks=[];
     try{
-      article.querySelectorAll('[data-storyboard-block]').forEach((node,index)=>{
-        const original=source.content_blocks?.[index]||{type:'text'};
+      article.querySelectorAll('[data-storyboard-block]').forEach((node)=>{
+        const type=node.querySelector('[data-storyboard-block-type]')?.value||'text';
+        const block={type,title:node.querySelector('[data-storyboard-block-title]')?.value.trim()||''};
         const field=node.querySelector('[data-storyboard-block-content]');
-        const block={...original,title:node.querySelector('[data-storyboard-block-title]')?.value.trim()||''};
-        if(field?.dataset.structured==='true')Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
+        if(CARD_STRUCTURED_BLOCK_TYPES.has(type))Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
         else block.content=field?.value.trim()||'';
         contentBlocks.push(block);
       });
@@ -248,6 +290,20 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
       renderCardPlan(data.cardPlan,data.layoutDecisions);renderGate(data.gate);
       toast('本页故事板已保存；生成图文时会整组重新渲染');
     }catch(error){toast(error.message);button.disabled=false;button.textContent=originalText;}
+  });
+  // 切换内容块类型：重渲染该块编辑器，保留标题；结构化/正文内容按新类型转换
+  document.addEventListener('change',(event)=>{
+    const select=event.target.closest('[data-storyboard-block-type]');if(!select)return;
+    const fieldset=select.closest('[data-storyboard-block]');if(!fieldset)return;
+    const type=select.value;
+    const title=fieldset.querySelector('[data-storyboard-block-title]')?.value||'';
+    const currentValue=fieldset.querySelector('[data-storyboard-block-content]')?.value||'';
+    let block={type,title};
+    if(CARD_STRUCTURED_BLOCK_TYPES.has(type)){
+      try{Object.assign(block,JSON.parse(currentValue||'{}'));}catch{block.items=[];block.headers=[];block.rows=[];}
+    }else{block.content=currentValue;}
+    const div=document.createElement('div');div.innerHTML=cardBlockEditorHtml(block,Number(fieldset.dataset.storyboardBlock));
+    fieldset.replaceWith(div.firstElementChild);
   });
 }
 if(!window.__socialDeliveryBound){window.__socialDeliveryBound=true;document.addEventListener('click',(event)=>{const image=event.target.closest('[data-social-image]');if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}const tab=event.target.closest('[data-social-proof]');if(tab){proofTab=tab.dataset.socialProof;renderProof();}});document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});}
