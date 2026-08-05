@@ -31,6 +31,8 @@
 
 ### Changed
 
+- 图文故事板内容更充实：单块字数上限从 160 提升到 240，并提示模型写具体内容（能力/机制/命令/数字/边界）、代码块给出完整多行命令序列（安装→初始化→运行→验证），减少代码块/短文本导致的卡片大片留白（`repository/event/custom-card-storyboard/references/storyboard.md` 与 `runtime-contract.md`）
+
 - AI 后台任务并发模型：候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥；超出 `aiJobs.maxConcurrent`（默认 2，可配）的任务进入 FIFO 队列以 `queued` 状态等待，不再互相阻塞或报「已有任务运行」
 - 服务重启恢复：`queued` 状态的 AI 任务与 `running` 一并标记为中断，避免残留排队记录
 
