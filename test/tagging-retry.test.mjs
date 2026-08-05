@@ -83,8 +83,9 @@ test('打标 JSON 截断时标记 invalid_output 并自动拆分重试', async (
   const origComplete=gateway.complete.bind(gateway);
   gateway.complete=async(input)=>{if(input.thinking)thinkingCalls.push(input);return origComplete(input);};
   const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
-  // 截断后先开 thinking 重试一次（仍失败），再进入拆分逻辑：1 + 1 + 2 = 4 次调用
-  assert.equal(calls,4); assert.equal(thinkingCalls.length,1);
+  // 截断后先开 thinking 重试一次（仍失败），拆分后的两个子批继续沿用 thinking，
+  // 不把刚打开的状态关掉：1（无 thinking）+ 1（thinking）+ 2（拆分沿用 thinking）= 4 次调用
+  assert.equal(calls,4); assert.equal(thinkingCalls.length,3);
   assert.equal(updated.length,2); assert.equal(result.updated,2);
   assert.equal(invalid[0].status,'invalid_output'); assert.match(invalid[0].error,/截断/);
 });
