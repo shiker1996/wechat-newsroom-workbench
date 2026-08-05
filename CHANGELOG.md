@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- AI 任务并发重构回归：`AiJobManager.run()` 不再丢失 `candidateId / documentKind / focus / focuses` 等执行参数（此前入队后以空参数执行，成稿/图文等任务 `getCandidate(undefined)` 报「Provided value cannot be bound to SQLite parameter 1」）
 - DeepSeek 推理强度修复：`reasoning_effort` 按官方 OpenAI SDK 用法**顶层下发**（同时保留 `thinking` 内嵌），低强度配置不再失效；未配置强度时显式开启 thinking，避免落到默认 high 导致推理失控
 - thinking 开启且推理吃光 `max_tokens`（finish=length 内容为空）时，`complete` / `streamComplete` 自动**回落无思考重试一次**，编辑室等调用不再因此报「未返回流式文本内容」
 - 流式请求显式发送 `stream_options.include_usage`，保证 token 用量按 API 返回的 `usage` 统计
