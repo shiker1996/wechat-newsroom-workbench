@@ -62,6 +62,7 @@
         "supportsJsonMode": true,
         "supportsThinkingToggle": true,
         "thinkingReserveTokens": 8000,
+        "reasoningEffort": "low",
         "enabled": true
       },
       "minimax": {
