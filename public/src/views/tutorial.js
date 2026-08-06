@@ -179,6 +179,10 @@ async function sendChat() {
   if (/[A-Za-z]:\\|(?:^|\s)\//.test(answer)) document.getElementById("tutorial-project-status").textContent = "正在自动读取本地项目并建立素材摘要…";
   input.value = "";
   const assistant = appendMessage("assistant", "", true);
+  const replyText = document.createElement("div");
+  replyText.className = "reply-text";
+  assistant.appendChild(replyText);
+  let thinkingBox = null, thinkingText = null;
   const response = await fetch(`/api/batches/${encodeURIComponent(batch.id)}/tutorial-chat/stream`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -196,15 +200,30 @@ async function sendChat() {
     for (const record of records) {
       if (!record.trim()) continue;
       const event = JSON.parse(record);
-      if (event.type === "delta") assistant.textContent += event.text;
+      if (event.type === "thinking") {
+        if (!thinkingBox) {
+          thinkingBox = document.createElement("details");
+          thinkingBox.className = "thinking-box";
+          const summary = document.createElement("summary");
+          summary.textContent = "思考过程";
+          thinkingText = document.createElement("div");
+          thinkingText.className = "thinking-text";
+          thinkingBox.append(summary, thinkingText);
+          assistant.insertBefore(thinkingBox, replyText);
+        }
+        thinkingBox.open = true;
+        thinkingText.textContent += event.text;
+        thinkingText.scrollTop = thinkingText.scrollHeight;
+      }
+      if (event.type === "delta") replyText.textContent += event.text;
       if (event.type === "error") throw new Error(event.error);
-      if (event.type === "done") result = event.data;
+      if (event.type === "done") { result = event.data; if (thinkingBox) thinkingBox.open = false; }
     }
     if (done) break;
   }
   assistant.classList.remove("pending");
   if (!result) throw new Error("教程策划未返回完整结果");
-  assistant.textContent = result.reply || assistant.textContent;
+  replyText.textContent = result.reply || replyText.textContent;
   applyUpdates(result.formUpdates);
   if (result.project) {
     field("localProjectPath").value = result.project.root;

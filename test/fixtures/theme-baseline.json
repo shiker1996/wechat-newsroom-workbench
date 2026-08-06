@@ -81,11 +81,11 @@
       { "id": "retro-terminal", "label": "复古终端", "class": "theme-retro-terminal theme-palette", "signature": "--accent:#00ff41" },
       { "id": "paper-craft", "label": "纸艺暖调", "class": "theme-paper-craft theme-palette", "signature": "--page:#f5ead6" },
       { "id": "charcoal", "label": "极简炭黑", "class": "theme-charcoal theme-palette", "signature": "--page:#1a1a1a" },
-      { "id": "peach", "label": "雾桃白桃", "class": "theme-peach theme-palette", "signature": "--accent:#ff9ab8" },
+      { "id": "peach", "label": "雾桃白桃", "class": "theme-peach theme-palette", "signature": "--accent:#c7416f" },
       { "id": "orange", "label": "落日橙界", "class": "theme-orange theme-palette", "signature": "--accent:#ff7a00" },
       { "id": "ice-blue", "label": "冰川冷调", "class": "theme-ice-blue", "signature": "background:linear-gradient(145deg,var(--page) 0%" },
       { "id": "mocha", "label": "摩卡原木", "class": "theme-mocha theme-palette", "signature": "--accent:#8b5c3f" },
-      { "id": "lavender", "label": "芋泥暮色", "class": "theme-lavender theme-palette", "signature": "--accent:#967bb6" },
+      { "id": "lavender", "label": "芋泥暮色", "class": "theme-lavender theme-palette", "signature": "--accent:#8361a8" },
       { "id": "crimson", "label": "赤焰硬核", "class": "theme-crimson theme-palette", "signature": "--accent:#ff2d55" },
       { "id": "bone-white", "label": "月白清灰", "class": "theme-bone-white theme-palette", "signature": "--page:#f5f5f3" }
     ]

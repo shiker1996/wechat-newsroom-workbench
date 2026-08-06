@@ -54,7 +54,7 @@
         "baseUrl": "https://api.deepseek.com",
         "model": "deepseek-v4-flash",
         "apiKeyEnv": "DEEPSEEK_API_KEY",
-        "contextWindow": 1000000,
+        "contextWindow": 900000,
         "maxOutputTokens": 16384,
         "maxTokensField": "max_tokens",
         "taggingChunkSize": 8,
@@ -62,6 +62,7 @@
         "supportsJsonMode": true,
         "supportsThinkingToggle": true,
         "thinkingReserveTokens": 8000,
+        "reasoningEffort": "low",
         "enabled": true
       },
       "minimax": {
@@ -101,5 +102,6 @@
     "rssContentMinChars": 800,
     "rssFallbackMinChars": 200,
     "githubMinChars": 200
-  }
+  },
+  "aiJobs": { "maxConcurrent": 2 }
 }
