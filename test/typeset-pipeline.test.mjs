@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { skipBrowser } from './helpers/tiers.mjs';
 import os from 'node:os';
 import path from 'node:path';
-import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput, defaultTypesetTheme } from '../lib/llm/typeset-pipeline.mjs';
+import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput, defaultTypesetTheme, htmlPreservesStructure } from '../lib/llm/typeset-pipeline.mjs';
 import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
 
 test('项目排版总技能声明与执行器使用相同的六阶段契约', () => {
@@ -332,4 +332,11 @@ const answer = 42;
   assert.match(html, /const answer = 42;/);
   assert.match(html, /<table\b[^>]*><thead><tr><th[^>]*>Key<\/th><th[^>]*>Value<\/th>/);
   assert.match(html, /<tbody><tr><td[^>]*>answer<\/td><td[^>]*><code[^>]*>42<\/code><\/td><\/tr><\/tbody>/);
+});
+
+test('结构保真检查对含 HTML 特殊字符（引号）的标题不误判', () => {
+  const markdown = '# 引言\n\n## 政策变轨：美国对华AI政策"硬封锁、软豁免"双轨并进\n\n正文段落。\n\n## 结尾\n\n[来源](https://example.com)\n';
+  const html = markdownToHtml(markdown, {});
+  assert.match(html, /政策变轨/);
+  assert.equal(htmlPreservesStructure(markdown, html), true, '含引号标题渲染后转义，仍应判定结构保留');
 });
