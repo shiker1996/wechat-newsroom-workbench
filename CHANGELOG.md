@@ -15,6 +15,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-06
+
 ### Fixed
 
 - 排版结构保真检查对含引号等 HTML 特殊字符的标题误判：标题渲染后被转义（`"`→`&quot;`），`htmlPreservesStructure` 用原始文本比对导致误报「HTML 初稿未完整保留标题、章节、链接或图片」；比对前对标题做同样转义
@@ -97,7 +99,8 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.1...0.2.2
 [0.2.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.1.5...0.2.0
 [0.1.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.0.1...0.1.0
 [0.0.1]: https://github.com/shiker1996/wechat-newsroom-workbench/releases/tag/0.0.1
