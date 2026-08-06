@@ -31,6 +31,7 @@
   - `defaultProvider`、`requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。
   - `providers.<name>`：`label`、`baseUrl`、`model`、`apiKeyEnv`、`contextWindow`、`maxOutputTokens`、`maxTokensField`。
   - 吞吐参数：`taggingChunkSize`（默认 ≤8，按 `maxOutputTokens` 收紧）、`taggingConcurrency`（默认 6）、`eventCardChunkSize`（默认 3）、`eventCardConcurrency`（默认 4）。
+- `aiJobs`：AI 后台任务并发。`maxConcurrent`（2）为全局并发上限，超过上限的任务进入 FIFO 队列等待；候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥。
 
 超时、重试、并发与 token 预算的安全默认值及适用范围见 [safety-defaults.md](./safety-defaults.md)。
 

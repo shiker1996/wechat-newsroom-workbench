@@ -55,7 +55,7 @@ test('多选关系对关联事件取并集并去重', () => {
 test('质量门禁忽略推测字数和逐事件ID引用要求', () => {
   const quality=normalizeDailyQuality({pass:false,issues:[
     {message:'未完全覆盖所有事件ID：缺少 E123 的独立引用'},
-    {message:'可见字符可能超过1200限制'},
+    {message:'可见字符可能超过1800限制'},
   ]},980);
   assert.equal(quality.pass,true);
   assert.deepEqual(quality.issues,[]);

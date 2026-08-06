@@ -15,6 +15,32 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 排版结构保真检查对含引号等 HTML 特殊字符的标题误判：标题渲染后被转义（`"`→`&quot;`），`htmlPreservesStructure` 用原始文本比对导致误报「HTML 初稿未完整保留标题、章节、链接或图片」；比对前对标题做同样转义
+- AI 任务并发重构回归：`AiJobManager.run()` 不再丢失 `candidateId / documentKind / focus / focuses` 等执行参数（此前入队后以空参数执行，成稿/图文等任务 `getCandidate(undefined)` 报「Provided value cannot be bound to SQLite parameter 1」）
+- DeepSeek 推理强度修复：`reasoning_effort` 按官方 OpenAI SDK 用法**顶层下发**（同时保留 `thinking` 内嵌），低强度配置不再失效；未配置强度时显式开启 thinking，避免落到默认 high 导致推理失控
+- thinking 开启且推理吃光 `max_tokens`（finish=length 内容为空）时，`complete` / `streamComplete` 自动**回落无思考重试一次**，编辑室等调用不再因此报「未返回流式文本内容」
+- 流式请求显式发送 `stream_options.include_usage`，保证 token 用量按 API 返回的 `usage` 统计
+- `model_calls` 新增 `reasoning_tokens` 列，记录 DeepSeek `usage.completion_tokens_details.reasoning_tokens`，便于诊断推理开销
+- 语义打标单批模型调用失败（超时 / 空内容 / 网络中断）不再拖垮整个批次：抛错后先翻转 thinking 重试一次，仍失败则把该批热点标记为失败跳过，批次结束后可「继续打标」补打；此前网关抛错会直接失败整个 auto 任务
+- 流式空内容报错补充诊断信息（finishReason + 推理字符数），便于区分「输出预算耗尽」与「内容过滤」
+- 语义打标重试不再把已开启的 thinking 关掉：JSON 截断进入拆分重试时，拆分后的子批继续沿用 thinking（此前拆分路径把 thinking 重置为关闭，导致模型退化问题复现）
+- 图文主题代码块对比度：`inverseText` 与 `codeBackground` 同色的主题（crimson / orange / charcoal）代码块此前是黑字黑底几乎不可见；新增 `accent-panel`（白字强调色底）与 `ink-panel`（白字深色底）代码配方并切换这三个主题，代码文字改为 `--ink` / `--inverse` 高对比色
+- crimson 列表由「白字黄底」（`hard-card`）改为「白字红底」（新增 `hard-accent` 列表配方），并提升结尾页文字对比度；crimson / orange / charcoal 主题版本升至 1.0.1
+- 全量图文主题对比度审计（`scripts/audit-theme-contrast.mjs`，无头浏览器实测）：brutalist 眉题由 1:1 不可见改为正文色；peach / tokyo-night / lavender / solarized 加深强调色使白字达标（步骤号 / 表头 / 结尾页），brand 对比度随之提升；bone-white / ice-blue / mocha / paper-craft / peach / solarized 眉题由 accent2 改为 muted 色提升可读性；相关主题版本升至 1.0.1
+
+### Changed
+
+- 批次早报可见字符门禁调整为 1300–1800 字（此前默认 1200 硬上限）：`daily-pipeline.mjs` 默认 `gates.length` 改为 `{minVisibleChars:1300,maxVisibleChars:1800}`，`wechat-mp-daily` 技能正文区间同步为 1300–1800 字
+- 布局审计失败后定位到具体故事板页：解析报错中的「P\d+」页码，自动展开「02 卡片故事板」对应页的编辑器、滚动并红色高亮，标注「布局审计未通过 · 修改本页后重新生成」，不再只给一段需要用户自己找页的报错文案
+- 图文故事板内容更充实：单块字数上限从 160 提升到 240，并提示模型写具体内容（能力/机制/命令/数字/边界）、代码块给出完整多行命令序列（安装→初始化→运行→验证），减少代码块/短文本导致的卡片大片留白（`repository/event/custom-card-storyboard/references/storyboard.md` 与 `runtime-contract.md`）
+
+- AI 后台任务并发模型：候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥；超出 `aiJobs.maxConcurrent`（默认 2，可配）的任务进入 FIFO 队列以 `queued` 状态等待，不再互相阻塞或报「已有任务运行」
+- 服务重启恢复：`queued` 状态的 AI 任务与 `running` 一并标记为中断，避免残留排队记录
+
+- README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
+
 ## [0.2.0] - 2026-08-04
 
 ### Fixed

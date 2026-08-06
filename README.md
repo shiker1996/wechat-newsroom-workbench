@@ -6,12 +6,11 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)](#支持矩阵)
 
 <p align="center">
-  <img src="docs/screenshots/ui-dashboard.png" alt="工作台总览" width="46%">
-  <img src="docs/screenshots/ui-atlas.png" alt="热点全景" width="46%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/ui-topics.png" alt="文章选题池" width="46%">
-  <img src="docs/screenshots/ui-social-topics.png" alt="图文选题池" width="46%">
+  <a href="https://img.shiker.tech/project/export-1785841213192.mp4">
+    <img src="docs/screenshots/ui-demo-cover.png" alt="点击播放演示视频" width="760">
+  </a>
+  <br>
+  <small>▶ 点击封面播放 2 分钟演示：热点全景 → 文章选题池 → 图文选题池（0.2.0，演示模式数据，无需配置模型服务商）</small>
 </p>
 
 本地优先的中文内容编辑与图文生产工作台。它以每日批次为主线，把热点采集、事实研判、选题、编辑决策、文章成稿、公众号排版和社交图文交付保存在同一个可审计的本地工作区中。

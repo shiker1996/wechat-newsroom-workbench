@@ -83,8 +83,9 @@ test('打标 JSON 截断时标记 invalid_output 并自动拆分重试', async (
   const origComplete=gateway.complete.bind(gateway);
   gateway.complete=async(input)=>{if(input.thinking)thinkingCalls.push(input);return origComplete(input);};
   const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
-  // 截断后先开 thinking 重试一次（仍失败），再进入拆分逻辑：1 + 1 + 2 = 4 次调用
-  assert.equal(calls,4); assert.equal(thinkingCalls.length,1);
+  // 截断后先开 thinking 重试一次（仍失败），拆分后的两个子批继续沿用 thinking，
+  // 不把刚打开的状态关掉：1（无 thinking）+ 1（thinking）+ 2（拆分沿用 thinking）= 4 次调用
+  assert.equal(calls,4); assert.equal(thinkingCalls.length,3);
   assert.equal(updated.length,2); assert.equal(result.updated,2);
   assert.equal(invalid[0].status,'invalid_output'); assert.match(invalid[0].error,/截断/);
 });
@@ -107,6 +108,29 @@ test('单条热点反复打标失败时跳过并记录，不拖垮整批', async
   assert.equal(result.updated,1);
   assert.equal(result.failed,1);
   assert.deepEqual(result.failedIds,[1]);
+});
+
+test('打标调用抛错（如空内容/超时）时翻转 thinking 重试，仍失败则跳过该批不拖垮整批', async () => {
+  const hotspots=[1,2,3,4].map((id)=>({id,title:`热点${id}`,source:'rsshub',url:`https://example.com/${id}`,raw_json:'{}'}));
+  const updated=[]; let calls=0; const thinkingFlags=[];
+  const store={
+    getBatch(){return {hotspots};},
+    updateModelCall(){},
+    updateHotspotTags(id,tags){updated.push(id);},
+  };
+  const gateway={config:{defaultProvider:'deepseek',providers:{deepseek:{maxOutputTokens:8192,taggingChunkSize:2,taggingConcurrency:2}}},async complete(input){
+    calls+=1; thinkingFlags.push(Boolean(input.thinking));
+    const rows=JSON.parse(input.messages[1].content);
+    if(rows.some((row)=>row.id===1))throw new Error('DeepSeek 未返回流式文本内容（finish=length，推理已产生 3000 字符后内容为空）');
+    return {callId:calls,content:JSON.stringify({items:rows.map((row)=>({id:row.id,eventKey:`事件${row.id}`,preScores:{conflict:10}}))}),finishReason:'stop',model:'test',context:{compressed:false,afterTokens:10},usage:{}};
+  }};
+  const result=await tagBatch({gateway,store,batchId:'b1',provider:'deepseek'});
+  assert.deepEqual(updated,[3,4]);
+  assert.deepEqual(result.failedIds,[1,2]);
+  assert.equal(result.updated,2);
+  assert.equal(result.failed,2);
+  assert.equal(calls,3, '失败批先无思考再补开 thinking 各一次 + 成功批一次');
+  assert.equal(thinkingFlags.filter(Boolean).length,1, '恰好一次补开 thinking 重试');
 });
 
 test('大批量打标使用持续补位工作池和服务商批次配置', async () => {

@@ -24,7 +24,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260801-theme-experience";
+const moduleVersion = "20260805-block-edit";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
