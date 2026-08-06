@@ -79,7 +79,7 @@
 | 网络服务商（Firecrawl / Tavily / GitHub / 又拍云） | 可选 | 原文抓取升级、搜索补证、项目发现、CDN 上传，未配置时对应功能降级或关闭 |
 | 磁盘空间 | — | 首次安装约需 1–2 GB（npm 依赖 + 技能级 Puppeteer Chromium），运行数据另计 |
 
-**当前仅支持 Windows。** 核心服务本身是标准 Node.js，理论上可在 macOS / Linux 运行，但启动脚本、浏览器采集与验收测试均未在非 Windows 环境验证，请勿当作跨平台软件使用；跨平台可行性评估在开源路线图中（`docs/open-source-readiness.md` P2）。
+**当前仅支持 Windows；macOS / Linux 未测试、理论上可运行。** 核心服务是标准 Node.js，但启动脚本、浏览器采集与验收测试均只在 Windows 验证过，macOS / Linux 上可能存在未发现的兼容问题，请勿当作已支持的跨平台软件使用。跨平台可行性评估见 [docs/open-source-readiness.md](./docs/open-source-readiness.md) P2。
 
 ### 快速上手（Windows）
 
@@ -135,7 +135,7 @@ node scripts/check-env.mjs
 
 ## 接入大模型
 
-工作台内置 OpenAI 兼容模型网关，默认提供 DeepSeek、MiniMax、Kimi 三条路由。推荐复制 `.env.example` 为 `.env`：
+工作台内置 OpenAI 兼容模型网关，默认提供 DeepSeek、MiniMax、Kimi 三条路由。**目前只对 DeepSeek 链路做过完整验证；MiniMax 与 Kimi 路由已内置、可配置，但未在本项目跑通完整流水线测试，配置后如遇兼容问题需自行排障。** 推荐复制 `.env.example` 为 `.env`：
 
 ```powershell
 Copy-Item .env.example .env
@@ -318,6 +318,12 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 来源图和资料图已经接入配图工作台。事件线、数据卡两类结构化信息图可由规划阶段标记为「可生成」，工作台一键确定性渲染本地 PNG；Mermaid 与声明式 ECharts 围栏可在排版链中转成 PNG；转换失败会保留原围栏并阻止正式交付，转换成功后仍需取得 HTTPS 图片地址。可执行脚本式 ECharts 配置会被拒绝。后台任务在服务重启后仍保留数据库审计记录，但内存中的逐行实时日志不会恢复。
 
 当前版本定位为单机、本地可信用户工具：只监听回环地址，没有账号、租户隔离、CSRF 防护或公网 API 鉴权。不要直接把端口暴露到局域网或互联网。正式开源与公开发布前的缺口见 [docs/open-source-readiness.md](./docs/open-source-readiness.md)。
+
+**平台与模型测试边界**：
+
+- **平台**：仅 Windows 10/11 经完整验证；macOS / Linux 未测试，理论上可运行（核心为标准 Node.js，但启动脚本与浏览器采集未在非 Windows 环境验证）。
+- **模型**：仅 DeepSeek 链路经完整验证；MiniMax / Kimi 路由已内置、可配置，未完成全流水线测试。
+- **服务形态**：单机、本机可信用户工具，不做公网 / 局域网部署；无遥测。
 
 ## 许可证与商标
 
