@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- 排版结构保真检查对含引号等 HTML 特殊字符的标题误判：标题渲染后被转义（`"`→`&quot;`），`htmlPreservesStructure` 用原始文本比对导致误报「HTML 初稿未完整保留标题、章节、链接或图片」；比对前对标题做同样转义
 - AI 任务并发重构回归：`AiJobManager.run()` 不再丢失 `candidateId / documentKind / focus / focuses` 等执行参数（此前入队后以空参数执行，成稿/图文等任务 `getCandidate(undefined)` 报「Provided value cannot be bound to SQLite parameter 1」）
 - DeepSeek 推理强度修复：`reasoning_effort` 按官方 OpenAI SDK 用法**顶层下发**（同时保留 `thinking` 内嵌），低强度配置不再失效；未配置强度时显式开启 thinking，避免落到默认 high 导致推理失控
 - thinking 开启且推理吃光 `max_tokens`（finish=length 内容为空）时，`complete` / `streamComplete` 自动**回落无思考重试一次**，编辑室等调用不再因此报「未返回流式文本内容」
