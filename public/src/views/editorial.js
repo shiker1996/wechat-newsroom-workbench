@@ -372,10 +372,12 @@ async function sendEditorialAnswer() {
   if (answer) messages.insertAdjacentHTML("beforeend", `<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll("\n", "<br>")}</p></div>`);
   const sm = document.createElement("div");
   sm.className = "editorial-message assistant streaming";
-  sm.innerHTML = "<b>AI 编辑 · 实时回应</b><p></p>";
+  sm.innerHTML = "<b>AI 编辑 · 实时回应</b><details class=\"thinking-box\" hidden><summary>思考过程</summary><div class=\"thinking-text\"></div></details><p class=\"reply-text\"></p>";
   messages.append(sm);
   messages.scrollTop = messages.scrollHeight;
-  const st = sm.querySelector("p");
+  const st = sm.querySelector(".reply-text");
+  const thinkingText = sm.querySelector(".thinking-text");
+  const thinkingBox = sm.querySelector(".thinking-box");
   button.disabled = true;
   button.textContent = "AI 正在回应…";
   try {
@@ -393,9 +395,10 @@ async function sendEditorialAnswer() {
     const consume = (line) => {
       if (!line.trim()) return;
       const event = JSON.parse(line);
+      if (event.type === "thinking") { if (thinkingBox) { thinkingBox.hidden = false; thinkingBox.open = true; } if (thinkingText) { thinkingText.textContent += event.text || ""; thinkingText.scrollTop = thinkingText.scrollHeight; } }
       if (event.type === "delta" && st) st.textContent += event.text || "";
       if (event.type === "error") throw new Error(event.error || "编辑会调用失败");
-      if (event.type === "done") completed = true;
+      if (event.type === "done") { completed = true; if (thinkingBox) thinkingBox.open = false; }
       messages.scrollTop = messages.scrollHeight;
     };
     while (true) {
@@ -476,10 +479,14 @@ async function startEditorialProduction() {
             console.textContent = logs.map((l) => `${l.at.slice(11, 19)}  ${l.message}`).join("\n") || job.progress;
             console.scrollTop = console.scrollHeight;
           }
-          if (job.status === "running") {
+          if (job.status === "running" || job.status === "queued") {
             state.jobTimer = setTimeout(poll, 1200);
           } else {
             toast(job.status === "completed" ? "完整成稿链已完成" : `任务失败：${job.error || "未取得有效结果"}`);
+            if (job.status === "completed") {
+              document.getElementById("production-job-dialog")?.close();
+              window.go?.("editor").then(() => window.loadWritingDeskForCandidate?.(candidateId));
+            }
           }
         } catch (err) { toast(err.message); }
       }, 1200);

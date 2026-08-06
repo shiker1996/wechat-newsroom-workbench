@@ -11,7 +11,7 @@ function Ensure-Node {
   param([string]$ProjectRoot)
   $node = Get-Command node.exe -ErrorAction SilentlyContinue
   if ($node) {
-    $major = [int]((& $node.Source -p 'process.versions.node.split(".")[0]') 2>$null)
+    $major = [int]((& $node.Source -p "process.versions.node.split('.')[0]") 2>$null)
     if ($major -ge 24) { return $node.Source }
   }
   $runtimeDir = Join-Path $ProjectRoot ".node-runtime\node-v$script:NodeBootstrapVersion"

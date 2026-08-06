@@ -24,7 +24,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260801-theme-experience";
+const moduleVersion = "20260805-block-edit";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
@@ -112,6 +112,15 @@ function bindGlobal() {
   document.addEventListener("click", (event) => {
     const utilityView = event.target.closest(".nav-utility[data-view]"); if (utilityView) go(utilityView.dataset.view);
     const goButton = event.target.closest("[data-go]"); if (goButton) go(goButton.dataset.go);
+    const immersiveButton = event.target.closest("[data-immersive-chat]");
+    if (immersiveButton) {
+      const chat = immersiveButton.closest(".editorial-chat");
+      if (chat) {
+        const active = chat.classList.toggle("immersive");
+        immersiveButton.title = active ? "退出沉浸式" : "沉浸式对话";
+        immersiveButton.setAttribute("aria-pressed", String(active));
+      }
+    }
     if (event.target.closest("[data-close-batch-dialog]")) document.getElementById("batch-dialog").close();
     if (event.target.closest("[data-close-drawer]")) document.getElementById("batch-drawer").close();
     if (event.target.closest("[data-close-breaking-dialog]")) document.getElementById("breaking-batch-dialog").close();
@@ -136,6 +145,14 @@ function bindGlobal() {
       navigatingFromHistory = true;
       go(view).finally(() => { navigatingFromHistory = false; });
     }
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    document.querySelectorAll(".editorial-chat.immersive").forEach((chat) => {
+      chat.classList.remove("immersive");
+      const btn = chat.querySelector("[data-immersive-chat]");
+      if (btn) { btn.title = "沉浸式对话"; btn.setAttribute("aria-pressed", "false"); }
+    });
   });
 }
 

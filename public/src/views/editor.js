@@ -765,6 +765,18 @@ async function runTypeset() {
 
 // batch-drawer 的成稿完成跳转依赖该桥接
 window.loadSelectedDocument = loadSelectedDocument;
+// 成稿链完成后的自动跳转桥接：切换到编辑器并打开指定候选的终稿
+window.loadWritingDeskForCandidate = async (candidateId) => {
+  const select = document.getElementById("writing-candidate");
+  if (!select) return;
+  const hasOption = [...select.options].some((option) => option.value === String(candidateId));
+  if (!hasOption) await loadWritingDesk();
+  if (candidateId == null || ![...select.options].some((option) => option.value === String(candidateId))) return;
+  const finalRadio = document.querySelector('input[name="doc-kind"][value="final"]');
+  if (finalRadio && !finalRadio.checked) finalRadio.checked = true;
+  select.value = String(candidateId);
+  await loadSelectedDocument();
+};
 
 let bound = false;
 function bindEditor() {

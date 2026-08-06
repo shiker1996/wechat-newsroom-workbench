@@ -52,11 +52,18 @@ import { handleMediaRoutes } from './lib/http/routes/media-routes.mjs';
 import { handleArticleRoutes } from './lib/http/routes/article-routes.mjs';
 import { handleSocialCardRoutes } from './lib/http/routes/social-card-routes.mjs';
 import { handleThemeRoutes } from './lib/http/routes/theme-routes.mjs';
+import { seedDemoData } from './lib/demo/seed.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(root);
 const config = loadConfig(root);
-const store = new Store(path.join(root, 'data', 'workbench.db'));
+// --demo / WORKBENCH_DEMO=1：无模型服务商时也能预览各视图，使用独立演示库，不污染真实数据。
+const demo = process.argv.includes('--demo') || process.env.WORKBENCH_DEMO === '1';
+const store = new Store(path.join(root, 'data', demo ? 'demo.db' : 'workbench.db'));
+if (demo) {
+  const seedResult = seedDemoData(store, { root });
+  if (seedResult.seeded) console.log(`演示模式：已写入演示批次（${seedResult.todayBatchId} / ${seedResult.yesterdayBatchId}）`);
+}
 const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
 const jobs = new JobManager(store, config);
@@ -703,6 +710,7 @@ async function api(request, response, url) {
         history: Array.isArray(input.history) ? input.history.slice(-40) : [],
         answer: String(input.answer || ''),
         onText: (text) => send({ type: 'delta', text }),
+        onThinking: (text) => send({ type: 'thinking', text }),
       });
       send({ type: 'done', data: { reply: result.reply, formUpdates: result.formUpdates, ready: result.ready, usage: result.usage, model: result.model } });
     } catch (error) {
@@ -784,7 +792,7 @@ async function api(request, response, url) {
     response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
     const send=(event)=>response.write(`${JSON.stringify(event)}\n`);
     try{
-      const result=await runTutorialChatStream({gateway:models,store,provider:input.provider,batchId,draft,history:Array.isArray(input.history)?input.history:[],answer:String(input.answer||''),projectContext,projectReadError,onText:(text)=>send({type:'delta',text})});
+      const result=await runTutorialChatStream({gateway:models,store,provider:input.provider,batchId,draft,history:Array.isArray(input.history)?input.history:[],answer:String(input.answer||''),projectContext,projectReadError,onText:(text)=>send({type:'delta',text}),onThinking:(text)=>send({type:'thinking',text})});
       send({type:'done',data:{...result,project:projectContext?{root:projectContext.root,summary:projectContext.summary,files:projectContext.files.map((item)=>item.path),truncated:projectContext.truncated}:null,projectReadError}});
     }catch(error){send({type:'error',error:error.message});}
     response.end();return true;
@@ -957,10 +965,12 @@ async function api(request, response, url) {
   return false;
 }
 
-// Auto-start RSSHub on boot
-ensureStarted(config.rsshub, (msg) => console.log(msg)).then(running => {
-  if (running) console.log('RSSHub 已启动并保持运行');
-}).catch(err => console.error('RSSHub 启动失败:', err.message));
+// Auto-start RSSHub on boot（演示模式跳过，避免拉起本地 RSSHub 进程）
+if (!demo) {
+  ensureStarted(config.rsshub, (msg) => console.log(msg)).then(running => {
+    if (running) console.log('RSSHub 已启动并保持运行');
+  }).catch(err => console.error('RSSHub 启动失败:', err.message));
+}
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -1001,4 +1011,5 @@ server.on('error', async (error) => {
 
 server.listen(config.port, '127.0.0.1', () => {
   console.log(`公众号工作台已启动：http://127.0.0.1:${config.port}`);
+  if (demo) console.log('演示模式：使用独立演示库 data/demo.db，无模型服务商也可浏览各视图。');
 });
