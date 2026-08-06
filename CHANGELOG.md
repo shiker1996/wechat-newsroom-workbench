@@ -31,6 +31,7 @@
 
 ### Changed
 
+- 批次早报可见字符门禁调整为 1300–1800 字（此前默认 1200 硬上限）：`daily-pipeline.mjs` 默认 `gates.length` 改为 `{minVisibleChars:1300,maxVisibleChars:1800}`，`wechat-mp-daily` 技能正文区间同步为 1300–1800 字
 - 布局审计失败后定位到具体故事板页：解析报错中的「P\d+」页码，自动展开「02 卡片故事板」对应页的编辑器、滚动并红色高亮，标注「布局审计未通过 · 修改本页后重新生成」，不再只给一段需要用户自己找页的报错文案
 - 图文故事板内容更充实：单块字数上限从 160 提升到 240，并提示模型写具体内容（能力/机制/命令/数字/边界）、代码块给出完整多行命令序列（安装→初始化→运行→验证），减少代码块/短文本导致的卡片大片留白（`repository/event/custom-card-storyboard/references/storyboard.md` 与 `runtime-contract.md`）
 
