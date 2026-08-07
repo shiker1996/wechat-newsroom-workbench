@@ -75,7 +75,7 @@ test('unknown theme id falls back to default cover theme', () => {
 
 test('all builtin cover themes render every block layout', () => {
   const covers = loadThemeDirectory('themes').filter((d) => d.targets?.includes('cover'));
-  assert.equal(covers.length, 5);
+  assert.equal(covers.length, 10);
   for (const theme of covers) {
     for (const position of ['left-third', 'right-panel', 'top-band', 'full']) {
       const { html } = buildCoverHtml({

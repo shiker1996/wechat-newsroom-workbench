@@ -71,7 +71,7 @@ test('内置封面主题全部通过 cover 发布门禁', () => {
 
 test('质量对比对 cover 不访问 recipes/components 且自相似为 1', () => {
   const signatures = compactThemeSignatures(registry.list({ target: 'cover' }), 'cover');
-  assert.equal(signatures.length, 5);
+  assert.equal(signatures.length, 10);
   assert.ok(!('recipes' in signatures[0]));
   const navy = registry.get('cover-navy-gold');
   assert.equal(themeVisualSimilarity(navy, navy), 1);
