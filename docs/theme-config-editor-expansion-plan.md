@@ -26,7 +26,7 @@
 | 分组 | 字段 |
 | --- | --- |
 | 颜色 | `background`、`surface`、可选 `page`、`text`、`muted`、`accent`、`accentSecondary`、`line`、`inverseText`、`codeBackground` |
-| 字体 | `family`、`headingFamily`、`bodyPx`、`h1Px`、`h2Px`、`captionPx`、`lineHeight`、`letterSpacingEm` |
+| 字体 | `family`、`headingFamily`、`bodyPx`、`h1Px`、`h2Px`、`captionPx`、可选 `codePx`、`lineHeight`、`letterSpacingEm` |
 | 间距 | `articlePaddingPx`、`sectionPx`、`paragraphPx`、`cardGapPx` |
 | 形状 | `radiusPx`、`borderWidthPx`、`shadow` |
 

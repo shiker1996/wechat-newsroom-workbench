@@ -32,3 +32,20 @@ test('图文编译器消费完整字阶间距及四组历史空配方',()=>{
   for(const signature of ['--body-size:13px','--h1-size:39px','--h2-size:15px','--page-padding:20px','--card-gap:14px','brutalist-frame','hard-fill','hard-card','hard-panel'])assert.ok(compiled.css.includes(signature)||JSON.stringify(compiled.recipes).includes(signature),signature);
   for(const selector of ['.page-inner{padding:var(--page-padding)}','.page-ending .page-content-stack','.page li{background:var(--accent2)','.code-block pre{background:var(--code)'])assert.ok(compiled.css.includes(selector),selector);
 });
+
+test('代码块字号由独立 codePx 控制，缺省回退 captionPx',()=>{
+  const withCodePx=structuredClone(socialThemeDefinition('brutalist'));
+  withCodePx.tokens.typography.captionPx=9;
+  withCodePx.tokens.typography.codePx=11;
+  const compiled=compileSocialTheme(withCodePx);
+  assert.ok(compiled.css.includes('--code-size:11px'),'codePx 应生成 --code-size');
+  assert.ok(compiled.css.includes('.code-block code{font-size:var(--code-size)'),'代码块应使用 --code-size 而非 --caption-size');
+
+  const legacy=structuredClone(socialThemeDefinition('brutalist'));
+  legacy.tokens.typography.captionPx=9;
+  delete legacy.tokens.typography.codePx;
+  assert.ok(compileSocialTheme(legacy).css.includes('--code-size:9px'),'缺省 codePx 应回退 captionPx');
+
+  const builtin=compileSocialTheme(socialThemeDefinition('retro-terminal'));
+  assert.ok(builtin.css.includes('--code-size:11px'),'内置社交主题统一提升到 11px');
+});
