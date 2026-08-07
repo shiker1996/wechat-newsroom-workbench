@@ -116,9 +116,9 @@
 - **主题中心页签未做**：封面主题选择在封面页内的主题下拉完成（`GET /api/themes?target=cover` 已可用）；AI 生成封面主题、上传公众号素材、规格微调 UI 均留二期。
 - **验证结果**：20 张内置主题样张人工验收通过（`scripts/render-cover-samples.mjs` → `output/cover-samples/`）；`test/cover-image-generate.test.mjs` 7 项；`npm run test:fast` 691 项全绿。
 
-## 二期（暂不实施）
+## 二期
 
-- **AI 生成封面主题**：`ai-theme-contract.mjs` 的 `TARGETS` 加 `'cover'`，补 `DEFAULTS.cover` / recipe 目录 / 数值范围声明（生成器修复流水线是 target 参数化的，逻辑基本复用）；质量门禁加 900×383 样张检查；
+- **AI 生成封面主题**：✅ 已实施（2026-08-07）。`ai-theme-contract.mjs`/`ai-theme-generator.mjs` 的 target 参数化扩展 `'cover'`（封面为纯 token 主题，targetConfig 可省略，归一化跳过 recipes/components 修复）；`theme-preview.mjs` 新增 `COVER_THEME_SPECIMEN` 固定样稿（覆盖全部组件种类），发布门禁 `theme-publish-gate.mjs` 支持 cover 分支（900×383 结构检查；反白对比度由封面编译器 `pick()` 动态保证，token 级 `inverseText/codeBackground` 硬门禁不适用于封面）；`ai-theme-quality.mjs` 兼容无配方主题；主题中心 AI 生成表单新增「封面主题」类型，编辑器对封面走纯 token 编辑；克隆/导入支持 cover。测试 `test/ai-theme-cover.test.mjs`（8 项），`npm run test:fast` 699 项全绿。
 - **上传公众号素材**：接微信 API 拿 `thumb_media_id` 挂草稿；
 - **规格手动微调 UI**：不满意时改文案/换主题再渲染，而非只能重 roll；
 - **标签形态扩展**：eyebrow `form` 枚举开放更多形态。
