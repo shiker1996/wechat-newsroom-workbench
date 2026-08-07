@@ -38,17 +38,6 @@ async function loadCandidates() {
   state.coverCandidates = ready;
 }
 
-async function loadThemes() {
-  const select = $("#cover-theme");
-  try {
-    const catalog = await request("/api/themes?target=cover");
-    select.innerHTML = `<option value="auto">自动（AI 按调性选主题）</option>` + catalog.items.map((theme) => `<option value="${theme.id}">${escapeHtml(theme.label)}</option>`).join("");
-    select.value = "auto";
-  } catch {
-    select.innerHTML = '<option value="auto">自动（主题目录暂不可用）</option>';
-  }
-}
-
 function renderArticleInfo() {
   const candidate = (state.coverCandidates || []).find((c) => String(c.id) === currentCandidateId());
   const info = $("#cover-article-info");
@@ -106,6 +95,6 @@ export default async function loadCoverView() {
   bindCover();
   const prov = $("#cover-provider");
   if (prov) prov.innerHTML = providerOptions(state.models?.defaultProvider || "");
-  await Promise.all([loadCandidates(), loadThemes()]);
+  await Promise.all([loadCandidates()]);
   await loadCoverState();
 }

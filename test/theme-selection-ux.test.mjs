@@ -42,7 +42,7 @@ test('生产编辑器使用与相邻控件等高的紧凑主题按钮', () => {
   const source = read('public', 'src', 'core', 'theme-catalog.js');
   assert.match(styles, /\.social-theme-picker:has\(#social-theme-trigger\)\{align-content:stretch\}/);
   assert.match(styles, /#social-theme-trigger\{width:100%;height:35px\}/);
-  assert.match(styles, /\.typeset-toolbar #typeset-theme-trigger\{width:170px;height:44px\}/);
+  assert.match(styles, /\.typeset-toolbar #typeset-theme-trigger,\.typeset-toolbar #cover-theme-trigger\{width:170px;height:44px\}/);
   assert.match(styles, /#typeset-theme-preview,#social-theme-preview,#typeset-theme-meta,#social-theme-meta\{display:none!important\}/);
   assert.match(styles, /content:'更换 →'/);
   assert.match(source, /textContent='主题'/);

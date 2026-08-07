@@ -17,6 +17,7 @@
 
 ### Added
 
+- **AI 生成封面主题**（封面二期）：AI 主题生成器的 target 参数化扩展到 `cover`——封面主题是纯 token 主题（无组件配方），契约允许 targetConfig 省略、归一化跳过 recipes/behavior/effects/components 修复、prompt 使用封面专属设计方向（900×383 固定画布、标题为绝对主角）；`compileThemePreview` 与发布门禁支持 cover（固定封面样稿渲染、900×383 结构检查，反白文字由封面编译器 `pick()` 动态保证对比度，不做 token 级硬门禁）；视觉相似度比较兼容无配方主题；主题中心 AI 生成表单新增「封面主题」类型，封面用户主题在编辑器中走纯 token 编辑；克隆与导入同步支持 cover 目标
 - **公众号文章封面图**（AI 非视觉生成）：新增「文章封面图」工作台（导航位于「公众号排版」之后，排版页「复制公众号富文本」旁有引导按钮）。AI 只做排版决策——选封面主题、组合组件（画布/几何色块/主标题断行与高亮/标签/副标题/信息行/装饰）、产出规格 JSON；规格经 `validateCoverSpec` 校验，任一不合规整体回退 `fallbackCoverSpec` 保证永远出图；最终由确定性 HTML 模板渲染并截图为 900×383 PNG（`lib/themes/cover-components.mjs`、`cover-theme-compiler.mjs`、`lib/llm/cover-image-generator.mjs`，产物落 `images/cover.png` 并登记 kind=封面图 artifact）。封面主题进主题中心体系（`targets:['cover']`，`themes/cover/` 内置 5 套），API：`POST /api/candidates/:id/cover/generate`、`GET /api/candidates/:id/cover`、`GET /api/candidates/:id/cover/local`
 - **AI 兴趣仓库发现**（`githubDiscovery.aiQueries`）：LLM 按 `account-context.json` 内容支柱生成 GitHub Search 查询组（缓存 `data/repo-discovery-queries.json`，默认 7 天复用，可手工编辑），随 github 采集执行为新通道 `ai-search`（来源名「AI 兴趣发现 · {方向}」），结果再经 LLM 兴趣相关性打分过滤（≥ `minInterestScore` 6 分保留，分数/理由随热点 `raw_json` 入库）；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）
 - **编辑会外部链接入库**：编辑会回答中粘贴的链接（去重后最多 5 条）自动逐个抓取并落新增的 `candidate_sources` 表（按候选+URL 覆盖），以「用户补充来源」分组注入事实基座；每条抓取结果（成功标题字数/失败原因）写入对话，对用户与模型可见
@@ -24,6 +25,7 @@
 ### Changed
 
 - 图文代码块字号独立为可选 token `codePx`（缺省回退 `captionPx`），14 个内置社交主题统一从 9px 提升到 11px；不计入密度预算（块级局部元素），AI 生成主题默认值同步
+- 封面页主题选择接入与文章/图文一致的主题选择弹窗：「封面主题」触发按钮打开带视觉样稿的主题弹窗（cover 目标单行卡片布局，左侧封面样稿、右侧主题文案，含「自动匹配」置顶项）；主题中心「浏览主题库」同步新增「浏览封面主题」入口；主题 hydration 统一移交 `hydrateThemePickers`，`cover.js` 不再自管目录加载
 
 ### Fixed
 

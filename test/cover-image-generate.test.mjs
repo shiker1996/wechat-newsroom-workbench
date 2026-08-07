@@ -103,10 +103,36 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(index.includes('data-view="cover"'));
   assert.ok(index.includes('id="goto-cover"'));
   assert.ok(index.includes('id="download-cover"'));
+  assert.ok(index.includes('data-theme-picker="cover"'));
+  assert.ok(index.includes('data-theme-browser="cover"'));
   const main = fs.readFileSync('public/src/main.js', 'utf8');
   assert.ok(main.includes('cover: "./views/cover.js"'));
   assert.ok(main.includes('cover: "文章封面图"'));
   // $ 是 querySelector：按 id 取元素必须带 # 前缀
   const view = fs.readFileSync('public/src/views/cover.js', 'utf8');
   assert.doesNotMatch(view, /\$\("(?!#)/);
+  const catalog = fs.readFileSync('public/src/core/theme-catalog.js', 'utf8');
+  assert.ok(catalog.includes("cover:'cover-theme'"));
+});
+
+test('planCoverSpec unwraps nested spec objects and returns null on invalid specs', async () => {
+  const { planCoverSpec } = await import('../lib/llm/cover-image-generator.mjs');
+  const themes = [{ id: 'cover-navy-gold', label: '藏青鎏金', description: 'x' }];
+  const args = { accountContext: { name: '测试号' }, title: '测试标题', summary: '', brand: '测试号 · 2026.08', themes, fixedThemeId: 'cover-navy-gold', provider: '' };
+  // 模型把规格包在 spec 外层键里
+  const wrapped = { themeId: 'cover-navy-gold', spec: { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['测试标题'], highlights: [] }] } };
+  const gateway = { complete: async () => ({ content: JSON.stringify(wrapped) }) };
+  const planned = await planCoverSpec({ ...args, gateway });
+  assert.ok(planned?.spec?.components?.length, '嵌套规格应被剥取');
+  assert.equal(planned.themeId, 'cover-navy-gold');
+  // 完全不含 components 的输出 → null（调用方回退默认构图）
+  const badGateway = { complete: async () => ({ content: JSON.stringify({ themeId: 'x', note: '没有规格' }) }) };
+  assert.equal(await planCoverSpec({ ...args, gateway: badGateway }), null);
+});
+
+test('cover generator resolves published user themes, not just builtins', () => {
+  const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
+  assert.ok(source.includes('resolveWorkspaceTheme'));
+  assert.ok(source.includes("listUserThemes?.({ target: 'cover' })"));
+  assert.ok(source.includes('workspaceRoot, workdir, gateway, store,'));
 });
