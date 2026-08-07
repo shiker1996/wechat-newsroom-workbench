@@ -15,6 +15,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-07
+
 ### Added
 
 - **早报封面图**：封面链接入批次早报——封面页下拉与排版页同一约定把 `daily-final` 文档拼为「早报」伪候选，生成走 daily 分支（终稿取批次级 `daily-final`，产物落 `articles/<批次>/daily/images/cover.png`，artifact 按 `candidateId=null` 登记）；新增路由 `POST /api/batches/:id/daily/cover/generate`、`GET /api/batches/:id/daily/cover`、`GET /api/batches/:id/daily/cover/local`
@@ -135,7 +137,8 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.2...0.3.0
 [0.2.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.1...0.2.2
 [0.2.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.1.5...0.2.0
