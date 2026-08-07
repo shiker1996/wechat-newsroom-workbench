@@ -54,6 +54,13 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 - Store 还承担备份恢复（整库导入 + `foreign_key_check`）与生成快照存取。
 - 同目录：`config.mjs`（默认值，含 LLM providers 与 RSSHub 路由）、`env.mjs`、`workspace-paths.mjs`（`articles/`、`topics/`、`social-cards/` 等产物目录）。
 
+### 核心实体关系（批次 / 热点 / 事件 / 选题）
+
+- **批次（`batches`）→ 热点（`hotspots`）**：一批采集 N 条热点，热点 = 一条报道 = 一个原始 URL；每条热点最多一份原文快照（`hotspot_sources`，按 `hotspot_id` 单行覆盖）。
+- **事件无实体表**：由 `clusterItems`（`lib/llm/research-pipeline.mjs`）按热点的 `eventKey` 标签在读取时实时聚类派生；`event_id = 'E' + sha1(eventKey)[:10]`，由指纹哈希决定，与输入顺序、成员增减无关，重算稳定。事件的持久化产物是事件卡文件（`topics/<批次>/sources/event-cards.json`，按 `event_id` 关联）与突发批次的 `breaking_analyses` 表。
+- **选题（`candidates`）**：普通选题经 `candidates.hotspot_id` 单指一个热点；综合（composite）选题经 `candidate_hotspots` 关联多个热点（成员关系，决定选题归属哪些事件）。选题的"关联事件" = 其成员热点聚类落到的事件（`eventGroupsForCandidate`）。
+- **候选级补充来源（`candidate_sources`）**：编辑会中作者粘贴的外部报道链接，抓取快照按 `(candidate_row_id, url)` 覆盖存储；不属于任何热点/事件，由 `eventGroupsForCandidate` 以"用户补充来源"合成分组注入事实基座（与 `hotspot_sources` 的热点级快照并列）。
+
 ## 后台任务
 
 - `lib/jobs/job-manager.mjs`：非 AI **采集任务**，内存 Map 按批次防重，并行跑 Reddit（CDP）与 RSSHub / GitHub 采集，逐源写 `source_runs` / `subscription_runs`。
@@ -92,7 +99,8 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 ```text
 热点采集 → 打标 / 事件卡 → 研判（research-pipeline：聚类 → 维度分组 → 预选 → 评分）
-       → 编辑会（editorial-room，对话式沉淀结构化决策，WRITE_NOW 门禁）
+       → 编辑会（editorial-room，对话式沉淀结构化决策，WRITE_NOW 门禁；
+          回答中粘贴的链接自动抓取落 candidate_sources，逐条结果写入对话）
        → 成稿（article-pipeline，ARTICLE_STAGE_CONTRACT 固定阶段：
           brief → fact-base → planning → drafting($writer) → 质量门禁
           → title → humanize → review → seo 评分 / 优化 → 终审门禁；

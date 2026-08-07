@@ -15,6 +15,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **AI 兴趣仓库发现**（`githubDiscovery.aiQueries`）：LLM 按 `account-context.json` 内容支柱生成 GitHub Search 查询组（缓存 `data/repo-discovery-queries.json`，默认 7 天复用，可手工编辑），随 github 采集执行为新通道 `ai-search`（来源名「AI 兴趣发现 · {方向}」），结果再经 LLM 兴趣相关性打分过滤（≥ `minInterestScore` 6 分保留，分数/理由随热点 `raw_json` 入库）；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）
+- **编辑会外部链接入库**：编辑会回答中粘贴的链接（去重后最多 5 条）自动逐个抓取并落新增的 `candidate_sources` 表（按候选+URL 覆盖），以「用户补充来源」分组注入事实基座；每条抓取结果（成功标题字数/失败原因）写入对话，对用户与模型可见
+
+### Fixed
+
+- 编辑会粘贴链接只抓取第一条、composite 候选下完全不生效（override 快照落 `hotspot_id=0` 永远不会被事实基座读回）、抓取成败不可见——以上随 `candidate_sources` 通道一并解决
+- **GitHub 增长搜索 / AI 兴趣发现整批被新鲜度过滤吞掉**：`publishedAt` 误用仓库创建时间（`repo.created_at`），下游 `isFreshForBatch` 按批次窗口（如 24h）过滤后全部丢弃——增长搜索自上线起从未进入热点全景与研判；改为发现时间，仓库创建时间保留在 `createdAt` 字段
+- AI 兴趣相关性过滤的分数与理由未随热点入库（归并时只取了保留集合的名字，存的是未带分数的原始条目）
+- 图文选题池候选描述（`candidate-description`）由仓库英文简介改为打标产出的中文相关度理由（`aiTags.relevanceReason`；能进图文池的热点必经打标，未打标场景留空不渲染）；入选理由新增 `ai-search` 通道标签（「AI 兴趣发现 · 兴趣契合 N/10」）
+
 ## [0.2.2] - 2026-08-06
 
 ### Fixed

@@ -27,6 +27,7 @@
 - `reddit`：Reddit 采集。`cdpUrl`、`subreddits`、`limitPerSubreddit`（15）、`navigationTimeoutMs`。
 - `rsshub`：RSSHub 采集。`baseUrl`、`routes`（默认 12 条路由）、`disabledRoutes`、`directFeeds`、`maxAgeHours`（168，旧闻窗口）、`concurrency`（5）、`keepAlive`、`startupTimeoutMs`。
 - `githubDiscovery`：GitHub 新项目发现。`enabled`、`createdWithinDays`（30）、`minStars`（1000）、`limit`、`cacheTtlMs`。
+  - `aiQueries`：AI 兴趣仓库发现。`enabled`、`refreshDays`（7，查询组缓存天数，缓存文件 `data/repo-discovery-queries.json`，可手工编辑）、`maxQueries`（6）、`perQueryLimit`（15）、`relevanceFilter`、`minInterestScore`（6，兴趣分阈值）。LLM 按 `account-context.json` 内容支柱生成 Search 查询组并做相关性打分过滤；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）。
 - `llm`：模型网关。
   - `defaultProvider`、`requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。
   - `providers.<name>`：`label`、`baseUrl`、`model`、`apiKeyEnv`、`contextWindow`、`maxOutputTokens`、`maxTokensField`。

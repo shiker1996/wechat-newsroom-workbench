@@ -41,7 +41,15 @@
     "createdWithinDays": 30,
     "minStars": 1000,
     "limit": 30,
-    "cacheTtlMs": 1800000
+    "cacheTtlMs": 1800000,
+    "aiQueries": {
+      "enabled": true,
+      "refreshDays": 7,
+      "maxQueries": 6,
+      "perQueryLimit": 15,
+      "relevanceFilter": true,
+      "minInterestScore": 6
+    }
   },
   "llm": {
     "defaultProvider": "deepseek",

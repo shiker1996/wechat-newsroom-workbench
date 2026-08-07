@@ -487,7 +487,7 @@ test('图文候选返回仓库描述与可读的入选理由', () => {
     const hotspot=store.getBatch(batch.id).hotspots[0];
     store.saveSocialPreselection(batch.id,[{hotspotId:hotspot.id,socialScore:80,socialScoreDetails:{toolClarity:18,scenarioValue:14,demonstrability:15,visualPotential:12,saveSearchValue:13,sourceCompleteness:18,finalScore:80}}]);
     const candidate=store.listCandidates(batch.id,'social_cards')[0];
-    assert.equal(candidate.repository_description,'帮助开发者自动整理复杂日志');
+    assert.equal(candidate.repository_description,'','未打标热点不再回退英文简介');
     assert.match(candidate.social_selection_reason,/近期增长发现/);
     assert.match(candidate.social_selection_reason,/2,345 Stars/);
     assert.match(store.getCandidate(candidate.id).social_selection_reason,/工具定位清晰/);
@@ -591,4 +591,19 @@ test('重复生成按任务和用途精确查找最近快照', () => {
     assert.equal(found.id,latest.id);
     assert.equal(found.snapshot.marker,'new');
   }finally{store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('图文候选描述优先用打标中文理由，ai-search 通道展示兴趣契合分', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-social-tagreason-'));let store;
+  try {
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-08-07',title:'图文候选打标理由'});
+    store.addHotspots(batch.id,'github',[{title:'owner/ai-tool',url:'https://github.com/owner/ai-tool',description:'messy english description',stars:900,discoveryChannels:['ai-search'],interestScore:9,interestReason:'读者会想用'}]);
+    const hotspot=store.getBatch(batch.id).hotspots[0];
+    store.updateHotspotTags(hotspot.id,{category:'🤖 AI/技术动态',chinaRelevance:10,relevanceReason:'国内 AI 开发者会立刻想试用的 Agent 工具'});
+    store.saveSocialPreselection(batch.id,[{hotspotId:hotspot.id,socialScore:80,socialScoreDetails:{toolClarity:18,scenarioValue:14,demonstrability:15,visualPotential:12,saveSearchValue:13,sourceCompleteness:18,finalScore:80}}]);
+    const candidate=store.listCandidates(batch.id,'social_cards')[0];
+    assert.equal(candidate.repository_description,'国内 AI 开发者会立刻想试用的 Agent 工具');
+    assert.match(candidate.social_selection_reason,/AI 兴趣发现 · 兴趣契合 9\/10/);
+  } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
 });

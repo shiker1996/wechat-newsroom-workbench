@@ -66,7 +66,7 @@ if (demo) {
 }
 const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
-const jobs = new JobManager(store, config);
+const jobs = new JobManager(store, config, () => models);
 
 function customArticleFingerprint(batchId,input={}) {
   const normalized={};
