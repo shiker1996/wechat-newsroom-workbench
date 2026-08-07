@@ -341,7 +341,7 @@ function updateEditorialPrepareGate(candidate) {
   }
   if (answer) {
     answer.disabled = blocked;
-    answer.placeholder = blocked ? "备料完成后即可开始对话" : "回答当前问题；首次进入时可以留空，让 AI 先提问";
+    answer.placeholder = blocked ? "备料完成后即可开始对话" : "回答当前问题；首次进入时可以留空，让 AI 先提问。可粘贴报道链接，系统将自动抓取纳入事实基座";
   }
   if (send) send.disabled = blocked;
 }
