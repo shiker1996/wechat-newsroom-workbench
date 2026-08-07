@@ -106,4 +106,7 @@ test('cover routes, job type and navigation are wired', () => {
   const main = fs.readFileSync('public/src/main.js', 'utf8');
   assert.ok(main.includes('cover: "./views/cover.js"'));
   assert.ok(main.includes('cover: "文章封面图"'));
+  // $ 是 querySelector：按 id 取元素必须带 # 前缀
+  const view = fs.readFileSync('public/src/views/cover.js', 'utf8');
+  assert.doesNotMatch(view, /\$\("(?!#)/);
 });
