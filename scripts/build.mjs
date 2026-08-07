@@ -49,7 +49,7 @@ const sourceFiles = [
 let ok = true;
 try {
   const themes = createThemeRegistry({ builtinRoot:path.join(root, "themes") });
-  console.log(`主题校验完成：${themes.list({ target:"article" }).length} 个文章主题，${themes.list({ target:"social" }).length} 个图文主题`);
+  console.log(`主题校验完成：${themes.list({ target:"article" }).length} 个文章主题，${themes.list({ target:"social" }).length} 个图文主题，${themes.list({ target:"cover" }).length} 个封面主题`);
 } catch (error) {
   console.error(`  内置主题校验失败：${error.message}`);
   ok = false;
