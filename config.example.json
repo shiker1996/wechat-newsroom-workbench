@@ -111,5 +111,10 @@
     "rssFallbackMinChars": 200,
     "githubMinChars": 200
   },
-  "aiJobs": { "maxConcurrent": 2 }
+  "aiJobs": { "maxConcurrent": 2 },
+  "articleLength": {
+    "minVisibleChars": 1300,
+    "maxVisibleChars": 2000,
+    "pipelines": { "article": {}, "daily": {}, "tutorial": {} }
+  }
 }

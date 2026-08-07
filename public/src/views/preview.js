@@ -29,7 +29,11 @@ function bindPreview() {
     await loadProductionPreview().catch((error) => toast(error.message));
   });
   document.getElementById("plan-article-images").addEventListener("click", (event) => withLoading(event.currentTarget, "正在分析…", () => planArticleImages().catch((error) => toast(error.message))));
-  document.getElementById("run-local-typeset").addEventListener("click", (event) => withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message))));
+  document.getElementById("run-local-typeset").addEventListener("click", (event) => {
+    const blocked = typesetBlockReason();
+    if (blocked) { toast(blocked); return; }
+    withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message)));
+  });
   document.getElementById("copy-typeset-html").addEventListener("click", (event) => withLoading(event.currentTarget, "正在复制…", () => copyTypesetHtml().catch((error) => toast(error.message))));
   document.addEventListener("click", (event) => {
     // 显式「上传 CDN」按钮：本地图片已就位时点击才产生外部写入
@@ -163,6 +167,17 @@ function openImageZoom(src, alt) {
   document.body.appendChild(overlay);
 }
 
+// 排版前预检：返回空字符串表示可排版，否则为阻断原因（配图必须全部上传 CDN，公众号要求图片可公开访问）
+function typesetBlockReason() {
+  const data = state.imageWorkspace;
+  const hasCandidate = Boolean(state.productionPreview?.candidates?.length);
+  if (!hasCandidate) return "请先运行完整成稿链";
+  if (!data?.planned) return "请先点击「AI 规划必要配图」，确认本文需要哪些配图";
+  const manual = data.manualUnresolved || (data.unresolved || []).filter((id) => !(data.generatedPending || []).includes(id));
+  if (manual.length) return `还有 ${manual.length} 张人工配图未上传 CDN：${manual.join("、")}，请先在配图工作台处理`;
+  return "";
+}
+
 function renderImageWorkspace() {
   const data = state.imageWorkspace;
   if (!data) return;
@@ -193,8 +208,9 @@ function renderImageWorkspace() {
   const manualPending = data.manualUnresolved || (data.unresolved || []).filter((id) => !(data.generatedPending || []).includes(id));
   var btn = document.getElementById('run-local-typeset');
   if (btn) {
-    btn.disabled = !hasCandidate || !data.planned || manualPending.length > 0;
-    btn.title = !hasCandidate ? '请先运行完整成稿链' : !data.planned ? '请先点击「AI 规划必要配图」' : manualPending.length ? '以下人工配图待上传：' + manualPending.join('、') : '生成公众号排版 HTML；自动图表将在任务中上传';
+    // 不再因配图未就绪 disable（禁用按钮点击无任何反馈）；保持可点，由点击预检 toast 说明原因
+    btn.disabled = !hasCandidate;
+    btn.title = typesetBlockReason() || '生成公众号排版 HTML；自动图表将在任务中上传';
   }
   const copyButton = document.getElementById('copy-typeset-html');
   if (copyButton) {

@@ -33,6 +33,7 @@
   - `providers.<name>`：`label`、`baseUrl`、`model`、`apiKeyEnv`、`contextWindow`、`maxOutputTokens`、`maxTokensField`。
   - 吞吐参数：`taggingChunkSize`（默认 ≤8，按 `maxOutputTokens` 收紧）、`taggingConcurrency`（默认 6）、`eventCardChunkSize`（默认 3）、`eventCardConcurrency`（默认 4）。
 - `aiJobs`：AI 后台任务并发。`maxConcurrent`（2）为全局并发上限，超过上限的任务进入 FIFO 队列等待；候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥。
+- `articleLength`：文章字数门禁（可见字符，统一五处判定：文章 / 早报 / 教程三条 pipeline 的长度返工区间、技能默认门禁、编辑器前端计数与 preflight 检查）。`minVisibleChars`（1300）/ `maxVisibleChars`（2000）为全局默认区间；`pipelines.article` / `pipelines.daily` / `pipelines.tutorial` 可按链路写同名字段做差异覆盖。生效优先级：技能覆盖层 `gates.length` > `articleLength.pipelines[链路]` > `articleLength` 全局 > 内置默认 1300–2000。编辑器前端经 `GET /api/system/settings` 读取全局区间，无需另配。字数门禁为**建议性**：pipeline 会先按区间尽力自动修复，修复后仍超限只记警告、任务照常完成；编辑器保存终稿不再拦截，仅 toast 提示，超限内容可在编辑器手动删减。
 
 超时、重试、并发与 token 预算的安全默认值及适用范围见 [safety-defaults.md](./safety-defaults.md)。
 
@@ -56,7 +57,7 @@
 - `prompt`：覆盖层，追加在内置技能 prompt 之后（`CONFIGURED OVERLAY`），与不可变安全门禁冲突时以门禁为准。
 - `defaultModel`：该技能默认模型路由。
 - `allowedTools`：工具白名单（信息工具槽位能力 ID）。
-- `gates`：质量门禁——`length.minVisibleChars` / `maxVisibleChars`（默认 800–2200，成稿主技能另有 1300–1800 约束）、`facts`（未核验事实/缺来源/模型建议冒充体验，默认 error）、`voice`（第一人称与亲测声明策略）、`repair`（自动返工开关与上限，默认 1 轮）。
+- `gates`：质量门禁——`length.minVisibleChars` / `maxVisibleChars`（默认跟随 `config.local.json` 的 `articleLength`，内置兜底 1300–2000；覆盖层配置后优先级最高；字数违规只记 warning，不阻断流程）、`facts`（未核验事实/缺来源/模型建议冒充体验，默认 error）、`voice`（第一人称与亲测声明策略）、`repair`（自动返工开关与上限，默认 1 轮）。
 
 选题阶段 5 个技能（`hotspot-tagging`、`event-card-generator`、`hotspot-brainstorm`、`hotspot-synthesis`、`editorial-room`）同样走覆盖层机制；它们在代码里留有内联 fallback，技能目录缺失时行为不变。
 

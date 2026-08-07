@@ -14,11 +14,12 @@ test('成稿规划兼容模型把数组字段返回为字符串', () => {
   assert.deepEqual(plan.titleCandidates,[{title:'一个可用标题',reason:''}]);
 });
 
-test('终稿以1500字为目标并允许上下浮动200个可见字符', () => {
-  assert.deepEqual(ARTICLE_LENGTH_RANGE,{min:1300,max:1700});
+test('终稿统一字数门禁默认1300–2000个可见字符', () => {
+  assert.deepEqual(ARTICLE_LENGTH_RANGE,{min:1300,max:2000});
   assert.deepEqual(articleLengthStatus(`# 标题\n\n${'字'.repeat(1166)}`),{count:1166,valid:false,shortfall:134,overflow:0});
   assert.deepEqual(articleLengthStatus(`# 标题\n\n${'字'.repeat(1450)}`),{count:1450,valid:true,shortfall:0,overflow:0});
-  assert.deepEqual(articleLengthStatus(`# 标题\n\n${'字'.repeat(1900)}`),{count:1900,valid:false,shortfall:0,overflow:200});
+  assert.deepEqual(articleLengthStatus(`# 标题\n\n${'字'.repeat(1900)}`),{count:1900,valid:true,shortfall:0,overflow:0});
+  assert.deepEqual(articleLengthStatus(`# 标题\n\n${'字'.repeat(2100)}`),{count:2100,valid:false,shortfall:0,overflow:100});
 });
 
 test('成稿规划保留结构化数组并接纳单个风险对象', () => {

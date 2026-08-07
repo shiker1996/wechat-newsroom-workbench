@@ -220,7 +220,7 @@ function renderMarkdown() {
   requestAnimationFrame(() => syncScroll(editor, preview));
   const count = visibleChars(editor.value);
   const cc = document.getElementById("char-count");
-  if (cc) cc.textContent = count + " / 2000";
+  if (cc) cc.textContent = count + " / " + articleLengthLimit.max;
   renderDocumentOutline(editor.value);
   renderWritingStats(editor.value);
   renderQualitySummary(editor.value);
@@ -265,7 +265,7 @@ function preflightChecks(markdown=document.getElementById("markdown-editor")?.va
     {id:"save",label:"保存状态",pass:!editorDirty&&Boolean(currentDocument),detail:!currentDocument?"当前文稿尚未保存":editorDirty?"仍有修改等待保存":"当前内容已安全保存",action:"保存"},
     {id:"goal",label:"写作目标",pass:stats.chars>=goal,detail:`${stats.chars.toLocaleString("zh-CN")} / ${goal.toLocaleString("zh-CN")} 字`,action:"设置目标"},
     {id:"quality",label:"内容质量",pass:issues.length===0,detail:issues.length?`有 ${issues.length} 项结构或可读性建议`:"未发现明显质量问题",action:"查看问题"},
-    {id:"final",label:"终稿门禁",pass:kind==="final"&&Boolean(title)&&stats.chars>0&&stats.chars<=2000,detail:kind!=="final"?"当前仍是草稿":!title?"缺少文章标题":stats.chars===0?"正文为空":stats.chars>2000?`超过 2000 字上限（当前 ${stats.chars} 字）`:"终稿格式与字数符合要求",action:"检查终稿"},
+    {id:"final",label:"终稿门禁",pass:kind==="final"&&Boolean(title)&&stats.chars>=articleLengthLimit.min&&stats.chars<=articleLengthLimit.max,detail:kind!=="final"?"当前仍是草稿":!title?"缺少文章标题":stats.chars===0?"正文为空":stats.chars>articleLengthLimit.max?`超过 ${articleLengthLimit.max} 字上限（当前 ${stats.chars} 字）`:stats.chars<articleLengthLimit.min?`不足 ${articleLengthLimit.min} 字下限（当前 ${stats.chars} 字）`:"终稿格式与字数符合要求",action:"检查终稿"},
   ];
 }
 
@@ -662,7 +662,12 @@ async function saveDocument({automatic=false}={}) {
   if (!candidateId&&!daily) return toast("请先选择一篇文稿");
   const content = document.getElementById("markdown-editor")?.value || "";
   const kind = selectedDocKind();
-  if (kind === "final" && visibleChars(content) > 2000) return toast("终稿超过 2000 可见字符，暂不能保存为终稿");
+  if (kind === "final") {
+    const chars = visibleChars(content);
+    // 字数只警告不拦截：超限可在编辑器手动删减
+    if (chars > articleLengthLimit.max) toast(`终稿超过 ${articleLengthLimit.max} 可见字符（当前 ${chars}），建议删减后再发布`);
+    else if (chars < articleLengthLimit.min) toast(`终稿不足 ${articleLengthLimit.min} 可见字符（当前 ${chars}），建议补充后再发布`);
+  }
   const title = document.getElementById("article-title")?.value || "";
   const sequence=++saveSequence;
   const savingGeneration=editGeneration;
@@ -845,8 +850,19 @@ function bindEditor() {
   });
 }
 
+// 终稿字数门禁：由服务端 /api/system/settings 统一下发（config.local.json articleLength），加载失败回退 1300–2000
+let articleLengthLimit = { min: 1300, max: 2000 };
+async function loadArticleLengthLimit() {
+  try {
+    const data = await request("/api/system/settings");
+    const al = data?.articleLength;
+    if (al) articleLengthLimit = { min: Number(al.minVisibleChars) || 1300, max: Number(al.maxVisibleChars) || 2000 };
+  } catch {}
+}
+
 export default async function loadWritingDeskView() {
   bindEditor();
+  loadArticleLengthLimit().then(() => renderMarkdown());
   return loadWritingDesk();
 }
 export { runTypeset };

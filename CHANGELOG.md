@@ -22,6 +22,11 @@
 ### Fixed
 
 - 排版页「生成文章封面图」跳转封面页时文章不匹配：早报（`daily`）没有候选工作区会静默落到第一篇文章；封面页收到无法匹配的文章 id 时不再静默回退到第一篇，改为空态并提示先产出 09-FINAL.md（早报场景随上方 daily 分支正式支持）
+- 「生成 / 更新排版 HTML」按钮在配图未规划或未上传 CDN 时被 disable，点击毫无反馈（禁用按钮不触发任何事件，原因只在 hover tooltip 里）：改为保持可点击，点击时由前端预检 toast 说明具体原因（未执行配图规划 / 具体哪几张人工配图待上传 CDN），仍阻止实际发起排版任务
+
+### Changed
+
+- **统一文章字数门禁并降级为建议性**：五处判定（文章 / 早报 / 教程三条 pipeline 的长度返工区间、技能默认门禁 `DEFAULT_GATES.length`、编辑器前端计数与 preflight 检查）收敛为同一配置入口 `config.local.json` 的 `articleLength`（全局默认 1300–2000 可见字符，`pipelines.article|daily|tutorial` 可按链路覆盖）；技能覆盖层 `gates.length` 仍优先级最高。编辑器不再硬编码 2000 字上限，改由 `GET /api/system/settings` 下发区间，并补齐下限检查。字数超限不再阻断流程：pipeline 尽力自动修复后仍超限只记警告、任务照常完成；技能配置门禁中字数违规由 error 降为 warning；编辑器保存终稿不再拒绝，仅 toast 提示，可在编辑器手动删减
 
 ## [0.3.0] - 2026-08-07
 
