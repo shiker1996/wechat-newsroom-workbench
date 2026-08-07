@@ -107,6 +107,9 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
           每阶段产物落候选工作目录，门禁不过自动返工一次）
        → 排版（typeset-pipeline：rendered → design → images → draft → normalized → gate；
           确定性 markdownToHtml + 主题 tokens，只输出内联样式，含 CDN 上传开关）
+       → 封面图（cover-image-generator：AI 只做排版决策产出规格 JSON，
+          validateCoverSpec 校验、不合规整体回退 fallbackCoverSpec，
+          再由封面编译器确定性渲染 900×383 PNG）
 ```
 
 ### 图文链
@@ -129,6 +132,7 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 | `lib/domain/` | 纯领域逻辑（账号上下文、事实基座、来源质量、图文门禁与提示词） |
 | `lib/http/routes/` | 已抽出的 HTTP 路由模块 |
 | `lib/llm/` | LLM 网关、各条流水线、AI 任务、技能 bundle 加载 |
+| `lib/themes/` | 主题注册 / 校验 / 编译、发布门禁、AI 主题生成（article / social / cover 三目标）、封面组件与封面编译器 |
 | `lib/skills/` | 技能注册、清单、路由、包管理 |
 | `lib/tools/` | 工具注册中心、策略、插件包管理、远程适配 |
 | `lib/jobs/` | 采集任务编排 |

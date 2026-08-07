@@ -33,6 +33,8 @@
 | [skill-and-tool-extension-plan.md](./skill-and-tool-extension-plan.md) | 技能与工具扩展能力方案（P0–P4 已完成） |
 | [tool-plugins-and-configurable-writing-skills.md](./tool-plugins-and-configurable-writing-skills.md) | 工具插件化与技能可配置化方案（已完成） |
 | [social-card-storyboard-skill-extension-plan.md](./social-card-storyboard-skill-extension-plan.md) | 图文故事板技能化改造方案 |
+| [2026-08-07-cover-image-and-ai-repo-discovery-plan.md](./2026-08-07-cover-image-and-ai-repo-discovery-plan.md) | 封面图、AI 兴趣仓库、事实基座链接入库的工作事项与实施方案（已实施，0.3.0） |
+| [2026-08-07-cover-image-design.md](./2026-08-07-cover-image-design.md) | 公众号封面图设计方案：组件契约、AI 排版决策、确定性渲染与封面主题体系（已实施，0.3.0） |
 
 ## 未来计划
 
@@ -45,7 +47,7 @@
 | [typeset-pipeline-optimization-plan.md](./typeset-pipeline-optimization-plan.md) | 排版流水线优化方案（P2 待实施） |
 | [article-and-social-theme-json-plan.md](./article-and-social-theme-json-plan.md) | 文章排版与图文视觉主题 JSON 化、版本化及用户自定义主题实施方案 |
 | [theme-config-editor-expansion-plan.md](./theme-config-editor-expansion-plan.md) | 主题完整样式配置、生产级实时预览与发布门禁扩展方案 |
-| [theme-style-capability-inventory.md](./theme-style-capability-inventory.md) | 现有 20 套主题视觉能力清单、配置消费矩阵与阶段 0 基线 |
+| [theme-style-capability-inventory.md](./theme-style-capability-inventory.md) | 文章 / 图文 20 套主题视觉能力清单、配置消费矩阵与阶段 0 基线 |
 | [ai-theme-creation-extension-plan.md](./ai-theme-creation-extension-plan.md) | 主题中心 AI 创建主题、候选确认、受控生成与发布治理扩展方案 |
 | [theme-element-customization-expansion-plan.md](./theme-element-customization-expansion-plan.md) | 主题文字、颜色、边框等元素级可配置现状与受控组件属性扩展方案 |
 | [star-growth-roadmap.md](./star-growth-roadmap.md) | Star 增长路线图：发布临门一脚、首个公开 Release、可见性渠道与留存运营（待评审） |
