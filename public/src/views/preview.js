@@ -15,6 +15,11 @@ function bindPreview() {
     renderProductionCandidate(id);
     loadImageWorkspace(id).catch((error) => toast(error.message));
   });
+  // 「生成文章封面图」引导：带着当前选中的文章跳转到封面页（state.coverCandidateId 由封面页消费）
+  document.getElementById("goto-cover").addEventListener("click", () => {
+    state.coverCandidateId = document.getElementById("typeset-candidate")?.value || null;
+    window.go("cover");
+  });
   document.getElementById("refresh-preview").addEventListener("click", () => loadProductionPreview().catch((error) => toast(error.message)));
   document.addEventListener("typeset:completed", () => {
     loadProductionPreview().catch((error) => toast(error.message));
@@ -243,6 +248,8 @@ function renderProductionCandidate(candidateId) {
   if (proofFrame) proofFrame.src = htmlArtifact ? '/api/artifacts/' + htmlArtifact.id + '/content?preview=phone&v=' + encodeURIComponent(htmlArtifact.modified_at) : 'about:blank';
   const copyBtn = document.getElementById('copy-typeset-html');
   if (copyBtn) copyBtn.disabled = !htmlArtifact;
+  const gotoCoverBtn = document.getElementById('goto-cover');
+  if (gotoCoverBtn) gotoCoverBtn.disabled = false;
   const status = document.getElementById('typeset-status');
   if (status) {
     status.classList.toggle('ready', Boolean(htmlArtifact));

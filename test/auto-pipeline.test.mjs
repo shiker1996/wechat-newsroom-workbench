@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 test('自动任务类型串联打标、事件卡与事件研判', () => {
   const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
-  assert.match(manager, /'tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','auto'/);
+  assert.match(manager, /'tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','cover-image','auto'/);
   const autoBranch = manager.slice(manager.indexOf("job.type === 'auto'"));
   assert.match(autoBranch, /runBreakingAnalysisPipeline/);
   const tagAt = autoBranch.indexOf('tagBatch');

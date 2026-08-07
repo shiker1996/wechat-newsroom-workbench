@@ -10,7 +10,7 @@ test('侧栏按五个任务阶段组织并自动展开当前阶段', () => {
     assert.match(html, new RegExp(label));
   }
   assert.equal((html.match(/class="nav-group"/g) || []).length, 5);
-  assert.equal((html.match(/class="nav-item/g) || []).length, 18);
+  assert.equal((html.match(/class="nav-item/g) || []).length, 19);
   assert.match(html,/data-view="topics">文章选题池/);
   assert.match(html,/data-view="editorial">热点事件/);
   assert.match(html, /class="nav-utility" data-view="system"/);

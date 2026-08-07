@@ -21,11 +21,12 @@ function validTheme(overrides={}){
   };
 }
 
-test('阶段 1 内置主题注册中心加载 6 个文章主题和 14 个图文主题', () => {
+test('阶段 1 内置主题注册中心加载 6 个文章主题、14 个图文主题和 5 个封面主题', () => {
   const registry=getBuiltinThemeRegistry();
-  assert.equal(registry.list().length,20);
+  assert.equal(registry.list().length,25);
   assert.deepEqual(new Set(registry.list({target:'article'}).map((item)=>item.id)),new Set(baseline.article.themes.map((item)=>item.id)));
   assert.deepEqual(new Set(registry.list({target:'social'}).map((item)=>item.id)),new Set(baseline.social.themes.map((item)=>item.id)));
+  assert.deepEqual(new Set(registry.list({target:'cover'}).map((item)=>item.id)),new Set(['cover-navy-gold','cover-split-navy','cover-editorial-red','cover-forest-cream','cover-graphite-neon']));
   for(const theme of registry.list()){
     assert.match(theme.hash,/^sha256:[0-9a-f]{64}$/);
     assert.equal(theme.source,'builtin');

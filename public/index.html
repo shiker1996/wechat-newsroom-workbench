@@ -43,6 +43,7 @@
           <div class="nav-section-label">统一编辑与交付</div>
           <button class="nav-item" data-view="editor">文章编辑器</button>
           <button class="nav-item" data-view="preview">公众号排版</button>
+          <button class="nav-item" data-view="cover">文章封面图</button>
         </div>
       </details>
       <details class="nav-group" data-nav-group="social">
@@ -469,6 +470,7 @@
         <button class="outline-button" id="run-local-typeset">生成 / 更新排版 HTML</button>
         <small class="muted action-hint">默认本地确定性渲染（不计费）；选用模型初稿时按服务商计费，图片上传 CDN 属于外部写入。</small>
         <button class="primary-button" id="copy-typeset-html" disabled>复制公众号富文本</button>
+        <button class="outline-button" id="goto-cover" disabled>生成文章封面图</button>
         <small id="typeset-status">排版结果保留在本机；生成后可直接复制富文本并粘贴到公众号编辑器。</small>
       </div>
       <section class="image-stage" id="image-stage">
@@ -484,6 +486,25 @@
           <iframe id="proof-frame" title="公众号排版预览" hidden></iframe>
         </section>
         <aside class="delivery-panel"><span class="kicker">DELIVERY</span><h3>交付出口</h3><div id="delivery-links"></div><button class="ghost-button" id="preview-reindex">扫描排版产物</button></aside>
+      </div>
+    </section>
+
+    <section class="view" id="view-cover">
+      <div class="section-intro"><div><span class="kicker">COVER IMAGE</span><h2>文章封面图</h2></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
+      <div class="typeset-toolbar">
+        <select id="cover-candidate" aria-label="封面文章"></select>
+        <select id="cover-theme" aria-label="封面主题"></select>
+        <select id="cover-provider" aria-label="封面设计模型"></select>
+        <button class="primary-button" id="generate-cover">生成封面图</button>
+        <small id="cover-status" class="muted">选择文章与主题后生成封面；重复生成会覆盖旧图。</small>
+      </div>
+      <div class="cover-layout">
+        <section class="cover-preview-panel">
+          <div class="phone-bar"><span>COVER PREVIEW · 900 × 383</span><a class="text-button" id="download-cover" href="#" download="cover.png" hidden>下载 PNG</a></div>
+          <div id="cover-empty" class="cover-empty">当前文章尚未生成封面图<br><small>点击上方“生成封面图”</small></div>
+          <img id="cover-image" alt="文章封面图预览" hidden>
+        </section>
+        <aside class="delivery-panel"><span class="kicker">ARTICLE</span><h3>文章信息</h3><div id="cover-article-info"></div></aside>
       </div>
     </section>
 

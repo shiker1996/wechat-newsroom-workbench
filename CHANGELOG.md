@@ -17,6 +17,7 @@
 
 ### Added
 
+- **公众号文章封面图**（AI 非视觉生成）：新增「文章封面图」工作台（导航位于「公众号排版」之后，排版页「复制公众号富文本」旁有引导按钮）。AI 只做排版决策——选封面主题、组合组件（画布/几何色块/主标题断行与高亮/标签/副标题/信息行/装饰）、产出规格 JSON；规格经 `validateCoverSpec` 校验，任一不合规整体回退 `fallbackCoverSpec` 保证永远出图；最终由确定性 HTML 模板渲染并截图为 900×383 PNG（`lib/themes/cover-components.mjs`、`cover-theme-compiler.mjs`、`lib/llm/cover-image-generator.mjs`，产物落 `images/cover.png` 并登记 kind=封面图 artifact）。封面主题进主题中心体系（`targets:['cover']`，`themes/cover/` 内置 5 套），API：`POST /api/candidates/:id/cover/generate`、`GET /api/candidates/:id/cover`、`GET /api/candidates/:id/cover/local`
 - **AI 兴趣仓库发现**（`githubDiscovery.aiQueries`）：LLM 按 `account-context.json` 内容支柱生成 GitHub Search 查询组（缓存 `data/repo-discovery-queries.json`，默认 7 天复用，可手工编辑），随 github 采集执行为新通道 `ai-search`（来源名「AI 兴趣发现 · {方向}」），结果再经 LLM 兴趣相关性打分过滤（≥ `minInterestScore` 6 分保留，分数/理由随热点 `raw_json` 入库）；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）
 - **编辑会外部链接入库**：编辑会回答中粘贴的链接（去重后最多 5 条）自动逐个抓取并落新增的 `candidate_sources` 表（按候选+URL 覆盖），以「用户补充来源」分组注入事实基座；每条抓取结果（成功标题字数/失败原因）写入对话，对用户与模型可见
 

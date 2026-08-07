@@ -454,6 +454,21 @@ AI 规划配图占位
 
 ---
 
+## 文章封面图
+
+### POST /api/candidates/:id/cover/generate
+生成 900×383 公众号封面图 { provider?, theme? }；theme 为封面主题 id 或 "auto"（AI 按文章调性选主题）。缺少成稿终稿时返回 409。返回 202 AI 任务（type=cover-image）
+→ 文章封面图
+
+### GET /api/candidates/:id/cover
+封面图状态 { exists, size?, modifiedAt?, title? }。
+
+### GET /api/candidates/:id/cover/local
+封面 PNG 预览（返回图片文件）
+→ 文章封面图
+
+---
+
 ## 图文故事板与交付
 
 ### GET /api/candidates/:id/card-editorial

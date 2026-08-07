@@ -66,16 +66,14 @@
 
 需求要点：以文章标题为主体，比例 900:383（公众号封面 2.35:1），风格与账号调性（`account-context.json`）一致。
 
-**技术路线（推荐，复用现有基建）**：
+**✅ 方案已确认（2026-08-07），详见 `docs/2026-08-07-cover-image-design.md`**。要点：
 
-1. **生成管线**：新增 `lib/llm/cover-image-generator.mjs`，参照 `article-image-generator.mjs` 模式：确定性 HTML 模板（标题排版 + 主题色，复用 `lib/themes/` 的文章主题与对比度门禁）→ `skills/html-pages-to-images`（puppeteer）按 900×383 视口截图 → 产物落 `articles/<id>/images/cover.png`（或同级 cover 目录）；
-2. **标题排版**：封面标题断行/强调复用 social-card 已验证的 AI 语义断行（`social-card-pipeline.mjs:705-723`，含 LLM 失败兜底），避免再写一套；
-3. **API + 前端**：新增 `POST /api/candidates/:id/cover/generate`，挂在 `media-routes.mjs`；文章预览页（`public/src/views/preview.js`）加"生成封面"入口与预览；支持重新生成与手动微调标题文案；
-4. **（可选，二期）上传公众号**：接入素材上传拿 `thumb_media_id` 并挂到草稿——需先确认项目现有微信 API 集成位置（`lib/integrations/`）再定，一期可先只生成图片供手动上传。
+- **AI 非视觉生成**：AI 只产出结构化设计规格 JSON（组件选择与参数、标题断行/高亮、文案），图片由确定性 HTML/CSS + `html-pages-to-images` 渲染，规格非法时回退默认构图，保证永远出图；
+- **组件自由组合**：提供组件目录（底色、色块、标题、标签、副标题、信息行、装饰）由 AI 按文章调性组合，不做固定版式三选一；效果图三版式（`skills/html-pages-to-images/output/cover-mockup/`）作为预置组合示例与兜底；
+- **封面主题进主题中心**：新增 `target: 'cover'`，封面主题 = 配色 token 组合，一期内置 4~6 套，二期开放 AI 生成封面主题；
+- 一期范围：生成 + 预览 + 重新生成；上传公众号素材（`thumb_media_id`）、手动微调 UI 留二期。
 
-验证：新增 `test/cover-image-generate.test.mjs`（比例、标题转义、HTML 模板、路由接线）；真实生成若干张封面人工确认视觉效果。
-
-**待确认项**：封面风格偏好（纯文字排版 / 文字 + 底图 / AI 文生图）。推荐一期做"文字排版 + 主题色块"的确定性模板，可控、快速、无额外成本；AI 文生图可作为二期选项。
+**待确认项**（已解决）：封面风格偏好——已定为"文字排版 + 主题色块"的确定性模板，AI 文生图不做。
 
 ### P2 — 事项 B：AI 兴趣仓库发现（✅ 已完成批次出口，2026-08-07；直达出口不做）
 

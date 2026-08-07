@@ -9,7 +9,7 @@ import { hydrateThemePickers } from "./core/theme-catalog.js";
 const viewModules = {
   dashboard: "./views/dashboard.js", batches: "./views/batches.js", overview: "./views/atlas.js",
   topics: "./views/topics.js", daily: "./views/daily.js", tutorial: "./views/tutorial.js", "social-topics": "./views/topics.js", "social-editor": "./views/social-editor.js", "social-custom": "./views/social-editor.js", "social-event": "./views/social-editor.js", editorial: "./views/editorial.js",
-  editor: "./views/editor.js", preview: "./views/preview.js",
+  editor: "./views/editor.js", preview: "./views/preview.js", cover: "./views/cover.js",
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
   system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
   themes: "./views/theme-manager.js",
@@ -29,7 +29,7 @@ const moduleVersion = "20260805-block-edit";
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
   topics: "文章选题池", daily: "批次早报", tutorial: "自主写作", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "热点事件创作", editor: "文章编辑器",
-  preview: "公众号排版", hotspots: "热点档案", artifacts: "产物中心",
+  preview: "公众号排版", cover: "文章封面图", hotspots: "热点档案", artifacts: "产物中心",
   system: "运行与配置中心", themes: "主题中心", skills: "技能与工具", sources: "采集源", models: "模型运行",
   logs: "任务日志", calendar: "内容日历",
 };
@@ -40,7 +40,7 @@ async function go(view) {
   const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
   const isViewChange = previousView !== view;
   var bs = document.getElementById("batch-switcher");
-  if (bs) bs.style.display = ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","artifacts"].includes(view) ? "block" : "none";
+  if (bs) bs.style.display = ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","cover","artifacts"].includes(view) ? "block" : "none";
   let activeNavItem = null;
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === view;
@@ -163,7 +163,7 @@ async function pollJobNotifications() {
       const previous = jobNoticeState.get(job.id);
       jobNoticeState.set(job.id, job.status);
       if (!previous || previous === job.status || !["completed", "failed", "interrupted"].includes(job.status)) continue;
-      const labels = { tag: "打标", retag: "重新打标", research: "事件研判", article: "成稿", daily: "批次早报", tutorial: "教程成稿", typeset: "排版", "social-card": "图文生成" };
+      const labels = { tag: "打标", retag: "重新打标", research: "事件研判", article: "成稿", daily: "批次早报", tutorial: "教程成稿", typeset: "排版", "social-card": "图文生成", "cover-image": "封面图生成" };
       const label = job.run_kind === "source" ? `来源采集 · ${job.type || "source"}` : (labels[job.type] || job.type || "后台任务");
       toast(job.status === "completed" ? `${label}任务已完成` : `${label}任务${job.status === "interrupted" ? "已中断" : "失败"}${job.error ? `：${job.error}` : ""}`);
     }
