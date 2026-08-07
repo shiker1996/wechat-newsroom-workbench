@@ -93,11 +93,13 @@ function renderDeliveryImage(){if(!delivery?.images?.length)return;deliveryIndex
 function renderProof(){if(!delivery)return;const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2)};document.getElementById('social-proof-content').textContent=values[proofTab];document.querySelectorAll('[data-social-proof]').forEach((button)=>button.classList.toggle('active',button.dataset.socialProof===proofTab));}
 async function loadDelivery(candidateId=selectedId){if(!candidateId)return;const data=await request(`/api/candidates/${candidateId}/social-cards`);if(candidateId!==selectedId)return;delivery=data;const panel=document.getElementById('social-delivery');panel.hidden=!data.ready;if(!data.ready)return;deliveryIndex=0;document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;document.getElementById('social-open-html').href=data.htmlUrl;document.getElementById('social-download-all').href=data.bundleUrl;document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}" aria-label="查看第 ${index+1} 张图文"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');renderDeliveryImage();renderProof();}
 
+let lastGate=null;
 function renderGate(gate) {
-  document.getElementById("card-ready-title").textContent=gate.ready?"故事板已就绪":selectedContentType==='event'?"请先生成事件故事板":selectedContentType==='custom'?"请先完善自定义事实基座":"请先分析仓库生成故事板";
+  lastGate=gate;  document.getElementById("card-ready-title").textContent=gate.ready?"故事板已就绪":selectedContentType==='event'?"请先生成事件故事板":selectedContentType==='custom'?"请先完善自定义事实基座":"请先分析仓库生成故事板";
   const generate=document.getElementById("generate-social-card");
   generate.disabled=!gate.ready;
   generate.title=gate.ready?"根据当前卡片故事板开始生成":selectedContentType==='event'?"请先根据事实基座生成事件故事板":selectedContentType==='custom'?"门禁项全部通过后才能生成图文":"请先分析仓库并生成卡片故事板";
+  syncGenerateButton();
 }
 
 function renderFacts(facts,eventAnalysis) {
@@ -213,11 +215,24 @@ function locateStoryboardPages(error) {
   articles[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-async function watchSocialJob(jobId,candidateId,button){
-  while(true){await new Promise((resolve)=>setTimeout(resolve,2000));const job=await request(`/api/jobs/${jobId}`);const active=job.status==='running'||job.status==='queued';if(candidateId===selectedId)button.textContent=active?(job.status==='queued'?'排队等待执行…':(job.progress||'图文任务执行中…')):'生成整组图文';if(active)continue;
-    // 按钮属于页面而非候选：生成中切换候选后也必须恢复，否则按钮永久卡死在禁用态
-    button.disabled=false;button.textContent=job.status==='completed'?'重新生成整组图文':'生成整组图文';
-    if(job.status==='completed'){toast('图文生成完成，已输出 HTML 和逐页 PNG');await loadDelivery(candidateId);}else{toast(`图文生成失败${job.error?`：${job.error}`:''}`);locateStoryboardPages(job.error);}return;
+// 生成任务按候选追踪，按钮按当前选中候选渲染——页面级单按钮不再被多个候选的任务进度交替覆盖
+const socialJobs = new Map();
+function syncGenerateButton() {
+  const generate = document.getElementById("generate-social-card"); if (!generate) return;
+  const job = selectedId ? socialJobs.get(Number(selectedId)) : null;
+  const active = job && (job.status === 'running' || job.status === 'queued');
+  if (active) { generate.disabled = true; generate.textContent = job.status === 'queued' ? '排队等待执行…' : (job.progress || '图文任务执行中…'); return; }
+  if (job && job.status === 'completed') { generate.textContent = '重新生成整组图文'; return; }
+  if (!job) generate.textContent = '生成整组图文';
+}
+async function watchSocialJob(jobId, candidateId) {
+  while (true) { await new Promise((resolve) => setTimeout(resolve, 2000)); const job = await request(`/api/jobs/${jobId}`);
+    socialJobs.set(Number(candidateId), { status: job.status, progress: job.progress || '', error: job.error || '' });
+    syncGenerateButton();
+    const active = job.status === 'running' || job.status === 'queued'; if (active) continue;
+    // 完成/失败提示只对当前选中的候选弹出；其余候选的任务安静落状态，切回时按钮自会反映
+    if (Number(candidateId) === Number(selectedId)) { if (job.status === 'completed') { toast('图文生成完成，已输出 HTML 和逐页 PNG'); await loadDelivery(candidateId); } else { toast(`图文生成失败${job.error ? `：${job.error}` : ''}`); locateStoryboardPages(job.error); } }
+    return;
   }
 }
 
@@ -330,7 +345,7 @@ inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");
-generateButton?.addEventListener("click",async()=>{if(!selectedId)return;const candidateId=selectedId;generateButton.disabled=true;generateButton.textContent="正在启动…";try{const job=await request(`/api/candidates/${candidateId}/ai/social-card`,{method:'POST',body:'{}'});generateButton.textContent="图文任务执行中…";toast("图文生成任务已启动，可在任务日志查看进度");watchSocialJob(job.id,candidateId,generateButton).catch((error)=>{generateButton.disabled=false;generateButton.textContent="生成整组图文";toast(error.message);});}catch(error){toast(error.message);generateButton.disabled=false;generateButton.textContent="生成整组图文";}});
+generateButton?.addEventListener("click", async () => { if (!selectedId) return; const candidateId = Number(selectedId); socialJobs.set(candidateId, { status: 'running', progress: '正在启动…' }); syncGenerateButton(); try { const job = await request(`/api/candidates/${candidateId}/ai/social-card`, { method: 'POST', body: '{}' }); socialJobs.set(candidateId, { status: 'running', progress: '图文任务执行中…' }); syncGenerateButton(); toast("图文生成任务已启动，可在任务日志查看进度"); watchSocialJob(job.id, candidateId).catch((error) => { socialJobs.set(candidateId, { status: 'failed', error: error.message }); syncGenerateButton(); toast(error.message); }); } catch (error) { socialJobs.delete(candidateId); syncGenerateButton(); renderGate(lastGate); toast(error.message); } });
 
 window.openSocialEditor=openSocialEditor;
 
