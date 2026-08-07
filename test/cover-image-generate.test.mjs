@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
 import { buildCoverHtml } from '../lib/themes/cover-theme-compiler.mjs';
@@ -113,6 +115,15 @@ test('cover routes, job type and navigation are wired', () => {
   assert.doesNotMatch(view, /\$\("(?!#)/);
   const catalog = fs.readFileSync('public/src/core/theme-catalog.js', 'utf8');
   assert.ok(catalog.includes("cover:'cover-theme'"));
+  // 早报（id="daily"）经 daily 分支生成封面：路由、伪候选与 URL 助手接线
+  const preview = fs.readFileSync('public/src/views/preview.js', 'utf8');
+  assert.ok(!preview.includes('暂不支持生成封面图'));
+  assert.ok(view.includes('preferredId && !preferred'));
+  assert.ok(view.includes('daily-final'));
+  assert.ok(view.includes('daily/cover'));
+  assert.ok(routes.includes('\\/daily\\/cover\\/generate$'));
+  assert.ok(routes.includes('\\/daily\\/cover\\/local$'));
+  assert.ok(routes.includes('\\/daily\\/cover$'));
 });
 
 test('planCoverSpec unwraps nested spec objects and returns null on invalid specs', async () => {
@@ -135,4 +146,33 @@ test('cover generator resolves published user themes, not just builtins', () => 
   assert.ok(source.includes('resolveWorkspaceTheme'));
   assert.ok(source.includes("listUserThemes?.({ target: 'cover' })"));
   assert.ok(source.includes('workspaceRoot, workdir, gateway, store,'));
+});
+
+
+test('runCoverImageJob daily 分支：candidateId 为 null 时走早报终稿与 daily 目录', async () => {
+  const { Store } = await import('../lib/core/store.mjs');
+  const { runCoverImageJob } = await import('../lib/llm/cover-image-generator.mjs');
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-daily-cover-'));
+  const store = new Store(path.join(tempRoot, 'test.db'));
+  try {
+    const batch = store.createBatch({ date: '2026-08-07', title: '早报封面' });
+    // 缺少 daily-final：明确报错，不落到候选错误
+    await assert.rejects(
+      runCoverImageJob({ gateway: null, store, batchId: batch.id, candidateId: null, workspaceRoot: tempRoot }),
+      /缺少早报终稿/,
+    );
+    // 候选级入口：不存在的候选报候选错误
+    await assert.rejects(
+      runCoverImageJob({ gateway: null, store, batchId: batch.id, candidateId: 999, workspaceRoot: tempRoot }),
+      /候选不存在/,
+    );
+    // daily-final 就位后应越过文档检查（后续渲染依赖截图技能，这里只验证到报错点不再是终稿缺失）
+    store.saveDocument({ batchId: batch.id, candidateId: null, kind: 'daily-final', title: '测试早报', content: '第一段正文内容足够长，可以作为封面副标题素材。' });
+    const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
+    assert.ok(source.includes("batchArticlesDir(workspaceRoot, batch), 'daily'"));
+    assert.ok(source.includes("'daily-final'"));
+  } finally {
+    store.close?.();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

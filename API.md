@@ -467,6 +467,17 @@ AI 规划配图占位
 封面 PNG 预览（返回图片文件）
 → 文章封面图
 
+### POST /api/batches/:id/daily/cover/generate
+生成批次早报的 900×383 封面图 { provider?, theme? }；终稿取批次级 daily-final 文档，产物落 articles/<批次>/daily/images/cover.png。缺少早报终稿时返回 409。返回 202 AI 任务（type=cover-image，candidateId=null）
+→ 文章封面图
+
+### GET /api/batches/:id/daily/cover
+早报封面图状态 { exists, size?, modifiedAt?, title? }。
+
+### GET /api/batches/:id/daily/cover/local
+早报封面 PNG 预览（返回图片文件）
+→ 文章封面图
+
 ---
 
 ## 图文故事板与交付

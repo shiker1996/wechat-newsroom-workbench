@@ -27,7 +27,12 @@ async function loadCandidates() {
   ]);
   const finalIds = new Set(documents.filter((d) => d.kind === "final").map((d) => d.candidate_row_id));
   const ready = candidates.filter((c) => finalIds.has(c.id));
-  const preferred = ready.find((c) => String(c.id) === String(state.coverCandidateId)) || ready[0] || null;
+  // 早报与排版页同一约定：批次级 daily-final 文档拼成伪候选 daily（参考 editor.js/preview.js）
+  const dailyFinal = documents.find((d) => d.kind === "daily-final" && d.candidate_row_id == null);
+  if (dailyFinal) ready.unshift({ id: "daily", candidate_id: "早报", hotspot_title: dailyFinal.title || "批次早报", category: "📰 综合资讯", daily: true });
+  const preferredId = state.coverCandidateId;
+  const preferred = ready.find((c) => String(c.id) === String(preferredId)) || (preferredId ? null : ready[0]) || null;
+  if (preferredId && !preferred) toast("该文章没有可生成封面的终稿，请先在成稿链产出 09-FINAL.md");
   state.coverCandidateId = null;
   select.innerHTML = ready.length
     ? ready.map((item) => `<option value="${item.id}">${escapeHtml(item.candidate_id)} · ${escapeHtml(item.hotspot_title)}</option>`).join("")
@@ -46,14 +51,20 @@ function renderArticleInfo() {
     + `<div class="delivery-item"><small>分类 / 角度</small>${escapeHtml(candidate.category || "未分类")}${candidate.angle ? ` · ${escapeHtml(candidate.angle)}` : ""}</div>`;
 }
 
+function coverApi(id, suffix = "") {
+  return id === "daily"
+    ? `/api/batches/${encodeURIComponent(state.activeBatchId)}/daily/cover${suffix}`
+    : `/api/candidates/${id}/cover${suffix}`;
+}
+
 async function loadCoverState() {
   renderArticleInfo();
   const id = currentCandidateId();
   const img = $("#cover-image"), empty = $("#cover-empty"), download = $("#download-cover");
   if (!id) { img.hidden = true; empty.hidden = false; download.hidden = true; return; }
-  const status = await request(`/api/candidates/${id}/cover`);
+  const status = await request(coverApi(id));
   if (status.exists) {
-    const url = `/api/candidates/${id}/cover/local?v=${encodeURIComponent(status.modifiedAt)}`;
+    const url = `${coverApi(id, "/local")}?v=${encodeURIComponent(status.modifiedAt)}`;
     img.src = url; img.hidden = false; empty.hidden = true;
     download.href = url; download.hidden = false;
     $("#cover-status").textContent = `已生成 · ${new Date(status.modifiedAt).toLocaleString("zh-CN")} · 可重新生成覆盖`;
@@ -83,7 +94,7 @@ async function pollCoverJob(jobId, candidateId) {
 async function generateCover() {
   const id = currentCandidateId();
   if (!id) return toast("请先选择文章");
-  const job = await request(`/api/candidates/${id}/cover/generate`, {
+  const job = await request(coverApi(id, "/generate"), {
     method: "POST",
     body: JSON.stringify({ theme: $("#cover-theme").value || "auto", provider: $("#cover-provider").value || undefined }),
   });

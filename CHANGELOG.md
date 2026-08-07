@@ -13,6 +13,16 @@
 
 应用版本的唯一来源是 `package.json` 的 `version` 字段（`lib/version.mjs` 统一读取，技能与插件的 `compatibleApp` 判定均以此为准）。发布流程见 `docs/release.md`。
 
+## [Unreleased]
+
+### Added
+
+- **早报封面图**：封面链接入批次早报——封面页下拉与排版页同一约定把 `daily-final` 文档拼为「早报」伪候选，生成走 daily 分支（终稿取批次级 `daily-final`，产物落 `articles/<批次>/daily/images/cover.png`，artifact 按 `candidateId=null` 登记）；新增路由 `POST /api/batches/:id/daily/cover/generate`、`GET /api/batches/:id/daily/cover`、`GET /api/batches/:id/daily/cover/local`
+
+### Fixed
+
+- 排版页「生成文章封面图」跳转封面页时文章不匹配：早报（`daily`）没有候选工作区会静默落到第一篇文章；封面页收到无法匹配的文章 id 时不再静默回退到第一篇，改为空态并提示先产出 09-FINAL.md（早报场景随上方 daily 分支正式支持）
+
 ## [0.3.0] - 2026-08-07
 
 ### Added
