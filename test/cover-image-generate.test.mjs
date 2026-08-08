@@ -42,8 +42,25 @@ test('invalid specs are rejected so callers fall back', () => {
   }
 });
 
-test('fallbackCoverSpec splits long titles into two constrained lines', () => {
-  const spec = fallbackCoverSpec('这是一个非常非常长的文章标题用来测试断行逻辑是否正常工作', { brand: '账号名 · 2026.08', subtitle: '副标题' });
+test('title fidelity: rewritten or truncated titles are rejected when expectedTitle is given', () => {
+  const original = 'DeepSeek 1.4亿入股宇树，人形机器人要变天了？';
+  // 改写标题（AI 自拟）→ 拒绝
+  const rewritten = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['王兴兴回应', '战略配售'] }] };
+  assert.equal(validateCoverSpec(rewritten, original).ok, false);
+  // 截掉后半句 → 拒绝
+  const truncated = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['DeepSeek 1.4亿', '入股宇树'] }] };
+  assert.equal(validateCoverSpec(truncated, original).ok, false);
+  // 仅断行位置不同（允许空白差异）→ 通过
+  const faithful = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['DeepSeek 1.4亿', '入股宇树，人形机', '器人要变天了？'] }] };
+  // 3 行超 titleLines 上限，用合规的两行版本验证
+  const faithful2 = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['AI 编程的分水岭', '时刻'] }] };
+  assert.equal(validateCoverSpec(faithful2, 'AI 编程的分水岭时刻').ok, true);
+  assert.equal(validateCoverSpec(faithful, original).ok, false); // 保真但行数超限仍拒绝
+  // 不传 expectedTitle 时保持旧行为
+  assert.equal(validateCoverSpec(rewritten).ok, true);
+});
+
+test('fallbackCoverSpec splits long titles into two constrained lines', () => {  const spec = fallbackCoverSpec('这是一个非常非常长的文章标题用来测试断行逻辑是否正常工作', { brand: '账号名 · 2026.08', subtitle: '副标题' });
   const title = spec.components.find((c) => c.type === 'title');
   assert.ok(title.lines.length >= 1 && title.lines.length <= COVER_LIMITS.titleLines);
   for (const line of title.lines) assert.ok([...line].length <= COVER_LIMITS.lineChars, line);
