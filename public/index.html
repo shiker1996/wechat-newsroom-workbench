@@ -1068,9 +1068,9 @@
   <dialog id="breaking-batch-dialog" class="modal">
     <form id="breaking-batch-form">
       <div class="modal-head"><div><span class="kicker">BREAKING NEWS FAST LANE</span><h2>新建突发专题</h2></div><button type="button" class="close-button" data-close-breaking-dialog aria-label="关闭">×</button></div>
-      <p class="story-meta" style="margin-bottom:18px">为一个明确事件建立隔离批次，不与每日热点进行 8+2 竞争。</p>
-      <label>事件标题 <span style="color:var(--red)">*</span><input name="title" required placeholder="一句话说明发生了什么"></label>
-      <label>素材链接 <span style="color:var(--red)">*</span><textarea name="urls" rows="5" required placeholder="每行一个链接，可同时提供原帖、公告和报道"></textarea></label>
+      <p class="story-meta modal-form-intro">为一个明确事件建立隔离批次，不与每日热点进行 8+2 竞争。</p>
+      <label>事件标题 <span class="required-mark">*</span><input name="title" required placeholder="一句话说明发生了什么"></label>
+      <label>素材链接 <span class="required-mark">*</span><textarea name="urls" rows="5" required placeholder="每行一个链接，可同时提供原帖、公告和报道"></textarea></label>
       <label>补充背景或作者观点<textarea name="note" rows="3" placeholder="可留空；这里不会被当作已核实事实"></textarea></label>
       <fieldset class="breaking-track-choice"><legend>评估与生产方向</legend><label><input type="checkbox" name="requestedTrack" value="article" checked> 公众号文章</label><label><input type="checkbox" name="requestedTrack" value="social_cards" checked> 社交图文</label></fieldset>
       <div class="modal-actions"><button type="button" class="ghost-button" data-close-breaking-dialog>取消</button><button type="submit" class="primary-button">建立突发专题</button></div>

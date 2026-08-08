@@ -77,7 +77,7 @@ test('技能列表严格按 kind 分组且每个技能只出现一次',()=>{
   assert.match(skills,/grouped\.get\(skillKindGroup\(skill\)\)\.push\(skill\)/);
   assert.doesNotMatch(skills,/function skillKindGroup\(skill\)\s*\{[^}]*entryPoints/s);
   assert.match(skills,/class="skill-purpose-group"/);
-  assert.match(styles,/\.skill-purpose-group>header\{position:sticky;top:0;z-index:2/);
+  assert.match(styles,/\.skill-purpose-group>header\{position:sticky;top:0;z-index:var\(--z-sticky\)/);
 });
 
 test('技能与工具作为独立一级页面而非运行配置标签',()=>{

@@ -123,12 +123,12 @@ async function loadRanking() {
 function renderRankingList(items, container) {
   container.innerHTML = items.map(function (item) {
     const reason = item.eliminationReason
-      ? `<span class="muted" style="font-size:11px">${escapeHtml(item.eliminationReason)}</span>`
-      : '<span class="muted" style="font-size:11px">已入池</span>';
+      ? `<span class="muted">${escapeHtml(item.eliminationReason)}</span>`
+      : '<span class="muted">已入池</span>';
     const cls = item.inPool ? "ranking-row in-pool" : "ranking-row";
     const btn = item.inPool
       ? ""
-      : `<button class="text-button" data-ranking-add="${item.hotspotId}" style="font-size:11px">加入候选</button>`;
+      : `<button class="text-button" data-ranking-add="${item.hotspotId}">加入候选</button>`;
     return `<div class="${cls}"><span class="ranking-rank">#${item.rank}</span><span class="ranking-score">${item.score}</span><div class="ranking-title"><b>${escapeHtml(item.title)}</b>${reason}</div><div class="ranking-actions">${btn}</div></div>`;
   }).join("");
 }
