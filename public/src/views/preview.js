@@ -319,6 +319,8 @@ async function loadProductionPreview() {
   if (statusEl && !ready.length) statusEl.innerHTML = '还没有终稿（09-FINAL.md），请先到 <a href="#editor">文章编辑器</a> 保存终稿。';
   const btn = document.getElementById("run-local-typeset");
   if (btn) btn.disabled = !ready.length;
+  const gotoCoverBtn = document.getElementById("goto-cover");
+  if (gotoCoverBtn) gotoCoverBtn.disabled = !ready.length;
   state.productionPreview = { batch, artifacts, candidates: ready };
   // 渲染对象必须与下拉选中项一致（此前写死 ready[0]，下拉显示 B、内容却是 A）
   const selectedId = select?.value || ready[0]?.id;
