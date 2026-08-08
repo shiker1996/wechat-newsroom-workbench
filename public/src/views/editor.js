@@ -525,7 +525,10 @@ async function loadSelectedDocument() {
   let docResult = null;
   try {
     docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${daily?"daily":candidateId}&kind=${daily?`daily-${kind}`:kind}`);
-  } catch {}
+  } catch (error) {
+    toast(`文稿加载失败，已保留当前内容：${error.message}`);
+    return;
+  }
   currentDocument = docResult?.id ? docResult : null;
   const candidate = daily?null:state.candidates.find((item) => item.id === candidateId);
   const titleEl = document.getElementById("article-title");
@@ -589,11 +592,14 @@ function replaceOne() {
   markDocumentDirty();renderMarkdown();findNext();
 }
 
-function replaceAll() {
+async function replaceAll() {
   const editor=document.getElementById("markdown-editor"),needle=document.getElementById("find-text").value;
   if(!needle)return;
   const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   const matcher=new RegExp(escaped,document.getElementById("find-case-sensitive").checked?"g":"gi");
+  const matches=editor.value.match(matcher);
+  if(!matches?.length){document.getElementById("find-result").textContent="未找到匹配内容";return;}
+  if(!await confirmAction(`将把 ${matches.length} 处匹配全部替换，此操作无法用撤销（Ctrl+Z）恢复，建议先保存版本。是否继续？`,{confirmText:"全部替换"}))return;
   let count=0;
   editor.value=editor.value.replace(matcher,()=>{count+=1;return document.getElementById("replace-text").value;});
   document.getElementById("find-result").textContent=count?`已替换 ${count} 处`:"未找到匹配内容";

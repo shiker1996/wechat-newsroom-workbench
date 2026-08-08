@@ -47,3 +47,6 @@ dist/
 
 # 自动下载的本地 Node.js 运行时
 .node-runtime/
+
+# 封面调试与采样生成物
+output/

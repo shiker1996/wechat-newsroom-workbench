@@ -1,16 +1,20 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
+import { poll } from "../core/poll.js";
 import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let bound = false;
-let pollTimer = null;
+let coverPoller = null;
 
 function bindCover() {
   if (bound) return;
   bound = true;
-  $("#cover-candidate").addEventListener("change", () => loadCoverState().catch((error) => toast(error.message)));
-  $("#generate-cover").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => generateCover().catch((error) => toast(error.message))));
+  $("#cover-candidate").addEventListener("change", () => loadCoverState().catch((error) => toast(error.message, "error")));
+  $("#generate-cover").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => generateCover().catch((error) => {
+    $("#cover-status").textContent = `生成失败：${error.message}`;
+    toast(error.message, "error");
+  })));
 }
 
 function currentCandidateId() {
@@ -75,20 +79,23 @@ async function loadCoverState() {
 }
 
 async function pollCoverJob(jobId, candidateId) {
-  clearTimeout(pollTimer);
-  const job = await request(`/api/jobs/${jobId}`);
-  if (String(job.candidateId ?? job.candidate_id ?? "") !== String(candidateId) && job.candidateId != null) return;
-  if (job.status === "running" || job.status === "queued") {
-    $("#cover-status").textContent = job.progress || "正在生成…";
-    pollTimer = setTimeout(() => pollCoverJob(jobId, candidateId).catch(() => {}), 1500);
-    return;
-  }
-  if (job.status === "completed") {
-    toast("封面图已生成");
-    await loadCoverState();
-  } else {
-    $("#cover-status").textContent = `生成失败：${job.error || "未知错误"}`;
-  }
+  coverPoller?.cancel();
+  coverPoller = poll(async () => {
+    const job = await request(`/api/jobs/${jobId}`);
+    if (String(job.candidateId ?? job.candidate_id ?? "") !== String(candidateId) && job.candidateId != null) return true;
+    if (job.status === "running" || job.status === "queued") {
+      $("#cover-status").textContent = job.progress || "正在生成…";
+      return false;
+    }
+    if (job.status === "completed") {
+      toast("封面图已生成", "success");
+      await loadCoverState();
+    } else {
+      $("#cover-status").textContent = `生成失败：${job.error || "未知错误"}`;
+    }
+    return true;
+  }, { interval: 1500 });
+  await coverPoller.promise;
 }
 
 async function generateCover() {

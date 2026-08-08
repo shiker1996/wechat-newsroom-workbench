@@ -332,9 +332,106 @@
               <section class="repository-facts-panel social-stage-panel social-facts-stage"><div class="social-stage-head"><span class="social-stage-number">01</span><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3><p>先确认事实和素材边界，再让 AI 规划页面。</p></div><div class="social-stage-actions"><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
               <section class="social-score-panel social-stage-panel"><div class="social-score-hero"><span class="kicker">SOCIAL FIT</span><strong id="social-fit-score">—</strong><small>图文适配度</small></div><div id="social-score-parts"></div></section>
             </div>
-            <section class="repository-facts-panel social-stage-panel social-storyboard-stage"><div class="social-stage-head social-storyboard-head"><span class="social-stage-number">02</span><div><span class="kicker">CARD STORYBOARD</span><h3>卡片故事板</h3><p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p></div></div><div class="social-control-deck"><details class="creation-skill-settings social-skill-settings"><summary><span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span><em>更换</em></summary><div class="creation-skill-popover"><div class="stage-skill-settings-head"><span>STORYBOARD ROUTE</span><b>选择故事板规划方式</b><small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small></div><div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div><div class="creation-skill-actions"><button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button><button type="button" class="outline-button" id="close-social-skills">完成</button></div></div></details><div class="social-picker-group"><label class="social-theme-picker"><span>发布渠道</span><select id="social-channel"><option value="wechat">公众号</option><option value="xiaohongshu">小红书</option></select></label><label class="social-theme-picker"><span>构图方式</span><select id="social-composition-mode"><option value="smart">智能构图</option><option value="template">稳定模板</option></select></label><label id="social-template-picker" class="social-theme-picker"><span>页面版式</span><select id="social-layout-style"><option value="auto">智能混排</option><option value="poster">海报大字</option><option value="editorial">杂志分栏</option><option value="data">数据报告</option><option value="checklist">卡片清单</option><option value="steps">教程步骤</option><option value="minimal">极简留白</option></select></label><label class="social-theme-picker"><span>视觉主题</span><select id="social-visual-style"><option value="ice-blue">正在加载主题…</option></select><button type="button" class="theme-picker-trigger" id="social-theme-trigger" data-theme-picker="social"><span>视觉主题</span><b>正在加载…</b></button><div id="social-theme-preview" class="theme-catalog-preview" hidden></div><small id="social-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small></label></div></div><div id="card-plan-preview" class="card-plan-preview"></div></section>
+            <section class="repository-facts-panel social-stage-panel social-storyboard-stage">
+              <div class="social-stage-head social-storyboard-head">
+                <span class="social-stage-number">02</span>
+                <div>
+                  <span class="kicker">CARD STORYBOARD</span>
+                  <h3>卡片故事板</h3>
+                  <p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p>
+                </div>
+              </div>
+              <div class="social-control-deck">
+                <details class="creation-skill-settings social-skill-settings">
+                  <summary>
+                    <span><b>故事板技能</b><small id="social-skill-summary" aria-live="polite">正在读取故事板技能…</small></span>
+                    <em>更换</em>
+                  </summary>
+                  <div class="creation-skill-popover">
+                    <div class="stage-skill-settings-head">
+                      <span>STORYBOARD ROUTE</span>
+                      <b>选择故事板规划方式</b>
+                      <small>本次选择只影响重新规划故事板，不改变视觉主题和逐页手工编辑。</small>
+                    </div>
+                    <div id="social-stage-skills" class="stage-skill-list" aria-busy="true"></div>
+                    <div class="creation-skill-actions">
+                      <button type="button" class="text-button" id="reset-social-skills">恢复入口默认</button>
+                      <button type="button" class="outline-button" id="close-social-skills">完成</button>
+                    </div>
+                  </div>
+                </details>
+                <div class="social-picker-group">
+                  <label class="social-theme-picker">
+                    <span>发布渠道</span>
+                    <select id="social-channel">
+                      <option value="wechat">公众号</option>
+                      <option value="xiaohongshu">小红书</option>
+                    </select>
+                  </label>
+                  <label class="social-theme-picker">
+                    <span>构图方式</span>
+                    <select id="social-composition-mode">
+                      <option value="smart">智能构图</option>
+                      <option value="template">稳定模板</option>
+                    </select>
+                  </label>
+                  <label id="social-template-picker" class="social-theme-picker">
+                    <span>页面版式</span>
+                    <select id="social-layout-style">
+                      <option value="auto">智能混排</option>
+                      <option value="poster">海报大字</option>
+                      <option value="editorial">杂志分栏</option>
+                      <option value="data">数据报告</option>
+                      <option value="checklist">卡片清单</option>
+                      <option value="steps">教程步骤</option>
+                      <option value="minimal">极简留白</option>
+                    </select>
+                  </label>
+                  <label class="social-theme-picker">
+                    <span>视觉主题</span>
+                    <select id="social-visual-style"><option value="ice-blue">正在加载主题…</option></select>
+                    <button type="button" class="theme-picker-trigger" id="social-theme-trigger" data-theme-picker="social"><span>视觉主题</span><b>正在加载…</b></button>
+                    <div id="social-theme-preview" class="theme-catalog-preview" hidden></div>
+                    <small id="social-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small>
+                  </label>
+                </div>
+              </div>
+              <div id="card-plan-preview" class="card-plan-preview"></div>
+            </section>
             <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。<span class="muted action-hint">生成调用模型（计费），渲染为本地确定性执行。</span></p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
-            <section class="social-delivery" id="social-delivery" hidden><div class="social-delivery-head"><div><span class="kicker">DELIVERY LIGHTBOX</span><h3>图文成片</h3><p id="social-delivery-meta"></p></div><div class="editorial-actions"><a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a><a class="primary-button" id="social-download-all">下载整组</a></div></div><div class="social-delivery-grid"><div class="social-gallery"><div class="social-gallery-stage"><button type="button" id="social-gallery-prev" aria-label="上一张">←</button><img id="social-gallery-image" alt="图文卡片预览"><button type="button" id="social-gallery-next" aria-label="下一张">→</button><span id="social-gallery-counter"></span></div><div class="social-gallery-film" id="social-gallery-film"></div><a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a></div><div class="social-proof"><div class="social-proof-tabs"><button type="button" data-social-proof="copy" class="active">发布文案</button><button type="button" data-social-proof="facts">事实清单</button><button type="button" data-social-proof="layout">布局审计</button></div><pre id="social-proof-content"></pre></div></div></section>
+            <section class="social-delivery" id="social-delivery" hidden>
+              <div class="social-delivery-head">
+                <div>
+                  <span class="kicker">DELIVERY LIGHTBOX</span>
+                  <h3>图文成片</h3>
+                  <p id="social-delivery-meta"></p>
+                </div>
+                <div class="editorial-actions">
+                  <a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a>
+                  <a class="primary-button" id="social-download-all">下载整组</a>
+                </div>
+              </div>
+              <div class="social-delivery-grid">
+                <div class="social-gallery">
+                  <div class="social-gallery-stage">
+                    <button type="button" id="social-gallery-prev" aria-label="上一张">←</button>
+                    <img id="social-gallery-image" alt="图文卡片预览">
+                    <button type="button" id="social-gallery-next" aria-label="下一张">→</button>
+                    <span id="social-gallery-counter"></span>
+                  </div>
+                  <div class="social-gallery-film" id="social-gallery-film"></div>
+                  <a class="text-button social-single-download" id="social-download-image">下载当前 PNG</a>
+                </div>
+                <div class="social-proof">
+                  <div class="social-proof-tabs">
+                    <button type="button" data-social-proof="copy" class="active">发布文案</button>
+                    <button type="button" data-social-proof="facts">事实清单</button>
+                    <button type="button" data-social-proof="layout">布局审计</button>
+                  </div>
+                  <pre id="social-proof-content"></pre>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -744,8 +841,120 @@
       <div class="theme-library-launch"><button type="button" data-theme-browser="article"><span>ARTICLE THEMES</span><b>浏览文章排版</b><small>6 套主题 · 支持自动匹配</small></button><button type="button" data-theme-browser="social"><span>SOCIAL THEMES</span><b>浏览图文视觉</b><small>14 套主题 · 版式与配色独立</small></button><button type="button" data-theme-browser="cover"><span>COVER THEMES</span><b>浏览封面主题</b><small>10 套主题 · AI 按调性自动匹配</small></button></div>
       <section class="theme-manager-panel">
         <div class="theme-manager-head"><div><span class="kicker">THEME STUDIO</span><h3>我的主题</h3><p>用一句视觉描述生成完整主题，确认后再进入编辑与发布流程。</p></div><button type="button" class="primary-button ai-theme-launch" id="open-ai-theme-creator" aria-expanded="false" aria-controls="ai-theme-creator"><span>AI CREATE</span><b>AI 创建主题</b><small>从视觉意图生成安全草稿</small></button><details class="theme-existing-tools"><summary>从已有主题复制或导入</summary><div class="theme-clone-bar"><select id="theme-clone-source" aria-label="复制来源主题"></select><input id="theme-clone-id" placeholder="主题 ID，如 my-editorial"><input id="theme-clone-label" placeholder="主题名称"><button class="ink-button" id="clone-theme">复制并编辑</button><label class="theme-import-button">导入 JSON<input id="import-theme-file" type="file" accept="application/json,.json"></label></div></details></div>
-        <section class="ai-theme-creator" id="ai-theme-creator" hidden aria-labelledby="ai-theme-creator-title"><header><div><span>AI THEME DIRECTION</span><h4 id="ai-theme-creator-title">描述你想要的视觉效果</h4><p>AI 只会组合现有安全样式与组件配方，不会生成任意网页代码。</p></div><button type="button" class="text-button" id="close-ai-theme-creator">关闭</button></header><div class="ai-theme-brief"><fieldset><legend>主题类型</legend><label><input type="radio" name="ai-theme-target" value="article" checked><span>文章主题<small>长文、标题、引用与代码</small></span></label><label><input type="radio" name="ai-theme-target" value="social"><span>图文主题<small>封面、内容页与结尾页</small></span></label><label><input type="radio" name="ai-theme-target" value="cover"><span>封面主题<small>900×383 公众号封面配色</small></span></label></fieldset><label class="ai-theme-prompt"><span>想要的效果 <small>20–500 字</small></span><textarea id="ai-theme-prompt" minlength="20" maxlength="500" rows="4" placeholder="例如：适合技术深度文章的深色终端主题，克制、清晰，代码区域突出但不要刺眼。"></textarea><small class="ai-theme-input-error" id="ai-theme-prompt-error" aria-live="polite"></small></label><details class="ai-theme-preferences"><summary>补充偏好 <small>可选</small></summary><div><label>使用场景<input id="ai-theme-scene" maxlength="40" placeholder="例如：技术、职场、财经"></label><label>明暗倾向<select id="ai-theme-brightness"><option value="auto">自动</option><option value="light">浅色</option><option value="dark">深色</option></select></label><label>阅读优先级<select id="ai-theme-reading"><option value="long-form">长文舒适</option><option value="density">信息密度</option><option value="impact">视觉冲击</option></select></label><fieldset><legend>视觉气质（最多 3 项）</legend><label><input type="checkbox" name="ai-theme-tone" value="restrained">克制</label><label><input type="checkbox" name="ai-theme-tone" value="editorial">编辑感</label><label><input type="checkbox" name="ai-theme-tone" value="playful">活泼</label><label><input type="checkbox" name="ai-theme-tone" value="bold">硬朗</label><label><input type="checkbox" name="ai-theme-tone" value="warm">温暖</label><label><input type="checkbox" name="ai-theme-tone" value="futuristic">未来感</label></fieldset></div></details><div class="ai-theme-generate-row"><p id="ai-theme-generate-status" aria-live="polite">候选在确认前不会保存到主题列表。</p><button type="button" class="ink-button" id="generate-ai-theme">生成主题候选</button></div></div><div class="ai-theme-candidate" id="ai-theme-candidate" hidden><aside><span>DESIGN NOTES</span><h4 id="ai-theme-candidate-title">候选主题</h4><p id="ai-theme-candidate-description"></p><ol id="ai-theme-design-summary"></ol><div id="ai-theme-repairs"></div><label>草稿名称<input id="ai-theme-final-label" maxlength="30" required></label><label>草稿描述<input id="ai-theme-final-description" maxlength="160" required></label><small class="ai-theme-input-error" id="ai-theme-create-error" aria-live="polite"></small><div class="ai-theme-candidate-actions"><button type="button" class="text-button" id="regenerate-ai-theme">重新生成</button><button type="button" class="primary-button" id="create-ai-theme-draft">创建为草稿</button></div></aside><div class="ai-theme-candidate-preview"><span>PRODUCTION SPECIMEN</span><iframe id="ai-theme-candidate-frame" title="AI 主题正式编译样稿" sandbox="allow-same-origin"></iframe></div></div></section>
-        <div class="theme-manager-layout"><aside id="user-theme-list" class="user-theme-list"><div class="empty-state">正在读取用户主题…</div></aside><form id="user-theme-form" class="user-theme-form" hidden onsubmit="return false"><div class="theme-editor-head"><div><h4 id="user-theme-editor-title">主题编辑器</h4><small id="user-theme-editor-meta"></small><small id="user-theme-usage"></small></div><button type="button" class="text-button" id="archive-user-theme">归档</button></div><div class="theme-editor-fields"><label>名称<input name="label" maxlength="30" required></label><label class="wide">描述<input name="description" maxlength="160" required></label></div><div id="user-theme-colors" class="theme-color-grid"></div><div id="user-theme-live-preview" class="user-theme-live-preview"></div><div class="theme-version-row"><select id="user-theme-versions" aria-label="历史版本"><option>暂无已发布版本</option></select><button type="button" class="ghost-button" id="restore-user-theme" disabled>恢复为草稿</button></div><div class="theme-editor-actions"><button type="button" class="text-button" id="export-user-theme">导出 JSON</button><button type="button" class="outline-button" id="validate-user-theme">保存并校验</button><button type="button" class="primary-button" id="publish-user-theme">发布新版本</button></div></form></div>
+        <section class="ai-theme-creator" id="ai-theme-creator" hidden aria-labelledby="ai-theme-creator-title">
+          <header>
+            <div>
+              <span>AI THEME DIRECTION</span>
+              <h4 id="ai-theme-creator-title">描述你想要的视觉效果</h4>
+              <p>AI 只会组合现有安全样式与组件配方，不会生成任意网页代码。</p>
+            </div>
+            <button type="button" class="text-button" id="close-ai-theme-creator">关闭</button>
+          </header>
+          <div class="ai-theme-brief">
+            <fieldset>
+              <legend>主题类型</legend>
+              <label>
+                <input type="radio" name="ai-theme-target" value="article" checked><span>文章主题<small>长文、标题、引用与代码</small></span>
+              </label>
+              <label>
+                <input type="radio" name="ai-theme-target" value="social"><span>图文主题<small>封面、内容页与结尾页</small></span>
+              </label>
+              <label>
+                <input type="radio" name="ai-theme-target" value="cover"><span>封面主题<small>900×383 公众号封面配色</small></span>
+              </label>
+            </fieldset>
+            <label class="ai-theme-prompt">
+              <span>想要的效果 <small>20–500 字</small></span>
+              <textarea id="ai-theme-prompt" minlength="20" maxlength="500" rows="4" placeholder="例如：适合技术深度文章的深色终端主题，克制、清晰，代码区域突出但不要刺眼。"></textarea>
+              <small class="ai-theme-input-error" id="ai-theme-prompt-error" aria-live="polite"></small>
+            </label>
+            <details class="ai-theme-preferences">
+              <summary>补充偏好 <small>可选</small></summary>
+              <div>
+                <label>使用场景<input id="ai-theme-scene" maxlength="40" placeholder="例如：技术、职场、财经"></label>
+                <label>
+                  明暗倾向
+                  <select id="ai-theme-brightness">
+                    <option value="auto">自动</option>
+                    <option value="light">浅色</option>
+                    <option value="dark">深色</option>
+                  </select>
+                </label>
+                <label>
+                  阅读优先级
+                  <select id="ai-theme-reading">
+                    <option value="long-form">长文舒适</option>
+                    <option value="density">信息密度</option>
+                    <option value="impact">视觉冲击</option>
+                  </select>
+                </label>
+                <fieldset>
+                  <legend>视觉气质（最多 3 项）</legend>
+                  <label><input type="checkbox" name="ai-theme-tone" value="restrained">克制</label>
+                  <label><input type="checkbox" name="ai-theme-tone" value="editorial">编辑感</label>
+                  <label><input type="checkbox" name="ai-theme-tone" value="playful">活泼</label>
+                  <label><input type="checkbox" name="ai-theme-tone" value="bold">硬朗</label>
+                  <label><input type="checkbox" name="ai-theme-tone" value="warm">温暖</label>
+                  <label><input type="checkbox" name="ai-theme-tone" value="futuristic">未来感</label>
+                </fieldset>
+              </div>
+            </details>
+            <div class="ai-theme-generate-row">
+              <p id="ai-theme-generate-status" aria-live="polite">候选在确认前不会保存到主题列表。</p>
+              <button type="button" class="ink-button" id="generate-ai-theme">生成主题候选</button>
+            </div>
+          </div>
+          <div class="ai-theme-candidate" id="ai-theme-candidate" hidden>
+            <aside>
+              <span>DESIGN NOTES</span>
+              <h4 id="ai-theme-candidate-title">候选主题</h4>
+              <p id="ai-theme-candidate-description"></p>
+              <ol id="ai-theme-design-summary"></ol>
+              <div id="ai-theme-repairs"></div>
+              <label>草稿名称<input id="ai-theme-final-label" maxlength="30" required></label>
+              <label>草稿描述<input id="ai-theme-final-description" maxlength="160" required></label>
+              <small class="ai-theme-input-error" id="ai-theme-create-error" aria-live="polite"></small>
+              <div class="ai-theme-candidate-actions">
+                <button type="button" class="text-button" id="regenerate-ai-theme">重新生成</button>
+                <button type="button" class="primary-button" id="create-ai-theme-draft">创建为草稿</button>
+              </div>
+            </aside>
+            <div class="ai-theme-candidate-preview">
+              <span>PRODUCTION SPECIMEN</span>
+              <iframe id="ai-theme-candidate-frame" title="AI 主题正式编译样稿" sandbox="allow-same-origin"></iframe>
+            </div>
+          </div>
+        </section>
+        <div class="theme-manager-layout">
+          <aside id="user-theme-list" class="user-theme-list">
+            <div class="empty-state">正在读取用户主题…</div>
+          </aside>
+          <form id="user-theme-form" class="user-theme-form" hidden onsubmit="return false">
+            <div class="theme-editor-head">
+              <div>
+                <h4 id="user-theme-editor-title">主题编辑器</h4>
+                <small id="user-theme-editor-meta"></small>
+                <small id="user-theme-usage"></small>
+              </div>
+              <button type="button" class="text-button" id="archive-user-theme">归档</button>
+            </div>
+            <div class="theme-editor-fields">
+              <label>名称<input name="label" maxlength="30" required></label>
+              <label class="wide">描述<input name="description" maxlength="160" required></label>
+            </div>
+            <div id="user-theme-colors" class="theme-color-grid"></div>
+            <div id="user-theme-live-preview" class="user-theme-live-preview"></div>
+            <div class="theme-version-row">
+              <select id="user-theme-versions" aria-label="历史版本"><option>暂无已发布版本</option></select>
+              <button type="button" class="ghost-button" id="restore-user-theme" disabled>恢复为草稿</button>
+            </div>
+            <div class="theme-editor-actions">
+              <button type="button" class="text-button" id="export-user-theme">导出 JSON</button>
+              <button type="button" class="outline-button" id="validate-user-theme">保存并校验</button>
+              <button type="button" class="primary-button" id="publish-user-theme">发布新版本</button>
+            </div>
+          </form>
+        </div>
       </section>
     </section>
 
@@ -795,7 +1004,7 @@
     </section>
 
     <section class="view" id="view-models">
-      <div class="section-intro"><div><span class="kicker">MODEL OPERATIONS</span><h2>模型运行</h2></div><p>查看当前可用模型、执行最小连接诊断并追踪调用记录。新增或修改服务请前往“运行与配置 → 模型接入”。</p></div>
+      <div class="section-intro"><div><span class="kicker">MODEL OPERATIONS</span><h2>模型运行</h2></div><p>查看当前可用模型、执行最小连接诊断并追踪调用记录。新增或修改服务请前往“运行与配置 → 模型接入”。 <button type="button" class="text-button" data-go="system">前往模型接入管理 →</button></p></div>
       <div class="model-layout">
         <section>
           <div class="model-grid" id="model-cards"></div>

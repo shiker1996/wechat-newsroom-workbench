@@ -1,5 +1,7 @@
 import { request } from "../core/http.js";
+import { poll as pollTask } from "../core/poll.js";
 import { state } from "../core/state.js";
+import { dimensionLabels } from "../core/dimensions.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
@@ -10,9 +12,6 @@ let selectedFocuses=new Map();
 let dailyGenerating=false;
 let dailyHasFinal=false;
 let dailyStage=1;
-
-const dimensionLabels={who:"主体",what:"动作",where:"场合"};
-
 function setDailyStage(stage) {
   dailyStage=stage;
   document.querySelectorAll("[data-daily-stage-panel]").forEach((panel)=>{panel.hidden=Number(panel.dataset.dailyStagePanel)!==stage;});
@@ -96,18 +95,18 @@ async function refreshJobs() {
   renderJobs();
 }
 async function pollJob(id) {
-  const status=document.getElementById("daily-job-status");
-  while(true){
-    await new Promise((resolve)=>setTimeout(resolve,1800));
+  await pollTask(async () => {
+    const status=document.getElementById("daily-job-status");
+    if(!status)return true;// 已离开早报视图，静默结束轮询
     const job=await request(`/api/jobs/${id}`);
     status.textContent=job.progress||"早报任务执行中…";
-    if(job.status==="running")continue;
+    if(job.status==="running"||job.status==="queued")return false;
     if(job.status!=="completed")throw new Error(job.error||"批次早报生成失败");
     dailyGenerating=false;dailyHasFinal=true;setDailyStage(3);
-    toast("关系维度早报已生成");
+    toast("关系维度早报已生成","success");
     await loadDaily();
-    return;
-  }
+    return true;
+  },{interval:1800}).promise;
 }
 async function generateDaily() {
   const batch=state.batches.find((item)=>item.id===state.activeBatchId);
@@ -169,9 +168,9 @@ function bind() {
       toast(`已恢复上次选择：${restored.map((item) => item.label).join("、")}`);
     }
     setDailyStage(2);
-    generateDaily().catch((error) => toast(error.message));
+    generateDaily().catch((error) => toast(error.message,"error"));
   });
-  document.getElementById("generate-daily").addEventListener("click",(event)=>withLoading(event.currentTarget,"生成中…",()=>generateDaily().catch((error)=>{toast(error.message);throw error;})));
+  document.getElementById("generate-daily").addEventListener("click",(event)=>withLoading(event.currentTarget,"生成中…",()=>generateDaily().catch((error)=>{toast(error.message,"error");throw error;})));
   document.getElementById("copy-daily-result").addEventListener("click",async()=>{
     await navigator.clipboard.writeText(document.getElementById("daily-result-content").textContent||"");toast("早报 Markdown 已复制");
   });
@@ -193,7 +192,7 @@ async function loadDaily() {
   if(runningJob&&!dailyGenerating){
     dailyGenerating=true;setDailyStage(2);
     document.getElementById("daily-job-status").textContent=runningJob.progress||"早报任务执行中…";
-    pollJob(runningJob.id).catch((error)=>{dailyGenerating=false;toast(error.message);refreshJobs();});
+    pollJob(runningJob.id).catch((error)=>{dailyGenerating=false;toast(error.message,"error");refreshJobs();});
   }
 }
 export default loadDaily;

@@ -2,6 +2,7 @@ import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, withLoading } from "../core/ui.js";
+import { dimensionLabels, dimensionRoles } from "../core/dimensions.js";
 
 let bound = false;
 const graphView = { scale: 1, x: 0, y: 0, dragging: false, pointerX: 0, pointerY: 0 };
@@ -126,8 +127,8 @@ function bindAtlas() {
   graph.addEventListener("pointercancel", stopPanning);
 }
 
-const LENS_LABELS = { who: "主体", what: "动作", where: "场合" };
-const DIMENSION_ROLES = { who: "主体动态", what: "横向对比", where: "场合盘点" };
+const LENS_LABELS = dimensionLabels;
+const DIMENSION_ROLES = dimensionRoles;
 const LENS_COLORS = { who: "#355f55", what: "#7a5c2e", where: "#6b4a7d" };
 
 function externalUrl(value) { return /^https?:\/\//.test(value) ? value : null; }

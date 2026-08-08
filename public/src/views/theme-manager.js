@@ -7,62 +7,429 @@ const colorFields=['background','surface','page','text','muted','accent','accent
 const labels={background:'背景',surface:'内容表面',page:'画布',text:'正文',muted:'弱化文字',accent:'主强调',accentSecondary:'次强调',line:'边线',inverseText:'反白文字',codeBackground:'代码背景'};
 const socialColorLabels={page:'图文页背景'};
 const tokenGroups={
-  typography:{label:'字体与字阶',hint:'控制正文、标题、注释、行高与字间距',fields:[['family','正文字体','select',['sans','serif','mono']],['headingFamily','标题字体','select',['sans','serif','mono']],['bodyPx','正文字号','number',9,18,1,'px'],['h1Px','一级标题','number',22,44,1,'px'],['h2Px','二级标题','number',11,28,1,'px'],['captionPx','注释字号','number',8,15,1,'px'],['lineHeight','正文行高','number',1.2,2.1,.05,''],['letterSpacingEm','字间距','number',-.08,.2,.005,'em']]},
-  spacing:{label:'间距节奏',hint:'控制画布留白、章节、段落和卡片间距',fields:[['articlePaddingPx','页面内边距','number',0,40,1,'px'],['sectionPx','章节间距','number',12,48,1,'px'],['paragraphPx','段落间距','number',6,28,1,'px'],['cardGapPx','卡片间距','number',0,28,1,'px']]},
-  shape:{label:'形状与层次',hint:'控制圆角、边线宽度和阴影语气',fields:[['radiusPx','圆角','number',0,32,1,'px'],['borderWidthPx','边线宽度','number',0,8,1,'px'],['shadow','阴影','select',['none','soft','hard','glow']]]},
+  typography:{label:'字体与字阶',hint:'控制正文、标题、注释、行高与字间距',fields:[
+    ['family','正文字体','select',['sans','serif','mono']],
+    ['headingFamily','标题字体','select',['sans','serif','mono']],
+    ['bodyPx','正文字号','number',9,18,1,'px'],
+    ['h1Px','一级标题','number',22,44,1,'px'],
+    ['h2Px','二级标题','number',11,28,1,'px'],
+    ['captionPx','注释字号','number',8,15,1,'px'],
+    ['lineHeight','正文行高','number',1.2,2.1,.05,''],
+    ['letterSpacingEm','字间距','number',-.08,.2,.005,'em']
+  ]},
+  spacing:{label:'间距节奏',hint:'控制画布留白、章节、段落和卡片间距',fields:[
+    ['articlePaddingPx','页面内边距','number',0,40,1,'px'],
+    ['sectionPx','章节间距','number',12,48,1,'px'],
+    ['paragraphPx','段落间距','number',6,28,1,'px'],
+    ['cardGapPx','卡片间距','number',0,28,1,'px']
+  ]},
+  shape:{label:'形状与层次',hint:'控制圆角、边线宽度和阴影语气',fields:[
+    ['radiusPx','圆角','number',0,32,1,'px'],
+    ['borderWidthPx','边线宽度','number',0,8,1,'px'],
+    ['shadow','阴影','select',['none','soft','hard','glow']]
+  ]},
 };
 const optionLabels={sans:'无衬线',serif:'衬线',mono:'等宽',none:'无',soft:'柔和阴影',hard:'硬边阴影',glow:'发光',grid:'网格',scanlines:'扫描线','paper-grain':'纸张颗粒',accent:'强调色',ink:'正文墨色'};
 const targetLabels={article:'文章',social:'图文',cover:'封面'};
 const targetLabel=(target)=>targetLabels[target]||target;
 const socialTokenLimits={bodyPx:[9,13],h1Px:[22,34],h2Px:[11,18],captionPx:[8,11],lineHeight:[1.2,1.55],articlePaddingPx:[0,28],sectionPx:[12,28],paragraphPx:[6,12],cardGapPx:[0,14]};
-async function sources(){const [article,social,cover]=await Promise.all([loadThemeCatalog('article'),loadThemeCatalog('social'),loadThemeCatalog('cover')]);const select=document.getElementById('theme-clone-source');select.innerHTML=[...article.items,...social.items,...cover.items].filter((item)=>item.source==='builtin').map((item)=>`<option value="${item.id}">${escapeHtml(item.label)} · ${targetLabel(item.target)}</option>`).join('');}
-async function list(){const data=await request('/api/themes/manage');const node=document.getElementById('user-theme-list');node.innerHTML=data.items.length?data.items.map((item)=>`<button type="button" class="user-theme-row ${active?.id===item.id?'active':''}" data-user-theme="${item.id}"><span><b>${escapeHtml(item.label)}</b><small>${targetLabel(item.target)} · ${item.status==='published'?'已发布':item.status==='archived'?'已归档':'草稿'}</small></span><em>${item.activeVersion?`v${item.activeVersion}`:'未发布'}</em></button>`).join(''):'<div class="empty-state">还没有用户主题。先从一个内置主题复制。</div>';}
-function fieldControl(group,field){const [key,label,type,a,b,step,unit]=field,value=active.draft.tokens[group][key],path=`tokens.${group}.${key}`;if(type==='select')return `<label class="theme-token-field"><span>${label}</span><select data-theme-field="${path}">${a.map((option)=>`<option value="${option}" ${option===value?'selected':''}>${optionLabels[option]}</option>`).join('')}</select></label>`;const [min,max]=active.target==='social'&&socialTokenLimits[key]?socialTokenLimits[key]:[a,b],pair=`${group}-${key}`;return `<label class="theme-token-field"><span>${label}<output data-token-output="${pair}">${value}${unit}</output></span><span class="theme-number-pair"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" aria-label="${label}滑杆"><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" data-theme-field="${path}" aria-label="${label}精确值" aria-describedby="${pair}-error"><i>${unit||'×'}</i></span><small class="theme-field-error" id="${pair}-error" aria-live="polite"></small></label>`;}
-function recipeEditor(){if(active.target==='cover')return '';const target=active.target,config=active.draft[target],catalog=active.editorCatalog?.recipes||{},recipeFields=Object.entries(catalog).map(([key,meta])=>{const current=config.recipes[key]??(target==='social'&&key==='coverTitle'?'classic':undefined);return `<label class="theme-recipe-field"><span><b>${meta.label}</b><small>${key==='coverTitle'?'只影响封面标题 · ':''}样稿：${meta.specimenRole}</small></span><select data-theme-field="${target}.recipes.${key}">${meta.options.map((option)=>`<option value="${option.value}" ${current===option.value?'selected':''}>${option.label}</option>`).join('')}</select></label>`;}).join('');let extras='';if(target==='article')extras=`<div class="theme-behavior-grid"><label><input type="checkbox" data-theme-field="article.behavior.justify" ${config.behavior.justify?'checked':''}> 正文两端对齐</label><label><input type="checkbox" data-theme-field="article.behavior.numberSections" ${config.behavior.numberSections?'checked':''}> 显示章节编号</label><label>重点文字<select data-theme-field="article.behavior.highlightStrong"><option value="accent" ${config.behavior.highlightStrong==='accent'?'selected':''}>强调色</option><option value="ink" ${config.behavior.highlightStrong==='ink'?'selected':''}>正文墨色</option></select></label></div>`;else extras=`<div class="theme-token-grid"><label class="theme-token-field"><span>背景纹理</span><select data-theme-field="social.effects.texture">${['none','grid','scanlines','paper-grain'].map((value)=>`<option value="${value}" ${config.effects.texture===value?'selected':''}>${optionLabels[value]}</option>`).join('')}</select></label>${effectNumber('decorationOpacity','装饰透明度',0,1,.05,'')}${effectNumber('contentTiltDeg','内容倾斜',-2,2,.1,'°')}</div>`;return `<details class="theme-token-section theme-recipe-section"><summary><span><b>${target==='article'?'文章组件配方':'图文组件配方'}</b><small>只改变组件外观，不改变内容、网格或页面顺序</small></span><i>展开设置</i></summary><div class="theme-recipe-grid">${recipeFields}</div>${extras}<button type="button" class="text-button theme-reset-group" data-reset-config="${target}">恢复当前主题的组件配置</button></details>`;}
-function componentEditor(){if(!active.editorCatalog?.components)return '';const target=active.target,groups=active.editorCatalog.components.groups,components=active.draft[target].components||(active.draft[target].components=structuredClone(active.editorCatalog.components.defaults));const cards=Object.entries(groups).map(([component,meta])=>`<fieldset class="theme-component-card" data-component-group="${component}"><legend><b>${meta.label}</b><small>${meta.hint}</small></legend><div>${Object.entries(meta.fields).map(([key,field])=>{const numeric=typeof field.options[0]?.value==='number';return `<label class="theme-token-field"><span>${field.label}</span><select data-theme-field="${target}.components.${component}.${key}" ${numeric?'data-value-type="number"':''}>${field.options.map((option)=>`<option value="${option.value}" ${components[component][key]===option.value?'selected':''}>${option.label}</option>`).join('')}</select></label>`;}).join('')}</div></fieldset>`).join(''),reset=true?'<button type="button" class="text-button theme-reset-group" data-reset-components>恢复配方推荐值</button>':'';return `<details class="theme-token-section theme-component-section"><summary><span><b>组件细节</b><small>${target==='article'?'细调文章标题、引用、表格和代码':'细调页面标题、信息组件和内容卡片'}；颜色只引用当前主题角色</small></span><i>展开设置</i></summary><div class="theme-component-grid">${cards}</div>${reset}</details>`;}
-function effectNumber(key,label,min,max,step,unit){const value=active.draft.social.effects[key],pair=`social-${key}`;return `<label class="theme-token-field"><span>${label}<output data-token-output="${pair}">${value}${unit}</output></span><span class="theme-number-pair"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" aria-label="${label}滑杆"><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" data-theme-field="social.effects.${key}" aria-label="${label}精确值" aria-describedby="${pair}-error"><i>${unit||'×'}</i></span><small class="theme-field-error" id="${pair}-error" aria-live="polite"></small></label>`;}
-function compatibilityReport(report,{legacy=false}={}){const checks={schema:'结构',contrast:'对比度',coverage:'编译覆盖',html:'HTML 安全',layout:'布局结构'},items=Object.entries(checks).map(([key,label])=>`<li class="${report.checks?.[key]?'pass':'fail'}"><b>${report.checks?.[key]?'✓':'!'}</b><span>${label}</span></li>`).join(''),issues=(report.issues||[]).map((item)=>`<li><code>${escapeHtml(item.field||'theme')}</code><span>${escapeHtml(item.message)}${item.specimenNode?` · 样稿节点：${escapeHtml(item.specimenNode)}`:''}</span></li>`).join('');return `<section class="theme-compat-report ${legacy?'legacy':''}" aria-label="主题兼容报告"><header><span>${legacy?'READ ONLY':'PUBLISH GATE'}</span><b>${legacy?'旧主题只读兼容报告':report.valid?'发布门禁已就绪':'发布前仍需处理'}</b></header><ul class="theme-gate-checks">${items}</ul>${issues?`<ul class="theme-gate-issues">${issues}</ul>`:''}${legacy?'<p>该草稿不会被原地迁移。你仍可导出 JSON、查看历史版本或归档主题。</p>':''}</section>`;}
+async function sources(){
+  const [article,social,cover]=await Promise.all([loadThemeCatalog('article'),loadThemeCatalog('social'),loadThemeCatalog('cover')]);
+  const select=document.getElementById('theme-clone-source');
+  select.innerHTML=[...article.items,...social.items,...cover.items].filter((item)=>item.source==='builtin').map((item)=>`<option value="${item.id}">${escapeHtml(item.label)} · ${targetLabel(item.target)}</option>`).join('');
+}
+async function list(){
+  const data=await request('/api/themes/manage');
+  const node=document.getElementById('user-theme-list');
+  node.innerHTML=data.items.length?data.items.map((item)=>`<button type="button" class="user-theme-row ${active?.id===item.id?'active':''}" data-user-theme="${item.id}"><span><b>${escapeHtml(item.label)}</b><small>${targetLabel(item.target)} · ${item.status==='published'?'已发布':item.status==='archived'?'已归档':'草稿'}</small></span><em>${item.activeVersion?`v${item.activeVersion}`:'未发布'}</em></button>`).join(''):'<div class="empty-state">还没有用户主题。先从一个内置主题复制。</div>';
+}
+function fieldControl(group,field){
+  const [key,label,type,a,b,step,unit]=field,value=active.draft.tokens[group][key],path=`tokens.${group}.${key}`;
+  if(type==='select')return `<label class="theme-token-field"><span>${label}</span><select data-theme-field="${path}">${a.map((option)=>`<option value="${option}" ${option===value?'selected':''}>${optionLabels[option]}</option>`).join('')}</select></label>`;
+  const [min,max]=active.target==='social'&&socialTokenLimits[key]?socialTokenLimits[key]:[a,b],pair=`${group}-${key}`;
+  return `<label class="theme-token-field"><span>${label}<output data-token-output="${pair}">${value}${unit}</output></span><span class="theme-number-pair"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" aria-label="${label}滑杆"><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" data-theme-field="${path}" aria-label="${label}精确值" aria-describedby="${pair}-error"><i>${unit||'×'}</i></span><small class="theme-field-error" id="${pair}-error" aria-live="polite"></small></label>`;
+}
+function recipeEditor(){
+  if(active.target==='cover')return '';
+  const target=active.target,config=active.draft[target],catalog=active.editorCatalog?.recipes||{},recipeFields=Object.entries(catalog).map(([key,meta])=>{
+    const current=config.recipes[key]??(target==='social'&&key==='coverTitle'?'classic':undefined);
+    return `<label class="theme-recipe-field"><span><b>${meta.label}</b><small>${key==='coverTitle'?'只影响封面标题 · ':''}样稿：${meta.specimenRole}</small></span><select data-theme-field="${target}.recipes.${key}">${meta.options.map((option)=>`<option value="${option.value}" ${current===option.value?'selected':''}>${option.label}</option>`).join('')}</select></label>`;
+  }).join('');
+  let extras='';
+  if(target==='article')extras=`<div class="theme-behavior-grid"><label><input type="checkbox" data-theme-field="article.behavior.justify" ${config.behavior.justify?'checked':''}> 正文两端对齐</label><label><input type="checkbox" data-theme-field="article.behavior.numberSections" ${config.behavior.numberSections?'checked':''}> 显示章节编号</label><label>重点文字<select data-theme-field="article.behavior.highlightStrong"><option value="accent" ${config.behavior.highlightStrong==='accent'?'selected':''}>强调色</option><option value="ink" ${config.behavior.highlightStrong==='ink'?'selected':''}>正文墨色</option></select></label></div>`;
+  else extras=`<div class="theme-token-grid"><label class="theme-token-field"><span>背景纹理</span><select data-theme-field="social.effects.texture">${['none','grid','scanlines','paper-grain'].map((value)=>`<option value="${value}" ${config.effects.texture===value?'selected':''}>${optionLabels[value]}</option>`).join('')}</select></label>${effectNumber('decorationOpacity','装饰透明度',0,1,.05,'')}${effectNumber('contentTiltDeg','内容倾斜',-2,2,.1,'°')}</div>`;
+  return `<details class="theme-token-section theme-recipe-section"><summary><span><b>${target==='article'?'文章组件配方':'图文组件配方'}</b><small>只改变组件外观，不改变内容、网格或页面顺序</small></span><i>展开设置</i></summary><div class="theme-recipe-grid">${recipeFields}</div>${extras}<button type="button" class="text-button theme-reset-group" data-reset-config="${target}">恢复当前主题的组件配置</button></details>`;
+}
+function componentEditor(){
+  if(!active.editorCatalog?.components)return '';
+  const target=active.target,groups=active.editorCatalog.components.groups,components=active.draft[target].components||(active.draft[target].components=structuredClone(active.editorCatalog.components.defaults));
+  const cards=Object.entries(groups).map(([component,meta])=>`<fieldset class="theme-component-card" data-component-group="${component}"><legend><b>${meta.label}</b><small>${meta.hint}</small></legend><div>${Object.entries(meta.fields).map(([key,field])=>{
+    const numeric=typeof field.options[0]?.value==='number';
+    return `<label class="theme-token-field"><span>${field.label}</span><select data-theme-field="${target}.components.${component}.${key}" ${numeric?'data-value-type="number"':''}>${field.options.map((option)=>`<option value="${option.value}" ${components[component][key]===option.value?'selected':''}>${option.label}</option>`).join('')}</select></label>`;
+  }).join('')}</div></fieldset>`).join(''),reset=true?'<button type="button" class="text-button theme-reset-group" data-reset-components>恢复配方推荐值</button>':'';
+  return `<details class="theme-token-section theme-component-section"><summary><span><b>组件细节</b><small>${target==='article'?'细调文章标题、引用、表格和代码':'细调页面标题、信息组件和内容卡片'}；颜色只引用当前主题角色</small></span><i>展开设置</i></summary><div class="theme-component-grid">${cards}</div>${reset}</details>`;
+}
+function effectNumber(key,label,min,max,step,unit){
+  const value=active.draft.social.effects[key],pair=`social-${key}`;
+  return `<label class="theme-token-field"><span>${label}<output data-token-output="${pair}">${value}${unit}</output></span><span class="theme-number-pair"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" aria-label="${label}滑杆"><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" data-theme-field="social.effects.${key}" aria-label="${label}精确值" aria-describedby="${pair}-error"><i>${unit||'×'}</i></span><small class="theme-field-error" id="${pair}-error" aria-live="polite"></small></label>`;
+}
+function compatibilityReport(report,{legacy=false}={}){
+  const checks={schema:'结构',contrast:'对比度',coverage:'编译覆盖',html:'HTML 安全',layout:'布局结构'},items=Object.entries(checks).map(([key,label])=>`<li class="${report.checks?.[key]?'pass':'fail'}"><b>${report.checks?.[key]?'✓':'!'}</b><span>${label}</span></li>`).join(''),issues=(report.issues||[]).map((item)=>`<li><code>${escapeHtml(item.field||'theme')}</code><span>${escapeHtml(item.message)}${item.specimenNode?` · 样稿节点：${escapeHtml(item.specimenNode)}`:''}</span></li>`).join('');
+  return `<section class="theme-compat-report ${legacy?'legacy':''}" aria-label="主题兼容报告"><header><span>${legacy?'READ ONLY':'PUBLISH GATE'}</span><b>${legacy?'旧主题只读兼容报告':report.valid?'发布门禁已就绪':'发布前仍需处理'}</b></header><ul class="theme-gate-checks">${items}</ul>${issues?`<ul class="theme-gate-issues">${issues}</ul>`:''}${legacy?'<p>该草稿不会被原地迁移。你仍可导出 JSON、查看历史版本或归档主题。</p>':''}</section>`;
+}
 function editorContent(){return compatibilityReport(active.compatibility,{legacy:active.editorMode==='read-only'})+(active.editorMode==='read-only'?'':tokenEditor());}
-function tokenEditor(){const colors=active.draft.tokens.colors,socialNeonSurface=active.target==='social'&&active.draft.social?.recipes?.surface==='neon',visibleColors=colorFields.filter((key)=>colors[key]&&(active.target!=='social'||key!=='background'||socialNeonSurface)),colorLabels=active.target==='social'?{...labels,...socialColorLabels,...(socialNeonSurface?{background:'页面底色（neon 表面配方）'}:{})}:labels,colorHtml=visibleColors.map((key)=>`<label class="theme-color-field"><span>${colorLabels[key]}</span><input type="color" name="color-${key}" value="${colors[key]}" data-theme-field="tokens.colors.${key}"><code>${colors[key]}</code></label>`).join('');const groups=Object.entries(tokenGroups).map(([group,meta])=>`<details class="theme-token-section"><summary><span><b>${meta.label}</b><small>${meta.hint}</small></span><i>展开设置</i></summary><div class="theme-token-grid">${meta.fields.map((field)=>fieldControl(group,field)).join('')}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="${group}">恢复当前主题的${meta.label}</button></details>`).join('');return `<details class="theme-token-section" open><summary><span><b>颜色系统</b><small>控制背景、内容层级、强调色和代码对比</small></span><i>展开设置</i></summary><div class="theme-color-grid">${colorHtml}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="colors">恢复当前主题的颜色</button></details>${groups}${recipeEditor()}${componentEditor()}`;}
-function renderEditor(data){active=data;if(data.target==='social'&&data.editorMode!=='read-only')active.draft[active.target].components=structuredClone(data.draft.social.components||data.editorCatalog.components.defaults);editorBaseline=structuredClone(active.draft);const form=document.getElementById('user-theme-form'),editor=document.getElementById('user-theme-colors'),readOnly=data.editorMode==='read-only';form.hidden=false;form.elements.label.value=data.draft.label;form.elements.description.value=data.draft.description;form.elements.label.disabled=readOnly;form.elements.description.disabled=readOnly;document.getElementById('validate-user-theme').disabled=readOnly;document.getElementById('publish-user-theme').disabled=readOnly;document.getElementById('user-theme-editor-title').textContent=data.draft.label;document.getElementById('user-theme-editor-meta').textContent=`${targetLabel(data.target)} · ${data.status==='published'?`已发布 v${data.activeVersion}`:data.status==='archived'?'已归档':'草稿'}`;editor.className='theme-token-editor';editor.innerHTML=editorContent();if(readOnly)document.getElementById('user-theme-live-preview').innerHTML=compatibilityReport(data.compatibility,{legacy:true});else updatePreview();loadVersions();}
-function setPath(root,path,value){const parts=path.split('.');const leaf=parts.pop(),parent=parts.reduce((node,key)=>node[key]||(node[key]={}),root);parent[leaf]=value;}
-function definition(){const value=structuredClone(active.draft);value.label=document.querySelector('#user-theme-form [name="label"]').value.trim();value.description=document.querySelector('#user-theme-form [name="description"]').value.trim();document.querySelectorAll('#user-theme-form [data-theme-field]').forEach((input)=>setPath(value,input.dataset.themeField,input.type==='checkbox'?input.checked:input.type==='number'||input.dataset.valueType==='number'?Number(input.value):input.type==='color'?input.value.toUpperCase():input.value));return value;}
-function previewShell(){const node=document.getElementById('user-theme-live-preview');if(!node.querySelector('iframe'))node.innerHTML='<div class="theme-preview-status" id="user-theme-preview-status" aria-live="polite">正在生成正式样稿…</div><iframe id="user-theme-preview-frame" title="主题正式编译样稿" sandbox="allow-same-origin"></iframe>';return node;}
-function updateFieldValues(){document.querySelectorAll('#user-theme-form input[type="color"]').forEach((input)=>input.closest('label')?.querySelector('code')?.replaceChildren(input.value.toUpperCase()));document.querySelectorAll('#user-theme-form [data-token-output]').forEach((output)=>{const input=document.querySelector(`#user-theme-form input[type="number"][data-token-pair="${output.dataset.tokenOutput}"]`),unit=input?.parentElement?.querySelector('i')?.textContent||'';if(input)output.textContent=`${input.value}${unit==='×'?'':unit}`;});}
-function showFieldValidity(input){document.querySelectorAll('#user-theme-form .theme-field-error').forEach((node)=>node.textContent='');document.querySelectorAll('#user-theme-form .theme-token-field.invalid').forEach((node)=>node.classList.remove('invalid'));if(!input)return;const message=input.validity.valueMissing?'请输入数值':input.validity.rangeUnderflow||input.validity.rangeOverflow?`请输入 ${input.min}–${input.max} 范围内的值`:input.validity.stepMismatch?`请按 ${input.step} 的步进输入数值`:'请输入有效数值',field=input.closest('.theme-token-field');field?.classList.add('invalid');field?.querySelector('.theme-field-error')?.replaceChildren(message);}
-async function updatePreview(highlightField=''){if(!active)return;previewShell();const requestId=++previewRequest,status=document.getElementById('user-theme-preview-status'),frame=document.getElementById('user-theme-preview-frame'),invalid=document.querySelector('#user-theme-form [data-theme-field]:invalid');updateFieldValues();showFieldValidity(invalid);if(invalid){status.textContent='请先修正左侧标出的配置项';status.classList.remove('error');return;}status.textContent='正在生成正式样稿…';status.classList.remove('error');try{const result=await request('/api/themes/preview',{method:'POST',body:JSON.stringify({target:active.target,definition:definition(),highlightField})});if(requestId!==previewRequest)return;frame.srcdoc=result.html;status.textContent=highlightField?`正在显示 ${highlightField.split('.').at(-1)} 的影响位置`:'样稿由正式生产编译器生成';}catch(error){if(requestId!==previewRequest)return;status.textContent=`样稿生成失败：${error.message}`;status.classList.add('error');}}
-function schedulePreview(highlightField='',delay=140){clearTimeout(previewTimer);previewTimer=setTimeout(()=>updatePreview(highlightField),delay);}
-function showGateIssues(issues=[]){if(!issues.length)return;active.compatibility={...active.compatibility,valid:false,issues};const report=document.querySelector('.theme-compat-report');if(report)report.outerHTML=compatibilityReport(active.compatibility);const first=issues.find((item)=>item.field),control=first&&document.querySelector(`[data-theme-field="${first.field}"]`);control?.closest('details')?.setAttribute('open','');control?.focus();}
-async function open(id){renderEditor(await request(`/api/themes/${encodeURIComponent(id)}`));const usage=await request(`/api/themes/${encodeURIComponent(id)}/usage`);document.getElementById('user-theme-usage').textContent=usage.usageCount?`已用于 ${usage.usageCount} 次生产 · ${usage.batchCount} 个批次 · 最近 ${new Date(usage.lastUsedAt).toLocaleString('zh-CN')}`:'尚未用于正式生产';await list();}
-async function loadVersions(){const data=await request(`/api/themes/${encodeURIComponent(active.id)}/versions`);const select=document.getElementById('user-theme-versions');select.innerHTML=data.items.length?data.items.map((item)=>`<option value="${item.version}">v${item.version} · ${new Date(item.published_at).toLocaleDateString('zh-CN')}</option>`).join(''):'<option value="">暂无已发布版本</option>';document.getElementById('restore-user-theme').disabled=!data.items.length;}
-async function refreshProductionThemes(){invalidateThemeCatalog();await hydrateThemePickers();await sources();}
-function aiThemePreferences(){const scene=document.getElementById('ai-theme-scene').value.trim(),tone=[...document.querySelectorAll('[name="ai-theme-tone"]:checked')].map((input)=>input.value),brightness=document.getElementById('ai-theme-brightness').value,readingPriority=document.getElementById('ai-theme-reading').value;return Object.fromEntries(Object.entries({scene,tone,brightness,readingPriority}).filter(([,value])=>Array.isArray(value)?value.length:value));}
+function tokenEditor(){
+  const colors=active.draft.tokens.colors,socialNeonSurface=active.target==='social'&&active.draft.social?.recipes?.surface==='neon',visibleColors=colorFields.filter((key)=>colors[key]&&(active.target!=='social'||key!=='background'||socialNeonSurface)),colorLabels=active.target==='social'?{...labels,...socialColorLabels,...(socialNeonSurface?{background:'页面底色（neon 表面配方）'}:{})}:labels,colorHtml=visibleColors.map((key)=>`<label class="theme-color-field"><span>${colorLabels[key]}</span><input type="color" name="color-${key}" value="${colors[key]}" data-theme-field="tokens.colors.${key}"><code>${colors[key]}</code></label>`).join('');
+  const groups=Object.entries(tokenGroups).map(([group,meta])=>`<details class="theme-token-section"><summary><span><b>${meta.label}</b><small>${meta.hint}</small></span><i>展开设置</i></summary><div class="theme-token-grid">${meta.fields.map((field)=>fieldControl(group,field)).join('')}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="${group}">恢复当前主题的${meta.label}</button></details>`).join('');
+  return `<details class="theme-token-section" open><summary><span><b>颜色系统</b><small>控制背景、内容层级、强调色和代码对比</small></span><i>展开设置</i></summary><div class="theme-color-grid">${colorHtml}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="colors">恢复当前主题的颜色</button></details>${groups}${recipeEditor()}${componentEditor()}`;
+}
+function renderEditor(data){
+  active=data;
+  if(data.target==='social'&&data.editorMode!=='read-only')active.draft[active.target].components=structuredClone(data.draft.social.components||data.editorCatalog.components.defaults);
+  editorBaseline=structuredClone(active.draft);
+  const form=document.getElementById('user-theme-form'),editor=document.getElementById('user-theme-colors'),readOnly=data.editorMode==='read-only';
+  form.hidden=false;
+  form.elements.label.value=data.draft.label;
+  form.elements.description.value=data.draft.description;
+  form.elements.label.disabled=readOnly;
+  form.elements.description.disabled=readOnly;
+  document.getElementById('validate-user-theme').disabled=readOnly;
+  document.getElementById('publish-user-theme').disabled=readOnly;
+  document.getElementById('user-theme-editor-title').textContent=data.draft.label;
+  document.getElementById('user-theme-editor-meta').textContent=`${targetLabel(data.target)} · ${data.status==='published'?`已发布 v${data.activeVersion}`:data.status==='archived'?'已归档':'草稿'}`;
+  editor.className='theme-token-editor';
+  editor.innerHTML=editorContent();
+  if(readOnly)document.getElementById('user-theme-live-preview').innerHTML=compatibilityReport(data.compatibility,{legacy:true});
+  else updatePreview();
+  loadVersions();
+}
+function setPath(root,path,value){
+  const parts=path.split('.');
+  const leaf=parts.pop(),parent=parts.reduce((node,key)=>node[key]||(node[key]={}),root);
+  parent[leaf]=value;
+}
+function definition(){
+  const value=structuredClone(active.draft);
+  value.label=document.querySelector('#user-theme-form [name="label"]').value.trim();
+  value.description=document.querySelector('#user-theme-form [name="description"]').value.trim();
+  document.querySelectorAll('#user-theme-form [data-theme-field]').forEach((input)=>setPath(value,input.dataset.themeField,input.type==='checkbox'?input.checked:input.type==='number'||input.dataset.valueType==='number'?Number(input.value):input.type==='color'?input.value.toUpperCase():input.value));
+  return value;
+}
+function previewShell(){
+  const node=document.getElementById('user-theme-live-preview');
+  if(!node.querySelector('iframe'))node.innerHTML='<div class="theme-preview-status" id="user-theme-preview-status" aria-live="polite">正在生成正式样稿…</div><iframe id="user-theme-preview-frame" title="主题正式编译样稿" sandbox="allow-same-origin"></iframe>';
+  return node;
+}
+function updateFieldValues(){
+  document.querySelectorAll('#user-theme-form input[type="color"]').forEach((input)=>input.closest('label')?.querySelector('code')?.replaceChildren(input.value.toUpperCase()));
+  document.querySelectorAll('#user-theme-form [data-token-output]').forEach((output)=>{
+    const input=document.querySelector(`#user-theme-form input[type="number"][data-token-pair="${output.dataset.tokenOutput}"]`),unit=input?.parentElement?.querySelector('i')?.textContent||'';
+    if(input)output.textContent=`${input.value}${unit==='×'?'':unit}`;
+  });
+}
+function showFieldValidity(input){
+  document.querySelectorAll('#user-theme-form .theme-field-error').forEach((node)=>node.textContent='');
+  document.querySelectorAll('#user-theme-form .theme-token-field.invalid').forEach((node)=>node.classList.remove('invalid'));
+  if(!input)return;
+  const message=input.validity.valueMissing?'请输入数值':input.validity.rangeUnderflow||input.validity.rangeOverflow?`请输入 ${input.min}–${input.max} 范围内的值`:input.validity.stepMismatch?`请按 ${input.step} 的步进输入数值`:'请输入有效数值',field=input.closest('.theme-token-field');
+  field?.classList.add('invalid');
+  field?.querySelector('.theme-field-error')?.replaceChildren(message);
+}
+async function updatePreview(highlightField=''){
+  if(!active)return;
+  previewShell();
+  const requestId=++previewRequest,status=document.getElementById('user-theme-preview-status'),frame=document.getElementById('user-theme-preview-frame'),invalid=document.querySelector('#user-theme-form [data-theme-field]:invalid');
+  updateFieldValues();
+  showFieldValidity(invalid);
+  if(invalid){
+    status.textContent='请先修正左侧标出的配置项';
+    status.classList.remove('error');
+    return;
+  }
+  status.textContent='正在生成正式样稿…';
+  status.classList.remove('error');
+  try{
+    const result=await request('/api/themes/preview',{method:'POST',body:JSON.stringify({target:active.target,definition:definition(),highlightField})});
+    if(requestId!==previewRequest)return;
+    frame.srcdoc=result.html;
+    status.textContent=highlightField?`正在显示 ${highlightField.split('.').at(-1)} 的影响位置`:'样稿由正式生产编译器生成';
+  }catch(error){
+    if(requestId!==previewRequest)return;
+    status.textContent=`样稿生成失败：${error.message}`;
+    status.classList.add('error');
+  }
+}
+function schedulePreview(highlightField='',delay=140){
+  clearTimeout(previewTimer);
+  previewTimer=setTimeout(()=>updatePreview(highlightField),delay);
+}
+function showGateIssues(issues=[]){
+  if(!issues.length)return;
+  active.compatibility={...active.compatibility,valid:false,issues};
+  const report=document.querySelector('.theme-compat-report');
+  if(report)report.outerHTML=compatibilityReport(active.compatibility);
+  const first=issues.find((item)=>item.field),control=first&&document.querySelector(`[data-theme-field="${first.field}"]`);
+  control?.closest('details')?.setAttribute('open','');
+  control?.focus();
+}
+async function open(id){
+  renderEditor(await request(`/api/themes/${encodeURIComponent(id)}`));
+  const usage=await request(`/api/themes/${encodeURIComponent(id)}/usage`);
+  document.getElementById('user-theme-usage').textContent=usage.usageCount?`已用于 ${usage.usageCount} 次生产 · ${usage.batchCount} 个批次 · 最近 ${new Date(usage.lastUsedAt).toLocaleString('zh-CN')}`:'尚未用于正式生产';
+  await list();
+}
+async function loadVersions(){
+  const data=await request(`/api/themes/${encodeURIComponent(active.id)}/versions`);
+  const select=document.getElementById('user-theme-versions');
+  select.innerHTML=data.items.length?data.items.map((item)=>`<option value="${item.version}">v${item.version} · ${new Date(item.published_at).toLocaleDateString('zh-CN')}</option>`).join(''):'<option value="">暂无已发布版本</option>';
+  document.getElementById('restore-user-theme').disabled=!data.items.length;
+}
+async function refreshProductionThemes(){
+  invalidateThemeCatalog();
+  await hydrateThemePickers();
+  await sources();
+}
+function aiThemePreferences(){
+  const scene=document.getElementById('ai-theme-scene').value.trim(),tone=[...document.querySelectorAll('[name="ai-theme-tone"]:checked')].map((input)=>input.value),brightness=document.getElementById('ai-theme-brightness').value,readingPriority=document.getElementById('ai-theme-reading').value;
+  return Object.fromEntries(Object.entries({scene,tone,brightness,readingPriority}).filter(([,value])=>Array.isArray(value)?value.length:value));
+}
 function aiThemeInput(){return {target:document.querySelector('[name="ai-theme-target"]:checked').value,prompt:document.getElementById('ai-theme-prompt').value.trim(),preferences:aiThemePreferences()};}
-function aiThemeQualityNodes(){let issues=document.getElementById('ai-theme-generation-issues');if(!issues){issues=document.createElement('ul');issues.id='ai-theme-generation-issues';issues.className='ai-theme-generation-issues';issues.hidden=true;document.getElementById('ai-theme-generate-status').after(issues);}let comparison=document.getElementById('ai-theme-comparison');if(!comparison){comparison=document.createElement('div');comparison.id='ai-theme-comparison';comparison.className='ai-theme-comparison';document.getElementById('ai-theme-design-summary').after(comparison);}return {issues,comparison};}
-function renderAiGenerationIssues(values=[]){const {issues}=aiThemeQualityNodes();issues.hidden=!values.length;issues.innerHTML=values.map((item)=>`<li><code>${escapeHtml(item.field||'candidate')}</code><span>${escapeHtml(item.message||'候选未通过质量检查')}</span></li>`).join('');}
-function renderAiComparison(value){const {comparison}=aiThemeQualityNodes();if(!value?.nearestTheme){comparison.innerHTML='';return;}const tone=value.recommendRegenerate?'warning':value.verdict==='related'?'related':'distinct',differences=value.differences.map((item)=>`<li><b>${escapeHtml(item.group)}</b><span>${escapeHtml(item.summary)}</span></li>`).join('');comparison.innerHTML=`<header><span>ORIGINALITY CHECK</span><b>与“${escapeHtml(value.nearestTheme.label)}”相似度 ${value.similarityPercent}%</b></header><p>${value.recommendRegenerate?'候选与现有主题过于接近，建议重新生成，或确认它正是你需要的方向。':value.verdict==='related'?'视觉方向有关联，但关键配置已形成差异。':'候选与现有主题具有明确差异。'}</p>${differences?`<ul>${differences}</ul>`:''}`;comparison.dataset.tone=tone;}
-function showAiThemeCandidate(result){aiCandidate=result;const definition=result.definition;renderAiGenerationIssues();document.getElementById('ai-theme-candidate').hidden=false;document.getElementById('ai-theme-candidate-title').textContent=definition.label;document.getElementById('ai-theme-candidate-description').textContent=definition.description;document.getElementById('ai-theme-final-label').value=definition.label;document.getElementById('ai-theme-final-description').value=definition.description;document.getElementById('ai-theme-design-summary').innerHTML=result.designSummary.map((item,index)=>`<li><b>${String(index+1).padStart(2,'0')}</b><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.description)}</small></span></li>`).join('');renderAiComparison(result.comparison);const repairs=document.getElementById('ai-theme-repairs');repairs.innerHTML=result.repairs.length?`<details><summary>系统修正了 ${result.repairs.length} 项配置</summary><ul>${result.repairs.map((item)=>`<li><code>${escapeHtml(item.field)}</code><span>${escapeHtml(item.reason)}</span></li>`).join('')}</ul></details>`:'<p>候选无需系统修正，已通过全部发布门禁。</p>';document.getElementById('ai-theme-candidate-frame').srcdoc=result.preview.html;document.getElementById('ai-theme-generate-status').textContent=`候选已生成 · ${new Date(result.expiresAt).toLocaleTimeString('zh-CN')} 前确认有效`;document.getElementById('ai-theme-candidate').scrollIntoView({behavior:'smooth',block:'start'});}
-async function generateAiTheme(){const prompt=document.getElementById('ai-theme-prompt'),errorNode=document.getElementById('ai-theme-prompt-error'),button=document.getElementById('generate-ai-theme'),status=document.getElementById('ai-theme-generate-status');errorNode.textContent='';status.classList.remove('error');renderAiGenerationIssues();if(!prompt.checkValidity()){errorNode.textContent=prompt.value.trim().length<20?'请至少用 20 个字描述主题效果':'主题描述不能超过 500 字';prompt.focus();return;}aiGenerationController?.abort();const controller=new AbortController();aiGenerationController=controller;button.disabled=true;button.textContent='正在生成…';status.textContent='AI 正在组织配色、字阶与组件配方，请稍候…';try{const result=await request('/api/themes/ai/generate',{method:'POST',signal:controller.signal,body:JSON.stringify(aiThemeInput())});showAiThemeCandidate(result);}catch(error){if(error.name==='AbortError')return;status.textContent=error.code==='AI_THEME_MODEL_UNAVAILABLE'?'模型服务当前不可用，请到“运行与配置”检查默认文本模型。':`生成失败：${error.message}`;renderAiGenerationIssues(error.issues);status.classList.add('error');}finally{if(aiGenerationController===controller){button.disabled=false;button.textContent='生成主题候选';aiGenerationController=null;}}}
-function openAiThemeCreator(){const node=document.getElementById('ai-theme-creator');node.hidden=false;document.getElementById('open-ai-theme-creator').setAttribute('aria-expanded','true');node.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('ai-theme-prompt').focus();}
-function closeAiThemeCreator(){aiGenerationController?.abort();document.getElementById('ai-theme-creator').hidden=true;document.getElementById('open-ai-theme-creator').setAttribute('aria-expanded','false');document.getElementById('open-ai-theme-creator').focus();}
+function aiThemeQualityNodes(){
+  let issues=document.getElementById('ai-theme-generation-issues');
+  if(!issues){
+    issues=document.createElement('ul');
+    issues.id='ai-theme-generation-issues';
+    issues.className='ai-theme-generation-issues';
+    issues.hidden=true;
+    document.getElementById('ai-theme-generate-status').after(issues);
+  }
+  let comparison=document.getElementById('ai-theme-comparison');
+  if(!comparison){
+    comparison=document.createElement('div');
+    comparison.id='ai-theme-comparison';
+    comparison.className='ai-theme-comparison';
+    document.getElementById('ai-theme-design-summary').after(comparison);
+  }
+  return {issues,comparison};
+}
+function renderAiGenerationIssues(values=[]){
+  const {issues}=aiThemeQualityNodes();
+  issues.hidden=!values.length;
+  issues.innerHTML=values.map((item)=>`<li><code>${escapeHtml(item.field||'candidate')}</code><span>${escapeHtml(item.message||'候选未通过质量检查')}</span></li>`).join('');
+}
+function renderAiComparison(value){
+  const {comparison}=aiThemeQualityNodes();
+  if(!value?.nearestTheme){
+    comparison.innerHTML='';
+    return;
+  }
+  const tone=value.recommendRegenerate?'warning':value.verdict==='related'?'related':'distinct',differences=value.differences.map((item)=>`<li><b>${escapeHtml(item.group)}</b><span>${escapeHtml(item.summary)}</span></li>`).join('');
+  comparison.innerHTML=`<header><span>ORIGINALITY CHECK</span><b>与“${escapeHtml(value.nearestTheme.label)}”相似度 ${value.similarityPercent}%</b></header><p>${value.recommendRegenerate?'候选与现有主题过于接近，建议重新生成，或确认它正是你需要的方向。':value.verdict==='related'?'视觉方向有关联，但关键配置已形成差异。':'候选与现有主题具有明确差异。'}</p>${differences?`<ul>${differences}</ul>`:''}`;
+  comparison.dataset.tone=tone;
+}
+function showAiThemeCandidate(result){
+  aiCandidate=result;
+  const definition=result.definition;
+  renderAiGenerationIssues();
+  document.getElementById('ai-theme-candidate').hidden=false;
+  document.getElementById('ai-theme-candidate-title').textContent=definition.label;
+  document.getElementById('ai-theme-candidate-description').textContent=definition.description;
+  document.getElementById('ai-theme-final-label').value=definition.label;
+  document.getElementById('ai-theme-final-description').value=definition.description;
+  document.getElementById('ai-theme-design-summary').innerHTML=result.designSummary.map((item,index)=>`<li><b>${String(index+1).padStart(2,'0')}</b><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.description)}</small></span></li>`).join('');
+  renderAiComparison(result.comparison);
+  const repairs=document.getElementById('ai-theme-repairs');
+  repairs.innerHTML=result.repairs.length?`<details><summary>系统修正了 ${result.repairs.length} 项配置</summary><ul>${result.repairs.map((item)=>`<li><code>${escapeHtml(item.field)}</code><span>${escapeHtml(item.reason)}</span></li>`).join('')}</ul></details>`:'<p>候选无需系统修正，已通过全部发布门禁。</p>';
+  document.getElementById('ai-theme-candidate-frame').srcdoc=result.preview.html;
+  document.getElementById('ai-theme-generate-status').textContent=`候选已生成 · ${new Date(result.expiresAt).toLocaleTimeString('zh-CN')} 前确认有效`;
+  document.getElementById('ai-theme-candidate').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function generateAiTheme(){
+  const prompt=document.getElementById('ai-theme-prompt'),errorNode=document.getElementById('ai-theme-prompt-error'),button=document.getElementById('generate-ai-theme'),status=document.getElementById('ai-theme-generate-status');
+  errorNode.textContent='';
+  status.classList.remove('error');
+  renderAiGenerationIssues();
+  if(!prompt.checkValidity()){
+    errorNode.textContent=prompt.value.trim().length<20?'请至少用 20 个字描述主题效果':'主题描述不能超过 500 字';
+    prompt.focus();
+    return;
+  }
+  aiGenerationController?.abort();
+  const controller=new AbortController();
+  aiGenerationController=controller;
+  button.disabled=true;
+  button.textContent='正在生成…';
+  status.textContent='AI 正在组织配色、字阶与组件配方，请稍候…';
+  try{
+    const result=await request('/api/themes/ai/generate',{method:'POST',signal:controller.signal,body:JSON.stringify(aiThemeInput())});
+    showAiThemeCandidate(result);
+  }catch(error){
+    if(error.name==='AbortError')return;
+    status.textContent=error.code==='AI_THEME_MODEL_UNAVAILABLE'?'模型服务当前不可用，请到“运行与配置”检查默认文本模型。':`生成失败：${error.message}`;
+    renderAiGenerationIssues(error.issues);
+    status.classList.add('error');
+  }finally{
+    if(aiGenerationController===controller){
+      button.disabled=false;
+      button.textContent='生成主题候选';
+      aiGenerationController=null;
+    }
+  }
+}
+function openAiThemeCreator(){
+  const node=document.getElementById('ai-theme-creator');
+  node.hidden=false;
+  document.getElementById('open-ai-theme-creator').setAttribute('aria-expanded','true');
+  node.scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('ai-theme-prompt').focus();
+}
+function closeAiThemeCreator(){
+  aiGenerationController?.abort();
+  document.getElementById('ai-theme-creator').hidden=true;
+  document.getElementById('open-ai-theme-creator').setAttribute('aria-expanded','false');
+  document.getElementById('open-ai-theme-creator').focus();
+}
 export default async function loadThemeManager(){
-  await Promise.all([sources(),list()]);if(bound)return;bound=true;
-  document.getElementById('clone-theme').addEventListener('click',async()=>{try{const sourceId=document.getElementById('theme-clone-source').value,id=document.getElementById('theme-clone-id').value.trim(),label=document.getElementById('theme-clone-label').value.trim();const result=await request(`/api/themes/${encodeURIComponent(sourceId)}/clone`,{method:'POST',body:JSON.stringify({id,label})});toast('已创建用户主题草稿');await open(result.theme.id);}catch(error){toast(error.message);}});
+  await Promise.all([sources(),list()]);
+  if(bound)return;
+  bound=true;
+  document.getElementById('clone-theme').addEventListener('click',async()=>{
+    try{
+      const sourceId=document.getElementById('theme-clone-source').value,id=document.getElementById('theme-clone-id').value.trim(),label=document.getElementById('theme-clone-label').value.trim();
+      const result=await request(`/api/themes/${encodeURIComponent(sourceId)}/clone`,{method:'POST',body:JSON.stringify({id,label})});
+      toast('已创建用户主题草稿');
+      await open(result.theme.id);
+    }catch(error){toast(error.message);}
+  });
   document.getElementById('open-ai-theme-creator').addEventListener('click',openAiThemeCreator);
   document.getElementById('close-ai-theme-creator').addEventListener('click',closeAiThemeCreator);
   document.getElementById('generate-ai-theme').addEventListener('click',generateAiTheme);
   document.getElementById('regenerate-ai-theme').addEventListener('click',generateAiTheme);
-  document.querySelectorAll('[name="ai-theme-tone"]').forEach((input)=>input.addEventListener('change',(event)=>{const selected=document.querySelectorAll('[name="ai-theme-tone"]:checked');if(selected.length>3){event.target.checked=false;toast('视觉气质最多选择 3 项');}}));
-  document.getElementById('create-ai-theme-draft').addEventListener('click',async()=>{if(!aiCandidate)return;const button=document.getElementById('create-ai-theme-draft'),labelInput=document.getElementById('ai-theme-final-label'),descriptionInput=document.getElementById('ai-theme-final-description'),errorNode=document.getElementById('ai-theme-create-error'),label=labelInput.value.trim(),description=descriptionInput.value.trim();errorNode.textContent='';if(!label||!description){errorNode.textContent='草稿名称和描述不能为空';(!label?labelInput:descriptionInput).focus();return;}button.disabled=true;button.textContent='正在创建…';try{const result=await request(`/api/themes/ai/candidates/${encodeURIComponent(aiCandidate.candidateId)}/create`,{method:'POST',body:JSON.stringify({label,description})});toast('AI 主题已创建为草稿');aiCandidate=null;document.getElementById('ai-theme-candidate').hidden=true;closeAiThemeCreator();await open(result.theme.id);}catch(error){errorNode.textContent=error.code==='AI_THEME_CANDIDATE_EXPIRED'?'候选已过期，请重新生成后再创建草稿。':`创建失败：${error.message}`;}finally{button.disabled=false;button.textContent='创建为草稿';}});
-  document.getElementById('import-theme-file').addEventListener('change',async(event)=>{const file=event.target.files?.[0];if(!file)return;try{const definition=JSON.parse(await file.text());const result=await request('/api/themes/import',{method:'POST',body:JSON.stringify({definition})});toast(result.warnings?.length?`导入成功：${result.warnings.map((item)=>item.message).join('；')}`:'主题已导入为草稿');await open(result.theme.id);}catch(error){toast(`导入失败：${error.message}`);}finally{event.target.value='';}});
-  document.getElementById('user-theme-list').addEventListener('click',(event)=>{const row=event.target.closest('[data-user-theme]');if(row)open(row.dataset.userTheme).catch((error)=>toast(error.message));});
-  document.getElementById('user-theme-form').addEventListener('input',(event)=>{const pair=event.target?.dataset?.tokenPair;if(pair){document.querySelectorAll(`#user-theme-form [data-token-pair="${pair}"]`).forEach((input)=>{if(input!==event.target)input.value=event.target.value;});}if(event.target?.dataset?.themeField==='social.recipes.coverTitle'){const colorRole=document.querySelector('#user-theme-form [data-theme-field="social.components.coverTitle.colorRole"]');if(colorRole){if(event.target.value==='highlight-block'&&colorRole.value==='text')colorRole.value='inverseText';else if(event.target.value!=='highlight-block'&&colorRole.value==='inverseText')colorRole.value='text';}}schedulePreview(event.target?.dataset?.themeField||'');});
-  document.getElementById('user-theme-form').addEventListener('focusin',(event)=>{const field=event.target?.dataset?.themeField;if(field)schedulePreview(field,0);});
+  document.querySelectorAll('[name="ai-theme-tone"]').forEach((input)=>input.addEventListener('change',(event)=>{
+    const selected=document.querySelectorAll('[name="ai-theme-tone"]:checked');
+    if(selected.length>3){
+      event.target.checked=false;
+      toast('视觉气质最多选择 3 项');
+    }
+  }));
+  document.getElementById('create-ai-theme-draft').addEventListener('click',async()=>{
+    if(!aiCandidate)return;
+    const button=document.getElementById('create-ai-theme-draft'),labelInput=document.getElementById('ai-theme-final-label'),descriptionInput=document.getElementById('ai-theme-final-description'),errorNode=document.getElementById('ai-theme-create-error'),label=labelInput.value.trim(),description=descriptionInput.value.trim();
+    errorNode.textContent='';
+    if(!label||!description){
+      errorNode.textContent='草稿名称和描述不能为空';
+      (!label?labelInput:descriptionInput).focus();
+      return;
+    }
+    button.disabled=true;
+    button.textContent='正在创建…';
+    try{
+      const result=await request(`/api/themes/ai/candidates/${encodeURIComponent(aiCandidate.candidateId)}/create`,{method:'POST',body:JSON.stringify({label,description})});
+      toast('AI 主题已创建为草稿');
+      aiCandidate=null;
+      document.getElementById('ai-theme-candidate').hidden=true;
+      closeAiThemeCreator();
+      await open(result.theme.id);
+    }catch(error){
+      errorNode.textContent=error.code==='AI_THEME_CANDIDATE_EXPIRED'?'候选已过期，请重新生成后再创建草稿。':`创建失败：${error.message}`;
+    }finally{
+      button.disabled=false;
+      button.textContent='创建为草稿';
+    }
+  });
+  document.getElementById('import-theme-file').addEventListener('change',async(event)=>{
+    const file=event.target.files?.[0];
+    if(!file)return;
+    try{
+      const definition=JSON.parse(await file.text());
+      const result=await request('/api/themes/import',{method:'POST',body:JSON.stringify({definition})});
+      toast(result.warnings?.length?`导入成功：${result.warnings.map((item)=>item.message).join('；')}`:'主题已导入为草稿');
+      await open(result.theme.id);
+    }catch(error){toast(`导入失败：${error.message}`);}finally{event.target.value='';}
+  });
+  document.getElementById('user-theme-list').addEventListener('click',(event)=>{
+    const row=event.target.closest('[data-user-theme]');
+    if(row)open(row.dataset.userTheme).catch((error)=>toast(error.message));
+  });
+  document.getElementById('user-theme-form').addEventListener('input',(event)=>{
+    const pair=event.target?.dataset?.tokenPair;
+    if(pair){
+      document.querySelectorAll(`#user-theme-form [data-token-pair="${pair}"]`).forEach((input)=>{
+        if(input!==event.target)input.value=event.target.value;
+      });
+    }
+    if(event.target?.dataset?.themeField==='social.recipes.coverTitle'){
+      const colorRole=document.querySelector('#user-theme-form [data-theme-field="social.components.coverTitle.colorRole"]');
+      if(colorRole){
+        if(event.target.value==='highlight-block'&&colorRole.value==='text')colorRole.value='inverseText';
+        else if(event.target.value!=='highlight-block'&&colorRole.value==='inverseText')colorRole.value='text';
+      }
+    }
+    schedulePreview(event.target?.dataset?.themeField||'');
+  });
+  document.getElementById('user-theme-form').addEventListener('focusin',(event)=>{
+    const field=event.target?.dataset?.themeField;
+    if(field)schedulePreview(field,0);
+  });
   document.getElementById('user-theme-form').addEventListener('focusout',()=>schedulePreview('',80));
-  document.getElementById('user-theme-form').addEventListener('click',(event)=>{const button=event.target.closest('[data-reset-token-group],[data-reset-config],[data-reset-components]');if(!button)return;if(button.dataset.resetTokenGroup){const group=button.dataset.resetTokenGroup;active.draft.tokens[group]=structuredClone(editorBaseline.tokens[group]);}else if(button.hasAttribute('data-reset-components'))active.draft[active.target].components=structuredClone(active.editorCatalog.components.defaults);else active.draft[button.dataset.resetConfig]=structuredClone(editorBaseline[button.dataset.resetConfig]);document.getElementById('user-theme-colors').innerHTML=editorContent();schedulePreview('',0);});
-  document.getElementById('validate-user-theme').addEventListener('click',async()=>{try{const saved=await request(`/api/themes/${active.id}/draft`,{method:'PUT',body:JSON.stringify({definition:definition()})});active.draft=saved.theme;const result=await request(`/api/themes/${active.id}/validate`,{method:'POST',body:'{}'});if(!result.valid)showGateIssues(result.issues);toast(result.valid?'当前草稿校验通过':`校验失败：${result.issues.map((item)=>`${item.field?`${item.field} `:''}${item.message}`).join('；')}`);await list();}catch(error){showGateIssues(error.issues);toast(`校验失败：${error.message}`);}});
-  document.getElementById('publish-user-theme').addEventListener('click',async()=>{try{await request(`/api/themes/${active.id}/draft`,{method:'PUT',body:JSON.stringify({definition:definition()})});await request(`/api/themes/${active.id}/publish`,{method:'POST',body:'{}'});toast('主题新版本已发布');await refreshProductionThemes();await open(active.id);}catch(error){showGateIssues(error.issues);toast(error.message);}});
-  document.getElementById('export-user-theme').addEventListener('click',async()=>{const definition=await request(`/api/themes/${active.id}/export?draft=1`),blob=new Blob([JSON.stringify(definition,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${active.id}.theme.json`;link.click();URL.revokeObjectURL(url);});
-  document.getElementById('archive-user-theme').addEventListener('click',async()=>{const impact=await request(`/api/themes/${active.id}/archive-impact`);if(!window.confirm(`归档后将从生产选择器移除。历史版本 ${impact.historicalVersions} 个，已用于生产 ${impact.usageCount} 次，是否继续？`))return;await request(`/api/themes/${active.id}/archive`,{method:'POST',body:'{}'});toast('主题已归档，历史版本与任务快照仍保留');await refreshProductionThemes();document.getElementById('user-theme-form').hidden=true;active=null;await list();});
-  document.getElementById('restore-user-theme').addEventListener('click',async()=>{const version=document.getElementById('user-theme-versions').value;if(!version)return;await request(`/api/themes/${active.id}/versions/${version}/restore`,{method:'POST',body:'{}'});toast(`已从 v${version} 创建草稿`);await open(active.id);});
+  document.getElementById('user-theme-form').addEventListener('click',(event)=>{
+    const button=event.target.closest('[data-reset-token-group],[data-reset-config],[data-reset-components]');
+    if(!button)return;
+    if(button.dataset.resetTokenGroup){
+      const group=button.dataset.resetTokenGroup;
+      active.draft.tokens[group]=structuredClone(editorBaseline.tokens[group]);
+    }else if(button.hasAttribute('data-reset-components'))active.draft[active.target].components=structuredClone(active.editorCatalog.components.defaults);
+    else active.draft[button.dataset.resetConfig]=structuredClone(editorBaseline[button.dataset.resetConfig]);
+    document.getElementById('user-theme-colors').innerHTML=editorContent();
+    schedulePreview('',0);
+  });
+  document.getElementById('validate-user-theme').addEventListener('click',async()=>{
+    try{
+      const saved=await request(`/api/themes/${active.id}/draft`,{method:'PUT',body:JSON.stringify({definition:definition()})});
+      active.draft=saved.theme;
+      const result=await request(`/api/themes/${active.id}/validate`,{method:'POST',body:'{}'});
+      if(!result.valid)showGateIssues(result.issues);
+      toast(result.valid?'当前草稿校验通过':`校验失败：${result.issues.map((item)=>`${item.field?`${item.field} `:''}${item.message}`).join('；')}`);
+      await list();
+    }catch(error){
+      showGateIssues(error.issues);
+      toast(`校验失败：${error.message}`);
+    }
+  });
+  document.getElementById('publish-user-theme').addEventListener('click',async()=>{
+    try{
+      await request(`/api/themes/${active.id}/draft`,{method:'PUT',body:JSON.stringify({definition:definition()})});
+      await request(`/api/themes/${active.id}/publish`,{method:'POST',body:'{}'});
+      toast('主题新版本已发布');
+      await refreshProductionThemes();
+      await open(active.id);
+    }catch(error){
+      showGateIssues(error.issues);
+      toast(error.message);
+    }
+  });
+  document.getElementById('export-user-theme').addEventListener('click',async()=>{
+    const definition=await request(`/api/themes/${active.id}/export?draft=1`),blob=new Blob([JSON.stringify(definition,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;
+    link.download=`${active.id}.theme.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('archive-user-theme').addEventListener('click',async()=>{
+    const impact=await request(`/api/themes/${active.id}/archive-impact`);
+    if(!window.confirm(`归档后将从生产选择器移除。历史版本 ${impact.historicalVersions} 个，已用于生产 ${impact.usageCount} 次，是否继续？`))return;
+    await request(`/api/themes/${active.id}/archive`,{method:'POST',body:'{}'});
+    toast('主题已归档，历史版本与任务快照仍保留');
+    await refreshProductionThemes();
+    document.getElementById('user-theme-form').hidden=true;
+    active=null;
+    await list();
+  });
+  document.getElementById('restore-user-theme').addEventListener('click',async()=>{
+    const version=document.getElementById('user-theme-versions').value;
+    if(!version)return;
+    await request(`/api/themes/${active.id}/versions/${version}/restore`,{method:'POST',body:'{}'});
+    toast(`已从 v${version} 创建草稿`);
+    await open(active.id);
+  });
 }

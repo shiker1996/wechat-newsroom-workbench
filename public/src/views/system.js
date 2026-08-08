@@ -1,4 +1,5 @@
 import { request } from "../core/http.js";
+import { state } from "../core/state.js";
 import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 
 let bound = false;
@@ -128,11 +129,8 @@ function bindBackupActions() {
       const response = await fetch("/api/system/backup/restore", { method: "POST", headers: { "content-type": "application/zip", "x-restore-confirm": "RESTORE" }, body: validatedBackup });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      toast(`恢复完成，已保留恢复前快照 ${result.safetyBackup}`);
-      validatedBackup = null;
-      document.getElementById("backup-file").value = "";
-      document.getElementById("backup-validation").textContent = `恢复完成 · ${result.batches} 个批次`;
-      document.getElementById("backup-validation").className = "backup-validation valid";
+      toast(`恢复完成，已保留恢复前快照 ${result.safetyBackup}，即将刷新页面`);
+      setTimeout(() => location.reload(), 800);
     } catch (error) {
       toast(error.message);
     } finally {
@@ -219,6 +217,9 @@ function renderModelSettings() {
 
 async function loadModelSettings() {
   runtimeModels = await request("/api/models");
+  // 与 models.js / main.js 共用一份模型快照，避免模型配置改动后其他视图拿到旧数据
+  state.models = runtimeModels;
+  window.__models = runtimeModels;
   renderModelSettings();
 }
 

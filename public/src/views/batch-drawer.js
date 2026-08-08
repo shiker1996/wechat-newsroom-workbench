@@ -45,13 +45,22 @@ export async function createBreakingBatch(event) {
 
 export async function createBatch(event) {
   event.preventDefault();
-  const input = Object.fromEntries(new FormData(event.currentTarget));
-  const batch = await request("/api/batches", { method: "POST", body: JSON.stringify(input) });
-  state.activeBatchId = batch.id;
-  $("#batch-dialog").close();
-  toast("今日批次已建立");
-  await loadOverview();
-  openBatch(batch.id);
+  const form = event.currentTarget;
+  const input = Object.fromEntries(new FormData(form));
+  const submit = form.querySelector("button[type=submit]");
+  submit.disabled = true; submit.textContent = "正在建立…";
+  try {
+    const batch = await request("/api/batches", { method: "POST", body: JSON.stringify(input) });
+    state.activeBatchId = batch.id;
+    $("#batch-dialog").close();
+    toast("今日批次已建立");
+    await loadOverview();
+    openBatch(batch.id);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    submit.disabled = false; submit.textContent = "建立批次";
+  }
 }
 
 export async function openBatch(id, mode) {

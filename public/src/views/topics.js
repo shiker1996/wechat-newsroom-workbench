@@ -2,6 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { dimensionLabels } from "../core/dimensions.js";
 
 function activeTrack() {
   return document.querySelector(".nav-item.active")?.dataset.view === "social-topics" ? "social_cards" : "article";
@@ -76,7 +77,7 @@ function renderCandidates(candidates, track = activeTrack()) {
           : `<div class="score-strip article-score-strip">${["h", "b", "p", "s", "d", "f"].map((k) => `<span title="${articleScoreLabels[k]}">${articleScoreLabels[k]}<b>${item[k + "_score"] == null ? "—" : Number(item[k + "_score"]).toFixed(item[k + "_score"] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
         // 综合候选（维度组）展示组标题（如"腾讯近期动态"），单热点候选优先展示事件摘要，与编辑室口径一致
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
-        const dimensionLabel = { who: "主体", what: "对比", where: "场合" }[item.dimension] || "";
+        const dimensionLabel = dimensionLabels[item.dimension] || "";
         const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
           <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
@@ -119,12 +120,12 @@ async function loadRanking() {
 function renderRankingList(items, container) {
   container.innerHTML = items.map(function (item) {
     const reason = item.eliminationReason
-      ? `<span class="muted" style="font-size:9px">${escapeHtml(item.eliminationReason)}</span>`
-      : '<span class="muted" style="font-size:9px">已入池</span>';
+      ? `<span class="muted" style="font-size:11px">${escapeHtml(item.eliminationReason)}</span>`
+      : '<span class="muted" style="font-size:11px">已入池</span>';
     const cls = item.inPool ? "ranking-row in-pool" : "ranking-row";
     const btn = item.inPool
       ? ""
-      : `<button class="text-button" data-ranking-add="${item.hotspotId}" style="font-size:9px">加入候选</button>`;
+      : `<button class="text-button" data-ranking-add="${item.hotspotId}" style="font-size:11px">加入候选</button>`;
     return `<div class="${cls}"><span class="ranking-rank">#${item.rank}</span><span class="ranking-score">${item.score}</span><div class="ranking-title"><b>${escapeHtml(item.title)}</b>${reason}</div><div class="ranking-actions">${btn}</div></div>`;
   }).join("");
 }
@@ -132,15 +133,26 @@ function renderRankingList(items, container) {
 async function loadSocialRanking() {
   const batch=state.batches.find((item)=>item.id===state.activeBatchId);if(!batch)return;
   try{
-    const items=await request(`/api/batches/${encodeURIComponent(batch.id)}/social-ranking`);const panel=document.getElementById('social-ranking-panel');
-    if(!panel||!items.length){if(panel)panel.hidden=true;return;}panel.hidden=false;const toggle=document.getElementById('toggle-social-ranking'),list=document.getElementById('social-ranking-list');
-    toggle.textContent=`展开(${items.length}条)`;toggle.onclick=()=>{const expanded=list.style.display!=='block';list.style.display=expanded?'block':'none';toggle.textContent=expanded?'收起':`展开(${items.length}条)`;if(expanded)renderSocialRankingList(items,list);};
+    const items=await request(`/api/batches/${encodeURIComponent(batch.id)}/social-ranking`);
+    const panel=document.getElementById('social-ranking-panel');
+    if(!panel||!items.length){if(panel)panel.hidden=true;return;}
+    panel.hidden=false;
+    const toggle=document.getElementById('toggle-social-ranking'),list=document.getElementById('social-ranking-list');
+    toggle.textContent=`展开(${items.length}条)`;
+    toggle.onclick=()=>{
+      const expanded=list.style.display!=='block';
+      list.style.display=expanded?'block':'none';
+      toggle.textContent=expanded?'收起':`展开(${items.length}条)`;
+      if(expanded)renderSocialRankingList(items,list);
+    };
     state.socialRankingItems=items;
   }catch{}
 }
 
 function renderSocialRankingList(items,container){
-  container.innerHTML=items.map((item)=>{const opinion=item.rejectionReason||((item.reasons||[]).join(' · ')||'适合进入图文池');const cls=item.inPool?'ranking-row in-pool':'ranking-row';
+  container.innerHTML=items.map((item)=>{
+    const opinion=item.rejectionReason||((item.reasons||[]).join(' · ')||'适合进入图文池');
+    const cls=item.inPool?'ranking-row in-pool':'ranking-row';
     const button=item.inPool?'':`<button class="text-button" data-social-ranking-add="${item.hotspotId}">加入图文池</button>`;
     return `<div class="${cls}"><span class="ranking-rank">#${item.socialRank}</span><span class="ranking-score">${item.socialScore}</span><div class="ranking-title"><b>${escapeHtml(item.title)}</b><span class="muted">${escapeHtml(opinion)}</span></div><div class="ranking-actions">${button}</div></div>`;
   }).join('');

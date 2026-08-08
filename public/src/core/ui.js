@@ -9,12 +9,15 @@ export function formatDate(value, options = {}) {
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", ...options }).format(new Date(value));
 }
 let toastTimer;
-export function toast(message) {
+// type: success / info / error（error 停留更久）；不传保持原行为
+const toastDurations = { success: 2600, info: 2600, error: 4500 };
+export function toast(message, type = "info") {
   const node = document.getElementById("toast");
   node.textContent = message;
-  node.classList.add("show");
+  node.classList.remove("toast-success", "toast-info", "toast-error");
+  node.classList.add("show", `toast-${type}`);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => node.classList.remove("show"), 2600);
+  toastTimer = setTimeout(() => node.classList.remove("show"), toastDurations[type] ?? 2600);
 }
 export function providerOptions(selected) {
   const providers = window.__models?.providers ?? [];

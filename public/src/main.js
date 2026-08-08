@@ -24,7 +24,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260805-block-edit";
+const moduleVersion = "20260808-poll-http";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
@@ -40,7 +40,7 @@ async function go(view) {
   const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
   const isViewChange = previousView !== view;
   var bs = document.getElementById("batch-switcher");
-  if (bs) bs.style.display = ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","cover","artifacts"].includes(view) ? "block" : "none";
+  if (bs) bs.classList.toggle("visible", ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","cover","artifacts"].includes(view));
   let activeNavItem = null;
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === view;
@@ -154,21 +154,38 @@ function bindGlobal() {
       if (btn) { btn.title = "沉浸式对话"; btn.setAttribute("aria-pressed", "false"); }
     });
   });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    clearTimeout(jobNoticeTimer);
+    jobNoticeDelay = JOB_NOTICE_INTERVAL;
+    pollJobNotifications();
+  });
 }
 
+const JOB_NOTICE_INTERVAL = 4000;
+let jobNoticeDelay = JOB_NOTICE_INTERVAL;
 async function pollJobNotifications() {
+  // 页面隐藏时暂停轮询，恢复可见时立即补一轮
+  if (document.visibilityState === "hidden") {
+    jobNoticeTimer = setTimeout(pollJobNotifications, jobNoticeDelay);
+    return;
+  }
   try {
     const jobs = await request("/api/jobs?limit=40");
+    jobNoticeDelay = JOB_NOTICE_INTERVAL;
     for (const job of jobs) {
       const previous = jobNoticeState.get(job.id);
       jobNoticeState.set(job.id, job.status);
       if (!previous || previous === job.status || !["completed", "failed", "interrupted"].includes(job.status)) continue;
       const labels = { tag: "打标", retag: "重新打标", research: "事件研判", article: "成稿", daily: "批次早报", tutorial: "教程成稿", typeset: "排版", "social-card": "图文生成", "cover-image": "封面图生成" };
       const label = job.run_kind === "source" ? `来源采集 · ${job.type || "source"}` : (labels[job.type] || job.type || "后台任务");
-      toast(job.status === "completed" ? `${label}任务已完成` : `${label}任务${job.status === "interrupted" ? "已中断" : "失败"}${job.error ? `：${job.error}` : ""}`);
+      toast(job.status === "completed" ? `${label}任务已完成` : `${label}任务${job.status === "interrupted" ? "已中断" : "失败"}${job.error ? `：${job.error}` : ""}`, job.status === "completed" ? "success" : "error");
     }
-  } catch {}
-  jobNoticeTimer = setTimeout(pollJobNotifications, 4000);
+    // 定期清理：只保留最近一轮仍返回的任务，避免 Map 无限增长
+    const activeIds = new Set(jobs.map((job) => job.id));
+    for (const id of jobNoticeState.keys()) if (!activeIds.has(id)) jobNoticeState.delete(id);
+  } catch { jobNoticeDelay = Math.min(jobNoticeDelay * 2, 60000); }
+  jobNoticeTimer = setTimeout(pollJobNotifications, jobNoticeDelay);
 }
 
 async function onReady() {
@@ -183,7 +200,7 @@ async function onReady() {
   const current = view in titles ? view : "dashboard";
   // 批次切换器与各视图共用 state.batches/overview；dashboard 视图会由 go 自行加载，避免重复请求
   if (current !== "dashboard") {
-    try { await loadOverview(); } catch (error) { toast("工作台加载失败：" + error.message); }
+    try { await loadOverview(); } catch (error) { toast("工作台加载失败：" + error.message, "error"); }
   }
   await go(current);
 }

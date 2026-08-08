@@ -1,4 +1,5 @@
 import { request } from "../core/http.js";
+import { poll as pollTask } from "../core/poll.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
@@ -244,22 +245,22 @@ async function inspectProject() {
 }
 
 async function poll(id) {
-  const status = document.getElementById("tutorial-job-status");
-  while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 1800));
+  await pollTask(async () => {
+    const status = document.getElementById("tutorial-job-status");
+    if (!status) return true; // 已离开自主写作视图，静默结束轮询
     const job = await request(`/api/jobs/${id}`);
     status.textContent = job.progress || "教程任务执行中…";
-    if (job.status === "running") continue;
+    if (job.status === "running" || job.status === "queued") return false;
     if (job.status !== "completed") throw new Error(job.error || "教程生成失败");
     writingGenerating = false;
     writingCompleted = true;
     updateWritingSteps(3);
     document.getElementById("tutorial-result").hidden = false;
     document.getElementById("tutorial-result-copy").textContent = `${job.result?.title || "文章终稿"}已生成，可继续编辑、查看版本历史和公众号排版。`;
-    toast("自主写作已生成并进入文章编辑器");
+    toast("自主写作已生成并进入文章编辑器", "success");
     await loadProjects();
-    return;
-  }
+    return true;
+  }, { interval: 1800 }).promise;
 }
 
 async function submit() {
@@ -370,7 +371,7 @@ function bind() {
       candidateId=Number(resume.dataset.candidateId);
       writingGenerating=true;
       return withLoading(resume,"等待生成…",()=>poll(resume.dataset.customWritingResume))
-        .catch((error)=>{writingGenerating=false;writingFailed=true;toast(error.message);})
+        .catch((error)=>{writingGenerating=false;writingFailed=true;toast(error.message,"error");})
         .finally(()=>loadProjects().catch(()=>{}));
     }
     const retry=event.target.closest("[data-custom-writing-retry]");

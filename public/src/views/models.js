@@ -29,7 +29,7 @@ async function loadModels() {
         <span class="status-pill ${ok ? "ok" : "bad"}">${p.enabled===false?"已停用":ok ? "已配置" : "缺少 Key"}</span>
         <h3>${escapeHtml(p.label)}</h3>
         <code>${escapeHtml(p.model)}</code>
-        <dl><dt>Base URL</dt><dd>${escapeHtml(p.baseUrl)}</dd><dt>上下文窗口</dt><dd>${Math.round(p.contextWindow / 1024)}K</dd><dt>最大输出</dt><dd>${p.maxOutputTokens}</dd></dl>
+        <dl><dt>Base URL</dt><dd>${escapeHtml(p.baseUrl)}</dd><dt>上下文窗口</dt><dd>${Math.round(p.contextWindow / 1024)}K</dd><dt>最大输出</dt><dd>${p.maxOutputTokens ?? "默认"}</dd></dl>
       </article>`;
     }).join("");
   document.getElementById("call-summary").textContent = `最近 ${data.calls?.length || 0} 次调用`;

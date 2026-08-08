@@ -89,9 +89,37 @@ function applyModeLayout(){
 function updateSocialTabControls(){const tabs=document.getElementById('social-editor-candidates');const previous=document.getElementById('social-tabs-previous');const next=document.getElementById('social-tabs-next');if(!tabs||!previous||!next)return;const max=Math.max(0,tabs.scrollWidth-tabs.clientWidth);previous.disabled=tabs.scrollLeft<=1;next.disabled=tabs.scrollLeft>=max-1;}
 function setupSocialTabNavigation(){const tabs=document.getElementById('social-editor-candidates');const strip=tabs?.closest('.social-candidate-tab-strip');if(!tabs||!strip||strip.dataset.navigationBound==='true')return;strip.dataset.navigationBound='true';strip.addEventListener('click',(event)=>{const arrow=event.target.closest('.candidate-tab-arrow');if(!arrow)return;tabs.scrollBy({left:(arrow.classList.contains('previous')?-1:1)*Math.max(220,tabs.clientWidth*.72),behavior:'smooth'});});tabs.addEventListener('scroll',updateSocialTabControls,{passive:true});window.addEventListener('resize',updateSocialTabControls,{passive:true});updateSocialTabControls();}
 
-function renderDeliveryImage(){if(!delivery?.images?.length)return;deliveryIndex=(deliveryIndex+delivery.images.length)%delivery.images.length;const image=delivery.images[deliveryIndex];document.getElementById('social-gallery-image').src=`${image.url}?s=${image.size}`;document.getElementById('social-gallery-counter').textContent=`${deliveryIndex+1} / ${delivery.images.length}`;document.getElementById('social-download-image').href=image.downloadUrl;document.getElementById('social-gallery-film').querySelectorAll('button').forEach((button,index)=>button.classList.toggle('active',index===deliveryIndex));}
-function renderProof(){if(!delivery)return;const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2)};document.getElementById('social-proof-content').textContent=values[proofTab];document.querySelectorAll('[data-social-proof]').forEach((button)=>button.classList.toggle('active',button.dataset.socialProof===proofTab));}
-async function loadDelivery(candidateId=selectedId){if(!candidateId)return;const data=await request(`/api/candidates/${candidateId}/social-cards`);if(candidateId!==selectedId)return;delivery=data;const panel=document.getElementById('social-delivery');panel.hidden=!data.ready;if(!data.ready)return;deliveryIndex=0;document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;document.getElementById('social-open-html').href=data.htmlUrl;document.getElementById('social-download-all').href=data.bundleUrl;document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}" aria-label="查看第 ${index+1} 张图文"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');renderDeliveryImage();renderProof();}
+function renderDeliveryImage(){
+  if(!delivery?.images?.length)return;
+  deliveryIndex=(deliveryIndex+delivery.images.length)%delivery.images.length;
+  const image=delivery.images[deliveryIndex];
+  document.getElementById('social-gallery-image').src=`${image.url}?s=${image.size}`;
+  document.getElementById('social-gallery-counter').textContent=`${deliveryIndex+1} / ${delivery.images.length}`;
+  document.getElementById('social-download-image').href=image.downloadUrl;
+  document.getElementById('social-gallery-film').querySelectorAll('button').forEach((button,index)=>button.classList.toggle('active',index===deliveryIndex));
+}
+function renderProof(){
+  if(!delivery)return;
+  const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2)};
+  document.getElementById('social-proof-content').textContent=values[proofTab];
+  document.querySelectorAll('[data-social-proof]').forEach((button)=>button.classList.toggle('active',button.dataset.socialProof===proofTab));
+}
+async function loadDelivery(candidateId=selectedId){
+  if(!candidateId)return;
+  const data=await request(`/api/candidates/${candidateId}/social-cards`);
+  if(candidateId!==selectedId)return;
+  delivery=data;
+  const panel=document.getElementById('social-delivery');
+  panel.hidden=!data.ready;
+  if(!data.ready)return;
+  deliveryIndex=0;
+  document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;
+  document.getElementById('social-open-html').href=data.htmlUrl;
+  document.getElementById('social-download-all').href=data.bundleUrl;
+  document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}" aria-label="查看第 ${index+1} 张图文"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');
+  renderDeliveryImage();
+  renderProof();
+}
 
 let lastGate=null;
 function renderGate(gate) {
@@ -321,11 +349,71 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
     fieldset.replaceWith(div.firstElementChild);
   });
 }
-if(!window.__socialDeliveryBound){window.__socialDeliveryBound=true;document.addEventListener('click',(event)=>{const image=event.target.closest('[data-social-image]');if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}const tab=event.target.closest('[data-social-proof]');if(tab){proofTab=tab.dataset.socialProof;renderProof();}});document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});}
-if(!window.__socialThemeBound){window.__socialThemeBound=true;document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});toast('视觉主题已保存，生成图文时生效');}catch(error){toast(error.message);}});}
-if(!window.__socialCompositionBound){window.__socialCompositionBound=true;document.getElementById('social-composition-mode')?.addEventListener('change',async(event)=>{if(!selectedId)return;const previous=selectedCompositionMode;selectedCompositionMode=event.target.value;syncCompositionControls();try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({composition_mode:selectedCompositionMode})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast(selectedCompositionMode==='smart'?'已切换为智能构图，系统会按页面角色自动组织版面':'已切换为稳定模板，可整组或逐页指定版式');}catch(error){selectedCompositionMode=previous;event.target.value=previous;syncCompositionControls();toast(error.message);}});}
-if(!window.__socialLayoutBound){window.__socialLayoutBound=true;document.getElementById('social-layout-style')?.addEventListener('change',async(event)=>{if(!selectedId)return;try{const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});renderCardPlan(data.cardPlan,data.layoutDecisions);toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');}catch(error){toast(error.message);}});}
-if(!window.__socialChannelBound){window.__socialChannelBound=true;document.getElementById('social-channel')?.addEventListener('change',async(event)=>{if(!selectedId)return;const channel=event.target.value;try{const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});selectedChannelMode=data.channelMode;renderCardPlan(currentCardPlan,data.layoutDecisions);if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);}catch(error){event.target.value=selectedChannelMode;toast(error.message);}});}
+if(!window.__socialDeliveryBound){
+  window.__socialDeliveryBound=true;
+  document.addEventListener('click',(event)=>{
+    const image=event.target.closest('[data-social-image]');
+    if(image){deliveryIndex=Number(image.dataset.socialImage);renderDeliveryImage();}
+    const tab=event.target.closest('[data-social-proof]');
+    if(tab){proofTab=tab.dataset.socialProof;renderProof();}
+  });
+  document.getElementById('social-gallery-prev')?.addEventListener('click',()=>{deliveryIndex-=1;renderDeliveryImage();});
+  document.getElementById('social-gallery-next')?.addEventListener('click',()=>{deliveryIndex+=1;renderDeliveryImage();});
+}
+if(!window.__socialThemeBound){
+  window.__socialThemeBound=true;
+  document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{
+    if(!selectedId)return;
+    try{
+      await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});
+      toast('视觉主题已保存，生成图文时生效');
+    }catch(error){toast(error.message);}
+  });
+}
+if(!window.__socialCompositionBound){
+  window.__socialCompositionBound=true;
+  document.getElementById('social-composition-mode')?.addEventListener('change',async(event)=>{
+    if(!selectedId)return;
+    const previous=selectedCompositionMode;
+    selectedCompositionMode=event.target.value;
+    syncCompositionControls();
+    try{
+      const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({composition_mode:selectedCompositionMode})});
+      renderCardPlan(data.cardPlan,data.layoutDecisions);
+      toast(selectedCompositionMode==='smart'?'已切换为智能构图，系统会按页面角色自动组织版面':'已切换为稳定模板，可整组或逐页指定版式');
+    }catch(error){
+      selectedCompositionMode=previous;
+      event.target.value=previous;
+      syncCompositionControls();
+      toast(error.message);
+    }
+  });
+}
+if(!window.__socialLayoutBound){
+  window.__socialLayoutBound=true;
+  document.getElementById('social-layout-style')?.addEventListener('change',async(event)=>{
+    if(!selectedId)return;
+    try{
+      const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});
+      renderCardPlan(data.cardPlan,data.layoutDecisions);
+      toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');
+    }catch(error){toast(error.message);}
+  });
+}
+if(!window.__socialChannelBound){
+  window.__socialChannelBound=true;
+  document.getElementById('social-channel')?.addEventListener('change',async(event)=>{
+    if(!selectedId)return;
+    const channel=event.target.value;
+    try{
+      const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});
+      selectedChannelMode=data.channelMode;
+      renderCardPlan(currentCardPlan,data.layoutDecisions);
+      if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;
+      toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);
+    }catch(error){event.target.value=selectedChannelMode;toast(error.message);}
+  });
+}
 if(!window.__socialSkillSelectionBound){window.__socialSkillSelectionBound=true;
   document.getElementById('social-stage-skills')?.addEventListener('change',(event)=>{
     if(!event.target.closest('[data-stage-skill]'))return;

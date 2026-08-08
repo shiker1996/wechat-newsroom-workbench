@@ -1,5 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
+import { poll } from "../core/poll.js";
 import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
@@ -469,29 +470,24 @@ async function startEditorialProduction() {
     // 成稿链长达数分钟：打开进度弹窗，轮询输出写入 #production-job-console
     document.getElementById("production-job-dialog")?.showModal();
     if (result?.id) {
-      // poll job
-      state.jobTimer = setTimeout(async function poll() {
-        try {
-          const job = await request(`/api/jobs/${result.id}`);
-          const console = document.getElementById("production-job-console");
-          if (console) {
-            const logs = job.logs || [{ at: job.updated_at || new Date().toISOString(), message: job.progress }];
-            console.textContent = logs.map((l) => `${l.at.slice(11, 19)}  ${l.message}`).join("\n") || job.progress;
-            console.scrollTop = console.scrollHeight;
-          }
-          if (job.status === "running" || job.status === "queued") {
-            state.jobTimer = setTimeout(poll, 1200);
-          } else {
-            toast(job.status === "completed" ? "完整成稿链已完成" : `任务失败：${job.error || "未取得有效结果"}`);
-            if (job.status === "completed") {
-              document.getElementById("production-job-dialog")?.close();
-              window.go?.("editor").then(() => window.loadWritingDeskForCandidate?.(candidateId));
-            }
-          }
-        } catch (err) { toast(err.message); }
-      }, 1200);
+      // 独立轮询句柄（不用 state.jobTimer，避免与 editor.js 的 clearTimeout 互相清理）
+      poll(async () => {
+        const job = await request(`/api/jobs/${result.id}`);
+        const console = document.getElementById("production-job-console");
+        if (!console) return true; // 弹窗已关闭/离开视图，结束轮询
+        const logs = job.logs || [{ at: job.updated_at || new Date().toISOString(), message: job.progress }];
+        console.textContent = logs.map((l) => `${l.at.slice(11, 19)}  ${l.message}`).join("\n") || job.progress;
+        console.scrollTop = console.scrollHeight;
+        if (job.status === "running" || job.status === "queued") return false;
+        toast(job.status === "completed" ? "完整成稿链已完成" : `任务失败：${job.error || "未取得有效结果"}`, job.status === "completed" ? "success" : "error");
+        if (job.status === "completed") {
+          document.getElementById("production-job-dialog")?.close();
+          window.go?.("editor").then(() => window.loadWritingDeskForCandidate?.(candidateId));
+        }
+        return true;
+      }, { interval: 1200 }).promise.catch((err) => toast(err.message, "error"));
     }
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "error"); }
 }
 
 // main.js 与 topics.js 的跨视图跳转依赖该桥接
