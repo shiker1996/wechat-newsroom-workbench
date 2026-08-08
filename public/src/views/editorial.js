@@ -4,6 +4,7 @@ import { poll } from "../core/poll.js";
 import { streamChat } from "../core/stream-chat.js";
 import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { DRAFT_SCORE_THRESHOLD, JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 const editorialStatusLabels = {
@@ -96,8 +97,8 @@ async function loadEditorialRoom(selectedId) {
   const sidebar = document.getElementById("editorial-candidates");
   if (!sidebar) return;
   // 与选题池同一成稿线：默认只展示 F≥55 的候选，选题池的"显示全部"开关同样生效
-  const hiddenCount = state.topicShowAll ? 0 : state.candidates.filter((item) => item.f_score != null && Number(item.f_score) < 55).length;
-  const visibleCandidates = state.topicShowAll ? state.candidates : state.candidates.filter((item) => item.f_score == null || Number(item.f_score) >= 55);
+  const hiddenCount = state.topicShowAll ? 0 : state.candidates.filter((item) => item.f_score != null && Number(item.f_score) < DRAFT_SCORE_THRESHOLD).length;
+  const visibleCandidates = state.topicShowAll ? state.candidates : state.candidates.filter((item) => item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD);
   sidebar.innerHTML = visibleCandidates.length
     ? visibleCandidates.map((item) => {
         // 与选题池口径一致：综合候选展示组标题，单热点候选优先展示事件摘要
@@ -449,7 +450,7 @@ async function startEditorialProduction() {
           window.go?.("editor").then(() => window.loadWritingDeskForCandidate?.(candidateId));
         }
         return true;
-      }, { interval: 1200 }).promise.catch((err) => toast(err.message, "error"));
+      }, { interval: JOB_POLL_INTERVAL_MS }).promise.catch((err) => toast(err.message, "error"));
     }
   } catch (err) { toast(err.message, "error"); }
 }

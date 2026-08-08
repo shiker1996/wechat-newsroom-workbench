@@ -1,5 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
+import { LOG_LIST_LIMIT } from "../core/constants.js";
 import { escapeHtml, formatDate, toast } from "../core/ui.js";
 
 let bound = false;
@@ -15,7 +16,7 @@ function bindLogs() {
 }
 
 async function loadLogs(logType) {
-  const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=150` : "?limit=150";
+  const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=${LOG_LIST_LIMIT}` : `?limit=${LOG_LIST_LIMIT}`;
   const logs = await request("/api/logs" + qs);
   document.getElementById("log-count").textContent = logs.length + " 条";
   const list = document.getElementById("log-list");

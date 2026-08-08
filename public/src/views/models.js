@@ -1,4 +1,3 @@
-import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions } from "../core/ui.js";
 import { state } from "../core/state.js";

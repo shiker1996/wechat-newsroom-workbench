@@ -66,7 +66,7 @@ function componentEditor(){
   const cards=Object.entries(groups).map(([component,meta])=>`<fieldset class="theme-component-card" data-component-group="${component}"><legend><b>${meta.label}</b><small>${meta.hint}</small></legend><div>${Object.entries(meta.fields).map(([key,field])=>{
     const numeric=typeof field.options[0]?.value==='number';
     return `<label class="theme-token-field"><span>${field.label}</span><select data-theme-field="${target}.components.${component}.${key}" ${numeric?'data-value-type="number"':''}>${field.options.map((option)=>`<option value="${option.value}" ${components[component][key]===option.value?'selected':''}>${option.label}</option>`).join('')}</select></label>`;
-  }).join('')}</div></fieldset>`).join(''),reset=true?'<button type="button" class="text-button theme-reset-group" data-reset-components>恢复配方推荐值</button>':'';
+  }).join('')}</div></fieldset>`).join(''),reset='<button type="button" class="text-button theme-reset-group" data-reset-components>恢复配方推荐值</button>';
   return `<details class="theme-token-section theme-component-section"><summary><span><b>组件细节</b><small>${target==='article'?'细调文章标题、引用、表格和代码':'细调页面标题、信息组件和内容卡片'}；颜色只引用当前主题角色</small></span><i>展开设置</i></summary><div class="theme-component-grid">${cards}</div>${reset}</details>`;
 }
 function effectNumber(key,label,min,max,step,unit){

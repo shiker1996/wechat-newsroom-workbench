@@ -2,6 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { DRAFT_SCORE_THRESHOLD } from "../core/constants.js";
 import { dimensionLabels } from "../core/dimensions.js";
 
 function activeTrack() {
@@ -14,7 +15,6 @@ function trackElements(track) {
     : { count: "candidate-count", list: "candidate-list" };
 }
 
-const DRAFT_SCORE_THRESHOLD = 55;
 function isDraftEligible(item) { return item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD; }
 const articleScoreLabels = { h: "历史 H", b: "潜力 B", p: "匹配 P", s: "饱和 S", d: "修正 D", f: "总分 F" };
 const editorialStatusLabels = {

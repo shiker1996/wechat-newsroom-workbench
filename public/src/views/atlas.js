@@ -1,6 +1,7 @@
 import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
+import { GRAPH_ZOOM_STEP } from "../core/constants.js";
 import { escapeHtml, toast, withLoading, confirmAction, debounce } from "../core/ui.js";
 import { dimensionLabels, dimensionRoles } from "../core/dimensions.js";
 
@@ -71,7 +72,7 @@ function bindAtlas() {
     const zoomButton = event.target.closest("[data-graph-zoom]");
     if (zoomButton) {
       if (zoomButton.dataset.graphZoom === "reset") resetGraphView();
-      else zoomGraph(zoomButton.dataset.graphZoom === "in" ? 1.2 : 1 / 1.2);
+      else zoomGraph(zoomButton.dataset.graphZoom === "in" ? GRAPH_ZOOM_STEP : 1 / GRAPH_ZOOM_STEP);
     }
     const graphNode = event.target.closest("[data-graph-node]");
     if (graphNode && state.atlas) {
@@ -105,7 +106,7 @@ function bindAtlas() {
   const graph = document.getElementById("event-graph");
   graph.addEventListener("wheel", (event) => {
     event.preventDefault();
-    zoomGraph(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+    zoomGraph(event.deltaY < 0 ? GRAPH_ZOOM_STEP : 1 / GRAPH_ZOOM_STEP, event.clientX, event.clientY);
   }, { passive: false });
   graph.addEventListener("pointerdown", (event) => {
     if (event.target.closest("[data-graph-node]")) return;

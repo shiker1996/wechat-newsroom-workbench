@@ -2,6 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { AUTOSAVE_DELAY_MS } from "../core/constants.js";
 
 let markdownRenderer;
 let ignoredScrollTarget = null;
@@ -49,7 +50,7 @@ function markDocumentDirty() {
   autoSaveTimer=setTimeout(()=>{
     if(!editorDirty||selectedDocKind()!=="draft"||String(document.getElementById("writing-candidate")?.value||"")!==candidateId)return;
     saveDocument({automatic:true}).catch(()=>{});
-  },1200);
+  },AUTOSAVE_DELAY_MS);
 }
 
 function confirmDiscardEdits() {

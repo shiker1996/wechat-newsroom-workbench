@@ -2,6 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
 import { state } from "../core/state.js";
+import { MAX_IMAGE_BYTES } from "../core/constants.js";
 import { reindex } from "./artifacts.js";
 import { pollJob } from "./batch-drawer.js";
 import { runTypeset } from "./editor.js";
@@ -266,8 +267,6 @@ function renderProductionCandidate(candidateId) {
   if (proofFrame) proofFrame.src = htmlArtifact ? '/api/artifacts/' + htmlArtifact.id + '/content?preview=phone&v=' + encodeURIComponent(htmlArtifact.modified_at) : 'about:blank';
   const copyBtn = document.getElementById('copy-typeset-html');
   if (copyBtn) copyBtn.disabled = !htmlArtifact;
-  const gotoCoverBtn = document.getElementById('goto-cover');
-  if (gotoCoverBtn) gotoCoverBtn.disabled = false;
   const status = document.getElementById('typeset-status');
   if (status) {
     status.classList.toggle('ready', Boolean(htmlArtifact));
@@ -359,7 +358,7 @@ async function saveLocalImageAsset(id, droppedFile = null) {
   const supported = /^(?:image\/png|image\/jpeg|image\/gif|image\/webp)$/i.test(file.type)
     || /\.(?:png|jpe?g|gif|webp)$/i.test(file.name);
   if (!supported) throw new Error("仅支持 PNG、JPEG、GIF 或 WebP 图片");
-  if (file.size > 8 * 1024 * 1024) throw new Error("单张图片不能超过 8MB");
+  if (file.size > MAX_IMAGE_BYTES) throw new Error("单张图片不能超过 8MB");
   const status = card.querySelector(".image-slot-status");
   if (status) status.textContent = "正在保存到本地…";
   try {

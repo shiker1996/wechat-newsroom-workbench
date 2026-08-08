@@ -1,7 +1,9 @@
 // src/core/poll.js — 轮询工具：带超时上限、指数退避、可取消
 // task 返回 true 表示完成（结束轮询），返回 false 继续；抛错则整体失败。
 // cancel() 后 promise 以 null 静默结束，不再执行 task。
-export function poll(task, { interval = 1500, factor = 1.5, maxInterval = 8000, timeout = 10 * 60 * 1000 } = {}) {
+import { JOB_POLL_INTERVAL_MS } from "./constants.js";
+
+export function poll(task, { interval = JOB_POLL_INTERVAL_MS, factor = 1.5, maxInterval = 8000, timeout = 10 * 60 * 1000 } = {}) {
   let timer = null;
   let stopped = false;
   const startedAt = Date.now();

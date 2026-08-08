@@ -1,5 +1,6 @@
 import { request } from "../core/http.js";
 import { poll as pollTask } from "../core/poll.js";
+import { JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { state } from "../core/state.js";
 import { dimensionLabels } from "../core/dimensions.js";
 import { escapeHtml, providerOptions, toast, withLoading, confirmAction } from "../core/ui.js";
@@ -106,7 +107,7 @@ async function pollJob(id) {
     toast("关系维度早报已生成","success");
     await loadDaily();
     return true;
-  },{interval:1800}).promise;
+  },{interval:JOB_POLL_INTERVAL_MS}).promise;
 }
 async function generateDaily() {
   const batch=state.batches.find((item)=>item.id===state.activeBatchId);

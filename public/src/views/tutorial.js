@@ -1,5 +1,6 @@
 import { request } from "../core/http.js";
 import { poll as pollTask } from "../core/poll.js";
+import { JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
@@ -260,7 +261,7 @@ async function poll(id) {
     toast("自主写作已生成并进入文章编辑器", "success");
     await loadProjects();
     return true;
-  }, { interval: 1800 }).promise;
+  }, { interval: JOB_POLL_INTERVAL_MS }).promise;
 }
 
 async function submit() {

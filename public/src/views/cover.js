@@ -1,6 +1,7 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { poll } from "../core/poll.js";
+import { JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
@@ -96,7 +97,7 @@ async function pollCoverJob(jobId, candidateId) {
       $("#cover-status").textContent = `生成失败：${job.error || "未知错误"}`;
     }
     return true;
-  }, { interval: 1500 });
+  }, { interval: JOB_POLL_INTERVAL_MS });
   await coverPoller.promise;
 }
 
