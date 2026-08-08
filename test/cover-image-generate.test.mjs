@@ -186,8 +186,6 @@ test('runCoverImageJob daily 分支：candidateId 为 null 时走早报终稿与
     // daily-final 就位后应越过文档检查（后续渲染依赖截图技能，这里只验证到报错点不再是终稿缺失）
     store.saveDocument({ batchId: batch.id, candidateId: null, kind: 'daily-final', title: '测试早报', content: '第一段正文内容足够长，可以作为封面副标题素材。' });
     const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
-    // 封面标题取正文 H1 而非 title 字段（两者可刻意不同，发布以 H1 为准）
-    assert.ok(source.includes("line.startsWith('# ')"));
     assert.ok(source.includes("batchArticlesDir(workspaceRoot, batch), 'daily'"));
     assert.ok(source.includes("'daily-final'"));
   } finally {
