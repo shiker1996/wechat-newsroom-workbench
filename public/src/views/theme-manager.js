@@ -6,6 +6,28 @@ let active=null,bound=false,previewTimer=0,previewRequest=0,editorBaseline=null,
 const colorFields=['background','surface','page','text','muted','accent','accentSecondary','line','inverseText','codeBackground'];
 const labels={background:'背景',surface:'内容表面',page:'画布',text:'正文',muted:'弱化文字',accent:'主强调',accentSecondary:'次强调',line:'边线',inverseText:'反白文字',codeBackground:'代码背景'};
 const socialColorLabels={page:'图文页背景'};
+const coverColorLabels={page:'画布底色',text:'标题文字',muted:'副标题/信息行',accent:'主强调',accentSecondary:'次强调',inverseText:'反白文字',codeBackground:'深色色块'};
+// 封面主题（900×383 画布）的字阶、留白与形状：服务大标题、眉题、副标题、信息行与内容区
+const coverTokenGroups={
+  typography:{label:'字体与字阶',hint:'控制封面大标题、眉题、副标题与信息行的字号层级',fields:[
+    ['family','正文字体','select',['sans','serif','mono']],
+    ['headingFamily','标题字体','select',['sans','serif','mono']],
+    ['titlePx','标题字号上限','number',30,56,1,'px'],
+    ['titleLineHeight','标题行高','number',1.1,1.6,.02,''],
+    ['eyebrowPx','眉题字号','number',14,24,1,'px'],
+    ['subtitlePx','副标题字号','number',16,26,1,'px'],
+    ['metaPx','信息行字号','number',12,20,1,'px']
+  ]},
+  spacing:{label:'留白与间距',hint:'控制内容区内边距、元素间距与信息行位置',fields:[
+    ['paddingXPx','内容区水平留白','number',24,64,1,'px'],
+    ['paddingYPx','内容区垂直留白','number',20,56,1,'px'],
+    ['gapPx','元素间距','number',8,32,1,'px'],
+    ['metaBottomPx','信息行距底','number',12,48,1,'px']
+  ]},
+  shape:{label:'形状',hint:'控制眉题徽章的圆角',fields:[
+    ['badgeRadiusPx','徽章圆角','number',0,16,1,'px']
+  ]},
+};
 const tokenGroups={
   typography:{label:'字体与字阶',hint:'控制正文、标题、注释、行高与字间距',fields:[
     ['family','正文字体','select',['sans','serif','mono']],
@@ -74,13 +96,13 @@ function effectNumber(key,label,min,max,step,unit){
   return `<label class="theme-token-field"><span>${label}<output data-token-output="${pair}">${value}${unit}</output></span><span class="theme-number-pair"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" aria-label="${label}滑杆"><input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-token-pair="${pair}" data-theme-field="social.effects.${key}" aria-label="${label}精确值" aria-describedby="${pair}-error"><i>${unit||'×'}</i></span><small class="theme-field-error" id="${pair}-error" aria-live="polite"></small></label>`;
 }
 function compatibilityReport(report,{legacy=false}={}){
-  const checks={schema:'结构',contrast:'对比度',coverage:'编译覆盖',html:'HTML 安全',layout:'布局结构'},items=Object.entries(checks).map(([key,label])=>`<li class="${report.checks?.[key]?'pass':'fail'}"><b>${report.checks?.[key]?'✓':'!'}</b><span>${label}</span></li>`).join(''),issues=(report.issues||[]).map((item)=>`<li><code>${escapeHtml(item.field||'theme')}</code><span>${escapeHtml(item.message)}${item.specimenNode?` · 样稿节点：${escapeHtml(item.specimenNode)}`:''}</span></li>`).join('');
+  const checks={schema:'结构',contrast:'对比度',coverage:'编译覆盖',html:'HTML 安全',layout:'布局结构'},items=Object.entries(checks).map(([key,label])=>`<li class="${report.checks?.[key]?'pass':'fail'}"><b>${report.checks?.[key]?'✓':'!'}</b><span>${label}</span></li>`).join(''),issues=(report.issues||[]).map((item)=>`<li><code>${escapeHtml(item.field||'theme')}</code><span>${escapeHtml(item.message)}${item.specimenNode?` · 样稿节点：${escapeHtml(item.specimenNode)}`:''}</span>${item.suggestion?`<small class="theme-issue-suggestion">建议：${escapeHtml(item.suggestion)}</small>`:''}</li>`).join('');
   return `<section class="theme-compat-report ${legacy?'legacy':''}" aria-label="主题兼容报告"><header><span>${legacy?'READ ONLY':'PUBLISH GATE'}</span><b>${legacy?'旧主题只读兼容报告':report.valid?'发布门禁已就绪':'发布前仍需处理'}</b></header><ul class="theme-gate-checks">${items}</ul>${issues?`<ul class="theme-gate-issues">${issues}</ul>`:''}${legacy?'<p>该草稿不会被原地迁移。你仍可导出 JSON、查看历史版本或归档主题。</p>':''}</section>`;
 }
 function editorContent(){return compatibilityReport(active.compatibility,{legacy:active.editorMode==='read-only'})+(active.editorMode==='read-only'?'':tokenEditor());}
 function tokenEditor(){
-  const colors=active.draft.tokens.colors,socialNeonSurface=active.target==='social'&&active.draft.social?.recipes?.surface==='neon',visibleColors=colorFields.filter((key)=>colors[key]&&(active.target!=='social'||key!=='background'||socialNeonSurface)),colorLabels=active.target==='social'?{...labels,...socialColorLabels,...(socialNeonSurface?{background:'页面底色（neon 表面配方）'}:{})}:labels,colorHtml=visibleColors.map((key)=>`<label class="theme-color-field"><span>${colorLabels[key]}</span><input type="color" name="color-${key}" value="${colors[key]}" data-theme-field="tokens.colors.${key}"><code>${colors[key]}</code></label>`).join('');
-  const groups=Object.entries(tokenGroups).map(([group,meta])=>`<details class="theme-token-section"><summary><span><b>${meta.label}</b><small>${meta.hint}</small></span><i>展开设置</i></summary><div class="theme-token-grid">${meta.fields.map((field)=>fieldControl(group,field)).join('')}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="${group}">恢复当前主题的${meta.label}</button></details>`).join('');
+  const colors=active.draft.tokens.colors,socialNeonSurface=active.target==='social'&&active.draft.social?.recipes?.surface==='neon',visibleColors=colorFields.filter((key)=>colors[key]&&(active.target!=='social'||key!=='background'||socialNeonSurface)),colorLabels=active.target==='cover'?coverColorLabels:active.target==='social'?{...labels,...socialColorLabels,...(socialNeonSurface?{background:'页面底色（neon 表面配方）'}:{})}:labels,colorHtml=visibleColors.map((key)=>`<label class="theme-color-field"><span>${colorLabels[key]}</span><input type="color" name="color-${key}" value="${colors[key]}" data-theme-field="tokens.colors.${key}"><code>${colors[key]}</code></label>`).join('');
+  const activeTokenGroups=active.target==='cover'?coverTokenGroups:tokenGroups,groups=Object.entries(activeTokenGroups).map(([group,meta])=>`<details class="theme-token-section"><summary><span><b>${meta.label}</b><small>${meta.hint}</small></span><i>展开设置</i></summary><div class="theme-token-grid">${meta.fields.map((field)=>fieldControl(group,field)).join('')}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="${group}">恢复当前主题的${meta.label}</button></details>`).join('');
   return `<details class="theme-token-section" open><summary><span><b>颜色系统</b><small>控制背景、内容层级、强调色和代码对比</small></span><i>展开设置</i></summary><div class="theme-color-grid">${colorHtml}</div><button type="button" class="text-button theme-reset-group" data-reset-token-group="colors">恢复当前主题的颜色</button></details>${groups}${recipeEditor()}${componentEditor()}`;
 }
 function renderEditor(data){
@@ -215,7 +237,7 @@ function aiThemeQualityNodes(){
 function renderAiGenerationIssues(values=[]){
   const {issues}=aiThemeQualityNodes();
   issues.hidden=!values.length;
-  issues.innerHTML=values.map((item)=>`<li><code>${escapeHtml(item.field||'candidate')}</code><span>${escapeHtml(item.message||'候选未通过质量检查')}</span></li>`).join('');
+  issues.innerHTML=values.map((item)=>`<li><code>${escapeHtml(item.field||'candidate')}</code><span>${escapeHtml(item.message||'候选未通过质量检查')}</span>${item.suggestion?`<small class="theme-issue-suggestion">建议：${escapeHtml(item.suggestion)}</small>`:''}</li>`).join('');
 }
 function renderAiComparison(value){
   const {comparison}=aiThemeQualityNodes();

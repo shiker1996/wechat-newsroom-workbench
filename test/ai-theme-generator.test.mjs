@@ -52,6 +52,25 @@ test('AI 图文候选收紧字号与间距上限并自动降低组合密度',()=
   assert.ok(result.repairs.some((item)=>item.reason.includes('组合密度')));
 });
 
+test('designSummary 缺失或格式异常时自动合成合规摘要',()=>{
+  const candidate=candidateFrom('magazine-warm');delete candidate.designSummary;
+  const missing=normalizeAiThemeCandidate(candidate,{target:'article'});
+  assert.equal(missing.candidate.designSummary.length,1);assert.equal(missing.candidate.designSummary[0].title,'设计说明');assert.ok(missing.candidate.designSummary[0].description.length>=1);assert.ok(missing.repairs.some((item)=>item.field==='designSummary'));
+  const malformed=candidateFrom('magazine-warm');malformed.designSummary=['不是对象',{title:'  ',description:'x'.repeat(150)},{title:'配色',description:'克制配色'}];
+  const fixed=normalizeAiThemeCandidate(malformed,{target:'article'});
+  assert.ok(fixed.candidate.designSummary.every((item)=>item.title.length>=1&&item.title.length<=20&&item.description.length>=1&&item.description.length<=100));assert.equal(fixed.candidate.designSummary[1].title,'配色');
+  const many=candidateFrom('magazine-warm');many.designSummary=Array.from({length:9},(_,index)=>({title:`条目${index}`,description:'说明'}));
+  assert.equal(normalizeAiThemeCandidate(many,{target:'article'}).candidate.designSummary.length,6);
+});
+
+test('文章与封面候选自动移除不消费的 page 颜色并记录修复',()=>{
+  const candidate=candidateFrom('magazine-warm');candidate.tokens.colors.page='#F5F1EA';
+  const article=normalizeAiThemeCandidate(candidate,{target:'article'});
+  assert.equal(article.candidate.tokens.colors.page,undefined);assert.ok(article.repairs.some((item)=>item.field==='tokens.colors.page'&&item.reason.includes('不消费')));
+  const social=normalizeAiThemeCandidate(structuredClone(candidate),{target:'social'});
+  assert.equal(social.candidate.tokens.colors.page,'#F5F1EA');
+});
+
 test('AI 候选修复模型常见的颜色别名、缺失枚举和误放行为字段',async()=>{
   const candidate=candidateFrom('magazine-warm'),colors=candidate.tokens.colors,behavior=candidate.targetConfig.behavior;
   colors.codeText=colors.inverseText;colors.border=colors.line;delete colors.inverseText;delete colors.line;delete candidate.tokens.typography.family;delete candidate.tokens.typography.headingFamily;delete candidate.tokens.shape.shadow;

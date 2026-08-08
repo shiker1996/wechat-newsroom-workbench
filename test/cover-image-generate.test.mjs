@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
+import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
 import { buildCoverHtml } from '../lib/themes/cover-theme-compiler.mjs';
 import { loadThemeDirectory } from '../lib/themes/theme-loader.mjs';
 
@@ -143,26 +143,60 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(routes.includes('\\/daily\\/cover$'));
 });
 
-test('planCoverSpec unwraps nested spec objects and returns null on invalid specs', async () => {
-  const { planCoverSpec } = await import('../lib/llm/cover-image-generator.mjs');
-  const themes = [{ id: 'cover-navy-gold', label: '藏青鎏金', description: 'x' }];
-  const args = { accountContext: { name: '测试号' }, title: '测试标题', summary: '', brand: '测试号 · 2026.08', themes, fixedThemeId: 'cover-navy-gold', provider: '' };
-  // 模型把规格包在 spec 外层键里
-  const wrapped = { themeId: 'cover-navy-gold', spec: { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['测试标题'], highlights: [] }] } };
-  const gateway = { complete: async () => ({ content: JSON.stringify(wrapped) }) };
-  const planned = await planCoverSpec({ ...args, gateway });
-  assert.ok(planned?.spec?.components?.length, '嵌套规格应被剥取');
-  assert.equal(planned.themeId, 'cover-navy-gold');
-  // 完全不含 components 的输出 → null（调用方回退默认构图）
-  const badGateway = { complete: async () => ({ content: JSON.stringify({ themeId: 'x', note: '没有规格' }) }) };
-  assert.equal(await planCoverSpec({ ...args, gateway: badGateway }), null);
+test('theme-baked cover spec: validation and deterministic article fill-in', () => {
+  const themeSpec = { components: [
+    { type: 'canvas', colorRole: 'ink' },
+    { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent' },
+    { type: 'eyebrow', form: 'badge', text: '深度观察' },
+    { type: 'title', align: 'center' },
+    { type: 'subtitle', withBar: true },
+    { type: 'meta' },
+    { type: 'decoration', kind: 'dots', position: 'bottom-right' },
+  ] };
+  assert.equal(validateCoverThemeSpec(themeSpec).ok, true);
+  // 缺 canvas / eyebrow 无静态文案 / 未知组件都拒绝
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'title' }] }).ok, false);
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'eyebrow', form: 'text' }] }).ok, false);
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'unknown' }] }).ok, false);
+
+  const spec = coverSpecFromTheme(themeSpec, {
+    title: 'DeepSeek 1.4亿入股宇树，人形机器人要变天了？',
+    subtitle: '一段来自正文的摘要，作为副标题素材。',
+    brand: '测试号 · 2026.08',
+  });
+  assert.ok(spec);
+  const title = spec.components.find((c) => c.type === 'title');
+  assert.equal(title.lines.join(''), 'DeepSeek 1.4亿入股宇树，人形机器人要变天了？');
+  assert.equal(title.align, 'center');
+  assert.deepEqual(title.highlights, []);
+  assert.equal(spec.components.find((c) => c.type === 'subtitle').text, '一段来自正文的摘要，作为副标题素材。');
+  assert.equal(spec.components.find((c) => c.type === 'meta').text, '测试号 · 2026.08');
+  assert.equal(spec.components.find((c) => c.type === 'eyebrow').text, '深度观察');
+  // 无摘要时不产出 subtitle 组件
+  const bare = coverSpecFromTheme(themeSpec, { title: '短标题' });
+  assert.ok(!bare.components.some((c) => c.type === 'subtitle'));
+  // 构图不合规 → null（调用方回退 fallbackCoverSpec）
+  assert.equal(coverSpecFromTheme({ components: [] }, { title: 'x' }), null);
 });
 
-test('cover generator resolves published user themes, not just builtins', () => {
+test('all builtin cover themes carry a valid baked spec', () => {
+  const covers = loadThemeDirectory('themes').filter((d) => d.targets?.includes('cover'));
+  assert.equal(covers.length, 10);
+  for (const theme of covers) {
+    const result = validateCoverThemeSpec(theme.cover?.spec);
+    assert.ok(result.ok, `${theme.id}: ${JSON.stringify(result.issues)}`);
+    const spec = coverSpecFromTheme(theme.cover.spec, { title: '一个用于检查构图的文章标题', subtitle: '摘要', brand: '账号 · 2026.08' });
+    assert.ok(spec, theme.id);
+    assert.ok(validateCoverSpec(spec).ok, theme.id);
+  }
+});
+
+test('cover generator resolves themes deterministically from baked specs', () => {
   const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
   assert.ok(source.includes('resolveWorkspaceTheme'));
-  assert.ok(source.includes("listUserThemes?.({ target: 'cover' })"));
-  assert.ok(source.includes('workspaceRoot, workdir, gateway, store,'));
+  assert.ok(source.includes('coverSpecFromTheme'));
+  assert.ok(!source.includes('planCoverSpec'));
+  assert.ok(source.includes('workspaceRoot, workdir, store'));
 });
 
 
