@@ -1,11 +1,12 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { poll } from "../core/poll.js";
-import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let bound = false;
 let coverPoller = null;
+let coverExists = false;
 
 function bindCover() {
   if (bound) return;
@@ -67,6 +68,7 @@ async function loadCoverState() {
   const img = $("#cover-image"), empty = $("#cover-empty"), download = $("#download-cover");
   if (!id) { img.hidden = true; empty.hidden = false; download.hidden = true; return; }
   const status = await request(coverApi(id));
+  coverExists = status.exists;
   if (status.exists) {
     const url = `${coverApi(id, "/local")}?v=${encodeURIComponent(status.modifiedAt)}`;
     img.src = url; img.hidden = false; empty.hidden = true;
@@ -101,6 +103,7 @@ async function pollCoverJob(jobId, candidateId) {
 async function generateCover() {
   const id = currentCandidateId();
   if (!id) return toast("请先选择文章");
+  if (coverExists && !await confirmAction("重新生成将覆盖当前已生成的封面图，是否继续？", { confirmText: "重新生成" })) return;
   const job = await request(coverApi(id, "/generate"), {
     method: "POST",
     body: JSON.stringify({ theme: $("#cover-theme").value || "auto", provider: $("#cover-provider").value || undefined }),

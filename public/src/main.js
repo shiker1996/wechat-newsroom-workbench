@@ -80,6 +80,7 @@ async function go(view) {
       if (mod.default) await mod.default(view);
     } catch (err) {
       console.error(`ESM 视图 ${view} 加载失败:`, err);
+      toast(`视图「${titles[view]}」加载失败，请刷新后重试`, "error");
     }
   }
 }
@@ -91,7 +92,9 @@ async function init() {
     const res = await request("/api/models");
     window.__models = res;
     state.models = res;
-  } catch {}
+  } catch {
+    toast("模型列表加载失败，模型下拉可能不可用", "error");
+  }
 }
 
 // 顶栏时钟（原 app-bind.js tick）
@@ -126,7 +129,7 @@ function bindGlobal() {
     if (event.target.closest("[data-close-breaking-dialog]")) document.getElementById("breaking-batch-dialog").close();
     if (event.target.closest("#close-production-job")) document.getElementById("production-job-dialog").close();
     if (event.target.closest(".preview-close")) document.getElementById("artifact-dialog").close();
-    const copy = event.target.closest("[data-copy]"); if (copy) navigator.clipboard.writeText(copy.dataset.copy).then(() => toast("启动命令已复制"));
+    const copy = event.target.closest("[data-copy]"); if (copy) navigator.clipboard.writeText(copy.dataset.copy).then(() => toast(copy.dataset.copyLabel || "已复制")).catch(() => toast("复制失败，请手动复制", "error"));
     // 选题池卡片"进入文章编辑室"（模块在 go 过程中完成加载并注册 window.loadEditorialRoom）
     const editorialButton = event.target.closest("[data-editorial-id]");
     if (editorialButton) {

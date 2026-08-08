@@ -1,7 +1,8 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { poll } from "../core/poll.js";
-import { escapeHtml, toast, providerOptions, withLoading } from "../core/ui.js";
+import { streamChat } from "../core/stream-chat.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
@@ -40,13 +41,13 @@ function bindEditorial() {
     if (state.editorialCandidate) updateEditorialPrepareGate(state.editorialCandidate);
   });
   document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const editCandidate = event.target.closest("[data-edit-candidate]");
     if (editCandidate) {
       const nextId = Number(editCandidate.dataset.editCandidate);
       const currentId = Number(document.getElementById("editorial-form")?.elements.candidateId?.value);
       // 切换候选前保护未保存的决策底稿手改内容
-      if (editorialDirty && nextId !== currentId && !window.confirm("当前候选的决策底稿有未保存的修改，切换后将丢失。仍要切换吗？")) return;
+      if (editorialDirty && nextId !== currentId && !await confirmAction("当前候选的决策底稿有未保存的修改，切换后将丢失。仍要切换吗？", { confirmText: "放弃修改并切换" })) return;
       openEditorial(nextId).catch((error) => toast(error.message));
     }
   });
@@ -371,62 +372,23 @@ async function sendEditorialAnswer() {
   const empty = messages.querySelector(".editorial-chat-empty");
   if (empty) empty.remove();
   if (answer) messages.insertAdjacentHTML("beforeend", `<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll("\n", "<br>")}</p></div>`);
-  const sm = document.createElement("div");
-  sm.className = "editorial-message assistant streaming";
-  sm.innerHTML = "<b>AI 编辑 · 实时回应</b><details class=\"thinking-box\" hidden><summary>思考过程</summary><div class=\"thinking-text\"></div></details><p class=\"reply-text\"></p>";
-  messages.append(sm);
-  messages.scrollTop = messages.scrollHeight;
-  const st = sm.querySelector(".reply-text");
-  const thinkingText = sm.querySelector(".thinking-text");
-  const thinkingBox = sm.querySelector(".thinking-box");
-  button.disabled = true;
-  button.textContent = "AI 正在回应…";
-  try {
-    const response = await fetch(`/api/candidates/${candidateId}/ai/editorial/stream`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: document.getElementById("editorial-provider")?.value || "", answer }),
-    });
-    if (!response.ok) { const d = await response.json().catch(() => ({})); throw new Error(d.error || `HTTP ${response.status}`); }
-    if (!response.body) throw new Error("浏览器未收到流式响应");
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let completed = false;
-    const consume = (line) => {
-      if (!line.trim()) return;
-      const event = JSON.parse(line);
-      if (event.type === "thinking") { if (thinkingBox) { thinkingBox.hidden = false; thinkingBox.open = true; } if (thinkingText) { thinkingText.textContent += event.text || ""; thinkingText.scrollTop = thinkingText.scrollHeight; } }
-      if (event.type === "delta" && st) st.textContent += event.text || "";
-      if (event.type === "error") throw new Error(event.error || "编辑会调用失败");
-      if (event.type === "done") { completed = true; if (thinkingBox) thinkingBox.open = false; }
-      messages.scrollTop = messages.scrollHeight;
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split(/\r?\n/);
-      buffer = lines.pop() || "";
-      for (const line of lines) consume(line);
-    }
-    buffer += decoder.decode();
-    if (buffer.trim()) consume(buffer);
-    if (!completed) throw new Error("编辑会连接提前结束，请重试");
-    const answerEl = document.getElementById("editorial-answer");
-    if (answerEl) answerEl.value = "";
-    sm.classList.remove("streaming");
-    await openEditorial(candidateId);
-    toast("编辑会决策已更新");
-  } catch (err) {
-    sm.classList.remove("streaming");
-    sm.classList.add("failed");
-    if (st && !st.textContent) st.textContent = `调用失败：${err.message}`;
-    throw err;
-  } finally {
-    button.disabled = false;
-    button.textContent = "发送回答 / 让 AI 提问";
-  }
+  await streamChat({
+    url: `/api/candidates/${candidateId}/ai/editorial/stream`,
+    body: { provider: document.getElementById("editorial-provider")?.value || "", answer },
+    messages,
+    button,
+    busyLabel: "AI 正在回应…",
+    doneLabel: "发送回答 / 让 AI 提问",
+    title: "AI 编辑",
+    errorLabel: "编辑会",
+    rethrow: true,
+    onDone: async () => {
+      const answerEl = document.getElementById("editorial-answer");
+      if (answerEl) answerEl.value = "";
+      await openEditorial(candidateId);
+      toast("编辑会决策已更新");
+    },
+  });
 }
 
 async function persistEditorialForm(opts) {

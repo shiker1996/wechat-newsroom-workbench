@@ -234,9 +234,8 @@ async function saveRemoteCredential() {
 async function submitSkillZip(file, input) {
   if (!file) return;
   if (!await confirmAction("仅管理员可以安装技能包。确认该技能包已完成代码审查？", { confirmText: "受信安装" })) { input.value = ""; return; }
-  const response = await fetch("/api/system/skill-packages/install", { method: "POST", headers: { "content-type": "application/zip", "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: file });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "安装失败");
+  // 二进制 zip 直接作为 body 上传，request() 支持自定义 content-type，无需绕开
+  const result = await request("/api/system/skill-packages/install", { method: "POST", headers: { "content-type": "application/zip", "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: file });
   toast(`已安装 ${result.name || result.id}`);
   input.value = "";
   await loadSkillRegistry();

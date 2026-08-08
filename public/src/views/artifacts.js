@@ -1,6 +1,6 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, formatDate, toast } from "../core/ui.js";
+import { escapeHtml, formatDate, openArtifactPreview, toast } from "../core/ui.js";
 import { state } from "../core/state.js";
 import loadOverview from "./dashboard.js";
 
@@ -20,11 +20,9 @@ function bindArtifacts() {
   document.addEventListener("click", (event) => {
     const artifact = event.target.closest("[data-artifact]");
     if (!artifact) return;
-    const dialog = document.getElementById("artifact-dialog");
-    dialog.querySelector("iframe").src = `/api/artifacts/${artifact.dataset.artifact}/preview`;
-    const original = document.getElementById("artifact-open-original");
-    if (original) original.href = `/api/artifacts/${artifact.dataset.artifact}/content`;
-    dialog.showModal();
+    openArtifactPreview(`/api/artifacts/${artifact.dataset.artifact}/preview`, {
+      originalUrl: `/api/artifacts/${artifact.dataset.artifact}/content`,
+    });
   });
 }
 

@@ -1,7 +1,7 @@
 import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, withLoading } from "../core/ui.js";
+import { escapeHtml, toast, withLoading, confirmAction } from "../core/ui.js";
 import { dimensionLabels, dimensionRoles } from "../core/dimensions.js";
 
 let bound = false;
@@ -184,11 +184,17 @@ function dimensionGroups() {
 async function loadAtlas() {
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return toast("请先选择一个批次");
+  const graph = document.getElementById("event-graph");
+  if (graph) {
+    graph.setAttribute("aria-busy", "true");
+    graph.innerHTML = '<div class="empty-state">正在加载热点全景…</div>';
+  }
   try {
     state.atlas = await request(`/api/batches/${encodeURIComponent(batch.id)}/overview`);
     resetGraphView({ autoFocus: true });
     renderAtlas();
-  } catch (err) { toast("加载热点全景失败: " + err.message); }
+  } catch (err) { toast("加载热点全景失败: " + err.message, "error"); }
+  finally { graph?.removeAttribute("aria-busy"); }
 }
 
 function renderGraph() {
@@ -376,10 +382,10 @@ async function createCompositeFromEvent(batchId, eventId, eventTitle, tracks = [
 }
 
 // 创建成功后给出可跳转的出口，避免"成功了但不知道去哪看"的死路
-function offerPoolExit(tracks, message) {
+async function offerPoolExit(tracks, message) {
   const target = tracks.includes("social_cards") ? "social-topics" : "topics";
   const label = target === "topics" ? "文章选题池" : "图文选题池";
-  if (window.confirm(`${message}\n\n是否前往${label}查看？`)) window.go(target);
+  if (await confirmAction(`${message}\n\n是否前往${label}查看？`, { confirmText: `前往${label}` })) window.go(target);
 }
 
 async function createCompositeFromDimension(batchId, nodeId, tracks = ['article']) {

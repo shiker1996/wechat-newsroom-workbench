@@ -54,7 +54,7 @@ function markDocumentDirty() {
 
 function confirmDiscardEdits() {
   if (!editorDirty) return true;
-  return window.confirm("当前文稿有未保存的修改，切换后将丢失。仍要切换吗？");
+  return confirmAction("当前文稿有未保存的修改，切换后将丢失。仍要切换吗？", { confirmText: "放弃修改并切换" });
 }
 
 function getMarkdownRenderer() {
@@ -793,12 +793,12 @@ let bound = false;
 function bindEditor() {
   if (bound) return;
   bound = true;
-  document.getElementById("writing-candidate").addEventListener("change", (event) => {
-    if (!confirmDiscardEdits()) { event.target.value = lastCandidateValue; return; }
+  document.getElementById("writing-candidate").addEventListener("change", async (event) => {
+    if (!await confirmDiscardEdits()) { event.target.value = lastCandidateValue; return; }
     loadSelectedDocument().catch((error) => toast(error.message));
   });
-  $$("input[name=doc-kind]").forEach((item) => item.addEventListener("change", () => {
-    if (!confirmDiscardEdits()) {
+  $$("input[name=doc-kind]").forEach((item) => item.addEventListener("change", async () => {
+    if (!await confirmDiscardEdits()) {
       const previous = document.querySelector(`input[name=doc-kind][value="${lastDocKind}"]`);
       if (previous) previous.checked = true;
       return;
@@ -816,6 +816,10 @@ function bindEditor() {
     renderMarkdown();
   });
   document.getElementById("save-document").addEventListener("click", () => saveDocument().catch((error) => toast(error.message)));
+  document.getElementById("document-save-state").addEventListener("click", (event) => {
+    if (!event.currentTarget.classList.contains("error")) return;
+    saveDocument().catch((error) => toast(error.message));
+  });
   document.getElementById("document-history").addEventListener("click",()=>openDocumentHistory().catch((error)=>toast(error.message)));
   document.getElementById("document-find").addEventListener("click",openFindDialog);
   document.querySelector("[data-close-find]").addEventListener("click",()=>document.getElementById("find-dialog").close());

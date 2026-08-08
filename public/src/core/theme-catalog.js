@@ -1,4 +1,5 @@
 import { request } from './http.js';
+import { escapeHtml } from './ui.js';
 
 const FALLBACK={article:{id:'magazine-warm',label:'暖纸杂志风'},social:{id:'ice-blue',label:'冰川冷调'},cover:{id:'cover-navy-gold',label:'藏青鎏金'}};
 const PICKER_SELECT={article:'typeset-theme',social:'social-visual-style',cover:'cover-theme'};
@@ -6,7 +7,8 @@ const PICKER_TITLE={article:'选择文章排版主题',social:'选择图文视�
 const AUTO_ITEM={article:{id:'auto',label:'自动匹配',description:'根据文章内容类型，自动选择最合适的内置主题。'},cover:{id:'auto',label:'自动匹配',description:'AI 按文章调性选择最合适的封面主题。'}};
 const AUTO_PREVIEW={background:'#F1E8D6',surface:'#FFFDF7',ink:'#192824',accent:'#C53A2E'};
 const cache=new Map(),catalogs=new Map();let pickerTarget=null,pickerValue=null,pickerFilter='all',pickerScene='all',pickerBound=false;
-const safe=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+// 与 core/ui.js 的 escapeHtml 共用转义表；保留 ??'' 语义（null/undefined 输出空串而非 "null"）
+const safe=(value)=>escapeHtml(value??'');
 export async function loadThemeCatalog(target){if(!cache.has(target))cache.set(target,request(`/api/themes?target=${encodeURIComponent(target)}`).catch((error)=>{cache.delete(target);throw error;}));return cache.get(target);}
 export function invalidateThemeCatalog(){cache.clear();catalogs.clear();}
 function option(theme){const node=document.createElement('option');node.value=theme.id;node.textContent=theme.label;return node;}

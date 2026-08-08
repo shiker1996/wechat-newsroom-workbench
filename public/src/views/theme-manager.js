@@ -1,5 +1,5 @@
 import { request } from '../core/http.js';
-import { escapeHtml, toast } from '../core/ui.js';
+import { escapeHtml, toast, confirmAction } from '../core/ui.js';
 import { hydrateThemePickers, invalidateThemeCatalog, loadThemeCatalog } from '../core/theme-catalog.js';
 
 let active=null,bound=false,previewTimer=0,previewRequest=0,editorBaseline=null,aiCandidate=null,aiGenerationController=null;
@@ -417,7 +417,7 @@ export default async function loadThemeManager(){
   });
   document.getElementById('archive-user-theme').addEventListener('click',async()=>{
     const impact=await request(`/api/themes/${active.id}/archive-impact`);
-    if(!window.confirm(`归档后将从生产选择器移除。历史版本 ${impact.historicalVersions} 个，已用于生产 ${impact.usageCount} 次，是否继续？`))return;
+    if(!await confirmAction(`归档后将从生产选择器移除。历史版本 ${impact.historicalVersions} 个，已用于生产 ${impact.usageCount} 次，是否继续？`,{confirmText:'归档主题'}))return;
     await request(`/api/themes/${active.id}/archive`,{method:'POST',body:'{}'});
     toast('主题已归档，历史版本与任务快照仍保留');
     await refreshProductionThemes();

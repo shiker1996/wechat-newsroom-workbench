@@ -2,7 +2,7 @@ import { request } from "../core/http.js";
 import { poll as pollTask } from "../core/poll.js";
 import { state } from "../core/state.js";
 import { dimensionLabels } from "../core/dimensions.js";
-import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
+import { escapeHtml, providerOptions, toast, withLoading, confirmAction } from "../core/ui.js";
 import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 let bound=false;
@@ -142,7 +142,11 @@ function bind() {
     const button=event.target.closest("[data-remove-daily-focus]");if(!button)return;
     selectedFocuses.delete(button.dataset.removeDailyFocus);dailyHasFinal=false;renderOptions();
   });
-  document.getElementById("clear-daily-focus").addEventListener("click",()=>{selectedFocuses.clear();dailyHasFinal=false;renderOptions();});
+  document.getElementById("clear-daily-focus").addEventListener("click",async()=>{
+    if(!selectedFocuses.size)return;
+    if(!await confirmAction(`清空已选的 ${selectedFocuses.size} 个焦点？`,{confirmText:"清空已选"}))return;
+    selectedFocuses.clear();dailyHasFinal=false;renderOptions();
+  });
   document.getElementById("daily-review-selection").addEventListener("click",()=>{if(selectedFocuses.size)setDailyStage(2);});
   document.getElementById("daily-back-selection").addEventListener("click",()=>setDailyStage(1));
   document.getElementById("daily-revise-selection").addEventListener("click",()=>{dailyHasFinal=false;setDailyStage(1);});

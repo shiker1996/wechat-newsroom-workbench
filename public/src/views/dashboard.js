@@ -12,15 +12,15 @@ export function activeBatch() {
   return state.batches.find((batch) => batch.id === state.activeBatchId) ?? null;
 }
 
-export function localDate() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+export function localDate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 export function renderBatchSwitcher() {
   const switcher = $("#batch-switcher");
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-  const recent = state.batches.filter((b) => b.batch_date >= weekAgo.toISOString().slice(0, 10) && (b.lifecycle_status||"active")==="active");
+  // batch_date 是本地日期，比较必须用本地日期串，不能用 toISOString()（UTC 截断会让负时区用户少看一天）
+  const recent = state.batches.filter((b) => b.batch_date >= localDate(weekAgo) && (b.lifecycle_status||"active")==="active");
   switcher.innerHTML = recent.length
     ? recent.map((batch) => `<option value="${escapeHtml(batch.id)}" ${batch.id === state.activeBatchId ? "selected" : ""}>${escapeHtml(batch.batch_date)} · ${escapeHtml(batch.title)}</option>`).join("")
     : state.batches.length ? '<option value="">选择批次</option>' : '<option value="">暂无批次</option>';

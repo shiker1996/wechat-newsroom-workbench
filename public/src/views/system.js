@@ -106,9 +106,7 @@ function bindBackupActions() {
     status.textContent = "正在校验备份包…";
     status.className = "backup-validation checking";
     try {
-      const response = await fetch("/api/system/backup/validate", { method: "POST", headers: { "content-type": "application/zip" }, body: file });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
+      const result = await request("/api/system/backup/validate", { method: "POST", headers: { "content-type": "application/zip" }, body: file });
       validatedBackup = file;
       restore.disabled = false;
       status.textContent = `校验通过 · ${result.fileCount} 个文件 · ${(result.totalBytes / 1024 / 1024).toFixed(1)} MB · ${new Date(result.createdAt).toLocaleString("zh-CN")}`;
@@ -126,9 +124,7 @@ function bindBackupActions() {
     button.disabled = true;
     button.textContent = "正在恢复…";
     try {
-      const response = await fetch("/api/system/backup/restore", { method: "POST", headers: { "content-type": "application/zip", "x-restore-confirm": "RESTORE" }, body: validatedBackup });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
+      const result = await request("/api/system/backup/restore", { method: "POST", headers: { "content-type": "application/zip", "x-restore-confirm": "RESTORE" }, body: validatedBackup });
       toast(`恢复完成，已保留恢复前快照 ${result.safetyBackup}，即将刷新页面`);
       setTimeout(() => location.reload(), 800);
     } catch (error) {
@@ -300,7 +296,15 @@ async function saveModelConfig(button) {
 async function deleteModelConfig(button) {
   const id = document.getElementById("model-existing-id").value;
   if (!id) return;
-  if (!await confirmAction("删除后，该模型将不能再被新任务选用。API Key 会保留在本机环境文件中，是否继续？", { confirmText: "删除配置" })) return;
+  const isDefault = id === runtimeModels?.defaultProvider;
+  const fallback = runtimeModels?.providers?.find((item) => item.name !== id && item.enabled !== false);
+  let impact = `删除后，该模型将不能再被新任务选用；已指定「${id}」的任务会在运行时失败，需改选其他模型。`;
+  if (isDefault) {
+    impact = fallback
+      ? `「${id}」是当前默认模型，删除后默认模型将回退为「${fallback.label || fallback.name}」，新任务将改用它。`
+      : `「${id}」是当前默认模型，且没有其他启用的模型可回退，删除会被服务端拒绝。`;
+  }
+  if (!await confirmAction(`${impact} API Key 会保留在本机环境文件中，是否继续？`, { confirmText: "删除配置" })) return;
   button.disabled = true;
   try {
     await request(`/api/models/config/${encodeURIComponent(id)}`, { method: "DELETE" });

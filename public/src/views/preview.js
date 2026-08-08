@@ -329,7 +329,12 @@ async function loadImageWorkspace(candidateId) {
     const ws = await request('/api/candidates/' + candidateId + '/images');
     state.imageWorkspace = Object.assign({}, ws, {candidateId:candidateId});
     renderImageWorkspace();
-  } catch { state.imageWorkspace = null; }
+  } catch (error) {
+    state.imageWorkspace = null;
+    const status = document.getElementById('image-stage-status');
+    if (status) status.textContent = '配图信息读取失败（网络或服务异常）：' + error.message;
+    toast('配图信息读取失败：' + error.message, 'error');
+  }
 }
 
 async function planArticleImages() {

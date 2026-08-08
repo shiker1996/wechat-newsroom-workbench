@@ -89,7 +89,7 @@ export async function openBatch(id, mode) {
         : `<button class="primary-button" data-ai-research>开始事件研判</button>`;
   const isBreaking = batch.batch_type === "breaking";
   let breakingAnalysis = null;
-  if (isBreaking) { try { breakingAnalysis = await request(`/api/batches/${encodeURIComponent(id)}/breaking-analysis`); } catch {} }
+  if (isBreaking) { try { breakingAnalysis = await request(`/api/batches/${encodeURIComponent(id)}/breaking-analysis`); } catch { toast("突发分析结果加载失败，本次仅展示基础信息", "error"); } }
   const materialLinks = (batch.hotspots || []).flatMap((item) => item.materials || []);
   const intakeSection = isBreaking
     ? `<section class="drawer-section breaking-intake-section"><div class="pipeline-heading"><div><span class="kicker">BREAKING INTAKE</span><h3>突发专题素材</h3></div><span class="composite-badge">独立批次</span></div><p>该事件不参与每日热点的“核心 8 条 + 黑马 2 条”竞争；研判后按创建时选择的方向进入文章池或图文池。</p><div class="breaking-material-list">${materialLinks.map((item, index) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer"><b>${String(index + 1).padStart(2, "0")}</b><span>${escapeHtml(item.title || item.url)}</span><em class="material-status ${escapeHtml(item.status || "pending")}">${item.status === "ok" ? "已抓取" : item.status === "error" ? "抓取失败" : "待抓取"}</em></a>`).join("")}</div><details class="breaking-add-material"><summary>补充更多素材链接</summary><textarea id="breaking-more-materials" rows="3" placeholder="每行一个链接"></textarea><button class="outline-button" data-breaking-add-material>添加素材</button></details></section>`
@@ -134,7 +134,9 @@ export async function openBatch(id, mode) {
     <section class="drawer-section"><h3>本批产物</h3><p>${batch.artifacts.length} 份已索引产物 · ${batch.hotspots.length} 条热点</p></section>
     <section class="drawer-section"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
   </div>`;
-  $("#batch-drawer").showModal();
+  // 轮询刷新会重复调用 openBatch；对话框已打开时不能再次 showModal（会抛 InvalidStateError）
+  const drawer = $("#batch-drawer");
+  if (!drawer.open) drawer.showModal();
   if (mode === "archive") {
     const secs = document.getElementById("batch-detail").querySelectorAll(".drawer-section");
     secs.forEach((s) => {
@@ -260,6 +262,9 @@ export async function startBreakingAnalysis() {
 export async function confirmBreakingRoute() {
   const tracks = $$("input[name=breakingRoute]:checked", $("#batch-detail")).map((item) => item.value);
   if (!tracks.length) return toast("请至少选择一个进入方向");
+  const trackLabel = tracks.map((track) => track === "article" ? "文章池" : "图文池").join("与");
+  // 分流会把突发专题写入选题池，属于不可逆写入，统一走二次确认
+  if (!await confirmAction(`确认将突发专题写入${trackLabel}？写入后不可撤销。`, { confirmText: "确认分流" })) return;
   await request(`/api/batches/${encodeURIComponent(state.currentBatch.id)}/breaking-analysis/route`, { method: "POST", body: JSON.stringify({ tracks }) });
   toast("已按确认方向进入选题池");
   await openBatch(state.currentBatch.id);

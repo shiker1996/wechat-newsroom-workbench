@@ -114,7 +114,7 @@ async function loadRanking() {
       if (expanded) renderRankingList(items, list);
     };
     state.rankingItems = items;
-  } catch {}
+  } catch (error) { toast("排行榜加载失败：" + error.message, "error"); }
 }
 
 function renderRankingList(items, container) {
@@ -146,7 +146,7 @@ async function loadSocialRanking() {
       if(expanded)renderSocialRankingList(items,list);
     };
     state.socialRankingItems=items;
-  }catch{}
+  }catch(error){toast('图文排行榜加载失败：'+error.message,'error');}
 }
 
 function renderSocialRankingList(items,container){
@@ -162,14 +162,23 @@ async function loadTopicPool() {
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
   const track = activeTrack();
-  const [detail, candidates] = await Promise.all([
-    request(`/api/batches/${encodeURIComponent(batch.id)}`),
-    request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=${encodeURIComponent(track)}`),
-  ]);
-  state.currentBatch = detail;
-  state.candidates = candidates;
-  renderCandidates(candidates, track);
-  if (track === "article") loadRanking(); else loadSocialRanking();
+  const list = document.getElementById(trackElements(track).list);
+  if (list) {
+    list.setAttribute("aria-busy", "true");
+    list.innerHTML = '<div class="empty-state">正在加载候选选题…</div>';
+  }
+  try {
+    const [detail, candidates] = await Promise.all([
+      request(`/api/batches/${encodeURIComponent(batch.id)}`),
+      request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=${encodeURIComponent(track)}`),
+    ]);
+    state.currentBatch = detail;
+    state.candidates = candidates;
+    renderCandidates(candidates, track);
+    if (track === "article") loadRanking(); else loadSocialRanking();
+  } finally {
+    list?.setAttribute("aria-busy", "false");
+  }
 }
 
 if (!window.__candidateTrackActionsBound) {
@@ -204,11 +213,15 @@ if (!window.__candidateTrackActionsBound) {
       await window.openSocialEditor?.(Number(editor.dataset.socialEditorId));
     }
     const socialAdd=event.target.closest('[data-social-ranking-add]');
-    if(socialAdd){const hotspotId=Number(socialAdd.dataset.socialRankingAdd),ranked=(state.socialRankingItems||[]).find((item)=>Number(item.hotspotId)===hotspotId);try{await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`,{method:'POST',body:JSON.stringify({hotspotIds:[hotspotId],tracks:['social_cards'],track:'social_cards',socialScoreDetails:ranked?.socialScoreDetails})});toast('已加入图文池');await loadTopicPool();}catch(error){toast(error.message);}}
+    if(socialAdd){
+      if(!await confirmAction("将该热点写入图文池？",{confirmText:"加入图文池"}))return;
+      const hotspotId=Number(socialAdd.dataset.socialRankingAdd),ranked=(state.socialRankingItems||[]).find((item)=>Number(item.hotspotId)===hotspotId);try{await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`,{method:'POST',body:JSON.stringify({hotspotIds:[hotspotId],tracks:['social_cards'],track:'social_cards',socialScoreDetails:ranked?.socialScoreDetails})});toast('已加入图文池');await loadTopicPool();}catch(error){toast(error.message);}
+    }
     const rankingAdd = event.target.closest("[data-ranking-add]");
     if (rankingAdd) {
       const hid = Number(rankingAdd.dataset.rankingAdd);
       if (hid && state.activeBatchId) {
+        if (!await confirmAction("将该热点写入文章候选池？", { confirmText: "加入候选" })) return;
         try {
           await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds: [hid] }) });
           toast("已加入候选池");

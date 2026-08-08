@@ -87,7 +87,7 @@
       <div class="top-actions">
         <select id="batch-switcher" class="batch-switcher" aria-label="当前批次"></select>
         <time id="clock"></time>
-        <button class="ghost-button" id="health-button">检查采集环境</button>
+        <button class="ghost-button" id="health-button">采集环境设置</button>
         <button class="ghost-button" id="new-breaking-button">⚡ 突发热点</button>
         <button class="primary-button" id="new-batch-button">＋ 新建今日批次</button>
       </div>
@@ -1081,7 +1081,7 @@
     <div class="job-console" id="production-job-console">等待任务…</div>
     <p class="fine-print" id="production-job-note">可以关闭窗口，任务仍会在后台继续。</p>
   </dialog>
-  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><iframe title="产物预览"></iframe></dialog>
+  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><div class="preview-status" hidden>正在加载预览…</div><iframe title="产物预览"></iframe></dialog>
   <dialog id="confirm-dialog" class="modal"><div class="confirm-body"><h2>确认操作</h2><p class="confirm-message"></p><div class="modal-actions"><button type="button" class="ghost-button" data-confirm-cancel>取消</button><button type="button" class="ink-button" data-confirm-ok>确认执行</button></div></div></dialog>
   <dialog id="revision-dialog" class="modal revision-dialog"><div class="modal-head"><div><span class="kicker">DOCUMENT HISTORY</span><h2>版本历史</h2></div><button class="close-button" data-close-revisions aria-label="关闭">×</button></div><div class="revision-layout"><div id="revision-list" class="revision-list"></div><div class="revision-preview"><div id="revision-summary" class="muted">选择一个版本查看差异</div><pre id="revision-diff" class="revision-diff"></pre><button class="ink-button" id="restore-revision" disabled>恢复此版本</button></div></div></dialog>
   <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>

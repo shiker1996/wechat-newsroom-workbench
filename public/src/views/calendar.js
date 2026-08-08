@@ -1,9 +1,14 @@
 import { $ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, formatDate, toast } from "../core/ui.js";
+import { escapeHtml, formatDate, openArtifactPreview, toast } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let bound = false;
+// batch_date 是本地日期（YYYY-MM-DD），按本地时区解析；直接 new Date("YYYY-MM-DD") 会被当成 UTC 零点，负时区用户的日历落点会偏前一天
+function parseLocalDate(value) {
+  const [y, m, d] = String(value).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
 function bindCalendar() {
   if (bound) return;
   bound = true;
@@ -22,13 +27,13 @@ function bindCalendar() {
     }
     const calArticle = event.target.closest("[data-cal-article]");
     if (calArticle) {
-      document.getElementById("artifact-dialog").showModal();
-      document.querySelector("#artifact-dialog iframe").src = "/api/documents/" + calArticle.dataset.calArticle + "/content";
+      openArtifactPreview("/api/documents/" + calArticle.dataset.calArticle + "/content");
     }
     const calSocial = event.target.closest("[data-cal-social]");
     if (calSocial) {
-      document.getElementById("artifact-dialog").showModal();
-      document.querySelector("#artifact-dialog iframe").src = "/api/candidates/" + calSocial.dataset.calSocial + "/social-cards/files/my-design.html";
+      openArtifactPreview("/api/artifacts/" + calSocial.dataset.calSocial + "/preview", {
+        originalUrl: "/api/artifacts/" + calSocial.dataset.calSocial + "/content",
+      });
     }
   });
 }
@@ -45,7 +50,7 @@ async function loadCalendar(y, m) {
   document.getElementById("cal-count").textContent = `共 ${entries.length} 项 · 文章 ${articleCount} · 图文 ${socialCount}`;
   const dayMap = {};
   for (const a of entries) {
-    const d = a.batch_date ? new Date(a.batch_date) : new Date(a.updated_at);
+    const d = a.batch_date ? parseLocalDate(a.batch_date) : new Date(a.updated_at);
     if (!isNaN(d.getTime())) {
       const day = d.getDate();
       if (!dayMap[day]) dayMap[day] = [];
@@ -73,7 +78,7 @@ async function loadCalendar(y, m) {
           for (const a of items) {
             const t = (a.title || a.hotspot_title || "").slice(0, 22);
             const isSocial = a.content_type === "social_cards";
-            const action = isSocial ? `data-cal-social="${a.candidate_row_id}"` : `data-cal-article="${a.id}"`;
+            const action = isSocial ? `data-cal-social="${a.id}"` : `data-cal-article="${a.id}"`;
             html += `<div class="cal-article ${isSocial ? "cal-social" : "cal-longform"}" title="${escapeHtml(a.batch_date || a.updated_at || "")} · ${escapeHtml(a.pool_role || "")}"><b class="cal-content-type">${isSocial ? "图文" : "文章"}</b><span style="cursor:pointer" ${action}>${escapeHtml(t)}</span></div>`;
           }
         }

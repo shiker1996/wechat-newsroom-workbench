@@ -36,6 +36,44 @@ export async function withLoading(button, label, fn) {
   finally { button.disabled = false; button.textContent = original; }
 }
 
+// 产物/日历共用的 iframe 预览：打开时显示加载态（load 后隐藏），关闭时清空 src，
+// 避免大文件在后台继续加载、下次打开时闪现旧内容；加载失败给出最小兜底提示
+let previewBound = false;
+export function openArtifactPreview(url, { originalUrl } = {}) {
+  const dialog = document.getElementById("artifact-dialog");
+  const iframe = dialog.querySelector("iframe");
+  const status = dialog.querySelector(".preview-status");
+  if (!previewBound) {
+    previewBound = true;
+    iframe.addEventListener("load", () => {
+      if (!dialog.open || !iframe.src || iframe.src === "about:blank") return;
+      status.hidden = true;
+      // 同源接口出错时返回的是 JSON 错误体而非可预览内容
+      try {
+        if (iframe.contentDocument?.contentType === "application/json") {
+          status.textContent = "预览加载失败，可尝试「打开原始文件」。";
+          status.hidden = false;
+        }
+      } catch {}
+    });
+    iframe.addEventListener("error", () => {
+      if (!dialog.open) return;
+      status.textContent = "预览加载失败，可尝试「打开原始文件」。";
+      status.hidden = false;
+    });
+    dialog.addEventListener("close", () => {
+      iframe.src = "about:blank";
+      status.hidden = true;
+    });
+  }
+  const original = document.getElementById("artifact-open-original");
+  if (original) original.href = originalUrl || url;
+  status.textContent = "正在加载预览…";
+  status.hidden = false;
+  iframe.src = url;
+  dialog.showModal();
+}
+
 // 统一确认对话框：覆盖、删除等危险操作都走这里，返回 Promise<boolean>
 // 取消（含 Esc）一律视为放弃操作，不再被赋予"以非强制模式继续"之类的第二语义
 export function confirmAction(message, { confirmText = "确认执行" } = {}) {

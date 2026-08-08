@@ -110,6 +110,12 @@ async function testSubscription(payload, button) {
 async function addSubscriptionFromForm(event) {
   event.preventDefault();
   const payload = subscriptionFormPayload();
+  if (!payload.value) return toast("订阅内容不能为空", "error");
+  if (payload.kind === "direct") {
+    try { new URL(payload.value); } catch { return toast("订阅地址不是有效的 URL，请检查格式", "error"); }
+  }
+  const duplicate = (state.subscriptions?.items || []).some((item) => item.kind === payload.kind && item.value === payload.value);
+  if (duplicate) return toast("该订阅已存在，请勿重复添加", "error");
   state.subscriptions = await request("/api/subscriptions", { method: "POST", body: JSON.stringify(payload) });
   if (event.currentTarget) event.currentTarget.reset();
   updateSubscriptionComposer();
