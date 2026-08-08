@@ -50,6 +50,7 @@ function bindSystem() {
     } else {
       row.remove();
     }
+    updateRsshubPendingHint();
   });
   bindBackupActions();
 }
@@ -188,13 +189,22 @@ function rsshubKvMarkup(field = { key: "", configured: false }, existing = false
     <input class="kv-value" data-rsshub-value type="password" value="" placeholder="${field.configured ? "•••••••• · 留空保持原值" : "输入配置值"}" autocomplete="off" aria-label="${escapeHtml(field.key || "新环境变量")}的值">
     <span class="env-state ${field.configured ? "configured" : ""}">${field.configured ? "已配置" : "新增"}</span>
     <input type="checkbox" data-rsshub-clear hidden>
-    <button type="button" class="kv-remove" data-rsshub-remove aria-label="${existing ? "删除" : "移除"} ${escapeHtml(field.key || "新环境变量")}">${existing ? "删除" : "×"}</button>
+    <button type="button" class="kv-remove" data-rsshub-remove aria-label="删除 ${escapeHtml(field.key || "新环境变量")}">删除</button>
   </div>`;
+}
+
+function updateRsshubPendingHint() {
+  const hint = document.getElementById("rsshub-pending-hint");
+  if (!hint) return;
+  const count = document.querySelectorAll("#rsshub-env-fields .rsshub-kv-row.pending-delete").length;
+  hint.hidden = count === 0;
+  hint.textContent = count ? `有 ${count} 项待删除，保存后生效` : "";
 }
 
 function renderRsshubKv(fields) {
   const node = document.getElementById("rsshub-env-fields");
   node.innerHTML = fields.length ? fields.map((field) => rsshubKvMarkup(field, true)).join("") : '<div class="kv-empty">尚无 RSSHub 环境变量，按需新增即可。</div>';
+  updateRsshubPendingHint();
 }
 
 function addRsshubKvRow() {

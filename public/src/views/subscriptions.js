@@ -151,11 +151,13 @@ function bindSubscriptions() {
   document.getElementById("subscription-form").addEventListener("submit", (event) => addSubscriptionFromForm(event).catch((error) => toast(error.message)));
   document.getElementById("test-subscription").addEventListener("click", (event) => testSubscription(subscriptionFormPayload(), event.currentTarget).catch((error) => toast(error.message)));
   document.addEventListener("change", (event) => {
+    if (!event.target.closest("#view-sources")) return;
     if (event.target.matches("[data-source-toggle]")) {
       toggleSubscription(event.target).catch((error) => { event.target.disabled = false; event.target.checked = !event.target.checked; toast(error.message); });
     }
   });
   document.addEventListener("click", (event) => {
+    if (!event.target.closest("#view-sources")) return;
     const sourceTest = event.target.closest("[data-source-test]");
     if (sourceTest) testSubscription({ kind: sourceTest.dataset.kind, value: sourceTest.dataset.value }, sourceTest).catch((error) => toast(error.message));
     const sourceRemove = event.target.closest("[data-source-remove]");

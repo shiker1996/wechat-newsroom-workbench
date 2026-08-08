@@ -6,6 +6,12 @@ let skillRegistryData = null;
 let selectedSkillId = "";
 let credentialPluginId = "";
 
+// 工具列表更新后会整体重渲染，焦点所在的控件被替换；按 data 属性找回等价控件恢复焦点
+function restoreToolControlFocus(pluginId, attribute) {
+  if (!attribute) return;
+  document.querySelector(`#tool-capability-list [${attribute}="${CSS.escape(pluginId)}"]`)?.focus();
+}
+
 function bindSkills() {
   if (bound) return;
   bound = true;
@@ -150,6 +156,7 @@ async function updateInformationSlot(slotId, pluginId, control) {
     });
     toast(result.available ? `${result.name} 已使用 ${result.selectedPlugin}` : `${result.name} 当前没有可用实现`);
     await loadSkillRegistry();
+    document.querySelector(`#information-slot-list [data-information-slot="${CSS.escape(slotId)}"]`)?.focus();
   } finally {
     control.disabled = false;
   }
@@ -314,6 +321,7 @@ async function confirmRemoteFirstRun(pluginId) {
 }
 
 async function updateToolPlugin(pluginId, changes, control) {
+  const refocusAttr = control?.dataset.toolEnabled !== undefined ? "data-tool-enabled" : control?.dataset.toolPriority !== undefined ? "data-tool-priority" : null;
   const pluginView = skillRegistryData?.tools.find((tool) => tool.plugin === pluginId);
   if (pluginView?.thirdParty) {
     if (changes.enabled === false && !await confirmAction(`停用工具 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`, { confirmText: "停用工具" })) {
@@ -326,6 +334,7 @@ async function updateToolPlugin(pluginId, changes, control) {
       await request(endpoint, { method: "PATCH", headers: pluginView.remote ? {} : { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: JSON.stringify({ status: changes.enabled === false ? "disabled" : "enabled" }) });
       toast(pluginView.remote ? "远程连接状态已即时生效" : "工具状态已保存，重启工作台后生效");
       await loadSkillRegistry();
+      restoreToolControlFocus(pluginId, refocusAttr);
     } finally {
       if (control) control.disabled = false;
     }
@@ -344,6 +353,7 @@ async function updateToolPlugin(pluginId, changes, control) {
     await request(`/api/system/tool-plugins/${encodeURIComponent(pluginId)}`, { method: "PATCH", body: JSON.stringify(changes) });
     toast(changes.enabled === false ? "工具已停用" : changes.enabled === true ? "工具已启用" : "工具优先级已更新");
     await loadSkillRegistry();
+    restoreToolControlFocus(pluginId, refocusAttr);
   } finally {
     if (control) control.disabled = false;
   }

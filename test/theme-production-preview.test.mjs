@@ -50,6 +50,7 @@ test('主题中心使用生产预览接口和隔离 iframe，不再手写样稿�
   const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
   assert.match(ui,/request\('\/api\/themes\/preview'/);
   assert.match(ui,/frame\.srcdoc=result\.html/);
-  assert.match(ui,/sandbox="allow-same-origin"/);
+  assert.match(ui,/sandbox=""/);
+  assert.doesNotMatch(ui,/allow-same-origin/);
   assert.doesNotMatch(ui,/colorContrast|FIXED SAMPLE|theme-live-bordered/);
 });

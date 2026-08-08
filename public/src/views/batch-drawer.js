@@ -23,12 +23,16 @@ export async function createBreakingBatch(event) {
   const form = event.currentTarget;
   const data = new FormData(form);
   const requestedTracks = data.getAll("requestedTrack");
+  const urls = String(data.get("urls") || "").split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+  const invalidUrl = urls.find((value) => { try { new URL(value); return false; } catch { return true; } });
+  if (invalidUrl) return toast(`素材链接格式不正确：${invalidUrl}`, "error");
+  if (!String(data.get("title") || "").trim()) return toast("请填写突发专题名称", "error");
   if (!requestedTracks.length) return toast("请至少选择文章或图文方向");
   const submit = form.querySelector("button[type=submit]");
   submit.disabled = true; submit.textContent = "正在建立…";
   try {
     const batch = await request("/api/batches/breaking", { method: "POST", body: JSON.stringify({
-      title: data.get("title"), urls: String(data.get("urls") || "").split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
+      title: data.get("title"), urls,
       note: data.get("note"), requestedTracks,
     }) });
     state.activeBatchId = batch.id;
@@ -47,6 +51,8 @@ export async function createBatch(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const input = Object.fromEntries(new FormData(form));
+  if (!input.date || Number.isNaN(Date.parse(input.date))) return toast("请选择有效的批次日期", "error");
+  if (!String(input.title || "").trim()) input.title = `${input.date} 每日选题`;
   const submit = form.querySelector("button[type=submit]");
   submit.disabled = true; submit.textContent = "正在建立…";
   try {

@@ -792,7 +792,7 @@
           </div>
           <div class="config-panel" id="config-panel-rsshub" role="tabpanel" data-config-panel="rsshub" hidden>
             <div class="config-panel-heading"><div><span class="kicker">RSSHUB/.ENV</span><h4>RSSHub 环境</h4></div><p>已有值不会回显，修改后重启 RSSHub 生效。</p></div>
-            <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div>
+            <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div>
           </div>
           <div class="config-panel" id="config-panel-models" role="tabpanel" data-config-panel="models" hidden>
             <div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型接入配置</h4></div><p>保存后即时进入模型网关；密钥只写入服务端环境文件。</p></div>
@@ -921,7 +921,7 @@
             </aside>
             <div class="ai-theme-candidate-preview">
               <span>PRODUCTION SPECIMEN</span>
-              <iframe id="ai-theme-candidate-frame" title="AI 主题正式编译样稿" sandbox="allow-same-origin"></iframe>
+              <iframe id="ai-theme-candidate-frame" title="AI 主题正式编译样稿" sandbox=""></iframe>
             </div>
           </div>
         </section>

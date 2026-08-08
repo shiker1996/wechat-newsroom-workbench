@@ -19,7 +19,7 @@ function bindArtifacts() {
   });
   document.addEventListener("click", (event) => {
     const artifact = event.target.closest("[data-artifact]");
-    if (!artifact) return;
+    if (!artifact || !artifact.closest("#view-artifacts")) return;
     openArtifactPreview(`/api/artifacts/${artifact.dataset.artifact}/preview`, {
       originalUrl: `/api/artifacts/${artifact.dataset.artifact}/content`,
     });

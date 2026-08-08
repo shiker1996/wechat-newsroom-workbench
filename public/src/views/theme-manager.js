@@ -117,7 +117,7 @@ function definition(){
 }
 function previewShell(){
   const node=document.getElementById('user-theme-live-preview');
-  if(!node.querySelector('iframe'))node.innerHTML='<div class="theme-preview-status" id="user-theme-preview-status" aria-live="polite">正在生成正式样稿…</div><iframe id="user-theme-preview-frame" title="主题正式编译样稿" sandbox="allow-same-origin"></iframe>';
+  if(!node.querySelector('iframe'))node.innerHTML='<div class="theme-preview-status" id="user-theme-preview-status" aria-live="polite">正在生成正式样稿…</div><iframe id="user-theme-preview-frame" title="主题正式编译样稿" sandbox=""></iframe>';
   return node;
 }
 function updateFieldValues(){
@@ -285,6 +285,8 @@ function openAiThemeCreator(){
 }
 function closeAiThemeCreator(){
   aiGenerationController?.abort();
+  aiCandidate=null;
+  document.getElementById('ai-theme-candidate').hidden=true;
   document.getElementById('ai-theme-creator').hidden=true;
   document.getElementById('open-ai-theme-creator').setAttribute('aria-expanded','false');
   document.getElementById('open-ai-theme-creator').focus();
