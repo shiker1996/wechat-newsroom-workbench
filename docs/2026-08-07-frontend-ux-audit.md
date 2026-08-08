@@ -144,15 +144,37 @@
 
 ## 事项状态总览（2026-08-08 更新）
 
-- **已修复（33 项）**：
+- **已修复（46 项）**：
   - 数据安全：#1 #2 #3 #12
   - 基础设施：#4 #5 #14 #16 #25
   - 样式系统：#13 #15
   - 高严重度收尾：#6 #7 #8 #9 #10 #11 #17 #18 #19 #20
   - 静默失败/加载态：#21 #22 #23 #24
   - 一致性/去重：#26 #27 #37 #38 #40 #54 #55
-- **未处理（中严重度，22 项）**：#28–#36、#39、#41–#52（防重复点击、离开保护、标题改写 H1、假按钮可访问性、tab 标注统一、KV 行删除交互、嵌套滚动、字数目标矛盾、状态管理一组等）
-- **未处理（低严重度，18 项）**：#53、#56–#72
+  - 中严重度高性价比：#28 #29 #31 #42 #44 #46 #47 #48 #49 #50 #51
+  - 低严重度实质 bug：#58 #59 #60 #62 #63 #70
+- **未处理（中严重度，11 项）**：#30、#32–#36、#39、#41、#43、#45、#52（标题改写 H1、假按钮可访问性、tab 标注统一、KV 行删除交互、嵌套滚动、字数目标矛盾、全量重渲染丢焦点、主题创建器残留、图片遮罩泄漏、iframe sandbox 收紧——多为体验打磨或需设计决策）
+- **未处理（低严重度，12 项）**：#53、#56、#57、#61、#64–#69、#71、#72
+
+### 第四轮：中严重度高性价比与低严重度实质 bug（#28 #29 #31 #42 #44 #46–#51 #58–#60 #62 #63 #70）
+
+- **#28**：preview.js 上传 CDN 改 withLoading、生成占位卡片用 generating 类去重；subscriptions.js 订阅开关请求期间 disabled，失败回滚。
+- **#29**：editorial.js 编辑室脏状态加 beforeunload（对齐 editor.js 写法，bindEditorial 单次守卫无泄漏）。
+- **#31**：editor.js 插入图表后禁用按钮选择器由 `card.querySelector("button")` 改为 `[data-insert-visual]`（原来禁用的是「忽略」）。
+- **#42**：tutorial.js 新建写作（非 retry）时重置模块级 candidateId，不再指向旧候选。
+- **#44**：topics.js 排行榜展开/收起文案统一从实际 display 状态推导（syncToggleText）。
+- **#46**：subscriptions.js 健康点阵 `maxDots` 改为 `Math.min(total, 50)`，点数与真实来源数对应，注释同步。
+- **#47**：editor.js 质量检查跳转删除行高估算，复用 textareaTextOffsetTop 精确定位（与 jumpToHeading 同系数）。
+- **#48**：system.js 删"检查中"前置 toast 只留结果；social-editor.js 5 处下拉变更成功 toast 改为静默，失败保留（联动微调了确认文案以保持 social-card-p2 测试断言语义）。
+- **#49**：core/ui.js 新增 debounce()，skills 搜索与 atlas 筛选输入加 200ms 防抖。
+- **#50**：editor.js 的 ensureModelOptions 抽取到 core/ui.js 并导出，editorial.js 改为调用，切换候选不再重复请求 /api/models。
+- **#51**：batch-drawer.js 归档模式三个区块加 data-section 稳定标识，隐藏逻辑不再靠 h3 中文文本匹配。
+- **#58**：editor.js 字数统计正则拆分——只剥行首列表/标题/引用标记与强调符，正文连字符不再误删。
+- **#59**：现状已是 searchOffset 递增查找，无需改动（报告行号对应旧写法已不存在）。
+- **#60**：daily.js data 属性比较改为双侧归一化转义，key 含 &/" 不再是死按钮，渲染转义不变。
+- **#62**：hotspots.js 外链补 rel="noopener noreferrer"，无 URL 渲染不可点 span；atlas.js 外链补 rel。
+- **#63**：index.html placeholder 改为通用文案，不再泄露开发者本机路径。
+- **#70**：topics.js `.map(escapeHtml)` 改 `.map((name) => escapeHtml(name))`。
 
 ## 修复记录（2026-08-08，#1–#25、#37–#40、#54–#55）
 
