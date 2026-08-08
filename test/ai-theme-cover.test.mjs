@@ -127,11 +127,86 @@ test('cover 归一化把旧文章字段迁移进封面契约', () => {
   assert.ok(repairs.some((item) => item.field === 'tokens.typography.titlePx' && item.reason.includes('映射')));
 });
 
+test('cover 文字入块：hold 内容区落进色块并切换色块配色板', () => {
+  const definition = composeAiThemeDefinition(coverCandidate({
+    targetConfig: { spec: { components: [
+      { type: 'canvas', colorRole: 'page' },
+      { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent', text: 'hold' },
+      { type: 'title', align: 'left' },
+      { type: 'subtitle', withBar: true },
+      { type: 'meta' },
+    ] } },
+  }), { target: 'cover', id: 'ai-cover-hold' }).definition;
+  const audit = auditThemeForPublish(definition, { target: 'cover' });
+  assert.ok(audit.valid, JSON.stringify(audit.issues));
+  const { html } = compileThemePreview({ target: 'cover', definition });
+  assert.ok(/cover-main[^>]*left:0px;right:600px/.test(html), '内容区落进左侧色块');
+  assert.equal((html.match(/cover-main/g) || []).length, 2, '单层渲染（含 CSS 类定义一处）');
+});
+
+test('cover 跨缝压字：span 双层渲染各自 clip 着色', () => {
+  const definition = composeAiThemeDefinition(coverCandidate({
+    targetConfig: { spec: { components: [
+      { type: 'canvas', colorRole: 'page' },
+      { type: 'color-block', position: 'right-half', shape: 'diagonal', colorRole: 'accent', text: 'span' },
+      { type: 'title', align: 'left' },
+      { type: 'subtitle', withBar: true },
+    ] } },
+  }), { target: 'cover', id: 'ai-cover-span' }).definition;
+  const audit = auditThemeForPublish(definition, { target: 'cover' });
+  assert.ok(audit.valid, JSON.stringify(audit.issues));
+  const { html } = compileThemePreview({ target: 'cover', definition });
+  assert.equal((html.match(/class="cover-main"/g) || []).length, 2, '双层内容区');
+  assert.ok(html.includes('clip-path:path(') && html.includes('clip-rule:evenodd'), '画布层补集裁剪');
+  assert.ok(html.includes('clip-path:polygon('), '色块层多边形裁剪');
+  const titles = html.match(/class="cover-title" style="[^"]*color:(#[0-9A-Fa-f]{6})/g);
+  assert.ok(titles && titles.length === 2 && titles[0] !== titles[1], '两层标题各自着色');
+  // top-band 上声明 span 无效，回退避让布局
+  const band = composeAiThemeDefinition(coverCandidate({ targetConfig: { spec: { components: [{ type: 'canvas', colorRole: 'page' }, { type: 'color-block', position: 'top-band', shape: 'rect', colorRole: 'accent', text: 'span' }, { type: 'title', align: 'left' }] } } }), { target: 'cover', id: 'ai-cover-span-band' }).definition;
+  const bandHtml = compileThemePreview({ target: 'cover', definition: band }).html;
+  assert.equal((bandHtml.match(/class="cover-main"/g) || []).length, 1, 'top-band 不支持 span');
+});
+
+test('cover 构图骨架：严格校验拦截越界组件，宽容模式按骨架收尾', () => {
+  // 严格模式：斜切分割骨架不允许 frame
+  const strict = auditThemeForPublish({ ...composeAiThemeDefinition(coverCandidate(), { target: 'cover', id: 'ai-cover-layout-base' }).definition, cover: { spec: { layout: 'diagonal-split', components: [{ type: 'canvas', colorRole: 'page' }, { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent' }, { type: 'title', align: 'left' }, { type: 'frame', style: 'single', colorRole: 'ink' }] } } }, { target: 'cover' });
+  assert.ok(strict.issues.some((item) => item.message.includes('斜切分割骨架不允许')));
+  // 严格模式：居中框景必须含 frame
+  const noFrame = auditThemeForPublish({ ...composeAiThemeDefinition(coverCandidate(), { target: 'cover', id: 'ai-cover-layout-base2' }).definition, cover: { spec: { layout: 'centered-frame', components: [{ type: 'canvas', colorRole: 'page' }, { type: 'title', align: 'center' }] } } }, { target: 'cover' });
+  assert.ok(noFrame.issues.some((item) => item.message.includes('居中框景骨架必须包含')));
+  // 未知骨架名被拒
+  const badLayout = auditThemeForPublish({ ...composeAiThemeDefinition(coverCandidate(), { target: 'cover', id: 'ai-cover-layout-base3' }).definition, cover: { spec: { layout: 'chaos', components: [{ type: 'canvas', colorRole: 'page' }, { type: 'title', align: 'left' }] } } }, { target: 'cover' });
+  assert.ok(badLayout.issues.some((item) => item.field === 'cover.spec.layout'));
+  // 归一化：frame 被骨架丢弃、色块形状被纠正、缺 frame 的居中框景自动补
+  const { candidate, repairs } = normalizeAiThemeCandidate(coverCandidate({ targetConfig: { spec: { layout: 'centered-frame', components: [{ type: 'canvas', colorRole: 'page' }, { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent' }, { type: 'giant-char', position: 'right', colorRole: 'ink' }, { type: 'title', align: 'center' }] } } }), { target: 'cover' });
+  const types = candidate.targetConfig.spec.components.map((item) => item.type);
+  assert.equal(candidate.targetConfig.spec.layout, 'centered-frame');
+  assert.ok(types.includes('frame') && !types.includes('color-block') && !types.includes('giant-char'));
+  assert.ok(repairs.some((item) => item.field === 'targetConfig.spec'));
+});
+
+test('cover 质感拓展：描边内框、画布纹理与渐变的校验与渲染', () => {
+  const definition = composeAiThemeDefinition(coverCandidate({
+    targetConfig: { spec: { components: [
+      { type: 'canvas', colorRole: 'page', texture: 'scanlines', gradient: 'diagonal' },
+      { type: 'frame', style: 'double', colorRole: 'accent' },
+      { type: 'title', align: 'left' },
+      { type: 'subtitle', withBar: true },
+    ] } },
+  }), { target: 'cover', id: 'ai-cover-texture' }).definition;
+  const audit = auditThemeForPublish(definition, { target: 'cover' });
+  assert.ok(audit.valid, JSON.stringify(audit.issues));
+  const { html } = compileThemePreview({ target: 'cover', definition });
+  assert.ok(html.includes('linear-gradient(135deg'), '对角渐变');
+  assert.ok(/cover-texture texture-scanlines/.test(html), '扫描线纹理');
+  assert.equal((html.match(/class="cover-frame"/g) || []).length, 2, '双线内框两层');
+});
+
 test('cover 几何拓展：斜切/半屏色块、背景大字与新装饰的校验与渲染', () => {
   const definition = composeAiThemeDefinition(coverCandidate({
     targetConfig: { spec: { components: [
       { type: 'canvas', colorRole: 'page' },
-      { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent' },
+      { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent', text: 'span' },
       { type: 'title', align: 'left' },
       { type: 'giant-char', position: 'right', colorRole: 'ink' },
       { type: 'decoration', kind: 'corner-marks', position: 'top-left' },

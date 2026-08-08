@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
+import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, sanitizeCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
 import { buildCoverHtml } from '../lib/themes/cover-theme-compiler.mjs';
 import { loadThemeDirectory } from '../lib/themes/theme-loader.mjs';
 
@@ -50,12 +50,14 @@ test('title fidelity: rewritten or truncated titles are rejected when expectedTi
   // 截掉后半句 → 拒绝
   const truncated = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['DeepSeek 1.4亿', '入股宇树'] }] };
   assert.equal(validateCoverSpec(truncated, original).ok, false);
-  // 仅断行位置不同（允许空白差异）→ 通过
+  // 仅断行位置不同（允许空白差异）→ 通过；长标题允许最多 3 行
   const faithful = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['DeepSeek 1.4亿', '入股宇树，人形机', '器人要变天了？'] }] };
-  // 3 行超 titleLines 上限，用合规的两行版本验证
+  assert.equal(validateCoverSpec(faithful, original).ok, true);
   const faithful2 = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['AI 编程的分水岭', '时刻'] }] };
   assert.equal(validateCoverSpec(faithful2, 'AI 编程的分水岭时刻').ok, true);
-  assert.equal(validateCoverSpec(faithful, original).ok, false); // 保真但行数超限仍拒绝
+  // 4 行仍超 titleLines 上限 → 拒绝
+  const fourLines = { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['DeepSeek 1.4亿', '入股宇树，', '人形机器人', '要变天了？'] }] };
+  assert.equal(validateCoverSpec(fourLines, original).ok, false);
   // 不传 expectedTitle 时保持旧行为
   assert.equal(validateCoverSpec(rewritten).ok, true);
 });
@@ -158,6 +160,13 @@ test('theme-baked cover spec: validation and deterministic article fill-in', () 
   assert.equal(validateCoverThemeSpec({ components: [{ type: 'title' }] }).ok, false);
   assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'eyebrow', form: 'text' }] }).ok, false);
   assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'unknown' }] }).ok, false);
+  // 半幅色块必须 span 跨布局；窄色块不受限
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent' }, { type: 'title' }] }).ok, false);
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent', text: 'span' }, { type: 'title' }] }).ok, true);
+  assert.equal(validateCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent', text: 'hold' }, { type: 'title' }] }).ok, true);
+  // AI 归一化路径自动纠正为 span 而不是丢弃色块
+  const sanitized = sanitizeCoverThemeSpec({ components: [{ type: 'canvas' }, { type: 'color-block', position: 'right-half', shape: 'diagonal', colorRole: 'accent' }, { type: 'title' }] });
+  assert.equal(sanitized.spec.components.find((c) => c.type === 'color-block')?.text, 'span');
 
   const spec = coverSpecFromTheme(themeSpec, {
     title: 'DeepSeek 1.4亿入股宇树，人形机器人要变天了？',
