@@ -3,7 +3,7 @@
 执行器在每次模型调用时加载总技能、全部 references 和当前阶段子技能，并明确当前阶段 ID。阶段顺序固定为：
 
 ```text
-brief → fact-base → planning → drafting → draft-quality-gate → title-generation → humanize → review → seo-keyword-scoring → seo-optimization → final-quality-gate → image-planning
+brief → fact-base → planning → drafting → draft-quality-gate → title-generation → humanize → review → seo-keyword-scoring → seo-optimization → final-quality-gate → visual-planning → image-planning
 ```
 
 ## `brief`
@@ -75,6 +75,10 @@ brief → fact-base → planning → drafting → draft-quality-gate → title-g
 ## `length-repair`
 
 正文低于 `min_visible_chars` 时，只依据事实基座补充必要解释、因果链、反方边界和读者可执行信息；正文超过 `max_visible_chars` 时，只删除重复背景、次要案例和同义结论。两种情况都必须保留标题、关键事实、来源、作者立场、风险边界和实用增量，禁止新增未经核验的事实。只输出完整 Markdown。
+
+## `visual-planning`
+
+同时使用总契约与 `article-visual-planner`。只针对确有理解增量的位置规划 Mermaid/ECharts 图表，数字必须逐项来自事实基座；图表围栏在 `image-planning` 之前插入正文，规划结果写入 `09-visual-plan.json`。
 
 ## `image-planning`
 

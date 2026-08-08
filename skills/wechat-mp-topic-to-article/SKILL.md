@@ -46,7 +46,7 @@ description: 将已锁定文章简报或用户直接确认的热点命题编排�
 项目运行时固定按以下阶段执行并记录，不得静默增删或改序：
 
 ```text
-brief → fact-base → planning → drafting → draft-quality-gate → title-generation → humanize → review → seo-keyword-scoring → seo-optimization → final-quality-gate → image-planning
+brief → fact-base → planning → drafting → draft-quality-gate → title-generation → humanize → review → seo-keyword-scoring → seo-optimization → final-quality-gate → visual-planning → image-planning
 ```
 
 每个 AI 阶段都同时接收本总契约和当前阶段子技能；没有独立子技能的事实基座与规划阶段由本技能直接约束。

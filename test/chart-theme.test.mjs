@@ -24,6 +24,12 @@ test('gossip-card Mermaid uses light rounded cards instead of the news dark node
   assert.match(config.themeCSS, /drop-shadow/);
 });
 
+test('Mermaid edge labels keep readable contrast against the page background', () => {
+  const config = mermaidConfigForTheme({ colors:{ background:'#FFFFFF', text:'#1A1A1A', accent:'#D61F26' } });
+  assert.equal(config.themeVariables.edgeLabelBackground, '#FFFFFF');
+  assert.match(config.themeCSS, /\.edgeLabel\{color:#1A1A1A\}/);
+});
+
 test('ECharts inherits theme defaults while article option keeps priority', () => {
   const option = echartsOptionWithTheme({ title:{ text:'数据' }, grid:{ left:80 }, series:[{type:'bar',data:[1]}] }, { colors:{ accent:'#123456' } });
   assert.equal(option.color[0], '#123456');
