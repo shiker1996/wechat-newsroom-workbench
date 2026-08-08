@@ -58,7 +58,10 @@ function bindBatchFilters() {
       const button=event.target.closest("[data-batch-filter]");
       if(!button)return;
       lifecycleFilter=button.dataset.batchFilter;
-      tabs.querySelectorAll("[data-batch-filter]").forEach((item)=>item.classList.toggle("active",item===button));
+      tabs.querySelectorAll("[data-batch-filter]").forEach((item)=>{
+        item.classList.toggle("active",item===button);
+        item.setAttribute("aria-selected",String(item===button));
+      });
       renderBatchList();
     });
   }

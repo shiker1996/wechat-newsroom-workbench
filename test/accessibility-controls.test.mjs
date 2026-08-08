@@ -26,9 +26,13 @@ test("图标按钮满足舒适点击区域并显示键盘焦点", () => {
 });
 
 test("筛选和关系维度向辅助技术同步选中状态", () => {
-  assert.match(html, /data-atlas-scope="全部" aria-pressed="true"/);
-  assert.match(html, /data-graph-lens="who" aria-pressed="true"/);
-  assert.match(atlas, /setAttribute\("aria-pressed", String\(button === lensButton\)\)/);
+  assert.match(html, /data-atlas-scope="全部" role="tab" aria-selected="true"/);
+  assert.match(html, /data-graph-lens="who" role="tab" aria-selected="true"/);
+  assert.match(html, /data-batch-filter="all" role="tab" aria-selected="true"/);
+  assert.match(html, /data-source-filter="all" role="tab" aria-selected="true"/);
+  assert.match(html, /data-log-type="" role="tab" aria-selected="true"/);
+  assert.match(html, /data-capability-tab="skills" role="tab" aria-selected="true"/);
+  assert.match(atlas, /setAttribute\("aria-selected", String\(button === lensButton\)\)/);
 });
 
 test("动态反馈通过状态区域播报并尊重减少动态偏好", () => {

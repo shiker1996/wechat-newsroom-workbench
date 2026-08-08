@@ -54,7 +54,7 @@ function bindAtlas() {
       state.atlasFilters.scope = scopeButton.dataset.atlasScope;
       $$("[data-atlas-scope]").forEach((button) => {
         button.classList.toggle("active", button === scopeButton);
-        button.setAttribute("aria-pressed", String(button === scopeButton));
+        button.setAttribute("aria-selected", String(button === scopeButton));
       });
       renderAtlas();
     }
@@ -65,7 +65,7 @@ function bindAtlas() {
       resetGraphView({ autoFocus: true });
       $$("[data-graph-lens]").forEach((button) => {
         button.classList.toggle("active", button === lensButton);
-        button.setAttribute("aria-pressed", String(button === lensButton));
+        button.setAttribute("aria-selected", String(button === lensButton));
       });
       renderAtlas();
     }
@@ -76,9 +76,7 @@ function bindAtlas() {
     }
     const graphNode = event.target.closest("[data-graph-node]");
     if (graphNode && state.atlas) {
-      const nodeId = graphNode.dataset.graphNode;
-      state.atlasSelectedDimension = state.atlasSelectedDimension === nodeId ? null : nodeId;
-      renderAtlas();
+      toggleGraphNode(graphNode.dataset.graphNode);
     }
     const dimensionCard = event.target.closest("[data-dimension-node]");
     if (dimensionCard && state.atlas && !event.target.closest("details") && !event.target.closest("[data-dimension-pool]") && !event.target.closest("summary")) {
@@ -127,6 +125,21 @@ function bindAtlas() {
   const stopPanning = () => { graphView.dragging = false; graph.classList.remove("is-panning"); };
   graph.addEventListener("pointerup", stopPanning);
   graph.addEventListener("pointercancel", stopPanning);
+  // SVG 维度节点带 role="button"，支持 Enter/Space 触发（与点击同逻辑）
+  graph.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (!(event.target instanceof Element) || !event.target.matches("[data-graph-node]") || !state.atlas) return;
+    event.preventDefault();
+    toggleGraphNode(event.target.dataset.graphNode);
+  });
+}
+
+function toggleGraphNode(nodeId) {
+  state.atlasSelectedDimension = state.atlasSelectedDimension === nodeId ? null : nodeId;
+  // 重渲染会重建 SVG，键盘操作后把焦点还给新节点
+  const hadFocus = document.activeElement?.matches?.("[data-graph-node]");
+  renderAtlas();
+  if (hadFocus) document.querySelector(`[data-graph-node="${CSS.escape(nodeId)}"]`)?.focus();
 }
 
 const LENS_LABELS = dimensionLabels;
@@ -252,7 +265,7 @@ function renderGraph() {
   const dimSvg = dimNodes.map((node) => {
     const pos = positions.get(node.id);
     const active = selected === node.id;
-    return `<g class="graph-node graph-dim${active ? " graph-active" : ""}${selected && !active ? " graph-dimmed" : ""}" data-graph-node="${escapeHtml(node.id)}" style="cursor:pointer">
+    return `<g class="graph-node graph-dim${active ? " graph-active" : ""}${selected && !active ? " graph-dimmed" : ""}" data-graph-node="${escapeHtml(node.id)}" style="cursor:pointer" tabindex="0" role="button" aria-label="${escapeHtml(node.label)}（${LENS_LABELS[lens]}维度 · 维度分 ${node.score} · ${node.eventCount} 个事件，回车选中）">
       <title>${escapeHtml(node.label)}（${LENS_LABELS[lens]}维度 · 维度分 ${node.score} · ${node.eventCount} 个事件）</title>
       <rect x="${pos.x - pos.r - 8}" y="${pos.y - pos.r - 8}" width="${(pos.r + 8) * 2}" height="${(pos.r + 8) * 2 + 16}" fill="#000" fill-opacity="0" pointer-events="all"></rect>
       <circle cx="${pos.x}" cy="${pos.y}" r="${pos.r}" fill="${LENS_COLORS[lens]}" opacity="${active ? 1 : 0.82}"></circle>

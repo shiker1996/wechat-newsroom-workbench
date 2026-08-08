@@ -160,7 +160,7 @@ function selectCapabilityTab(tab) {
   document.querySelectorAll("[data-capability-tab]").forEach((button) => {
     const active = button.dataset.capabilityTab === selected;
     button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
+    button.setAttribute("aria-selected", String(active));
   });
   document.querySelectorAll("[data-capability-section]").forEach((section) => {
     section.hidden = section.dataset.capabilitySection !== selected;

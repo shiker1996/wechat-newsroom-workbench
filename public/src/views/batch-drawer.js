@@ -334,7 +334,8 @@ export async function pollJob(id) {
 export function bindBatchDrawer() {
   document.addEventListener("click", (event) => {
     const batch = event.target.closest("[data-batch]");
-    if (batch) {
+    // 拖拽选中卡片文本时不触发打开（选区非空说明这次 click 是选中文本后的 mouseup）
+    if (batch && !window.getSelection()?.toString()) {
       const mode = document.querySelector(".nav-item.active")?.dataset.view === "batches" ? "archive" : "full";
       openBatch(batch.dataset.batch, mode);
     }
@@ -356,6 +357,16 @@ export function bindBatchDrawer() {
     if (event.target.closest("[data-batch-delete]")) deleteBatchPermanently().catch((error) => toast(error.message));
   });
   $("#new-batch-button").addEventListener("click", openNewBatch);
+  // 整卡 role="button" 的批次卡片（如工作台最新批次）支持 Enter/Space 打开；
+  // 仅当焦点就在卡片本身（event.target 即卡片）时触发，避免吞掉卡片内部真实按钮的按键
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target instanceof Element && event.target.matches('[data-batch][role="button"]') ? event.target : null;
+    if (!card) return;
+    event.preventDefault();
+    const mode = document.querySelector(".nav-item.active")?.dataset.view === "batches" ? "archive" : "full";
+    openBatch(card.dataset.batch, mode);
+  });
   $("#dashboard-new").addEventListener("click", openNewBatch);
   $("#dashboard-primary-action").addEventListener("click", () => {
     if (state.overview?.latest) openBatch(state.overview.latest.id);

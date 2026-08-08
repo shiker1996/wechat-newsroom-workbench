@@ -271,7 +271,7 @@ async function loadSimilarArticles(id) {
   try {
     const similar = await request(`/api/candidates/${id}/similar`);
     if (similar.length) {
-      container.innerHTML = "<b>历史覆盖</b>" + similar.map((s) => `<div><span style="cursor:pointer;color:var(--red)" data-cal-article="${s.id}">${escapeHtml(s.title.slice(0, 30))}</span> <span class="muted">${escapeHtml(s.batchDate)} · ${escapeHtml(s.poolRole || "")}</span></div>`).join("");
+      container.innerHTML = "<b>历史覆盖</b>" + similar.map((s) => `<div><button type="button" class="inline-button danger" data-cal-article="${s.id}">${escapeHtml(s.title.slice(0, 30))}</button> <span class="muted">${escapeHtml(s.batchDate)} · ${escapeHtml(s.poolRole || "")}</span></div>`).join("");
       container.hidden = false;
     } else {
       container.hidden = true;

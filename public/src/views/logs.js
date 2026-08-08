@@ -13,7 +13,10 @@ function bindLogs() {
   document.getElementById("log-type-filter").addEventListener("click", (event) => {
     const btn = event.target.closest("[data-log-type]");
     if (!btn) return;
-    $$("[data-log-type]", document.getElementById("log-type-filter")).forEach((b) => b.classList.toggle("active", b === btn));
+    $$("[data-log-type]", document.getElementById("log-type-filter")).forEach((b) => {
+      b.classList.toggle("active", b === btn);
+      b.setAttribute("aria-selected", String(b === btn));
+    });
     currentLogType = btn.dataset.logType || undefined;
     loadLogs(currentLogType).catch((error) => toast(error.message));
   });

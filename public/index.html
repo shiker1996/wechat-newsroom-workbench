@@ -142,13 +142,13 @@
       </section>
       <div class="atlas-notice"><b>覆盖结构 ≠ 舆情热度</b></div>
       <div class="atlas-controls" id="atlas-controls">
-        <div class="scope-tabs" aria-label="地区筛选"><button class="active" data-atlas-scope="全部" aria-pressed="true">全部</button><button data-atlas-scope="国内" aria-pressed="false">国内</button><button data-atlas-scope="全球性" aria-pressed="false">全球性</button><button data-atlas-scope="国外" aria-pressed="false">国外</button></div>
+        <div class="scope-tabs" role="tablist" aria-label="地区筛选"><button class="active" data-atlas-scope="全部" role="tab" aria-selected="true">全部</button><button data-atlas-scope="国内" role="tab" aria-selected="false">国内</button><button data-atlas-scope="全球性" role="tab" aria-selected="false">全球性</button><button data-atlas-scope="国外" role="tab" aria-selected="false">国外</button></div>
         <label class="atlas-multi"><input id="atlas-multisource" type="checkbox"> 只看多源报道</label>
         <label class="atlas-search"><span>⌕</span><input id="atlas-query" placeholder="搜索事件、关键词或来源"></label>
       </div>
       <div class="atlas-grid atlas-semantic-grid">
         <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
-        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" aria-label="关系排序维度"><button class="active" data-graph-lens="who" aria-pressed="true">主体</button><button data-graph-lens="what" aria-pressed="false">动作</button><button data-graph-lens="where" aria-pressed="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
+        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
       </div>
       <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
     </section>
@@ -610,11 +610,11 @@
       <div class="section-intro"><div><span class="kicker">BATCH ARCHIVE</span><h2>批次管理</h2></div><p>查看所有历史批次的概览、来源记录和产物。</p></div>
       <div class="batch-ledger-controls">
         <label class="search-field"><span>⌕</span><input id="batch-search" type="search" placeholder="搜索批次标题或值班备注"></label>
-        <div class="scope-tabs" id="batch-lifecycle-filter" aria-label="批次状态筛选">
-          <button type="button" class="active" data-batch-filter="all">全部</button>
-          <button type="button" data-batch-filter="active">进行中</button>
-          <button type="button" data-batch-filter="completed">已完成待归档</button>
-          <button type="button" data-batch-filter="archived">已归档</button>
+        <div class="scope-tabs" id="batch-lifecycle-filter" role="tablist" aria-label="批次状态筛选">
+          <button type="button" class="active" data-batch-filter="all" role="tab" aria-selected="true">全部</button>
+          <button type="button" data-batch-filter="active" role="tab" aria-selected="false">进行中</button>
+          <button type="button" data-batch-filter="completed" role="tab" aria-selected="false">已完成待归档</button>
+          <button type="button" data-batch-filter="archived" role="tab" aria-selected="false">已归档</button>
         </div>
         <span class="muted" id="batch-result-count"></span>
       </div>
@@ -646,10 +646,10 @@
     <section class="view skill-registry-view" id="view-skills">
       <div class="section-intro"><div><span class="kicker">CREATION CAPABILITIES</span><h2>技能与工具</h2></div><p>技能决定内容怎么创作，工具负责获取资料与执行外部操作。默认配置可直接使用，需要时再安装或替换。</p></div>
       <div class="runtime-path-strip skill-registry-summary" id="skill-registry-summary"><span>正在扫描项目技能…</span></div>
-      <nav class="capability-section-tabs" aria-label="技能与工具管理分区">
-        <button type="button" class="active" data-capability-tab="skills" aria-pressed="true"><span>01</span><b>技能库</b><small>查看创作规则与契约</small></button>
-        <button type="button" data-capability-tab="tools" aria-pressed="false"><span>02</span><b>信息工具</b><small>查看写作资料能力是否就绪</small></button>
-        <button type="button" data-capability-tab="extensions" aria-pressed="false"><span>03</span><b>安装扩展</b><small>增加技能或连接外部服务</small></button>
+      <nav class="capability-section-tabs" role="tablist" aria-label="技能与工具管理分区">
+        <button type="button" class="active" data-capability-tab="skills" role="tab" aria-selected="true"><span>01</span><b>技能库</b><small>查看创作规则与契约</small></button>
+        <button type="button" data-capability-tab="tools" role="tab" aria-selected="false"><span>02</span><b>信息工具</b><small>查看写作资料能力是否就绪</small></button>
+        <button type="button" data-capability-tab="extensions" role="tab" aria-selected="false"><span>03</span><b>安装扩展</b><small>增加技能或连接外部服务</small></button>
       </nav>
       <div class="extension-management-grid" data-capability-section="extensions" hidden>
       <section class="runtime-commandbar skill-package-installer extension-card">
@@ -989,12 +989,12 @@
         <section class="source-ledger-panel">
           <div class="source-ledger-head">
             <div><span class="kicker">ACTIVE INTELLIGENCE DESK</span><h3>当前订阅</h3></div>
-            <div class="source-filter-tabs" id="subscription-filters">
-              <button class="active" data-source-filter="all">全部</button>
-              <button data-source-filter="direct">直连</button>
-              <button data-source-filter="twitter">X</button>
-              <button data-source-filter="rsshub">RSSHub</button>
-              <button data-source-filter="github">GitHub</button>
+            <div class="source-filter-tabs" id="subscription-filters" role="tablist" aria-label="来源筛选">
+              <button class="active" data-source-filter="all" role="tab" aria-selected="true">全部</button>
+              <button data-source-filter="direct" role="tab" aria-selected="false">直连</button>
+              <button data-source-filter="twitter" role="tab" aria-selected="false">X</button>
+              <button data-source-filter="rsshub" role="tab" aria-selected="false">RSSHub</button>
+              <button data-source-filter="github" role="tab" aria-selected="false">GitHub</button>
             </div>
           </div>
           <div class="subscription-list" id="subscription-list"><div class="empty-state">正在读取订阅配置…</div></div>
@@ -1042,11 +1042,11 @@
         <p>批次所有任务的执行记录。AI 任务按每次运行记录一条，模型调用累积到 2048 条后滚动清理。</p>
       </div>
       <div class="log-controls">
-        <div class="scope-tabs" id="log-type-filter" aria-label="日志类型">
-          <button class="active" data-log-type="">全部</button>
-          <button data-log-type="ai">AI 任务</button>
-          <button data-log-type="source">数据采集</button>
-          <button data-log-type="model">模型调用</button>
+        <div class="scope-tabs" id="log-type-filter" role="tablist" aria-label="日志类型">
+          <button class="active" data-log-type="" role="tab" aria-selected="true">全部</button>
+          <button data-log-type="ai" role="tab" aria-selected="false">AI 任务</button>
+          <button data-log-type="source" role="tab" aria-selected="false">数据采集</button>
+          <button data-log-type="model" role="tab" aria-selected="false">模型调用</button>
         </div>
         <span class="muted" id="log-count"></span>
         <button type="button" class="ghost-button" id="log-refresh">刷新</button>

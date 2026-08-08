@@ -79,7 +79,7 @@ async function loadCalendar(y, m) {
             const t = (a.title || a.hotspot_title || "").slice(0, 22);
             const isSocial = a.content_type === "social_cards";
             const action = isSocial ? `data-cal-social="${a.id}"` : `data-cal-article="${a.id}"`;
-            html += `<div class="cal-article ${isSocial ? "cal-social" : "cal-longform"}" title="${escapeHtml(a.batch_date || a.updated_at || "")} · ${escapeHtml(a.pool_role || "")}"><b class="cal-content-type">${isSocial ? "图文" : "文章"}</b><span style="cursor:pointer" ${action}>${escapeHtml(t)}</span></div>`;
+            html += `<div class="cal-article ${isSocial ? "cal-social" : "cal-longform"}" title="${escapeHtml(a.batch_date || a.updated_at || "")} · ${escapeHtml(a.pool_role || "")}"><b class="cal-content-type">${isSocial ? "图文" : "文章"}</b><button type="button" class="inline-button" ${action}>${escapeHtml(t)}</button></div>`;
           }
         }
         html += "</div>";

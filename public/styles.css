@@ -188,6 +188,10 @@ nav { flex:1;min-height:0;padding-top: 18px; display: grid; align-content:start;
 .ghost-button { border: 1px solid var(--line); background: rgba(255,255,255,.24); color: var(--ink); }
 .outline-button { border: 1px solid currentColor; color: var(--ink); background: transparent; }
 .text-button { padding: 6px 0; background: none; color: var(--red); font-weight: 700; }
+/* 内联无边框工具按钮：替换原先 span+cursor:pointer 的假按钮，保持与周围文字一致的字号颜色 */
+.inline-button { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.inline-button:hover { color: var(--red); }
+.inline-button.danger { color: var(--red); }
 .view { display: none; padding-top: 34px; }
 .view.active { display: block; }
 .lead-grid { display: grid; grid-template-columns: minmax(480px, 1.35fr) minmax(260px, .65fr); gap: 22px; }
@@ -917,6 +921,7 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 .image-contact-sheet img[data-zoom-image] { cursor:zoom-in; }
 .image-zoom-overlay { position:fixed; inset:0; z-index:1200; display:grid; place-items:center; padding:4vmin; background:rgba(20,18,12,.84); cursor:zoom-out; }
 .image-zoom-overlay img { max-width:92vw; max-height:92vh; object-fit:contain; background:#fff; box-shadow:0 18px 60px rgba(0,0,0,.45); }
+.image-zoom-overlay .image-zoom-close { position:fixed; top:18px; right:18px; background:var(--red); color:#fff; }
 /* Editorial: 备料门禁（先抓取原文再对话） */
 .editorial-prepare { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; padding:10px 14px; border:1px solid var(--line); border-left:5px solid var(--yellow); background:rgba(251,249,242,.85); font-size:12px; }
 .editorial-prepare-actions { display:flex; gap:8px; align-items:center; white-space:nowrap; }

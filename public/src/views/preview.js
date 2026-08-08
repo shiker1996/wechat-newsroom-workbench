@@ -157,17 +157,30 @@ function imageCard(item) {
   </article>`;
 }
 
-// 生成图放大查看：轻量遮罩，点击任意处关闭
+// 生成图放大查看：轻量遮罩对话框，点击遮罩/关闭按钮/Esc 关闭；关闭时解绑 Esc 监听并还原焦点
+let activeZoomClose = null;
 function openImageZoom(src, alt) {
-  document.querySelector(".image-zoom-overlay")?.remove();
+  activeZoomClose?.();
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const overlay = document.createElement("div");
   overlay.className = "image-zoom-overlay";
-  overlay.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt || "")}">`;
-  overlay.addEventListener("click", () => overlay.remove());
-  document.addEventListener("keydown", function onKey(event) {
-    if (event.key === "Escape") { overlay.remove(); document.removeEventListener("keydown", onKey); }
-  });
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", alt ? `放大查看：${alt}` : "放大查看图片");
+  overlay.innerHTML = `<button type="button" class="close-button image-zoom-close" aria-label="关闭放大查看">×</button><img src="${escapeHtml(src)}" alt="${escapeHtml(alt || "")}">`;
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+  function close() {
+    document.removeEventListener("keydown", onKeydown);
+    overlay.remove();
+    if (activeZoomClose === close) activeZoomClose = null;
+    previousFocus?.focus?.();
+  }
+  overlay.addEventListener("click", (event) => { if (!event.target.closest("img")) close(); });
+  overlay.querySelector(".image-zoom-close").addEventListener("click", close);
+  document.addEventListener("keydown", onKeydown);
   document.body.appendChild(overlay);
+  activeZoomClose = close;
+  overlay.querySelector(".image-zoom-close").focus();
 }
 
 // 排版前预检：返回空字符串表示可排版，否则为阻断原因（配图必须全部上传 CDN，公众号要求图片可公开访问）

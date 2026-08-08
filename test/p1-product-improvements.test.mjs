@@ -18,7 +18,7 @@ test("文章编辑器无锁定候选时禁用写作、AI 与检查工具并只�
 
 test("批次管理支持生命周期筛选、标题搜索和已完成待归档分组",()=>{
   assert.match(html,/id="batch-search"/);
-  assert.match(html,/data-batch-filter="completed">已完成待归档/);
+  assert.match(html,/data-batch-filter="completed" role="tab" aria-selected="false">已完成待归档/);
   assert.match(batches,/lifecycleFilter==="all"\|\|lifecycle===lifecycleFilter/);
   assert.match(batches,/batch\.title\|\|""/);
   assert.match(batches,/\["completed","已完成待归档"\]/);

@@ -163,7 +163,10 @@ function bindSubscriptions() {
     const sourceFilter = event.target.closest("[data-source-filter]");
     if (sourceFilter) {
       state.subscriptionFilter = sourceFilter.dataset.sourceFilter;
-      $$("[data-source-filter]").forEach((item) => item.classList.toggle("active", item === sourceFilter));
+      $$("[data-source-filter]").forEach((item) => {
+        item.classList.toggle("active", item === sourceFilter);
+        item.setAttribute("aria-selected", String(item === sourceFilter));
+      });
       renderSubscriptions();
     }
   });

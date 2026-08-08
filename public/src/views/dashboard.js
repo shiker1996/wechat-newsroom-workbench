@@ -31,10 +31,10 @@ function renderLatest(batch) {
   if (!batch) { node.className = "empty-state"; node.textContent = "还没有批次，先建立今天的编辑任务。"; return; }
   const [stageName, progress] = stages[batch.stage] ?? [batch.stage, 5];
   node.className = "";
-  node.innerHTML = `<article class="latest-row" data-batch="${escapeHtml(batch.id)}">
+  node.innerHTML = `<article class="latest-row" data-batch="${escapeHtml(batch.id)}" role="button" tabindex="0" aria-label="打开批次：${escapeHtml(batch.title)}">
     <div class="date-block">${formatDate(batch.batch_date)}<small>${escapeHtml(batch.batch_date)}</small></div>
     <div><h4>${escapeHtml(batch.title)}</h4><p>${stageName} · ${batch.hotspot_count} 条热点 · ${batch.artifact_count} 份产物</p><div class="progress-line"><i style="width:${progress}%"></i></div></div>
-    <button class="outline-button">打开批次</button>
+    <span class="outline-button" aria-hidden="true">打开批次</span>
   </article>`;
 }
 
