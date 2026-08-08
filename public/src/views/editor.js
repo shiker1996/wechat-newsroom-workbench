@@ -21,6 +21,8 @@ let visualPlan = null;
 const undoStack = [];
 const redoStack = [];
 let lastEditorValue = "";
+// 标题输入框上一次同步时的值：仅当正文 H1 与之相同才联动改写，避免覆盖用户刻意不同的 H1
+let lastTitleValue = "";
 let lastSnapshotAt = 0;
 const HISTORY_LIMIT = 100;
 const HISTORY_SNAPSHOT_MS = 800;
@@ -257,7 +259,8 @@ function renderMarkdown() {
   requestAnimationFrame(() => syncScroll(editor, preview));
   const count = visibleChars(editor.value);
   const cc = document.getElementById("char-count");
-  if (cc) cc.textContent = count + " / " + articleLengthLimit.max;
+  // 字数计数与写作目标同口径（此前分母是门禁上限 2000，与“目标 1,500 字”并列显示互相矛盾）
+  if (cc) cc.textContent = count + " / " + currentWritingGoal().toLocaleString("zh-CN");
   renderDocumentOutline(editor.value);
   renderWritingStats(editor.value);
   renderQualitySummary(editor.value);
@@ -552,6 +555,7 @@ async function loadSelectedDocument() {
     const titleEl = document.getElementById("article-title");
     const editor = document.getElementById("markdown-editor");
     if (titleEl) titleEl.value = "";
+    lastTitleValue = "";
     if (editor) { editor.value = ""; renderMarkdown(); }
     resetHistory(editor?.value || "");
     setSaveState("saved","等待锁定候选");
@@ -572,6 +576,7 @@ async function loadSelectedDocument() {
   const titleEl = document.getElementById("article-title");
   const editor = document.getElementById("markdown-editor");
   if (titleEl) titleEl.value = docResult?.title || candidate?.hotspot_title || "";
+  lastTitleValue = titleEl?.value || "";
   if (editor) {
     editor.value = docResult?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : "");
     renderMarkdown();
@@ -848,11 +853,17 @@ function bindEditor() {
   });
   document.getElementById("article-title").addEventListener("input", () => {
     markDocumentDirty();
+    const title = document.getElementById("article-title").value;
     const content = document.getElementById("markdown-editor").value;
     if (content.startsWith("# ")) {
       const sep = content.indexOf("\n");
-      document.getElementById("markdown-editor").value = "# " + document.getElementById("article-title").value + (sep >= 0 ? content.slice(sep) : "\n\n");
+      const currentH1 = content.slice(2, sep >= 0 ? sep : undefined);
+      // 仅当 H1 与标题原本一致时才联动，用户刻意改过的 H1 不再被静默覆盖
+      if (currentH1 === lastTitleValue) {
+        document.getElementById("markdown-editor").value = "# " + title + (sep >= 0 ? content.slice(sep) : "\n\n");
+      }
     }
+    lastTitleValue = title;
     renderMarkdown();
   });
   document.getElementById("save-document").addEventListener("click", () => saveDocument().catch((error) => toast(error.message)));
