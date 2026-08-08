@@ -1,7 +1,7 @@
 import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, confirmAction, formatTime } from "../core/ui.js";
 import loadOverview, { stages, renderBatchSwitcher, localDate } from "./dashboard.js";
 
 export function openNewBatch() {
@@ -284,7 +284,7 @@ export async function pollJob(id) {
   try {
     const job = await request(`/api/jobs/${id}`);
     const logs = job.logs ?? [{ at: job.updated_at || new Date().toISOString(), message: job.progress }];
-    const output = logs.map((line) => `${line.at.slice(11, 19)}  ${line.message}`).join("\n") || job.progress;
+    const output = logs.map((line) => `${formatTime(line.at)}  ${line.message}`).join("\n") || job.progress;
     ["#job-console", "#production-job-console"].forEach((selector) => {
       const consoleNode = $(selector); if (!consoleNode) return;
       consoleNode.textContent = output; consoleNode.scrollTop = consoleNode.scrollHeight;

@@ -419,14 +419,11 @@ async function copyTypesetHtml() {
         "text/plain": new Blob([plain], { type:"text/plain" }),
       })]);
     } else {
-      const body = frame.contentDocument?.body;
-      if (!body) throw new Error("浏览器不支持富文本剪贴板");
-      const range = document.createRange();
-      range.selectNodeContents(body);
-      const selection = window.getSelection();
-      selection.removeAllRanges(); selection.addRange(range);
-      if (!document.execCommand("copy")) throw new Error("浏览器拒绝复制");
-      selection.removeAllRanges();
+      // 无富文本剪贴板能力时降级为复制排版 HTML 源码
+      if (!navigator.clipboard?.writeText) throw new Error("浏览器不支持剪贴板写入");
+      await navigator.clipboard.writeText(html);
+      toast("当前浏览器不支持富文本复制，已改为复制排版 HTML 源码");
+      return;
     }
     toast("公众号富文本已复制，直接粘贴到公众号编辑器即可");
   } catch (error) { toast(`复制失败：${error.message}`); }

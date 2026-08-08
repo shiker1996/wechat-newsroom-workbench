@@ -683,6 +683,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .log-body { display:flex;align-items:baseline;gap:8px;font-size:12px; }
 .log-body code { font-size: 11px;font-weight:600;color:var(--muted);padding:1px 5px;background:var(--line);border-radius:3px;white-space:nowrap; }
 .log-body span { color:var(--ink);line-height:1.5; }
+.log-expand { flex:1;min-width:0; }
+.log-expand summary { color:var(--ink);line-height:1.5;cursor:pointer; }
+.log-expand span { display:block;margin-top:4px;white-space:pre-wrap;word-break:break-all; }
 .log-meta { font-size: 11px;color:var(--muted); }
 .log-status.status-pill { font-size: 11px;padding:1px 6px; }
 

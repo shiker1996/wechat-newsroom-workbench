@@ -144,7 +144,7 @@
 
 ## 事项状态总览（2026-08-08 更新）
 
-- **已修复（50 项）**：
+- **已修复（54 项）**：
   - 数据安全：#1 #2 #3 #12
   - 基础设施：#4 #5 #14 #16 #25
   - 样式系统：#13 #15
@@ -154,8 +154,18 @@
   - 中严重度高性价比：#28 #29 #31 #42 #44 #46 #47 #48 #49 #50 #51
   - 低严重度实质 bug：#58 #59 #60 #62 #63 #70
   - 代码健康度：#53 #57 #66 #72
+  - 低严重度杂项：#56 #65 #67 #68
 - **未处理（中严重度，11 项）**：#30、#32–#36、#39、#41、#43、#45、#52（标题改写 H1、假按钮可访问性、tab 标注统一、KV 行删除交互、嵌套滚动、字数目标矛盾、全量重渲染丢焦点、主题创建器残留、图片遮罩泄漏、iframe sandbox 收紧——多为体验打磨或需设计决策）
-- **未处理（低严重度，8 项）**：#56、#61、#64、#65、#67、#68、#69、#71
+- **未处理（低严重度，4 项）**：#61、#64、#69、#71
+
+### 第六轮：低严重度杂项（#56 #65 #67 #68）
+
+- **#56 废弃 execCommand**：
+  - editor.js 撤销/重做改为自定义历史栈（undoStack/redoStack，上限 100）：输入事件按 800ms 时间窗合并快照，工具栏命令、查找替换（逐个/全部）、图表围栏插入、AI 起草等程序化修改在改动前入栈；切换文稿时 resetHistory 清空。撤销/重做只在栈非空、真实改变内容时标脏（原来无条件标脏），栈空时 toast 提示。textarea 原生 Ctrl+Z 输入级撤销不受影响。replaceAll 确认文案从"无法用撤销恢复"改为"可用工具栏「撤销」回退"。test/editor-autosave.test.mjs 断言同步更新（改为断言 applyHistoryCommand/pushHistory 存在、无 execCommand 调用）。
+  - preview.js 复制排版的 execCommand 回退分支改为 navigator.clipboard.writeText(html) 降级复制 HTML 源码（沿用现有 try/catch 兜底），不再选区复制。
+- **#65 文案不一致**：skills.js 第三方/内置工具停用确认统一为"依赖其能力的技能将无法启动"；远程连接卸载链路按钮/确认/Toast 统一为"删除连接"（本地工具保持"卸载"）；技能状态筛选项"第三方"改为"已安装"（与汇总标签一致）；subscriptions.js 订阅类型 label 改用 `#subscription-value-label-text` span 显式取值，不再依赖 firstChild 是文本节点（index.html 结构同步）。
+- **#67 时间容错**：core/ui.js 新增 formatTime()——不可解析输入原样返回、空值显示"--"，不再出现 Invalid Date 乱码。daily.js 任务历史的 `replace("T"," ").slice(5,16)` 与 batch-drawer.js 任务控制台的 `line.at.slice(11,19)` 均改走 formatTime。同类残留（editor.js/editorial.js 控制台、models.js 调用记录）未在本轮范围，可后续跟进。
+- **#68 日志视图**：超 200 字符的日志消息改为 `<details>` 截断+点击展开全文（styles.css 补 .log-expand）；新增「刷新」按钮手动重拉；进入视图用 core/poll.js 按 LOG_POLL_INTERVAL_MS(5000，新增于 constants.js) 自动刷新，离开视图时轮询任务返回 true 静默结束（重新进入时先 cancel 旧轮询）。
 
 ### 第五轮：代码健康度（#53 #57 #66 #72）
 

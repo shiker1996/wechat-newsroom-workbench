@@ -49,7 +49,7 @@ function bindSkills() {
   document.getElementById("skill-status-filter")?.addEventListener("change", () => renderSkillList());
   const skillStatusFilter = document.getElementById("skill-status-filter");
   if (skillStatusFilter && !skillStatusFilter.querySelector('[value="installed"]')) {
-    skillStatusFilter.insertAdjacentHTML("beforeend", '<option value="installed">第三方</option>');
+    skillStatusFilter.insertAdjacentHTML("beforeend", '<option value="installed">已安装</option>');
   }
   document.getElementById("validate-skill-package")?.addEventListener("click", () => submitSkillDirectory(false).catch((error) => toast(error.message)));
   document.getElementById("install-skill-package")?.addEventListener("click", () => submitSkillDirectory(true).catch((error) => toast(error.message)));
@@ -289,7 +289,10 @@ async function manageToolPluginVersions(pluginId) {
 
 async function uninstallManagedToolPlugin(pluginId) {
   const remote = skillRegistryData?.tools.some((tool) => tool.plugin === pluginId && tool.remote);
-  if (!await confirmAction(`卸载 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`, { confirmText: "确认卸载" })) return;
+  const confirmed = remote
+    ? await confirmAction(`删除连接 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`, { confirmText: "删除连接" })
+    : await confirmAction(`卸载 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`, { confirmText: "确认卸载" });
+  if (!confirmed) return;
   await request(remote ? `/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}` : `/api/system/tool-plugins/${encodeURIComponent(pluginId)}`, {
     method: "DELETE", headers: remote ? {} : { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" },
     body: JSON.stringify({ confirmImpact: true }),
@@ -313,7 +316,7 @@ async function confirmRemoteFirstRun(pluginId) {
 async function updateToolPlugin(pluginId, changes, control) {
   const pluginView = skillRegistryData?.tools.find((tool) => tool.plugin === pluginId);
   if (pluginView?.thirdParty) {
-    if (changes.enabled === false && !await confirmAction(`停用工具 ${pluginId} 后，依赖能力的新任务将被阻断。是否继续？`, { confirmText: "停用工具" })) {
+    if (changes.enabled === false && !await confirmAction(`停用工具 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`, { confirmText: "停用工具" })) {
       if (control?.matches("[type=checkbox]")) control.checked = true;
       return;
     }

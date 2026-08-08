@@ -48,7 +48,9 @@ test('Markdown 工具栏提供常用结构与撤销重做',()=>{
     assert.match(html,new RegExp(`data-markdown-command="${command}"`));
   }
   assert.match(editor,/function applyMarkdownCommand\(command\)/);
-  assert.match(editor,/document\.execCommand\(command\)/);
+  assert.match(editor,/function applyHistoryCommand\(command\)/);
+  assert.match(editor,/function pushHistory\(value\)/);
+  assert.doesNotMatch(editor,/document\.execCommand\(/);
 });
 
 test('Markdown 加粗与链接支持编辑器快捷键',()=>{

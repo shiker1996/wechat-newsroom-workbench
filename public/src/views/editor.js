@@ -16,6 +16,40 @@ let saveSequence = 0;
 let editGeneration = 0;
 let visualPlan = null;
 
+// 自定义撤销/重做栈：替代已废弃的 document.execCommand。
+// 输入事件按时间窗合并快照（每 800ms 至多入栈一次），工具栏/替换等程序化修改在改动前入栈。
+const undoStack = [];
+const redoStack = [];
+let lastEditorValue = "";
+let lastSnapshotAt = 0;
+const HISTORY_LIMIT = 100;
+const HISTORY_SNAPSHOT_MS = 800;
+
+function pushHistory(value) {
+  if (value === undefined || undoStack[undoStack.length - 1] === value) return;
+  undoStack.push(value);
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function resetHistory(value) {
+  undoStack.length = 0;
+  redoStack.length = 0;
+  lastEditorValue = value;
+}
+
+function applyHistoryCommand(command) {
+  const from = command === "undo" ? undoStack : redoStack;
+  const to = command === "undo" ? redoStack : undoStack;
+  if (!from.length) { toast(command === "undo" ? "没有可撤销的操作" : "没有可重做的操作"); return; }
+  const editor = document.getElementById("markdown-editor");
+  to.push(editor.value);
+  editor.value = from.pop();
+  lastEditorValue = editor.value;
+  markDocumentDirty();
+  renderMarkdown();
+}
+
 function setFocusMode(enabled,{persist=true}={}) {
   document.body.classList.toggle("editor-focus",enabled);
   const button=document.getElementById("editor-focus-mode");
@@ -150,8 +184,9 @@ function insertVisual(id) {
   const rest=editor.value.slice(sectionStart);
   const next=/\n#{1,3}\s+/.exec(rest);
   const insertAt=next?sectionStart+next.index:editor.value.length;
+  pushHistory(editor.value);
   editor.value=`${editor.value.slice(0,insertAt).trimEnd()}\n\n${item.fence}\n${editor.value.slice(insertAt)}`;
-  markDocumentDirty();renderMarkdown();
+  lastEditorValue=editor.value;markDocumentDirty();renderMarkdown();
   const card=document.querySelector(`[data-visual-id="${CSS.escape(id)}"]`);
   card?.classList.add("inserted");
   card?.querySelector("[data-insert-visual]")?.setAttribute("disabled","");
@@ -518,6 +553,7 @@ async function loadSelectedDocument() {
     const editor = document.getElementById("markdown-editor");
     if (titleEl) titleEl.value = "";
     if (editor) { editor.value = ""; renderMarkdown(); }
+    resetHistory(editor?.value || "");
     setSaveState("saved","等待锁定候选");
     renderPreflightSummary("");
     lastCandidateValue = "";
@@ -540,6 +576,7 @@ async function loadSelectedDocument() {
     editor.value = docResult?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : "");
     renderMarkdown();
   }
+  resetHistory(editor?.value || "");
   editorDirty = false;
   clearAutoSave();
   setSaveState("saved",docResult?.updated_at?`已保存 · ${new Date(docResult.updated_at).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`:"尚未保存");
@@ -590,8 +627,9 @@ function replaceOne() {
   const selected=editor.value.slice(editor.selectionStart,editor.selectionEnd);
   const sensitive=document.getElementById("find-case-sensitive").checked;
   if((sensitive?selected:selected.toLocaleLowerCase())!==(sensitive?needle:needle.toLocaleLowerCase())&&!findNext())return;
+  pushHistory(editor.value);
   editor.setRangeText(document.getElementById("replace-text").value,editor.selectionStart,editor.selectionEnd,"end");
-  markDocumentDirty();renderMarkdown();findNext();
+  lastEditorValue=editor.value;markDocumentDirty();renderMarkdown();findNext();
 }
 
 async function replaceAll() {
@@ -601,20 +639,21 @@ async function replaceAll() {
   const matcher=new RegExp(escaped,document.getElementById("find-case-sensitive").checked?"g":"gi");
   const matches=editor.value.match(matcher);
   if(!matches?.length){document.getElementById("find-result").textContent="未找到匹配内容";return;}
-  if(!await confirmAction(`将把 ${matches.length} 处匹配全部替换，此操作无法用撤销（Ctrl+Z）恢复，建议先保存版本。是否继续？`,{confirmText:"全部替换"}))return;
+  if(!await confirmAction(`将把 ${matches.length} 处匹配全部替换，可用工具栏「撤销」回退，也建议先保存版本。是否继续？`,{confirmText:"全部替换"}))return;
   let count=0;
+  pushHistory(editor.value);
   editor.value=editor.value.replace(matcher,()=>{count+=1;return document.getElementById("replace-text").value;});
   document.getElementById("find-result").textContent=count?`已替换 ${count} 处`:"未找到匹配内容";
-  if(count){markDocumentDirty();renderMarkdown();}
+  if(count){lastEditorValue=editor.value;markDocumentDirty();renderMarkdown();}
 }
 
 function applyMarkdownCommand(command) {
   const editor=document.getElementById("markdown-editor");
   editor.focus();
   if(command==="undo"||command==="redo"){
-    document.execCommand(command);
-    markDocumentDirty();renderMarkdown();return;
+    applyHistoryCommand(command);return;
   }
+  pushHistory(editor.value);
   const start=editor.selectionStart,end=editor.selectionEnd,value=editor.value,selected=value.slice(start,end);
   let replacement=selected,nextStart=start,nextEnd=end;
   if(command==="bold"){
@@ -630,11 +669,11 @@ function applyMarkdownCommand(command) {
     const prefix=command==="heading"?"## ":command==="quote"?"> ":command==="unordered-list"?"- ":"";
     replacement=command==="ordered-list"?lines.map((line,index)=>`${index+1}. ${line}`).join("\n"):lines.map((line)=>prefix+line).join("\n");
     editor.setRangeText(replacement,lineStart,lineEnd<0?value.length:lineEnd,"select");
-    markDocumentDirty();renderMarkdown();return;
+    lastEditorValue=editor.value;markDocumentDirty();renderMarkdown();return;
   }
   editor.setRangeText(replacement,start,end,"select");
   editor.setSelectionRange(nextStart,nextEnd);
-  markDocumentDirty();renderMarkdown();
+  lastEditorValue=editor.value;markDocumentDirty();renderMarkdown();
 }
 
 async function openDocumentHistory() {
@@ -720,7 +759,7 @@ async function aiDraft() {
       body: JSON.stringify({ provider, instructions, existingDraft: existing }),
     });
     const editor = document.getElementById("markdown-editor");
-    if (editor) editor.value = result.content;
+    if (editor) { pushHistory(editor.value); editor.value = result.content; lastEditorValue = editor.value; }
     markDocumentDirty();
     renderMarkdown();
     const ctx = document.getElementById("draft-context");
@@ -801,7 +840,12 @@ function bindEditor() {
     }
     loadSelectedDocument().catch((error) => toast(error.message));
   }));
-  document.getElementById("markdown-editor").addEventListener("input", () => { markDocumentDirty(); renderMarkdown(); });
+  document.getElementById("markdown-editor").addEventListener("input", () => {
+    const now=Date.now();
+    if(now-lastSnapshotAt>HISTORY_SNAPSHOT_MS){pushHistory(lastEditorValue);lastSnapshotAt=now;}
+    lastEditorValue=document.getElementById("markdown-editor").value;
+    markDocumentDirty(); renderMarkdown();
+  });
   document.getElementById("article-title").addEventListener("input", () => {
     markDocumentDirty();
     const content = document.getElementById("markdown-editor").value;

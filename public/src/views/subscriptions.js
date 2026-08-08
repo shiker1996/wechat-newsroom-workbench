@@ -9,18 +9,18 @@ function subscriptionTypeLabel(kind) {
 function updateSubscriptionComposer() {
   const kind = document.getElementById("subscription-kind").value;
   const input = document.getElementById("subscription-value");
-  const label = document.getElementById("subscription-value-label");
+  const labelText = document.getElementById("subscription-value-label-text");
   const labelWrap = document.getElementById("subscription-label-wrap");
   if (kind === "twitter") {
-    label.firstChild.textContent = "X 用户名 ";
+    labelText.textContent = "X 用户名";
     input.type = "text"; input.placeholder = "@OpenAI 或 OpenAI";
     labelWrap.hidden = true;
   } else if (kind === "rsshub") {
-    label.firstChild.textContent = "RSSHub 路由 ";
+    labelText.textContent = "RSSHub 路由";
     input.type = "text"; input.placeholder = "/twitter/user/OpenAI 或 /readhub";
     labelWrap.hidden = true;
   } else {
-    label.firstChild.textContent = "订阅地址 ";
+    labelText.textContent = "订阅地址";
     input.type = "url"; input.placeholder = "https://example.com/feed.xml";
     labelWrap.hidden = false;
   }

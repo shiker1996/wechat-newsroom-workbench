@@ -974,7 +974,7 @@
               <option value="rsshub">RSSHub 路由</option>
             </select>
           </label>
-          <label id="subscription-value-label">订阅地址
+          <label id="subscription-value-label"><span id="subscription-value-label-text">订阅地址</span>
             <input name="value" id="subscription-value" type="url" required placeholder="https://example.com/feed.xml">
           </label>
           <label id="subscription-label-wrap">显示名称（可选）
@@ -1049,6 +1049,7 @@
           <button data-log-type="model">模型调用</button>
         </div>
         <span class="muted" id="log-count"></span>
+        <button type="button" class="ghost-button" id="log-refresh">刷新</button>
       </div>
       <div id="log-list" class="log-list"></div>
     </section>

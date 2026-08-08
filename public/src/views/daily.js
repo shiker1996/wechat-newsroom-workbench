@@ -3,7 +3,7 @@ import { poll as pollTask } from "../core/poll.js";
 import { JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { state } from "../core/state.js";
 import { dimensionLabels } from "../core/dimensions.js";
-import { escapeHtml, providerOptions, toast, withLoading, confirmAction } from "../core/ui.js";
+import { escapeHtml, providerOptions, toast, withLoading, confirmAction, formatTime } from "../core/ui.js";
 import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
 let bound=false;
@@ -79,7 +79,7 @@ function renderJobs() {
   const jobs = (dailyData?.jobs || []).slice(0, 3);
   if (!jobs.length) { box.innerHTML = ""; return; }
   box.innerHTML = jobs.map((job) => {
-    const time = String(job.updatedAt || job.createdAt || "").replace("T", " ").slice(5, 16);
+    const time = formatTime(job.updatedAt || job.createdAt, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
     const failed = job.status === "failed" || job.status === "interrupted";
     const detail = failed
       ? `<span class="daily-job-error">${escapeHtml(job.error || job.progress || "生成失败")}</span>`

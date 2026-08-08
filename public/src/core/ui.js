@@ -26,6 +26,13 @@ export function formatDate(value, options = {}) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", ...options }).format(new Date(value));
 }
+// 容错时间格式化：非 ISO/不可解析输入原样返回（空值给占位），避免 Invalid Date 乱码
+export function formatTime(value, options = { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("zh-CN", options);
+}
 let toastTimer;
 // type: success / info / error（error 停留更久）；不传保持原行为
 const toastDurations = { success: 2600, info: 2600, error: 4500 };
