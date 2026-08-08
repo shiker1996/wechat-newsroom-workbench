@@ -720,7 +720,11 @@ async function saveDocument({automatic=false}={}) {
     if (chars > articleLengthLimit.max) toast(`终稿超过 ${articleLengthLimit.max} 可见字符（当前 ${chars}），建议删减后再发布`);
     else if (chars < articleLengthLimit.min) toast(`终稿不足 ${articleLengthLimit.min} 可见字符（当前 ${chars}），建议补充后再发布`);
   }
-  const title = document.getElementById("article-title")?.value || "";
+  // title 统一以正文 H1 为准（与成稿链、封面口径一致）；无 H1 时保留输入框值
+  const h1 = content.split("\n").find((line) => line.startsWith("# "))?.slice(2).trim();
+  const title = h1 || document.getElementById("article-title")?.value || "";
+  const titleEl = document.getElementById("article-title");
+  if (h1 && titleEl && titleEl.value !== h1) { titleEl.value = h1; lastTitleValue = h1; }
   const sequence=++saveSequence;
   const savingGeneration=editGeneration;
   clearAutoSave();
