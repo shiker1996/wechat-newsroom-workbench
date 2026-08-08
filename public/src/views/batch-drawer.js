@@ -93,7 +93,7 @@ export async function openBatch(id, mode) {
   const materialLinks = (batch.hotspots || []).flatMap((item) => item.materials || []);
   const intakeSection = isBreaking
     ? `<section class="drawer-section breaking-intake-section"><div class="pipeline-heading"><div><span class="kicker">BREAKING INTAKE</span><h3>突发专题素材</h3></div><span class="composite-badge">独立批次</span></div><p>该事件不参与每日热点的“核心 8 条 + 黑马 2 条”竞争；研判后按创建时选择的方向进入文章池或图文池。</p><div class="breaking-material-list">${materialLinks.map((item, index) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer"><b>${String(index + 1).padStart(2, "0")}</b><span>${escapeHtml(item.title || item.url)}</span><em class="material-status ${escapeHtml(item.status || "pending")}">${item.status === "ok" ? "已抓取" : item.status === "error" ? "抓取失败" : "待抓取"}</em></a>`).join("")}</div><details class="breaking-add-material"><summary>补充更多素材链接</summary><textarea id="breaking-more-materials" rows="3" placeholder="每行一个链接"></textarea><button class="outline-button" data-breaking-add-material>添加素材</button></details></section>`
-    : `<section class="drawer-section"><h3>采集今日热点</h3><p>按业务来源独立执行与记账；GitHub 包含 Trending、增长发现及热点提及仓库。采集完成后将自动进入语义打标与事件研判，无需逐节点击。</p><div class="check-row"><label><input type="checkbox" name="source" value="reddit" checked> Reddit</label><label><input type="checkbox" name="source" value="rsshub" checked> RSSHub</label><label><input type="checkbox" name="source" value="github" checked> GitHub</label></div><div class="check-row"><label>时间范围 <select id="collect-max-age">${[24, 48, 72, 120, 168].map((hours) => `<option value="${hours}"${(Number(batch.max_age_hours) || 24) === hours ? " selected" : ""}>${hours / 24} 天</option>`).join("")}</select></label></div><div style="display:flex;gap:8px"><button class="primary-button" data-collect>一键采集并研判</button></div></section>`;
+    : `<section class="drawer-section" data-section="intake"><h3>采集今日热点</h3><p>按业务来源独立执行与记账；GitHub 包含 Trending、增长发现及热点提及仓库。采集完成后将自动进入语义打标与事件研判，无需逐节点击。</p><div class="check-row"><label><input type="checkbox" name="source" value="reddit" checked> Reddit</label><label><input type="checkbox" name="source" value="rsshub" checked> RSSHub</label><label><input type="checkbox" name="source" value="github" checked> GitHub</label></div><div class="check-row"><label>时间范围 <select id="collect-max-age">${[24, 48, 72, 120, 168].map((hours) => `<option value="${hours}"${(Number(batch.max_age_hours) || 24) === hours ? " selected" : ""}>${hours / 24} 天</option>`).join("")}</select></label></div><div style="display:flex;gap:8px"><button class="primary-button" data-collect>一键采集并研判</button></div></section>`;
   const analysis = breakingAnalysis?.analysis;
   const recommendationLabel = { recommend: "建议入池", conditional: "补充材料后可入池", hold: "建议暂缓" };
   const breakingAnalysisSection = isBreaking ? `<section class="drawer-section breaking-analysis-section">
@@ -112,7 +112,7 @@ export async function openBatch(id, mode) {
       : `<div class="breaking-analysis-empty"><p>系统将抓取全部素材，区分事实、主张与作者观点，并分别计算文章适配度和事件型图文适配度。</p><button class="ink-button" data-breaking-analyze>抓取素材并生成双评分</button></div>`}
     ${latestAiRun?.status === "failed" ? `<div class="pipeline-error"><b>最近任务失败 · ${escapeHtml(latestAiRun.type)}</b><span>${escapeHtml(latestAiRun.error || latestAiRun.progress)}</span></div>` : ""}
   </section>` : "";
-  const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
+  const regularAiSection = !isBreaking ? `<section class="drawer-section ai-pipeline-section" data-section="ai-pipeline"><div class="pipeline-heading"><div><span class="kicker">AI NEWSROOM FLOW</span><h3>打标与事件研判</h3></div><select id="batch-ai-provider" aria-label="批次模型">${providerOptions(preferred)}</select></div>
       <div class="pipeline-steps"><div data-pipeline-step="collect" class="${stepClass("collect")}"><b>01</b><span>采集<small>${batch.freshness?.fresh ?? batch.hotspots.length} 条有效${batch.freshness?.stale ? ` · ${batch.freshness.stale} 条旧闻归档` : ""}</small></span></div><i>→</i><div data-pipeline-step="tag" class="${stepClass("tag")}"><b>02</b><span>语义打标<small>${ai.tagged} / ${ai.total}</small></span></div><i>→</i><div data-pipeline-step="event-cards" class="${stepClass("eventCards")}"><b>03</b><span>事件卡<small>${cards.count} / ${cards.total}</small></span></div><i>→</i><div data-pipeline-step="research" class="${stepClass("research")}"><b>04</b><span>事件研判<small>${researchDone ? "已完成" : "核心 / 黑马筛选 · 六维评分"}</small></span></div></div>
       <p>打标覆盖全量热点，生成事件语义指纹、地区、风险和预评估证据；研判随后完成全量聚类、核心 8 + 黑马 2、探索脑暴与临时复排。</p>
       <p class="muted action-hint">打标、事件卡与研判均调用 LLM（按所选服务商计费）；研判可能使用联网搜索，会向搜索服务商发送查询词。</p>
@@ -132,7 +132,7 @@ export async function openBatch(id, mode) {
     <section class="drawer-section"><h3>来源记录</h3>${batch.sources.length ? batch.sources.map((item) => `<div class="source-row ${item.status}"><i></i><div><strong>${escapeHtml(item.source)}</strong><small>${escapeHtml(item.error || item.ended_at || "执行中")}</small></div><b>${item.item_count}</b></div>`).join("") : '<p class="story-meta">尚未运行采集。</p>'}</section>
     ${breakingAnalysisSection}${regularAiSection}
     <section class="drawer-section"><h3>本批产物</h3><p>${batch.artifacts.length} 份已索引产物 · ${batch.hotspots.length} 条热点</p></section>
-    <section class="drawer-section"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
+    <section class="drawer-section" data-section="logs"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
   </div>`;
   // 轮询刷新会重复调用 openBatch；对话框已打开时不能再次 showModal（会抛 InvalidStateError）
   const drawer = $("#batch-drawer");
@@ -140,9 +140,9 @@ export async function openBatch(id, mode) {
   if (mode === "archive") {
     const secs = document.getElementById("batch-detail").querySelectorAll(".drawer-section");
     secs.forEach((s) => {
-      const h3 = s.querySelector("h3");
-      if ((h3 && h3.textContent === "采集今日热点") || (h3 && h3.textContent === "执行日志")) { s.style.display = "none"; }
-      else if (h3 && h3.textContent === "打标与事件研判") {
+      const section = s.dataset.section;
+      if (section === "intake" || section === "logs") { s.style.display = "none"; }
+      else if (section === "ai-pipeline") {
         s.querySelectorAll(".pipeline-actions,.pipeline-gate,.pipeline-error,#batch-ai-provider").forEach((b) => { b.style.display = "none"; });
       }
     });

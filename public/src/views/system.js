@@ -380,7 +380,7 @@ async function loadSystem(target = "all", button = null) {
     button.disabled = true;
     button.textContent = "检查中…";
   }
-  toast(target === "all" ? "正在检查采集环境…" : "正在重新检查当前卡片…");
+  // 结果 toast 统一在检查完成后给出，过程不再弹"检查中"
   let health;
   try {
     health = await request(`/api/system/health${target === "all" ? "" : `?target=${encodeURIComponent(target)}`}`);

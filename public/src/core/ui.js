@@ -1,4 +1,22 @@
 // src/core/ui.js — UI 工具
+import { state } from "./state.js";
+import { request } from "./http.js";
+
+export function debounce(fn, delay = 200) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+// 模型列表全局只拉一次，缓存于 state.models（编辑室/写作台切换候选时复用）
+export async function ensureModelOptions() {
+  if (!state.models) {
+    try { state.models = await request("/api/models"); } catch {}
+  }
+}
+
 export function escapeHtml(value = "") {
   return String(value).replace(/[&<>'"]/g, (ch) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch])

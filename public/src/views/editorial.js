@@ -2,7 +2,7 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { poll } from "../core/poll.js";
 import { streamChat } from "../core/stream-chat.js";
-import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 
@@ -20,6 +20,8 @@ function bindEditorial() {
   const form = document.getElementById("editorial-form");
   form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message)));
   form.addEventListener("input", () => { editorialDirty = true; renderEditorialReadiness(); });
+  // 与 editor.js 一致：决策底稿有未保存修改时拦截关闭/刷新（bindEditorial 仅执行一次，无监听泄漏）
+  window.addEventListener("beforeunload", (event) => { if (!editorialDirty) return; event.preventDefault(); event.returnValue = ""; });
   form.addEventListener("change", () => { renderEditorialReadiness(); updateEditorialSkillSummary(); });
   form.addEventListener("stage-skills-loaded", updateEditorialSkillSummary);
   document.getElementById("reset-editorial-skills")?.addEventListener("click",()=>{
@@ -165,7 +167,7 @@ function setupEditorialGateNavigation() {
 }
 
 async function openEditorial(id) {
-  try { state.models = await request("/api/models"); } catch {}
+  await ensureModelOptions();
   const candidate = await request(`/api/candidates/${id}`);
   await Promise.all([
     loadSkillSelect(document.getElementById("editorial-writer-skill"), `/api/candidates/${id}/writer-skills`),

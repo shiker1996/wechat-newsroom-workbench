@@ -1,7 +1,7 @@
 import { state } from "../core/state.js";
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, withLoading, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, withLoading, confirmAction, debounce } from "../core/ui.js";
 import { dimensionLabels, dimensionRoles } from "../core/dimensions.js";
 
 let bound = false;
@@ -42,9 +42,10 @@ function bindAtlas() {
     state.atlasFilters.multi = event.target.checked;
     renderAtlas();
   });
+  const renderAtlasDebounced = debounce(() => renderAtlas());
   document.getElementById("atlas-query").addEventListener("input", (event) => {
     state.atlasFilters.query = event.target.value;
-    renderAtlas();
+    renderAtlasDebounced();
   });
   document.addEventListener("click", (event) => {
     const scopeButton = event.target.closest("[data-atlas-scope]");
@@ -302,7 +303,7 @@ function renderDimensionCards() {
       const links = (event.articles || []).map((a) => {
         const url = externalUrl(a.url);
         const origin = a.channel && a.channel !== a.source ? `${a.source} · ${a.channel}` : a.source;
-        return url ? `<a href="${escapeHtml(url)}" target="_blank"><span>${escapeHtml(a.title)}</span><b>${escapeHtml(origin)}</b></a>` : `<span class="event-source-static"><span>${escapeHtml(a.title)}</span><b>${escapeHtml(origin)}</b></span>`;
+        return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(a.title)}</span><b>${escapeHtml(origin)}</b></a>` : `<span class="event-source-static"><span>${escapeHtml(a.title)}</span><b>${escapeHtml(origin)}</b></span>`;
       }).join("");
       const summary = String(event.card?.conclusion || "").trim();
       const headline = event.representative_title || event.title || "";

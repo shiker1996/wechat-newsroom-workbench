@@ -27,7 +27,7 @@ async function loadHotspots(params) {
           const aiTags = raw.aiTags || {};
           return `<article class="story-row">
             <div class="story-source">${escapeHtml(item.source_group || item.source)}</div>
-            <h3><a href="${escapeHtml(item.url || "#")}" target="_blank">${escapeHtml(item.title)}</a></h3>
+            <h3>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a>` : `<span>${escapeHtml(item.title)}</span>`}</h3>
             <div class="story-meta">${escapeHtml(item.category)} · ${aiTags.eventKey ? escapeHtml(aiTags.eventKey) : ""}</div>
             <div class="story-date">${formatDate(item.published_at, { hour: "2-digit", minute: "2-digit" })}</div>
           </article>`;

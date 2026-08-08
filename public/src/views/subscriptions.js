@@ -43,13 +43,13 @@ function renderSubscriptions() {
     ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
     ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github||0, "Trending / Search"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-          // 健康状态点阵（固定50个竖椭圆，按比例采样）
+          // 健康状态点阵（最多 50 个竖椭圆：来源不超过 50 时一源一点，超过 50 按比例采样）
   var allItems = state.subscriptions.items;
   var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
   var bads = allItems.filter(function(i){return i.health && i.health.status !== "success";}).length;
   var idles = allItems.filter(function(i){return !i.health;}).length;
   var total = oks + bads + idles;
-  var maxDots = 100;
+  var maxDots = Math.min(total, 50);
   if(total > 0){
     var dotHtml = "<div class=\"health-dots\">";
     var addDots=function(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
@@ -123,11 +123,14 @@ async function addSubscriptionFromForm(event) {
   toast("订阅已写入本地配置，下一次采集生效");
 }
 async function toggleSubscription(input) {
+  // 请求期间禁用开关，避免连续点击产生并发 PATCH（响应顺序不保证）
+  input.disabled = true;
   state.subscriptions = await request("/api/subscriptions", {
     method: "PATCH", body: JSON.stringify({ kind: input.dataset.kind, value: input.dataset.value, enabled: input.checked }),
   });
   renderSubscriptions();
   toast(input.checked ? "订阅已启用" : "订阅已暂停");
+  input.disabled = false;
 }
 async function removeSubscription(button) {
   if (!await confirmAction(`确定删除订阅"${button.dataset.value}"吗？`, { confirmText: "删除" })) return;
@@ -148,7 +151,7 @@ function bindSubscriptions() {
   document.getElementById("test-subscription").addEventListener("click", (event) => testSubscription(subscriptionFormPayload(), event.currentTarget).catch((error) => toast(error.message)));
   document.addEventListener("change", (event) => {
     if (event.target.matches("[data-source-toggle]")) {
-      toggleSubscription(event.target).catch((error) => { event.target.checked = !event.target.checked; toast(error.message); });
+      toggleSubscription(event.target).catch((error) => { event.target.disabled = false; event.target.checked = !event.target.checked; toast(error.message); });
     }
   });
   document.addEventListener("click", (event) => {

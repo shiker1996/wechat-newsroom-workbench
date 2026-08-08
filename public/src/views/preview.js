@@ -39,7 +39,7 @@ function bindPreview() {
     // 显式「上传 CDN」按钮：本地图片已就位时点击才产生外部写入
     const uploadCdnButton = event.target.closest("[data-upload-cdn]");
     if (uploadCdnButton) {
-      uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message));
+      withLoading(uploadCdnButton, "正在上传…", () => uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message)));
       return;
     }
     // 「生成图片」：可生成占位调用确定性生成链，仅产出本地 PNG，不自动上传
@@ -63,6 +63,8 @@ function bindPreview() {
     // 可生成空态：点击占位区直接触发生成（生成中禁用，防止重复点击）
     const generateTrigger = event.target.closest("[data-generate-trigger]");
     if (generateTrigger) {
+      // 生成中（卡片带 generating 标记）忽略重复点击
+      if (generateTrigger.closest("[data-image-id]")?.classList.contains("generating")) return;
       const card = generateTrigger.closest("[data-image-id]");
       card?.classList.add("generating");
       generateImageAsset(generateTrigger.dataset.generateTrigger).catch((error) => {

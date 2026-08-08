@@ -270,6 +270,8 @@ async function submit() {
   writingGenerating = true;
   const retrying = Boolean(candidateId && writingFailed);
   writingFailed = false;
+  // 新建写作先清空模块级 candidateId（打开/重试旧项目会残留），避免后续失败重试指向旧候选
+  if (!retrying) candidateId = null;
   updateWritingSteps(3);
   try {
     const input=payload();

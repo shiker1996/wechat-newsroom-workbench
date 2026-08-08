@@ -131,7 +131,7 @@ function bind() {
   });
   document.getElementById("daily-event-list").addEventListener("click",(event)=>{
     const button=event.target.closest("[data-daily-focus]");if(!button)return;
-    const focus=availableOptions().find((item)=>item.key===button.dataset.dailyFocus);
+    const focus=availableOptions().find((item)=>escapeHtml(item.key)===escapeHtml(button.dataset.dailyFocus));
     if(!focus)return;
     const id=focusId(focus);
     if(selectedFocuses.has(id))selectedFocuses.delete(id);else selectedFocuses.set(id,focus);
@@ -140,7 +140,8 @@ function bind() {
   });
   document.getElementById("daily-selection-summary").addEventListener("click",(event)=>{
     const button=event.target.closest("[data-remove-daily-focus]");if(!button)return;
-    selectedFocuses.delete(button.dataset.removeDailyFocus);dailyHasFinal=false;renderOptions();
+    const key=[...selectedFocuses.keys()].find((item)=>escapeHtml(item)===escapeHtml(button.dataset.removeDailyFocus));
+    if(key!==undefined)selectedFocuses.delete(key);dailyHasFinal=false;renderOptions();
   });
   document.getElementById("clear-daily-focus").addEventListener("click",async()=>{
     if(!selectedFocuses.size)return;

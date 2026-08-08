@@ -304,7 +304,6 @@ if(!window.__socialPageLayoutBound){window.__socialPageLayoutBound=true;
     try{
       const data=await request(`/api/candidates/${selectedId}/card-pages/${page}/layout`,{method:'PUT',body:JSON.stringify({layout_style:select.value})});
       renderCardPlan(data.cardPlan,data.layoutDecisions);
-      toast('逐页版式已保存，重新生成图文时统一生效');
     }catch(error){toast(error.message);renderCardPlan(currentCardPlan,currentLayoutDecisions);}
   });
 }
@@ -384,7 +383,6 @@ if(!window.__socialThemeBound){
     if(!selectedId)return;
     try{
       await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});
-      toast('视觉主题已保存，生成图文时生效');
     }catch(error){toast(error.message);}
   });
 }
@@ -399,7 +397,6 @@ if(!window.__socialCompositionBound){
     try{
       const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({composition_mode:selectedCompositionMode})});
       renderCardPlan(data.cardPlan,data.layoutDecisions);
-      toast(selectedCompositionMode==='smart'?'已切换为智能构图，系统会按页面角色自动组织版面':'已切换为稳定模板，可整组或逐页指定版式');
     }catch(error){
       selectedCompositionMode=previous;
       event.target.value=previous;
@@ -417,7 +414,6 @@ if(!window.__socialLayoutBound){
       const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});
       currentGroupLayout=event.target.value;
       renderCardPlan(data.cardPlan,data.layoutDecisions);
-      toast('整组版式已保存；逐页手动指定仍优先，重新生成图文时生效');
     }catch(error){event.target.value=currentGroupLayout;toast(error.message);}
   });
 }
@@ -432,7 +428,6 @@ if(!window.__socialChannelBound){
       selectedChannelMode=data.channelMode;
       renderCardPlan(currentCardPlan,data.layoutDecisions);
       if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;
-      toast(data.hasPlan?'渠道已切换：智能版式推荐已同步更新，建议检查后重新生成图文':`渠道已切换为${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}，生成故事板与图文时生效`);
     }catch(error){event.target.value=selectedChannelMode;toast(error.message);}
   });
 }
@@ -455,7 +450,7 @@ inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");
-generateButton?.addEventListener("click", async () => { if (!selectedId) return; const candidateId = Number(selectedId); if (delivery?.ready && !await confirmAction("重新生成将覆盖当前已生成的整组图文交付物（HTML 与逐页 PNG），是否继续？", { confirmText: "重新生成" })) return; socialJobs.set(candidateId, { status: 'running', progress: '正在启动…' }); syncGenerateButton(); try { const job = await request(`/api/candidates/${candidateId}/ai/social-card`, { method: 'POST', body: '{}' }); socialJobs.set(candidateId, { status: 'running', progress: '图文任务执行中…' }); syncGenerateButton(); toast("图文生成任务已启动，可在任务日志查看进度"); watchSocialJob(job.id, candidateId).catch((error) => { socialJobs.set(candidateId, { status: 'failed', error: error.message }); syncGenerateButton(); toast(error.message); }); } catch (error) { socialJobs.delete(candidateId); syncGenerateButton(); renderGate(lastGate); toast(error.message); } });
+generateButton?.addEventListener("click", async () => { if (!selectedId) return; const candidateId = Number(selectedId); if (delivery?.ready && !await confirmAction("重新生成图文将覆盖当前已生成的整组交付物（HTML 与逐页 PNG），是否继续？", { confirmText: "重新生成" })) return; socialJobs.set(candidateId, { status: 'running', progress: '正在启动…' }); syncGenerateButton(); try { const job = await request(`/api/candidates/${candidateId}/ai/social-card`, { method: 'POST', body: '{}' }); socialJobs.set(candidateId, { status: 'running', progress: '图文任务执行中…' }); syncGenerateButton(); toast("图文生成任务已启动，可在任务日志查看进度"); watchSocialJob(job.id, candidateId).catch((error) => { socialJobs.set(candidateId, { status: 'failed', error: error.message }); syncGenerateButton(); toast(error.message); }); } catch (error) { socialJobs.delete(candidateId); syncGenerateButton(); renderGate(lastGate); toast(error.message); } });
 
 window.openSocialEditor=openSocialEditor;
 

@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions, withLoading, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
 
 let markdownRenderer;
@@ -153,7 +153,7 @@ function insertVisual(id) {
   markDocumentDirty();renderMarkdown();
   const card=document.querySelector(`[data-visual-id="${CSS.escape(id)}"]`);
   card?.classList.add("inserted");
-  card?.querySelector("button")?.setAttribute("disabled","");
+  card?.querySelector("[data-insert-visual]")?.setAttribute("disabled","");
   toast("图表围栏已插入文章，请检查后保存终稿");
   recordVisualDecision(item,"inserted");
 }
@@ -207,7 +207,8 @@ function visibleChars(markdown) {
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`>#-]/g, "")
+    .replace(/^[-#>]\s?/gm, "")
+    .replace(/[*_`]/g, "")
     .replace(/\s/g, "")
     .length;
 }
@@ -320,8 +321,8 @@ function jumpToQualityIssue(button) {
   const editor=document.getElementById("markdown-editor"),offset=Number(button.dataset.qualityOffset);
   document.getElementById("quality-dialog").close();
   editor.focus();editor.setSelectionRange(offset,offset);
-  const line=editor.value.slice(0,offset).split("\n").length-1;
-  editor.scrollTop=Math.max(0,line*(parseFloat(getComputedStyle(editor).lineHeight)||26)-editor.clientHeight*.2);
+  // 与 jumpToHeading 同一精确实现：镜像元素测量实际换行高度，长段落不再跑偏
+  editor.scrollTop=Math.max(0,textareaTextOffsetTop(editor,offset)-editor.clientHeight*.18);
 }
 
 function writingStatistics(markdown) {
@@ -701,12 +702,6 @@ async function saveDocument({automatic=false}={}) {
     if(!automatic)throw error;
     toast(`自动保存失败：${error.message}`);
     throw error;
-  }
-}
-
-async function ensureModelOptions() {
-  if (!state.models) {
-    try { state.models = await request("/api/models"); } catch {}
   }
 }
 

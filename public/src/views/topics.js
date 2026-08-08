@@ -85,7 +85,7 @@ function renderCandidates(candidates, track = activeTrack()) {
           ${track==='social_cards'&&item.repository_description?`<p class="candidate-description">${escapeHtml(item.repository_description)}</p>`:''}
           ${track==='social_cards'&&item.social_selection_reason?`<p class="candidate-selection-reason"><b>入选理由</b>${escapeHtml(item.social_selection_reason)}</p>`:''}
           <div class="candidate-meta"><span>${escapeHtml(item.track_pool_role || item.pool_role)}</span><span>${item.composite ? `多源综合${item.hotspot_count ? ` · ${item.hotspot_count}条报道` : ""}` : escapeHtml(item.source_name || item.source_group || item.source)}</span><span>风险 ${escapeHtml(item.risk_level)}</span></div>
-          ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map(escapeHtml).join("」「")}」共享事件素材</p>` : ""}
+          ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map((name) => escapeHtml(name)).join("」「")}」共享事件素材</p>` : ""}
           ${scoreStrip}
           <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster">${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
         </article>`;
@@ -106,11 +106,14 @@ async function loadRanking() {
     const toggle = document.getElementById("toggle-ranking");
     const list = document.getElementById("ranking-list");
     if (!toggle || !list) return;
-    toggle.textContent = `展开(${items.length}条)`;
+    // 文案从实际 display 状态推导，避免重载后脱节
+    const syncToggleText = () => { toggle.textContent = list.style.display === "block" ? "收起" : `展开(${items.length}条)`; };
+    if (list.style.display === "block") renderRankingList(items, list);
+    syncToggleText();
     toggle.onclick = function () {
       const expanded = list.style.display !== "block";
       list.style.display = expanded ? "block" : "none";
-      toggle.textContent = expanded ? "收起" : `展开(${items.length}条)`;
+      syncToggleText();
       if (expanded) renderRankingList(items, list);
     };
     state.rankingItems = items;
@@ -138,11 +141,13 @@ async function loadSocialRanking() {
     if(!panel||!items.length){if(panel)panel.hidden=true;return;}
     panel.hidden=false;
     const toggle=document.getElementById('toggle-social-ranking'),list=document.getElementById('social-ranking-list');
-    toggle.textContent=`展开(${items.length}条)`;
+    const syncToggleText=()=>{toggle.textContent=list.style.display==='block'?'收起':`展开(${items.length}条)`;};
+    if(list.style.display==='block')renderSocialRankingList(items,list);
+    syncToggleText();
     toggle.onclick=()=>{
       const expanded=list.style.display!=='block';
       list.style.display=expanded?'block':'none';
-      toggle.textContent=expanded?'收起':`展开(${items.length}条)`;
+      syncToggleText();
       if(expanded)renderSocialRankingList(items,list);
     };
     state.socialRankingItems=items;

@@ -1,5 +1,5 @@
 import { request } from "../core/http.js";
-import { escapeHtml, toast, confirmAction } from "../core/ui.js";
+import { escapeHtml, toast, confirmAction, debounce } from "../core/ui.js";
 
 let bound = false;
 let skillRegistryData = null;
@@ -45,7 +45,7 @@ function bindSkills() {
   document.getElementById("tool-execution-close")?.addEventListener("click", () => {
     document.getElementById("tool-execution-panel").hidden = true;
   });
-  document.getElementById("skill-search")?.addEventListener("input", () => renderSkillList());
+  document.getElementById("skill-search")?.addEventListener("input", debounce(() => renderSkillList()));
   document.getElementById("skill-status-filter")?.addEventListener("change", () => renderSkillList());
   const skillStatusFilter = document.getElementById("skill-status-filter");
   if (skillStatusFilter && !skillStatusFilter.querySelector('[value="installed"]')) {
