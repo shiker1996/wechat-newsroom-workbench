@@ -207,9 +207,9 @@ function renderImageWorkspace() {
       ? data.items.map(imageCard).join('')
       : '<div class="image-stage-empty">' + (data.planned ? '没有必要的人工配图，文章可直接排版。' : '点击“AI 规划必要配图”，系统只会为有证据或阅读价值的图片留位。') + '</div>';
   }
-  var hasCandidate = Boolean(state.productionPreview?.candidates?.length);
+  const hasCandidate = Boolean(state.productionPreview?.candidates?.length);
   const manualPending = data.manualUnresolved || (data.unresolved || []).filter((id) => !(data.generatedPending || []).includes(id));
-  var btn = document.getElementById('run-local-typeset');
+  const btn = document.getElementById('run-local-typeset');
   if (btn) {
     // 不再因配图未就绪 disable（禁用按钮点击无任何反馈）；保持可点，由点击预检 toast 说明原因
     btn.disabled = !hasCandidate;

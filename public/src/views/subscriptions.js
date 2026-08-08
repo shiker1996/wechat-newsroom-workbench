@@ -44,27 +44,28 @@ function renderSubscriptions() {
     ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github||0, "Trending / Search"],
   ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
           // 健康状态点阵（最多 50 个竖椭圆：来源不超过 50 时一源一点，超过 50 按比例采样）
-  var allItems = state.subscriptions.items;
-  var oks = allItems.filter(function(i){return i.health && i.health.status === "success";}).length;
-  var bads = allItems.filter(function(i){return i.health && i.health.status !== "success";}).length;
-  var idles = allItems.filter(function(i){return !i.health;}).length;
-  var total = oks + bads + idles;
-  var maxDots = Math.min(total, 50);
+  const allItems = state.subscriptions.items;
+  const oks = allItems.filter((i) => i.health && i.health.status === "success").length;
+  const bads = allItems.filter((i) => i.health && i.health.status !== "success").length;
+  const idles = allItems.filter((i) => !i.health).length;
+  const total = oks + bads + idles;
+  const maxDots = Math.min(total, 50);
   if(total > 0){
-    var dotHtml = "<div class=\"health-dots\">";
-    var addDots=function(cnt, cls, label){for(var d=0; d<cnt; d++){dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>";}}
-    var ratio = maxDots / total;
-    var okDots = Math.round(oks * ratio) || (oks > 0 ? 1 : 0);
-    var badDots = Math.round(bads * ratio) || (bads > 0 ? 1 : 0);
-    var idleDots = Math.round(idles * ratio) || (idles > 0 ? 1 : 0);
-    var sum = okDots + badDots + idleDots;
-    while(sum > maxDots){if(okDots > badDots && okDots > idleDots)okDots--;else if(badDots > idleDots)badDots--;else idleDots--;sum--;}
-    while(sum < maxDots){if(oks > bads && oks > idles)okDots++;else if(bads > idles)badDots++;else idleDots++;sum++;}
+    let dotHtml = "<div class=\"health-dots\">";
+    const addDots = (cnt, cls, label) => { for(let d = 0; d < cnt; d++){ dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>"; } };
+    const ratio = maxDots / total;
+    let okDots = Math.round(oks * ratio) || (oks > 0 ? 1 : 0);
+    let badDots = Math.round(bads * ratio) || (bads > 0 ? 1 : 0);
+    let idleDots = Math.round(idles * ratio) || (idles > 0 ? 1 : 0);
+    let sum = okDots + badDots + idleDots;
+    while(sum > maxDots){ if(okDots > badDots && okDots > idleDots) okDots--; else if(badDots > idleDots) badDots--; else idleDots--; sum--; }
+    while(sum < maxDots){ if(oks > bads && oks > idles) okDots++; else if(bads > idles) badDots++; else idleDots++; sum++; }
     addDots(okDots, "ok", oks + "个来源正常");
     if(bads > 0) addDots(badDots, "bad", bads + "个来源异常");
     if(idles > 0) addDots(idleDots, "idle", idles + "个未采集");
     dotHtml += "</div>";
-    var hc=document.getElementById("subscription-health");if(hc)hc.innerHTML=dotHtml;
+    const hc = document.getElementById("subscription-health");
+    if(hc) hc.innerHTML = dotHtml;
   }
   const items = state.subscriptions.items.filter(
     (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter

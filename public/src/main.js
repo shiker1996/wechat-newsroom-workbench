@@ -39,7 +39,7 @@ async function go(view) {
   if(view!=="editor")document.body.classList.remove("editor-focus");
   const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
   const isViewChange = previousView !== view;
-  var bs = document.getElementById("batch-switcher");
+  const bs = document.getElementById("batch-switcher");
   if (bs) bs.classList.toggle("visible", ["overview","topics","daily","tutorial","social-topics","social-editor","social-custom","social-event","editorial","editor","preview","cover","artifacts"].includes(view));
   let activeNavItem = null;
   $$(".nav-item").forEach((item) => {
