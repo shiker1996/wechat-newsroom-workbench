@@ -47,6 +47,14 @@
 19. **产物/日历预览 iframe 无加载态与错误兜底** — `src/views/artifacts.js:20-29`、`src/views/calendar.js:31`。iframe 直接设 src，404 时对话框直接渲染后端错误页；关闭对话框不清 `iframe.src`，大文件后台继续加载且下次打开闪现旧内容。calendar 还硬编码 `my-design.html` 路径。
 20. **图文画廊翻页按钮可能永久失效** — `src/views/social-editor.js:324`。监听器在模块顶层 `if(!window.__socialDeliveryBound)` 块内绑定且用 `?.` 静默跳过，若绑定时机 DOM 未就绪即为死按钮（与加载时序相关，需运行期复核）。建议改为 document 级事件委托。
 
+### 2026-08-08 修复记录（#7、#8、#10、#11、#20）
+
+- #7：`social-editor.js` 生成按钮点击处理器在已有交付物（`delivery.ready`）时先 `confirmAction`，确认后才入队重新生成。
+- #8：`cover.js` 以模块变量 `coverExists` 记录当前封面状态（`loadCoverState` 内更新），`generateCover` 在封面已存在时先 `confirmAction`。
+- #10：**取舍**——采用「重建前检测未保存修改并 confirmAction 警告」，而非「收集编辑并在重建后恢复」。原因：逐页编辑器含可增删的动态内容块列表，快照/还原实现复杂且易与保存后的服务端数据不一致；警告方案最小且与项目内其他破坏性操作确认模式一致。实现：模块变量 `storyboardDirty`，编辑器内 `input` 事件、增删内容块、切换块类型时置位，`renderCardPlan` 重建时复位；整组版式、逐页版式、构图模式、渠道四个会触发重建的变更在提交前检查，用户取消则回退下拉值。视觉主题切换不重建 DOM，无需拦截。
+- #11：`runStoryboard` catch 分支由 `renderCardPlan([])` 改为 `renderCardPlan(currentCardPlan, currentLayoutDecisions)`，失败时恢复原故事板内容，toast 标为 error。
+- #20：画廊上一张/下一张按钮改为 `__socialDeliveryBound` 块内 document 级 click 委托，删除顶层 `?.` 绑定，避免 DOM 未就绪时死按钮。
+
 ---
 
 ## 二、中严重度（体验受损、反馈缺失或一致性破坏）
@@ -133,3 +141,62 @@
 4. **一致性收口**：维度词典共享（#38）、模型配置双入口合并（#40）、格式化压缩单行文件（#54）。
 
 > 注：审查同时确认了一些做得对的地方——`confirmAction` 与 `method="dialog"` 表单模式配合正确；导航 hash 与 pushState 防重入处理得当；用户可控字段基本都过了 `escapeHtml`，未发现明显 innerHTML 注入点（例外见 #52）；atlas 的 `wheel` 监听绑在容器上而非 innerHTML 节点，重渲染不丢监听。
+
+## 事项状态总览（2026-08-08 更新）
+
+- **已修复（33 项）**：
+  - 数据安全：#1 #2 #3 #12
+  - 基础设施：#4 #5 #14 #16 #25
+  - 样式系统：#13 #15
+  - 高严重度收尾：#6 #7 #8 #9 #10 #11 #17 #18 #19 #20
+  - 静默失败/加载态：#21 #22 #23 #24
+  - 一致性/去重：#26 #27 #37 #38 #40 #54 #55
+- **未处理（中严重度，22 项）**：#28–#36、#39、#41–#52（防重复点击、离开保护、标题改写 H1、假按钮可访问性、tab 标注统一、KV 行删除交互、嵌套滚动、字数目标矛盾、状态管理一组等）
+- **未处理（低严重度，18 项）**：#53、#56–#72
+
+## 修复记录（2026-08-08，#1–#25、#37–#40、#54–#55）
+
+### 第一轮：优先修复建议四组（#1 #2 #3 #5 #12 #13 #14 #15 #16 #25 #38 #40 #54）
+
+- **#1**：`editor.js` loadSelectedDocument catch 改为 toast 报错并 `return` 保留现有内容，不再填模板覆盖服务端文稿。
+- **#2**：`system.js` 恢复备份成功后 toast 提示并 `location.reload()`。
+- **#3**：`batch-drawer.js` createBatch 对齐 createBreakingBatch：try/catch + toast + 提交期间禁用按钮。
+- **#12**：`editor.js` replaceAll 先统计匹配数并 `confirmAction` 确认（提示不可撤销），无匹配直接提示返回。
+- **#5**：`core/http.js` request() 重写——GET 不带 content-type；204/空 body 返回 null；按响应 content-type 解析；HTML 错误页抛 `HTTP <status>：摘要`。
+- **#25**：`core/ui.js` toast 支持 success/info/error 类型（error 4500ms），styles.css 补类型样式。
+- **#16**：新增 `core/poll.js`（指数退避 + 超时上限 + 可取消），迁移 daily/tutorial/cover/editorial/main.js 五处轮询；cover 失败死状态消除；editorial 不再共用 `state.jobTimer`；main.js 后台轮询失败退避、标签页隐藏暂停、jobNoticeState 定期清理。
+- **#14**：批次切换器显隐改 `visible` class 切换，移动端媒体查询恢复生效。
+- **#13**：`:root` 补齐 `--serif/--mono/--cream/--paper-soft/--soft/--accent` 六个变量，取值均复用现有设计体系。
+- **#15**：styles.css 全部 7–10px 字号提升至 11px（仅主题目录微缩预览保留 10px）；topics.js 内联 9px 同改。
+- **#38**：新增 `core/dimensions.js` 共享维度词典，topics/daily/atlas 统一为 `who→主体 / what→动作 / where→场合`（与后端 DIMENSION_POOL_ROLES 口径一致，topics 的"对比"改为"动作"）。
+- **#40**：system.js 保留为唯一模型管理入口，models 视图加跳转按钮；`loadModelSettings()` 同步刷新 `state.models`/`window.__models`；models.js "undefined" 字面量修复（改"默认"）。
+- **#54**：index.html 两处、theme-manager.js 全文、social-editor.js/topics.js 指定段落手工拆行（纯空白改动，去空白后逐字节等价；theme-manager 因测试有源码正则断言不做 prettier 自动格式化）。
+
+### 第二轮：高严重度收尾与静默失败（#4 #6–#11 #17–#24）
+
+- **#4**：`main.js` 视图动态 import 失败 toast error。
+- **#6**：`batch-drawer.js` openBatch 加 `if (!drawer.open)` 守卫，轮询刷新不再抛 InvalidStateError。
+- **#7**：social-editor 重新生成整组图文前，已有交付物时 `confirmAction` 确认。
+- **#8**：cover 重新生成封面前，已有封面时 `confirmAction` 确认（新增 `coverExists` 状态）。
+- **#9**：`editor.js` 保存失败状态绑定点击重试（仅 error 态可点），styles.css 补可点击视觉提示。
+- **#10**：故事板未保存修改检测（`storyboardDirty` + input 委托），触发全量重建的四个变更（整组版式/逐页版式/构图模式/渠道）提交前 `confirmAction` 警告，取消时回退下拉值。**取舍**：未做快照恢复，警告方案最小且与服务端数据一致性更稳。
+- **#11**：生成故事板失败时 `renderCardPlan(currentCardPlan, currentLayoutDecisions)` 恢复原内容，不再清空为空态。
+- **#17**：新增订阅三道校验：非空、direct 类型 URL 格式、kind+value 查重。
+- **#18**：`system.js` 删除模型配置按服务端回退逻辑写明影响：默认模型说明回退到哪个模型（无回退提示会被拒绝），非默认模型提示已指定任务将运行失败。
+- **#19**：`core/ui.js` 新增 `openArtifactPreview(url, { originalUrl })`：加载态、JSON 错误体/error 事件兜底、关闭清 `iframe.src`；artifacts.js/calendar.js 接入；calendar 硬编码 `my-design.html` 改走 `/api/artifacts/:id/preview`（用查询已返回的产物 id）。
+- **#20**：图文画廊翻页按钮改 document 级事件委托（`#social-gallery-prev/next`），不再依赖绑定时机。
+- **#21**：topics 排行榜两处、preview 图片工作台、main.js 模型列表、batch-drawer 突发分析的静默 catch 均加 toast error 或界面降级提示；preview 区分网络错误与无配图空态。
+- **#22**：hotspots/topics/atlas 列表请求加 `aria-busy` + 占位文案的加载态（对齐 tutorial.js 现有模式）。
+- **#23**：`[data-copy]` toast 改 `copy.dataset.copyLabel || "已复制"`，writeText 失败 toast error。
+- **#24**：「检查采集环境」按钮改文案为「采集环境设置」（实际行为是跳转 system 视图，那里另有真正的检查按钮）。
+
+### 第三轮：#26 / #27 / #37 / #55
+
+- **#26 统一 confirmAction**：`editor.js`（confirmDiscardEdits，两个 change 监听改为 async）、`editorial.js:49`（切换候选）、`atlas.js` offerPoolExit、`theme-manager.js` 归档主题均改为 `confirmAction` 并给出动作化 confirmText。**取舍**：`atlas.js` 的 `prompt("综合选题名称…")` 需要文本输入，`confirmAction` 不支持输入，按既定取舍保留原生 prompt。
+- **#27 危险操作补确认**：`batch-drawer.js` confirmBreakingRoute（写入选题池前确认，提示不可逆）；topics.js「加入候选」实际位于 `topics.js`（`data-ranking-add` / `data-social-ranking-add`，报告原写 batch-drawer.js 系行号漂移），已补确认；`daily.js`「清空已选」补确认（空选时直接返回不弹窗）。
+- **#37 本地时区**：`dashboard.js` 近 7 天筛选改用 `localDate(weekAgo)`（`localDate` 增加可选日期参数，原无参行为不变）；`calendar.js` 新增 `parseLocalDate`，`batch_date`（YYYY-MM-DD）按本地时区解析，负时区用户日历落点不再偏前一天。其余 `toISOString()` 用法均为日志时间戳展示，不涉及日期比较，未改。
+- **#55 去重**：
+  - `escapeHtml`：`skill-selection.js` 已是从 `core/ui.js` 导入（报告所述第三份已不存在）；`core/theme-catalog.js` 的 `safe` 改为委托 `escapeHtml`，但保留 `value ?? ''` 语义——`safe(undefined)` 原输出空串，直接换 `escapeHtml` 会输出 `"undefined"`，故只收口转义表不改变空值行为。
+  - 流式对话：新增 `core/stream-chat.js`（`streamChat()`），`editorial.js` 与 `social-editor.js` 两处改为调用。差异以参数保留：title/errorLabel 文案、`onDone` 回调（editorial 重开编辑室，social 维护 history 并回填表单）、`rethrow`（editorial 失败抛给上层 toast，social 就地 toast）。
+  - zip 上传：`submitSkillZip` 与 system.js 备份 validate/restore 并非 multipart，而是 `application/zip` 二进制 body；`core/http.js` 的 `request()` 本就支持自定义 content-type 与 body，三处直接改用 `request()`，无需新增 multipart 支持。错误兜底文案由「安装失败」等变为 `HTTP <状态码>`（服务端始终返回 `error` 字段时不触发）。
+
