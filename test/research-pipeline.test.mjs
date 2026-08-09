@@ -98,6 +98,54 @@ test('H/B/P/S/D/F由服务端公式计算', () => {
   assert.equal(result.f,62.4);
 });
 
+test('GitHub、开源和开发工具使用独立配置加分，不依赖泛 AI 分类', () => {
+  const clusters=clusterItems([dimensionHotspot(1,{who:'tool',what:'开源开发工具',actionType:'开源',object:'开发工具',labels:{who:'Tool'}})]);
+  const ranking=preselection(clusters);
+  const pool=selectDimensionPool(clusters,ranking,{accountContext:{contentPillars:[],scoring:{toolEngineeringBonus:12}}});
+  assert.equal(pool.groups[0].accountFit,0);
+  assert.equal(pool.groups[0].toolEngineeringBonus,12);
+  assert.equal(resolveScoring({scoring:{toolEngineeringBonus:14}}).toolEngineeringBonus,14);
+});
+
+test('核心候选按配置保留最低工具工程席位，工具不足时不伪造补位', () => {
+  const generic=Array.from({length:6},(_,index)=>dimensionHotspot(index+1,{who:`主体${index}`,what:'行业动态',actionType:'争议回应'}));
+  const tools=[
+    dimensionHotspot(20,{who:'tool-a',what:'开源开发工具',actionType:'开源',object:'开发工具'}),
+    dimensionHotspot(21,{who:'tool-b',what:'发布代码助手',actionType:'发布',object:'代码助手'}),
+  ];
+  const clusters=clusterItems([...generic,...tools]);
+  const ranking=preselection(clusters).map((item)=>({...item,finalPreScore:item.hotspotId>=20?35:90}));
+  const pool=selectDimensionPool(clusters,ranking,{coreLimit:4,blackLimit:0,backupLimit:0,accountContext:{contentPillars:[],scoring:{toolEngineeringBonus:5,minimumToolCandidates:2}}});
+  assert.equal(pool.selected.filter((group)=>group.toolEngineering).length,2);
+});
+
+test('选题评分贯通分发池与读者利益并拦截伪通知', () => {
+  const source={candidateId:'C001',title:'平台规则变化',category:'💼 职场生态',poolRole:'核心8条',credibleScoop:0,riskLevel:'低'};
+  const base={candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
+    hProfile:{historicalType:'worker_social',fiveSenseCount:3,fiveQuestionCount:3,recommendationFit:5,emotionTheme:5,searchFriendly:2}};
+  const downgraded=scoreCards([{...base,packaging:{distributionLane:'通知池',readerStake:'影响开发者岗位选择',notificationFit:5}}],{items:[]})[0];
+  assert.equal(downgraded.distributionLane,'实验池');
+  assert.equal(downgraded.readerStake,'影响开发者岗位选择');
+  assert.equal(downgraded.notificationEligible,false);
+  const qualified=scoreCards([{...base,packaging:{distributionLane:'通知池',readerStake:'平台开发者必须在8月前迁移接口，否则发布流程会中断并增加维护成本',notificationFit:4}}],{items:[]})[0];
+  assert.equal(qualified.distributionLane,'通知池');
+  const report=markdownRanked([qualified],{items:[],metaNarratives:[],combination:{}});
+  assert.match(report,/\| 通知池 \|/);
+  assert.match(report,/读者利益：平台开发者必须在8月前迁移接口/);
+});
+
+test('通知池按最终分最多保留两条，非法推荐技能回退到可路由枚举', () => {
+  const cards=[1,2,3].map((id)=>({candidateId:`C00${id}`,status:'PASS',source:{title:`平台变更${id}`,category:'🤖 AI/技术动态',poolRole:'核心8条',credibleScoop:0,riskLevel:'低'},
+    angle:'接口迁移',thesis:'平台变更要求迁移',recommendedSkill:'tool-review',
+    packaging:{distributionLane:'通知池',readerStake:`使用旧接口的开发者必须在8月前迁移，否则发布流程会中断并增加维护成本${id}`,notificationFit:5},
+    bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:5},
+    hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}));
+  const scored=scoreCards(cards,{items:[]});
+  assert.deepEqual(scored.map((item)=>item.distributionLane),['通知池','通知池','实验池']);
+  assert.ok(scored[2].notificationBlockers.includes('batch-notification-quota'));
+  assert.ok(scored.every((item)=>item.recommendedSkill==='wechat-mp-tech-hotspot'));
+});
+
 test('图文推荐优先采用模型贴图建议并识别工具类候选', () => {
   const safe = { status:'PASS', writeReadiness:'READY_PUBLIC_ANALYSIS', source:{ riskLevel:'低' } };
   assert.equal(isSocialCardCandidate({ ...safe, format:'贴图', hProfile:{ historicalType:'bigtech' } }), true);
@@ -233,6 +281,29 @@ test('who 维度：多事件主体成组，minWhoEvents=1 时单事件主体也�
   assert.equal(DIMENSION_POOL_ROLES.who, '主体动态');
   const withSingles = dimensionSelections(clusters, ranking, { minWhoEvents: 1 });
   assert.equal(withSingles.filter((group) => group.dimension === 'who').length, 2);
+});
+
+test('跨维度组共享一半以上事件时只占一个 8+2 席位，维度分不再封顶 100', () => {
+  const clusters=clusterItems([
+    dimensionHotspot(1,{who:'openai',what:'发布agent',actionType:'发布',object:'agent',labels:{who:'OpenAI',object:'Agent'}}),
+    dimensionHotspot(2,{who:'openai',what:'发布模型',actionType:'发布',object:'model',labels:{who:'OpenAI'}}),
+    dimensionHotspot(3,{who:'google',what:'发布agent',actionType:'发布',object:'agent',labels:{who:'Google',object:'Agent'}}),
+  ]);
+  const ranking=preselection(clusters).map((item)=>({...item,finalPreScore:98}));
+  const pool=selectDimensionPool(clusters,ranking,{coreLimit:8,blackLimit:0,backupLimit:0,accountContext:{contentPillars:['AI 行业热点：x'],scoring:{accountFitBonus:6}}});
+  assert.ok(pool.groups.some((group)=>group.score>100));
+  assert.ok(pool.groups.some((group)=>group.duplicateOf));
+  const selectedIds=pool.selected.flatMap((group)=>group.events.map((event)=>event.event_id));
+  assert.equal(new Set(selectedIds).size,selectedIds.length);
+});
+
+test('过宽的发布或开源动作组不生成维度候选，避免吞掉具体主体与对象题', () => {
+  const clusters=clusterItems(Array.from({length:9},(_,index)=>dimensionHotspot(index+1,{
+    who:`主体${index+1}`,what:`发布项目${index+1}`,actionType:'发布',object:`项目${index+1}`,
+  })));
+  const groups=dimensionSelections(clusters,preselection(clusters),{minWhoEvents:1,whoLimit:20,whatLimit:20});
+  assert.equal(groups.some((group)=>group.key==='action:发布'),false);
+  assert.equal(groups.filter((group)=>group.dimension==='who').length,9);
 });
 
 test('what 维度：object 组要求至少两个不同主体，actionType 同理', () => {

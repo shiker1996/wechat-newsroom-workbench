@@ -26,6 +26,25 @@ test('server delegates isolated functional route modules', () => {
   assert.doesNotMatch(server, /\/card-editorial/);
   assert.doesNotMatch(server, /\/ai\\\/editorial/);
   assert.match(server, /createRouteHelpers\(/);
+  assert.match(server, /candidateEventGroups:\s*routeHelpers\.candidateEventGroups/);
+});
+
+test('候选详情路由使用注入的 candidateEventGroups 返回事件组', async () => {
+  const { handleCandidateRoutes } = await import('../lib/http/routes/candidate-routes.mjs');
+  let payload = null;
+  const candidate = { id:578, hotspot_title:'测试候选' };
+  const handled = await handleCandidateRoutes({
+    request:{ method:'GET' }, response:{}, pathname:'/api/candidates/578', searchParams:new URLSearchParams(),
+    root:'', config:{}, store:{ getCandidate(id) { return id === 578 ? { ...candidate } : null; }, findSimilarArticles(){}, findSimilarSocialCards(){} },
+    body:async()=>({}), json(_response,status,data) { payload={status,data}; }, models:null, aiJobs:null,
+    batchWorkdir(){}, articleWorkdir(){}, socialCardWorkdir(){}, writeUtf8(){}, candidateRepositoryUrl(){ return ''; },
+    candidateEventGroups(current) { assert.equal(current.id,578); return [{event_id:'E1',card:{conclusion:'事实卡'}}]; },
+    attachEventConclusions(items) { return items; }, evaluateCustomCardGate(){ return {}; },
+  });
+  assert.equal(handled,true);
+  assert.equal(payload.status,200);
+  assert.equal(payload.data.events[0].event_id,'E1');
+  assert.equal(payload.data.event_card.conclusion,'事实卡');
 });
 
 test('服务端路由模块均可通过 Node 语法编译', () => {

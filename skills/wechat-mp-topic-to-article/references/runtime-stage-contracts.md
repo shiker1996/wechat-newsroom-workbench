@@ -25,10 +25,10 @@ brief → fact-base → planning → drafting → draft-quality-gate → title-g
 根据锁定简报和事实基座建立作者素材、大纲与第一轮标题方向。综合选题明确多个热点之间的关联逻辑；普通选题围绕单一主线。只返回严格 JSON：
 
 ```json
-{"contentRole":"拉新|沉淀|搜索","expectedAction":["评论|分享|收藏|关注|搜索"],"practicalIncrement":"具体实用增量","materialsMarkdown":"作者素材补充","outlineMarkdown":"完整结构大纲","titleCandidates":[{"title":"标题","reason":"理由"}],"selectedTitle":"阶段选中标题","coreKeywords":["核心词"],"remainingRisks":["剩余风险"]}
+{"distributionLane":"推荐池|通知池|实验池","readerStake":"对读者工作、收入、岗位、效率、成本或选择的具体影响","contentRole":"拉新|沉淀|搜索","expectedAction":["评论|分享|收藏|关注|搜索"],"practicalIncrement":"具体实用增量","materialsMarkdown":"作者素材补充","outlineMarkdown":"完整结构大纲","titleCandidates":[{"title":"标题","reason":"理由"}],"selectedTitle":"阶段选中标题","coreKeywords":["核心词"],"remainingRisks":["剩余风险"]}
 ```
 
-`outlineMarkdown` 包含核心判断、目标读者、内容角色、事实基座、结构大纲、信息增量、实用增量和增长承接。
+`distributionLane` 与 `readerStake` 继承锁定简报，不得擅自换池；缺失时才根据账号上下文提出建议。`outlineMarkdown` 包含核心判断、目标读者、分发池、读者利益、内容角色、事实基座、结构大纲、信息增量、实用增量和增长承接。
 
 ## `drafting`
 
@@ -51,7 +51,7 @@ brief → fact-base → planning → drafting → draft-quality-gate → title-g
 同时使用总契约与 `title-generator`，根据已经完成的初稿重新生成标题。准确兑现正文，不夸大，默认不超过 28 个汉字。只返回严格 JSON：
 
 ```json
-{"titleCandidates":[{"title":"标题","reason":"理由","score":0}],"selectedTitle":"最终标题","coreKeywords":["核心词"]}
+{"distributionLane":"推荐池|通知池|实验池","readerStake":"具体读者利益","titleCandidates":[{"title":"标题","reason":"理由","score":0}],"selectedTitle":"最终标题","coreKeywords":["核心词"]}
 ```
 
 `score` 使用 0–12。

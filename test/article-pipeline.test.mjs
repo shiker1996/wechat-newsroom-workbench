@@ -7,11 +7,13 @@ import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
 
 test('成稿规划兼容模型把数组字段返回为字符串', () => {
-  const plan=normalizePlanningResult({expectedAction:'收藏、分享',coreKeywords:'AI；编程工具',remainingRisks:'none',titleCandidates:'一个可用标题'});
+  const plan=normalizePlanningResult({distribution_lane:'通知池',reader_stake:'影响开发者成本',expectedAction:'收藏、分享',coreKeywords:'AI；编程工具',remainingRisks:'none',titleCandidates:'一个可用标题'});
   assert.deepEqual(plan.expectedAction,['收藏','分享']);
   assert.deepEqual(plan.coreKeywords,['AI','编程工具']);
   assert.deepEqual(plan.remainingRisks,[]);
   assert.deepEqual(plan.titleCandidates,[{title:'一个可用标题',reason:''}]);
+  assert.equal(plan.distributionLane,'通知池');
+  assert.equal(plan.readerStake,'影响开发者成本');
 });
 
 test('终稿统一字数门禁默认1300–2000个可见字符', () => {
@@ -113,6 +115,18 @@ test('热点文章契约明确拒绝伪装教程、工具清单和纯快讯',()=
   assert.match(skill,/不承接纯资讯早报/);
   assert.match(skill,/教程必须先建立环境、步骤、成功标准和作者实践证据/);
   assert.match(skill,/工具 → 图文/);
+  assert.match(skill,/distribution_lane/);
+  assert.match(skill,/reader_stake/);
+});
+
+test('成稿执行器将分发池和读者利益写入规划、标题与锁定简报',()=>{
+  const pipeline=fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs',import.meta.url),'utf8');
+  const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+  assert.match(pipeline,/distribution_lane:\$\{brief\.distributionLane\}/);
+  assert.match(pipeline,/reader_stake:\$\{brief\.readerStake/);
+  assert.match(pipeline,/distribution_lane:brief\.distributionLane,reader_stake:brief\.readerStake/);
+  assert.match(server,/distribution_lane: \$\{candidate\.distribution_lane/);
+  assert.match(server,/reader_stake: \$\{candidate\.reader_stake/);
 });
 
 test('阶段子技能从项目 skills 目录加载', () => {

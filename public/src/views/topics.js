@@ -4,6 +4,7 @@ import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { DRAFT_SCORE_THRESHOLD } from "../core/constants.js";
 import { dimensionLabels } from "../core/dimensions.js";
+import { distributionLane, distributionLaneClass, readerStakeText } from "../core/distribution-view.js";
 
 function activeTrack() {
   return document.querySelector(".nav-item.active")?.dataset.view === "social-topics" ? "social_cards" : "article";
@@ -79,11 +80,14 @@ function renderCandidates(candidates, track = activeTrack()) {
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
         const dimensionLabel = dimensionLabels[item.dimension] || "";
         const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
+        const lane=distributionLane(item.distribution_lane);
+        const distributionSummary=track==="article"?`<div class="candidate-distribution" aria-label="分发判断"><span class="distribution-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><p><b>读者利益</b>${escapeHtml(readerStakeText(item.reader_stake))}</p></div>`:"";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
           <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
           ${track==='article'&&!item.composite&&item.event_conclusion?`<p class="candidate-description">代表报道：${escapeHtml(item.hotspot_title)}</p>`:''}
           ${track==='social_cards'&&item.repository_description?`<p class="candidate-description">${escapeHtml(item.repository_description)}</p>`:''}
           ${track==='social_cards'&&item.social_selection_reason?`<p class="candidate-selection-reason"><b>入选理由</b>${escapeHtml(item.social_selection_reason)}</p>`:''}
+          ${distributionSummary}
           <div class="candidate-meta"><span>${escapeHtml(item.track_pool_role || item.pool_role)}</span><span>${item.composite ? `多源综合${item.hotspot_count ? ` · ${item.hotspot_count}条报道` : ""}` : escapeHtml(item.source_name || item.source_group || item.source)}</span><span>风险 ${escapeHtml(item.risk_level)}</span></div>
           ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map((name) => escapeHtml(name)).join("」「")}」共享事件素材</p>` : ""}
           ${scoreStrip}

@@ -6,6 +6,7 @@ import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureM
 import { state } from "../core/state.js";
 import { DRAFT_SCORE_THRESHOLD, JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
+import { distributionLane, distributionLaneClass, readerStakeText } from "../core/distribution-view.js";
 
 const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
@@ -100,10 +101,11 @@ async function loadEditorialRoom(selectedId) {
   const hiddenCount = state.topicShowAll ? 0 : state.candidates.filter((item) => item.f_score != null && Number(item.f_score) < DRAFT_SCORE_THRESHOLD).length;
   const visibleCandidates = state.topicShowAll ? state.candidates : state.candidates.filter((item) => item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD);
   sidebar.innerHTML = visibleCandidates.length
-    ? visibleCandidates.map((item) => {
+      ? visibleCandidates.map((item) => {
         // 与选题池口径一致：综合候选展示组标题，单热点候选优先展示事件摘要
         const label = !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
-        return `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(statusLabel(item.brief_status || "DISCUSS"))}</b><span>${escapeHtml(label)}</span></button>`;
+        const lane=distributionLane(item.distribution_lane);
+        return `<button class="editorial-candidate ${Number(selectedId) === item.id ? "active" : ""}" data-edit-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)} · ${escapeHtml(statusLabel(item.brief_status || "DISCUSS"))}</b><span class="editorial-candidate-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><span class="editorial-candidate-title">${escapeHtml(label)}</span></button>`;
       }).join("")
     : '<div class="empty-state">选题池为空</div>';
   if (hiddenCount) sidebar.innerHTML += `<div class="editorial-hidden-note">已隐藏 ${hiddenCount} 条低于成稿线（F<55）的候选，可在选题池打开"显示全部"</div>`;
@@ -207,6 +209,11 @@ async function openEditorial(id) {
   if (title) title.textContent = !candidate.composite && candidate.event_card?.conclusion ? candidate.event_card.conclusion : candidate.hotspot_title;
   const badge = document.getElementById("editorial-composite-badge");
   if (badge) badge.hidden = !candidate.composite;
+  const lane=distributionLane(candidate.distribution_lane);
+  const laneEl=document.getElementById("editorial-distribution-lane");
+  if(laneEl){laneEl.textContent=lane;laneEl.className=`distribution-lane distribution-lane-${distributionLaneClass(lane)}`;}
+  const stakeEl=document.getElementById("editorial-reader-stake");
+  if(stakeEl)stakeEl.textContent=readerStakeText(candidate.reader_stake);
   const briefState = document.getElementById("brief-state");
   if (briefState) briefState.textContent = statusLabel(editorial.brief_status);
   const provEl = document.getElementById("editorial-provider");

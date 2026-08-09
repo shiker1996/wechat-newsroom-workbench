@@ -15,6 +15,19 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-10
+
+### Changed
+
+- 将账号内容策略拆分为推荐池、通知池和实验池，通知池增加具体读者利益、事实支持、风险等级和批次上限等确定性门禁，允许整批通知池为空。
+- 调整热点研判与候选选择：降低分数饱和和重复小事件干扰，为真实工具 / 工程内容增加独立识别、账号匹配加分和最低候选席位。
+- 选题、编辑会、标题和成稿技能贯通 `distribution_lane` 与 `reader_stake`，并在数据库候选记录、锁定简报和文章规划中持续保留。
+- 文章选题卡与热点事件创作页只读展示池位和读者利益，不提供人工改池控件。
+
+### Fixed
+
+- 修复路由拆分后候选详情处理器漏传 `candidateEventGroups`，导致热点事件创作页加载候选时报错的问题，并补充真实路由回归测试。
+
 ## [0.5.0] - 2026-08-09
 
 ### Added
@@ -191,7 +204,8 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/v0.4.3...0.5.0
 [0.4.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.1...0.4.2
 [0.4.1]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.0...0.4.1

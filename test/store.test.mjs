@@ -597,7 +597,7 @@ test('多报道事件研判落池为事件级综合候选并携带评分，重�
     store.addHotspots(batch.id, 'rsshub', [{ title: '事件A 报道一' }, { title: '事件A 报道二' }, { title: '事件B 唯一报道' }]);
     const [a1, a2, b1] = store.getBatch(batch.id).hotspots;
     const records = [
-      { hotspotId:a1.id, hotspotIds:[a1.id, a2.id], title:'事件A 报道一', poolRole:'核心8条', riskLevel:'低', angle:'角度A', thesis:'命题A', h:70, b:60, p:40, s:2, d:0, f:58 },
+      { hotspotId:a1.id, hotspotIds:[a1.id, a2.id], title:'事件A 报道一', poolRole:'核心8条', riskLevel:'低', angle:'角度A', thesis:'命题A', distributionLane:'通知池', readerStake:'影响开发者岗位选择', h:70, b:60, p:40, s:2, d:0, f:58 },
       { hotspotId:b1.id, title:'事件B 唯一报道', poolRole:'黑马2条', riskLevel:'低', angle:'角度B', thesis:'命题B', h:60, b:60, p:40, s:2, d:0, f:52 },
     ];
     store.saveAnalyzedCandidates(batch.id, records);
@@ -608,6 +608,8 @@ test('多报道事件研判落池为事件级综合候选并携带评分，重�
     assert.equal(composite.hotspot_count, 2);
     assert.equal(composite.pool_role, '核心8条');
     assert.equal(composite.f_score, 58);
+    assert.equal(composite.distribution_lane, '通知池');
+    assert.equal(composite.reader_stake, '影响开发者岗位选择');
     assert.equal(composite.status, 'analyzed');
     const single = list.find((item) => !item.composite);
     assert.equal(single.hotspot_id, b1.id);

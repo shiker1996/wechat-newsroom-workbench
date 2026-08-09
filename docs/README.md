@@ -40,6 +40,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
 | [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |
 | [optional-feature-todos.md](./optional-feature-todos.md) | 可选功能扩展 TODO（各事项独立状态） |
 | [optional-feature-implementation-roadmap.md](./optional-feature-implementation-roadmap.md) | 可选功能实施路线图（部分批次已完成） |

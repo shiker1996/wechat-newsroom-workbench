@@ -29,9 +29,41 @@
     "深度案例": "40%",
     "方法分享": "20%"
   },
+  "distributionStrategy": {
+    "recommendation": {
+      "purpose": "虚构示例：拉新、分享、收藏与搜索长尾",
+      "preferredTopics": ["方法", "工具", "案例"],
+      "titleRule": "场景痛点 + 可信证据 + 可获得结果"
+    },
+    "notification": {
+      "purpose": "虚构示例：维护存量读者与表达账号判断",
+      "preferredTopics": ["行业变化", "读者切身利益"],
+      "titleRule": "事件 + 对目标读者的直接影响"
+    },
+    "experiment": {
+      "purpose": "虚构示例：验证新形式和新角度",
+      "preferredTopics": ["新栏目", "跨领域观察"],
+      "titleRule": "明确假设与新角度"
+    }
+  },
+  "notificationPolicy": {
+    "minimumMatchedCriteria": 2,
+    "minimumNotificationFit": 4,
+    "minimumFactSupport": 4,
+    "maxPerBatch": 2,
+    "blockedRiskLevels": ["高", "较高"],
+    "readerStakes": ["工作", "收入", "岗位", "效率", "成本", "选择"],
+    "criteria": [
+      "影响目标读者的工作或选择",
+      "标题能说明为什么与读者有关",
+      "除信息复述外有明确判断或行动增量"
+    ]
+  },
   "scoring": {
     "weights": { "h": 0.6, "b": 0.25, "p": 0.15 },
     "accountFitBonus": 6,
+    "toolEngineeringBonus": 10,
+    "minimumToolCandidates": 2,
     "categoryPreference": { "🏢 大厂战略": 6, "🤖 AI/技术动态": 4, "📈 行业趋势": 3, "📰 综合资讯": 1, "💼 职场生态": 0 },
     "pBase": { "🏢 大厂战略": 50, "🤖 AI/技术动态": 40, "📈 行业趋势": 30, "📰 综合资讯": 20, "💼 职场生态": 10 },
     "hBase": { "worker_social": 48, "bigtech": 33, "owned_experience": 35, "controversial_return": 30, "key_person_move": 33, "github_tool": 25, "ai_tool_test": 25, "financing": 10, "career_anxiety": 5, "contrarian_bigtech": 35 }

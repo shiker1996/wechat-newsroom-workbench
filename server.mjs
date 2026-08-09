@@ -207,6 +207,8 @@ function lockedBrief(candidate, editorial) {
   return `---
 brief_status: LOCKED
 candidate_id: ${candidate.candidate_id}
+distribution_lane: ${candidate.distribution_lane || '推荐池'}
+reader_stake: ${candidate.reader_stake || ''}
 experience_required: ${editorial.experience_required ? 'true' : 'false'}
 decision_source: explicit-user
 final_readiness: WRITE_NOW
@@ -221,6 +223,11 @@ ${candidate.thesis.trim()}
 ## 推荐角度
 
 ${candidate.angle.trim() || '未单独填写，以锁定命题为准。'}
+
+## 分发与读者利益
+
+- 分发池：${candidate.distribution_lane || '推荐池'}
+- 读者利益：${candidate.reader_stake || '待明确'}
 
 ## 已确认公共事实
 

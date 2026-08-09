@@ -42,9 +42,13 @@
 复制 `account-context.example.json` 后按自己的账号修改。被编辑会、选题契合加分和成稿技能读取。字段含义：
 
 - 画像：`name`、`description`、`readerProfile`、`contentPillars`（前缀映射打标五类，决定账号契合加分命中）、`voiceGuardrails`、`packagingModes`、`followReason`、`conversionBridge`、`differentiators`、`articleFramework`、`contentRatio`。格式化逻辑见 `lib/domain/account-context.mjs`。
+- 双分发策略（可选）：`distributionStrategy.recommendation|notification|experiment`。每个池可配置 `purpose`、`preferredTopics` 和 `titleRule`，由选题、编辑会、标题和成稿技能读取；这些字段只描述内容规划，不授予自动群发或发布权限。
+- 通知资格（可选）：`notificationPolicy.minimumMatchedCriteria`、`minimumNotificationFit`（默认 4/5）、`minimumFactSupport`（默认 4/5）、`maxPerBatch`（默认 2，允许 0）、`blockedRiskLevels`、`readerStakes`、`criteria`。通知池必须有具体读者、明确动作或决策和具体后果；传闻、待核事实及禁入风险会确定性降到实验池，缺失配置时使用内置严格规则。
 - `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`lib/llm/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
   - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——总分公式 `F = H×h + B×b + P×p - S`。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
+  - `toolEngineeringBonus`（10）：维度组命中 GitHub、开源、开发工具、工程实践、框架、插件、代码模型或 Agent Skills 等强工具信号时加分；可在私有账号配置中单独提高，不会奖励泛 AI 新闻。
+  - `minimumToolCandidates`（2）：常规核心候选中至少保留的强工具/工程候选数；没有足够合格工具时按实际数量保留，不会用泛 AI 事件补位。私有账号可按内容配比提高。
   - `categoryPreference`：预排序分类偏好分（大厂 6 / AI 4 / 行业 3 / 综合 1 / 职场 0）。调低或调负可让泛热点沉底。
   - `pBase`：P 分类基分（大厂 50 / AI 40 / 行业 30 / 综合 20 / 职场 10）。
   - `hBase`：H 爆款画像基分（worker_social 48、bigtech 33 等，完整键见示例文件）。

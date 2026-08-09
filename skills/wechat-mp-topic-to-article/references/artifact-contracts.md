@@ -42,6 +42,8 @@ articles/<topic-slug>/
 - `locked_thesis`
 - `target_reader`
 - `reader_job`
+- `distribution_lane: 推荐池|通知池|实验池`
+- `reader_stake`
 - `confirmed_public_facts`
 - `confirmed_author_opinions`
 - `confirmed_experiences`
@@ -60,6 +62,8 @@ articles/<topic-slug>/
 - `brief_status: LOCKED`
 - `experience_required: true|false`
 - `audience`
+- `distribution_lane: 推荐池|通知池|实验池`
+- `reader_stake`
 - `content_role: 拉新|沉淀|搜索`
 - `expected_action`（1-2 个：评论、分享、收藏、关注或搜索）
 - `practical_increment`
@@ -79,6 +83,7 @@ articles/<topic-slug>/
 - `## 核心判断`
 - `## 目标读者`
 - `## 内容角色`
+- `## 分发池与读者利益`
 - `## 事实基座`
 - `## 结构大纲`
 - `## 信息增量`
@@ -94,6 +99,8 @@ articles/<topic-slug>/
 ### 03-titles.md
 
 - `core_keywords`
+- `distribution_lane: 推荐池|通知池|实验池`
+- `reader_stake`
 - 候选标题及评分理由
 - 唯一一行 `SELECTED_TITLE: ...`
 - `writer_skill: ...`
