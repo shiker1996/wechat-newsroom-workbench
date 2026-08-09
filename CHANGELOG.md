@@ -15,6 +15,31 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-09
+
+### Added
+
+- 将持久化层拆分为数据库迁移、查询服务和按领域划分的 Repository，并保留 `Store` 兼容门面。
+- 将批次、候选、任务等服务端路由，以及文章排版、图文故事板和编辑器文档模型拆分为独立模块。
+- 新增采集质量门，在入库和 AI 打标前过滤标题、摘要与正文均为空的低价值记录。
+
+### Changed
+
+- Reddit 运行时改用独立 Chrome Profile 和专用 CDP 端口，并增强 IPv4、IPv6 与 localhost 兼容处理。
+- 事件卡生成对模型合法 JSON 漏项执行极简重试，部分失败会显示明确状态，不再假完成。
+- 完成项目架构与重构评估文档，明确各层职责和后续维护边界。
+
+### Fixed
+
+- 修复新版 Chrome 下 Reddit 启动按钮阻塞、健康检查误判和停止操作假成功。
+- 修复空采集记录导致事件卡进度长期停留在最后一条的问题。
+- 修复批次早报配图工作台缺少 `daily/images/:imageId/generate` 路由导致生成图片返回 404。
+- 修复路由拆分后的 ESM 命名导入问题，并增加真实模块链接测试。
+
+### Security
+
+- 收紧排版结构检查中的嵌套 `<style>` 清理和编辑器字数统计中的嵌套 HTML 注释清理，通过 CodeQL 扫描。
+
 ## [0.4.2] - 2026-08-08
 
 ### Fixed
@@ -166,7 +191,10 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/v0.4.3...0.5.0
+[0.4.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.1...0.4.2
+[0.4.1]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.2...0.3.0
 [0.2.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.2.1...0.2.2
