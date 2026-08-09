@@ -87,7 +87,7 @@ test('news search requests news topic and keeps provider warnings', async () => 
 });
 
 test('creation chains wire search flags into both autonomous writing and custom cards', () => {
-  const server = fs.readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
+  const server = `${fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs', import.meta.url), 'utf8')}\n${fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8')}`;
   const occurrences = server.match(/attachInformationSearch\(\{ ?fact, ?input/g) || [];
   assert.equal(occurrences.length, 2);
   assert.match(server, /skillId: 'custom-card-storyboard'/);

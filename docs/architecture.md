@@ -10,8 +10,8 @@
 浏览器（public/src 视图）
    │  /api/*（JSON 与 NDJSON 流）
    ▼
-server.mjs ──► lib/http/routes/*（已抽出的路由模块，返回 falsy 继续）
-   │        └─► server.mjs 内联路由（候选、任务、流式策划等，过渡形态）
+server.mjs ──► lib/http/routes/*（按批次、候选创作、任务及既有领域模块拆分）
+   │        └─► server.mjs（只保留装配、静态资源和少量顶层入口）
    ▼
 ┌────────────────┬─────────────────┬──────────────────┐
 │ Store（数据层） │ AiJobManager /   │ ModelGateway      │
@@ -27,7 +27,7 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 1. `loadEnv`（`lib/core/env.mjs`）→ `loadConfig`（`lib/core/config.mjs`，全部默认值内置，`config.local.json` 覆盖）。
 2. 组装单例：`Store`（`data/workbench.db`）、`JobManager`（采集任务）、`ModelGateway`、`AiJobManager`，构造函数传参，无 DI 框架。
-3. 路由注册是**顺序链式**：`/api/` 请求先依次过 `lib/http/routes/` 六个 handler（返回 falsy 则继续），再进 server.mjs 内联路由，最后 404。这是「路由模块抽出进行中」的过渡形态，新增路由应优先进 `lib/http/routes/`。
+3. 路由注册是**顺序链式**：`/api/` 请求先依次经过 `lib/http/routes/` 的模型、主题、内容、系统、媒体、文章、社交卡、批次、候选创作和任务 handler（返回 falsy 则继续），最后由顶层入口决定 404。路由模块只负责 HTTP 适配，批次/候选/任务的业务编排通过显式上下文注入。
 4. 静态资源只服务 `public/`，路径越界检查 + `no-store`，无 SPA fallback。
 5. 引导时异步自启 RSSHub（失败只记日志不阻塞）；端口被占用时探测既有实例 `/api/overview`，已运行则提示退出。除 RSSHub 外无常驻守护，后台任务均为请求触发。
 
@@ -41,6 +41,10 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 | `media-routes.mjs` | 配图工作区、排版 `/ai/typeset`、文档列表、可视化规划与决策 |
 | `article-routes.mjs` | 编辑会（同步与流式）、writer / stage 技能选择、文档修订、来源抓取、`/ai/draft`、`/ai/article` |
 | `social-card-routes.mjs` | 卡片编辑会、卡片页 CRUD / layout、social-cards 文件与 ZIP、渠道、仓库巡检、`/ai/social-card` |
+| `batch-routes.mjs` | 批次 CRUD、采集、排名、社交排名、热点全景和删除影响评估 |
+| `candidate-routes.mjs` | 候选池、综合候选、突发素材、自定义图文、自主写作和候选轨道 |
+| `task-routes.mjs` | 打标、研究、自动化、事件卡、日报与任务查询 |
+| `route-helpers.mjs` | 路由响应、批次装饰、事件卡关联、事件事实和文件写入辅助 |
 
 两个横切约定：
 
@@ -49,9 +53,9 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 ## 数据层（lib/core/）
 
-- `store.mjs` 的 `Store` 类：WAL 模式 + 外键约束，约 25 张表覆盖批次、热点、候选、文档、产物、编辑会话、LLM 调用审计（`model_calls`）、生成快照、AI 运行、工具执行等。
+- `store.mjs` 的 `Store` 类是兼容 facade：负责打开数据库、执行启动迁移、组装 Repository/Query Service/Application Service，并暴露旧公共 API；Store 本身不再直接执行 SQL。
 - 迁移是**幂等的 `CREATE TABLE IF NOT EXISTS` + `PRAGMA table_info` 探测补列**（无 `user_version`），只增不破；跨版本验收见 `test/version-compat.test.mjs`。
-- Store 还承担备份恢复（整库导入 + `foreign_key_check`）与生成快照存取。
+- 整库导入与 `foreign_key_check` 由 `DatabaseRestoreService` 承担，生成快照等领域数据由对应 Repository 存取。
 - 同目录：`config.mjs`（默认值，含 LLM providers 与 RSSHub 路由）、`env.mjs`、`workspace-paths.mjs`（`articles/`、`topics/`、`social-cards/` 等产物目录）。
 
 ### 核心实体关系（批次 / 热点 / 事件 / 选题）
@@ -64,7 +68,9 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 ## 后台任务
 
 - `lib/jobs/job-manager.mjs`：非 AI **采集任务**，内存 Map 按批次防重，并行跑 Reddit（CDP）与 RSSHub / GitHub 采集，逐源写 `source_runs` / `subscription_runs`。
-- `lib/llm/ai-job-manager.mjs`：**AI 任务**统一入口，合法类型 `tag / retag / event-cards / research / breaking-analysis / article / daily / tutorial / typeset / social-card / auto`；同批次只允许一个 running；`auto` 串联打标 → 事件卡 → 研判。
+- `lib/llm/ai-job-manager.mjs`：**AI 任务调度器**，只负责排队、并发上限、批次/候选互斥、thinking 日志、状态持久化与统一异常收口。
+- `lib/jobs/ai-job-handlers.mjs`：12 类 AI 任务的显式注册表，集中声明合法任务类型、批次级互斥类型以及各流水线参数映射。
+- `lib/jobs/auto-pipeline.mjs`：`auto` 复合流程，普通批次串联打标 → 事件卡 → 研判，突发批次转入突发事实分析。
 - 持久化：内存与 `ai_runs` 表双写，`GET /api/jobs/:id` 先查内存再回退数据库。**重启后任务视为结束，不做断点续跑**；逐行内存日志不恢复，数据库审计仍在。
 - `lib/llm/tasks.mjs`：基础任务单元（热点打标 `tagBatch`、快速起草 `draftArticle`）。
 
@@ -132,10 +138,12 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 | `lib/domain/` | 纯领域逻辑（账号上下文、事实基座、来源质量、图文门禁与提示词） |
 | `lib/http/routes/` | 已抽出的 HTTP 路由模块 |
 | `lib/llm/` | LLM 网关、各条流水线、AI 任务、技能 bundle 加载 |
+| `lib/persistence/` | SQLite 连接、完整 Schema/兼容迁移、外键校验、按领域拆分的数据仓储与跨领域只读 Query Service；`Store` 作为兼容 facade 暴露旧 API |
+| `lib/rendering/` | 无文件系统和模型副作用的 Markdown/HTML、故事板和主题输出纯函数 |
 | `lib/themes/` | 主题注册 / 校验 / 编译、发布门禁、AI 主题生成（article / social / cover 三目标）、封面组件与封面编译器 |
 | `lib/skills/` | 技能注册、清单、路由、包管理 |
 | `lib/tools/` | 工具注册中心、策略、插件包管理、远程适配 |
 | `lib/jobs/` | 采集任务编排 |
 | `lib/artifacts/` | 备份归档等产物处理 |
 | `skills/`、`plugins/` | 内置技能与内置工具插件源码 |
-| `public/` | 浏览器端（原生 ESM 视图） |
+| `public/` | 浏览器端（原生 ESM 视图）；大型编辑器视图把无 DOM 文档分析和图文展示规则分别下沉到 `editor-document-model.js`、`social-editor-model.js` |

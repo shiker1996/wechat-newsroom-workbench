@@ -3,6 +3,7 @@ import { request } from "../core/http.js";
 import { streamChat } from "../core/stream-chat.js";
 import { escapeHtml, toast, providerOptions, confirmAction } from "../core/ui.js";
 import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
+import { candidateMode, cardBlockEditorHtml, cardBlockTypeOptions, isCustomOutput, isEventOutput, socialFactsHtml, socialScoreView } from "./social-editor-model.js";
 
 let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
@@ -23,26 +24,12 @@ const CARD_ROLE_LABELS={cover:'封面',concept:'概念',feature:'功能',steps:'
 const CARD_COMPOSITION_LABELS={'hero-stack':'主视觉堆叠','hero-frame':'主视觉框景','concept-split':'概念分栏','concept-offset':'概念错位','feature-ledger':'功能账本','feature-stack':'功能纵列','sequence-rail':'步骤轨道','sequence-offset':'步骤错列','metric-board':'数据面板','metric-split':'数据分栏','comparison-board':'对比面板','comparison-split':'对比分栏','evidence-ledger':'证据账本','evidence-frame':'证据框景','timeline-rail':'时间轨道','timeline-offset':'时间错列','risk-sidebar':'风险侧栏','risk-frame':'风险框景','closing-focus':'收束聚焦','closing-note':'收束便笺'};
 const CARD_DECORATION_LABELS={none:'无装饰',orbit:'轨道圆环','index-line':'索引线',stamp:'编辑戳记'};
 const CARD_OVERLAP_LABELS={none:'标准层级','title-card':'标题叠卡','accent-edge':'边缘错位'};
-const CARD_ALLOWED_BLOCK_TYPES=['text','list','code','note','stats','compare','steps','timeline','scenes','highlight'];
-const CARD_STRUCTURED_BLOCK_TYPES=new Set(['stats','compare','steps','timeline','scenes']);
-const CARD_BLOCK_TYPE_LABELS={text:'正文',list:'列表',code:'代码',note:'提示',stats:'数据卡',compare:'对比卡',steps:'步骤卡',timeline:'时间线',scenes:'场景卡',highlight:'亮点'};
-function cardBlockTypeOptions(selected){
-  return CARD_ALLOWED_BLOCK_TYPES.map((type)=>`<option value="${type}"${type===selected?' selected':''}>${CARD_BLOCK_TYPE_LABELS[type]||type}</option>`).join('');
-}
-function cardBlockEditorHtml(block,index){
-  const type=CARD_ALLOWED_BLOCK_TYPES.includes(block?.type)?block.type:'text';
-  const structured=CARD_STRUCTURED_BLOCK_TYPES.has(type);
-  const payload=structured?JSON.stringify({items:block.items||[],headers:block.headers||[],rows:block.rows||[]},null,2):String(block.content||'');
-  return `<fieldset class="storyboard-block-editor" data-storyboard-block="${index}"><legend>内容块 ${index+1}<select data-storyboard-block-type>${cardBlockTypeOptions(type)}</select></legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title||'')}"></label><label>${structured?'结构化内容（JSON）':'正文'}<textarea data-storyboard-block-content rows="${structured?6:3}">${escapeHtml(payload)}</textarea></label><button type="button" class="text-button" data-remove-storyboard-block>删除此块</button></fieldset>`;
-}
 
 function syncCompositionControls(){
   const picker=document.getElementById('social-template-picker');
   if(picker)picker.hidden=selectedCompositionMode==='smart';
 }
 
-const CUSTOM_TYPE_LABELS={tutorial:'教程',list:'清单',opinion:'观点'};
-const CUSTOM_LEVEL_LABELS={author_experience:'作者体验',user_material:'用户素材',model_suggestion:'模型建议'};
 const SOCIAL_ENTRY_POINTS={repository:'social-tool',event:'social-event',custom:'social-custom'};
 
 function socialRoutingContentType(data){
@@ -70,9 +57,6 @@ async function loadSocialSkillControls(data){
 
 // 工具图文 / 自定义图文 / 事件图文三个导航入口共用本模块，以 currentMode 区分
 let currentMode='tools';
-function isCustomOutput(mode){return String(mode||'').includes('custom-cards');}
-function isEventOutput(mode){return String(mode||'').includes('event-cards');}
-function candidateMode(outputMode){return isCustomOutput(outputMode)?'custom':isEventOutput(outputMode)?'event':'tools';}
 const MODE_LAYOUT={
   tools:{heading:'工具图文',intro:'AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。',empty:'当前批次没有工具图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
   custom:{heading:'自定义图文',intro:'从主题、要点和素材直接立项，AI 按来源等级规划卡片故事板。',empty:'当前批次没有自定义图文，请点击上方「创建自定义图文」添加。'},
@@ -136,33 +120,13 @@ function renderGate(gate) {
 }
 
 function renderFacts(facts,eventAnalysis) {
-  const node=document.getElementById("repository-facts"); const fact=facts?.data;
-  if(selectedContentType==='event'){
-    const analysis=eventAnalysis?.analysis;
-    if(!analysis){node.innerHTML='<div class="empty-state">突发事实基座尚未生成。</div>';return;}
-    const confirmed=analysis.factBase?.confirmedFacts||[],claims=analysis.factBase?.claims||[],sources=analysis.sources||[];
-    node.innerHTML=`<div class="repository-fact-grid"><span><b>${sources.filter((item)=>item.status==='ok').length}</b>可用来源</span><span><b>${confirmed.length}</b>确认事实</span><span><b>${claims.length}</b>待核主张</span><span><b>${analysis.sourceAudit?.independentSourceCount||0}</b>独立来源</span></div><p>${escapeHtml(analysis.eventSummary||'')}</p>${(analysis.sourceAudit?.issues||[]).length?`<ul>${analysis.sourceAudit.issues.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul>`:''}`;
-    return;
-  }
-  if(selectedContentType==='custom'){
-    if(!fact||fact.kind!=='custom'){node.innerHTML='<div class="empty-state">自定义事实基座尚未生成，请重新创建自定义图文。</div>';return;}
-    const points=fact.points||[],materials=fact.materials||[];
-    const materialsHtml=materials.length?`<ul>${materials.map((item)=>`<li>${escapeHtml(item.url)}（${item.status==='ok'?`抓取成功 ${item.content_chars} 字`:`抓取失败：${escapeHtml(item.error||'未知原因')}`}）</li>`).join('')}</ul>`:'';
-    node.innerHTML=`<div class="repository-fact-grid"><span><b>${escapeHtml(CUSTOM_TYPE_LABELS[fact.content_type]||fact.content_type)}</b>内容类型</span><span><b>${points.length}</b>核心要点</span><span><b>${materials.filter((item)=>item.status==='ok').length}/${materials.length}</b>素材抓取</span><span><b>${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}</b>渠道</span></div><p>${escapeHtml(fact.topic||'')}</p><ul>${points.map((item)=>`<li>[${escapeHtml(CUSTOM_LEVEL_LABELS[item.source_level]||item.source_level)}] ${escapeHtml(item.text)}</li>`).join('')}</ul>${materialsHtml}${fact.limitations?`<small>限制：${escapeHtml(fact.limitations)}</small>`:''}`;
-    return;
-  }
-  if(!fact){node.innerHTML=facts?.error?`<div class="pipeline-error">${escapeHtml(facts.error)}</div>`:'<div class="empty-state">尚未核验仓库。点击“核验 / 刷新仓库”。</div>';return;}
-  node.innerHTML=`<div class="repository-fact-grid"><span><b>${Number(fact.stars?.value||0).toLocaleString()}</b>Stars</span><span><b>${escapeHtml(fact.license?.type||'UNKNOWN')}</b>License</span><span><b>${escapeHtml(fact.latestRelease?.version||'未发现')}</b>Release</span><span><b>${escapeHtml(fact.maturity||'unknown')}</b>成熟度</span></div><p>${escapeHtml(fact.description||'仓库未提供简介')}</p><small>核验时间：${escapeHtml(fact.stars?.checkedAt||facts.checked_at||'')}</small>${(fact.warnings||[]).length?`<ul>${fact.warnings.map((x)=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}`;
+  document.getElementById("repository-facts").innerHTML=socialFactsHtml({contentType:selectedContentType,channelMode:selectedChannelMode,facts,eventAnalysis});
 }
 
 function renderScore(score) {
-  const data=score?.score||{}; document.getElementById("social-fit-score").textContent=data.finalScore??"—";
-  const labels=selectedContentType==='event'
-    ? {informationDensity:'信息密度',visualNarrative:'视觉叙事',conflictEmotion:'冲突情绪',timeliness:'时效性',audienceRelevance:'受众相关',evidenceCompleteness:'证据完整',singleSource:'单源扣分',unverifiedAllegation:'未核实扣分'}
-    : selectedContentType==='custom'
-      ? {}
-      : {toolClarity:'工具明确',scenarioValue:'场景价值',demonstrability:'可演示',visualPotential:'拆页潜力',saveSearchValue:'收藏搜索',sourceCompleteness:'来源完整',factGapPenalty:'事实扣分',permissionRiskPenalty:'权限扣分'};
-  document.getElementById("social-score-parts").innerHTML=Object.entries(labels).map(([key,label])=>`<span>${label}<b>${data[key]??'—'}</b></span>`).join('')||'<span>自定义图文不参与选题评分</span>';
+  const view=socialScoreView(score,selectedContentType);
+  document.getElementById("social-fit-score").textContent=view.finalScore;
+  document.getElementById("social-score-parts").innerHTML=view.partsHtml;
 }
 
 async function loadSimilarSocialCards(candidateId){const container=document.getElementById('similar-social-cards');if(!container)return;container.hidden=true;container.innerHTML='';try{const items=await request(`/api/candidates/${candidateId}/similar-social`);if(candidateId!==selectedId||!items.length)return;container.innerHTML=`<b>历史图文覆盖</b>${items.map((item)=>`<div><button type="button" class="inline-button" data-cal-social="${item.candidateRowId}" title="打开历史图文">${escapeHtml(item.title||item.candidateId)}</button> <small>${escapeHtml(item.batchDate||'')} · ${escapeHtml(item.reason||'相似内容')}</small></div>`).join('')}`;container.hidden=false;}catch{container.hidden=true;}}

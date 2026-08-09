@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
 const dashboard = fs.readFileSync(path.join(root, "public/src/views/dashboard.js"), "utf8");
-const store = fs.readFileSync(path.join(root, "lib/core/store.mjs"), "utf8");
+const workbenchQueries = fs.readFileSync(path.join(root, "lib/persistence/queries/workbench-query-service.mjs"), "utf8");
 
 test("首页首屏提供五项可操作值班信号", () => {
   assert.match(html, /id="dashboard-attention"/);
@@ -22,10 +22,10 @@ test("采集状态进入采集源，当前流程打开批次详情", () => {
 });
 
 test("首页概览返回当前批次异常与待办统计", () => {
-  assert.match(store, /failedRuns:/);
-  assert.match(store, /pendingArticleCandidates:/);
-  assert.match(store, /blockedBriefs:/);
-  assert.match(store, /sourceOk:/);
+  assert.match(workbenchQueries, /failedRuns:/);
+  assert.match(workbenchQueries, /pendingArticleCandidates:/);
+  assert.match(workbenchQueries, /blockedBriefs:/);
+  assert.match(workbenchQueries, /sourceOk:/);
 });
 
 test("累计数据退为四项次级指标", () => {

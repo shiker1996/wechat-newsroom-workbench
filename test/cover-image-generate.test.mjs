@@ -117,7 +117,7 @@ test('cover routes, job type and navigation are wired', () => {
   const routes = fs.readFileSync('lib/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('\\/cover\\/generate$'));
   assert.ok(routes.includes('\\/cover\\/local$'));
-  const jobs = fs.readFileSync('lib/llm/ai-job-manager.mjs', 'utf8');
+  const jobs = fs.readFileSync('lib/jobs/ai-job-handlers.mjs', 'utf8');
   assert.ok(jobs.includes("'cover-image'"));
   assert.ok(jobs.includes('runCoverImageJob'));
   const index = fs.readFileSync('public/index.html', 'utf8');

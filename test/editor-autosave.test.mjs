@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const editor=fs.readFileSync(new URL('../public/src/views/editor.js',import.meta.url),'utf8');
+const documentModel=fs.readFileSync(new URL('../public/src/views/editor-document-model.js',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 
@@ -70,8 +71,8 @@ test('专注模式可切换、记忆偏好并通过 Esc 退出',()=>{
 test('文章大纲解析一至三级标题并排除代码围栏',()=>{
   assert.match(html,/id="document-outline"/);
   assert.match(editor,/function markdownHeadings\(markdown\)/);
-  assert.equal(editor.includes('/^(#{1,3})\\s+'),true);
-  assert.match(editor,/inFence=!inFence/);
+  assert.equal(documentModel.includes('/^(#{1,3})\\s+'),true);
+  assert.match(documentModel,/inFence = !inFence/);
 });
 
 test('大纲章节可同时定位编辑器与预览并记忆展开状态',()=>{
@@ -92,13 +93,13 @@ test('窄桌面宽度下保存按钮留在工具栏网格内',()=>{
 test('写作统计实时计算字数、段落与阅读时长',()=>{
   assert.match(html,/id="writing-stats"/);
   assert.match(editor,/function writingStatistics\(markdown\)/);
-  assert.match(editor,/Math\.ceil\(chars\/400\)/);
+  assert.match(documentModel,/Math\.ceil\(chars \/ 400\)/);
   assert.match(editor,/stat-paragraphs/);
 });
 
 test('章节完整度检查标题后的正文展开量',()=>{
-  assert.match(editor,/headings=markdownHeadings\(markdown\)\.filter/);
-  assert.match(editor,/>=50/);
+  assert.match(documentModel,/markdownHeadings\(text\)\.filter/);
+  assert.match(documentModel,/>= 50/);
   assert.match(editor,/stats\.complete===stats\.sections/);
 });
 
@@ -118,10 +119,10 @@ test('写作目标实时计算百分比并限制合理范围',()=>{
 test('质量检查覆盖空章节、长段落、标题结构和来源链接',()=>{
   assert.match(html,/id="quality-dialog"/);
   assert.match(editor,/function qualityIssues\(markdown\)/);
-  assert.match(editor,/缺少一级标题/);
-  assert.match(editor,/段落过长/);
-  assert.match(editor,/缺少正文/);
-  assert.match(editor,/尚未包含任何来源链接/);
+  assert.match(documentModel,/缺少一级标题/);
+  assert.match(documentModel,/段落过长/);
+  assert.match(documentModel,/缺少正文/);
+  assert.match(documentModel,/尚未包含任何来源链接/);
 });
 
 test('质量问题支持点击定位正文且不会自动改写',()=>{

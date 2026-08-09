@@ -39,6 +39,8 @@ test('generated html escapes content and honors ratio sizes', () => {
 test('generate endpoint and workbench button are wired', () => {
   const routes = fs.readFileSync('lib/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('/generate$'));
+  assert.ok(routes.includes('dailyImageGenerateMatch'));
+  assert.match(routes, /daily\\\/images[\s\S]*dailyImageGenerateMatch/);
   assert.ok(routes.includes('generateArticleImage'));
   assert.ok(routes.includes('registerGeneratedSlotImage'));
   const preview = fs.readFileSync('public/src/views/preview.js', 'utf8');

@@ -158,6 +158,24 @@ test('事件卡生成：截断自动拆分，单事件失败不阻塞整批', as
   assert.ok(invalid.some((entry) => entry.status === 'invalid_output'));
 });
 
+test('事件卡生成：模型返回合法 JSON 但漏项时自动极简重试', async () => {
+  const clusters = clusterItems([hotspot(21,'事件漏项','主体|发布|产品')]);
+  let calls = 0;
+  const gateway = { config:{ defaultProvider:'deepseek', providers:{ deepseek:{ maxOutputTokens:8192 } } }, async complete(input) {
+    calls += 1;
+    const events = JSON.parse(input.messages[1].content.replace(/^【极简重试】[^\n]*\n/, ''));
+    if (calls === 1) return { callId:calls, finishReason:'stop', content:'{"items":[]' + '}', context:{}, usage:{} };
+    return { callId:calls, finishReason:'stop', context:{}, usage:{}, content:JSON.stringify({items:[{
+      event_id:events[0].event_id, conclusion:'补回的事件卡', confirmed_facts:[], source_increment:[], disagreements:[], timeline:[], unverified:[], angles:[],
+    }]}) };
+  }};
+  const result = await generateEventCards({ gateway, store:{updateModelCall(){}}, clusters, batchId:'b1', provider:'deepseek' });
+  assert.equal(calls, 2);
+  assert.equal(result.cards.size, 1);
+  assert.equal(result.failed.length, 0);
+  assert.equal(clusters[0].card.conclusion, '补回的事件卡');
+});
+
 test('事件卡大批量生成使用持续补位工作池和服务商并发配置', async () => {
   const clusters = clusterItems(Array.from({ length: 8 }, (_, i) => hotspot(i + 1, `事件${i + 1}`, `主体${i + 1}|动作|对象`)));
   let active = 0; let maxActive = 0; let calls = 0;

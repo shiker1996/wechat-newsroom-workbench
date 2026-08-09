@@ -437,6 +437,9 @@ AI 规划配图占位
 ### POST /api/batches/:id/daily/images/:imageId
 保存批次早报本地图片。
 
+### POST /api/batches/:id/daily/images/:imageId/generate
+根据早报配图占位中的结构化 generate 规格生成本地图片。
+
 ### GET /api/batches/:id/daily/images/:imageId/local
 预览批次早报本地图片。
 
