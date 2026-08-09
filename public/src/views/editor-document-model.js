@@ -1,9 +1,16 @@
 export function visibleChars(markdown) {
-  return String(markdown || '')
+  let cleaned = String(markdown || '')
     .replace(/```(?:mermaid|echarts)\b[\s\S]*?```/gi, '')
     .replace(/^```[^\r\n]*$/gm, '')
-    .replace(/^#.*$/gm, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^#.*$/gm, '');
+
+  let previous;
+  do {
+    previous = cleaned;
+    cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+  } while (cleaned !== previous);
+
+  return cleaned
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/^[-#>]\s?/gm, '')
