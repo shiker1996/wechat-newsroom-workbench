@@ -6,10 +6,13 @@ async function getJson(url, options) {
   return response.json();
 }
 
-function cdpCandidates(configuredUrl) {
+export function cdpCandidates(configuredUrl) {
   const candidates = [configuredUrl];
   try {
     const parsed = new URL(configuredUrl);
+    if (['127.0.0.1', 'localhost', '[::1]', '::1'].includes(parsed.hostname)) {
+      candidates.push(`${parsed.protocol}//localhost:${parsed.port || '9222'}`);
+    }
     if (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
       candidates.push(`${parsed.protocol}//[::1]:${parsed.port || '9222'}`);
     }

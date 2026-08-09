@@ -21,10 +21,10 @@ test('教程管线使用独立技能并保存标准文章终稿',()=>{
 });
 
 test('教程入口创建标准文章候选并启动独立任务',()=>{
-  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
   assert.match(source,/custom-articles\|tutorials/);
-  assert.match(source,/tracks:\['article'\]/);
-  assert.match(source,/type:'tutorial'/);
+  assert.match(source,/tracks: \['article'\]/);
+  assert.match(source,/type: 'tutorial'/);
   assert.match(source,/tutorial-chat\\\/stream/);
   assert.match(source,/readLocalProject/);
   assert.match(source,/wechat-experience/);

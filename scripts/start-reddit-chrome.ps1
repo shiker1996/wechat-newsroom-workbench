@@ -1,9 +1,9 @@
 param(
-  [int]$Port = 9222,
+  [int]$Port = 9333,
   [switch]$ValidateOnly
 )
 
-$profilePath = Join-Path $PSScriptRoot '..\data\reddit-chrome-profile'
+$profilePath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\data\reddit-chrome-profile'))
 $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
 $chromeCandidates = @(
   (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
@@ -31,17 +31,27 @@ New-Item -ItemType Directory -Force -Path $profilePath | Out-Null
 try {
   $ready = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 2
   if ($ready.webSocketDebuggerUrl) {
-    Start-Process "https://old.reddit.com/r/programming/hot/"
     Write-Host "Reddit Chrome is already running. CDP port: $Port"
     exit 0
   }
 } catch {}
-Start-Process -FilePath $chromePath -ArgumentList @(
-  "--remote-debugging-port=$Port",
-  "--user-data-dir=$profilePath",
-  '--no-first-run',
-  'https://old.reddit.com/r/programming/hot/'
-)
+$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+$startInfo.FileName = $chromePath
+$startInfo.Arguments = "--remote-debugging-port=$Port --user-data-dir=`"$profilePath`" --no-first-run --new-window https://old.reddit.com/r/programming/hot/"
+$startInfo.UseShellExecute = $true
+[System.Diagnostics.Process]::Start($startInfo) | Out-Null
 
-Write-Host "Reddit Chrome started. CDP port: $Port"
-Write-Host 'Sign in to Reddit in this window once. The dedicated profile will keep the session.'
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+  try {
+    $ready = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 1
+    if ($ready.webSocketDebuggerUrl) {
+      Write-Host "Reddit Chrome started and CDP is ready. Port: $Port"
+      Write-Host 'Sign in to Reddit in this window once. The dedicated profile will keep the session.'
+      exit 0
+    }
+  } catch {}
+  Start-Sleep -Milliseconds 500
+}
+
+Write-Error "Chrome started but CDP did not become ready on 127.0.0.1:$Port"
+exit 1

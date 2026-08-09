@@ -3,6 +3,7 @@ import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { AUTOSAVE_DELAY_MS } from "../core/constants.js";
+import { lineDiff as documentLineDiff, markdownHeadings as documentMarkdownHeadings, qualityIssues as documentQualityIssues, visibleChars as documentVisibleChars, writingStatistics as documentWritingStatistics } from "./editor-document-model.js";
 
 let markdownRenderer;
 let ignoredScrollTarget = null;
@@ -237,19 +238,7 @@ function setupSynchronizedScrolling() {
   preview.addEventListener("scroll", () => syncScroll(preview, editor), { passive: true });
 }
 
-function visibleChars(markdown) {
-  return String(markdown || "")
-    .replace(/```(?:mermaid|echarts)\b[\s\S]*?```/gi, "")
-    .replace(/^```[^\r\n]*$/gm, "")
-    .replace(/^#.*$/gm, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/^[-#>]\s?/gm, "")
-    .replace(/[*_`]/g, "")
-    .replace(/\s/g, "")
-    .length;
-}
+function visibleChars(markdown) { return documentVisibleChars(markdown); }
 
 function renderMarkdown() {
   const editor = document.getElementById("markdown-editor");
@@ -266,29 +255,7 @@ function renderMarkdown() {
   renderQualitySummary(editor.value);
 }
 
-function qualityIssues(markdown) {
-  const text=String(markdown||""),issues=[],headings=markdownHeadings(text);
-  if(text.trim()&&!headings.some((item)=>item.level===1))issues.push({type:"结构",message:"缺少一级标题",offset:0});
-  const seen=new Map();let previousLevel=0;
-  headings.forEach((heading,index)=>{
-    const key=heading.text.trim().toLocaleLowerCase();
-    if(seen.has(key))issues.push({type:"结构",message:`标题重复：${heading.text}`,offset:heading.offset});
-    else seen.set(key,heading.offset);
-    if(previousLevel&&heading.level>previousLevel+1)issues.push({type:"结构",message:`标题层级从 H${previousLevel} 跳到 H${heading.level}`,offset:heading.offset});
-    previousLevel=heading.level;
-    if(heading.level>=2){
-      const start=text.indexOf("\n",heading.offset),end=headings[index+1]?.offset??text.length;
-      if(visibleChars(text.slice(start<0?end:start+1,end))<10)issues.push({type:"空章节",message:`章节“${heading.text}”缺少正文`,offset:heading.offset});
-    }
-  });
-  let searchOffset=0;
-  text.split(/\n\s*\n/).forEach((paragraph)=>{
-    const offset=text.indexOf(paragraph,searchOffset);searchOffset=Math.max(searchOffset,offset+paragraph.length);
-    if(!/^#{1,6}\s/m.test(paragraph)&&visibleChars(paragraph)>300)issues.push({type:"可读性",message:`段落过长（${visibleChars(paragraph)} 字），建议拆分`,offset:Math.max(0,offset)});
-  });
-  if(visibleChars(text)>=300&&!/https?:\/\/\S+/.test(text))issues.push({type:"来源",message:"正文尚未包含任何来源链接",offset:0});
-  return issues;
-}
+function qualityIssues(markdown) { return documentQualityIssues(markdown); }
 
 function renderQualitySummary(markdown) {
   const issues=qualityIssues(markdown),count=document.getElementById("quality-issue-count");
@@ -364,21 +331,7 @@ function jumpToQualityIssue(button) {
   editor.scrollTop=Math.max(0,textareaTextOffsetTop(editor,offset)-editor.clientHeight*.18);
 }
 
-function writingStatistics(markdown) {
-  const chars=visibleChars(markdown);
-  const paragraphs=String(markdown||"").split(/\n\s*\n/).filter((block)=>{
-    const text=block.replace(/^#{1,6}\s+.*$/gm,"").replace(/```[\s\S]*?```/g,"").trim();
-    return visibleChars(text)>=10;
-  }).length;
-  const headings=markdownHeadings(markdown).filter((item)=>item.level>=2);
-  let complete=0;
-  for(let index=0;index<headings.length;index+=1){
-    const start=String(markdown).indexOf("\n",headings[index].offset);
-    const end=headings[index+1]?.offset??String(markdown).length;
-    if(visibleChars(String(markdown).slice(start<0?end:start+1,end))>=50)complete+=1;
-  }
-  return {chars,paragraphs,minutes:chars?Math.max(1,Math.ceil(chars/400)):0,sections:headings.length,complete};
-}
+function writingStatistics(markdown) { return documentWritingStatistics(markdown); }
 
 function writingGoalKey() {
   const candidate=document.getElementById("writing-candidate")?.value||"none";
@@ -424,16 +377,7 @@ function saveWritingGoal(event) {
   toast("写作目标已更新");
 }
 
-function markdownHeadings(markdown) {
-  const headings=[];let offset=0,inFence=false;
-  for(const line of String(markdown||"").split("\n")){
-    if(/^```/.test(line.trim()))inFence=!inFence;
-    const match=!inFence&&/^(#{1,3})\s+(.+?)\s*$/.exec(line);
-    if(match)headings.push({level:match[1].length,text:match[2].replace(/[*_`[\]]/g,""),offset});
-    offset+=line.length+1;
-  }
-  return headings;
-}
+function markdownHeadings(markdown) { return documentMarkdownHeadings(markdown); }
 
 function renderDocumentOutline(markdown) {
   const list=document.getElementById("document-outline-list");
@@ -590,15 +534,7 @@ async function loadSelectedDocument() {
   lastDocKind = kind;
 }
 
-function lineDiff(oldText, newText) {
-  const oldLines=String(oldText||"").split("\n"),newLines=String(newText||"").split("\n");
-  const out=[];
-  for(let i=0;i<Math.max(oldLines.length,newLines.length);i+=1){
-    if(oldLines[i]===newLines[i]) out.push(`  ${oldLines[i]??""}`);
-    else { if(oldLines[i]!==undefined) out.push(`- ${oldLines[i]}`); if(newLines[i]!==undefined) out.push(`+ ${newLines[i]}`); }
-  }
-  return out.join("\n");
-}
+function lineDiff(oldText, newText) { return documentLineDiff(oldText, newText); }
 
 function openFindDialog() {
   const dialog=document.getElementById("find-dialog"),editor=document.getElementById("markdown-editor");

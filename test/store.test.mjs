@@ -4,6 +4,79 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../lib/core/store.mjs';
+import { WorkbenchQueryService } from '../lib/persistence/queries/workbench-query-service.mjs';
+import { EditorialRepository } from '../lib/persistence/repositories/editorial-repository.mjs';
+import { SocialCandidateRepository } from '../lib/persistence/repositories/social-candidate-repository.mjs';
+import { CustomArticleRepository } from '../lib/persistence/repositories/custom-article-repository.mjs';
+import { BatchQueryService } from '../lib/persistence/queries/batch-query-service.mjs';
+import { CandidateQueryService } from '../lib/persistence/queries/candidate-query-service.mjs';
+import { CandidateSelectionService } from '../lib/application/candidate-selection-service.mjs';
+import { DatabaseRestoreService } from '../lib/persistence/database-restore-service.mjs';
+
+test('Store delegates cross-domain reads to the workbench query service', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-query-service-'));
+  let store;
+  try {
+    store = new Store(path.join(tempRoot, 'test.db'));
+    assert.ok(store.queries.workbench instanceof WorkbenchQueryService);
+    assert.ok(store.queries.batches instanceof BatchQueryService);
+    assert.ok(store.queries.candidates instanceof CandidateQueryService);
+    assert.equal(store.getBatch(-1), null);
+    assert.deepEqual(store.getBatchOverview(-1), store.queries.batches.getOverview(-1));
+    assert.deepEqual(store.listCandidates(-1), store.queries.candidates.list(-1));
+    assert.equal(store.getCandidate(-1), null);
+    assert.deepEqual(store.listFinalArticles(), store.queries.workbench.listFinalArticles());
+    assert.deepEqual(store.listCalendarContent(), store.queries.workbench.listCalendarContent());
+    assert.deepEqual(store.findSimilarArticles(-1), store.queries.workbench.findSimilarArticles(-1));
+    assert.deepEqual(store.findSimilarSocialCards(-1), store.queries.workbench.findSimilarSocialCards(-1));
+    assert.deepEqual(store.articleStats(), store.queries.workbench.articleStats());
+    assert.deepEqual(store.listLogs(), store.queries.workbench.listLogs());
+    assert.deepEqual(store.overview(), store.queries.workbench.overview());
+  } finally {
+    store?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('Store exposes editorial and social candidate repositories through compatible methods', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-domain-repositories-'));
+  let store;
+  try {
+    store = new Store(path.join(tempRoot, 'test.db'));
+    assert.ok(store.repositories.editorial instanceof EditorialRepository);
+    assert.ok(store.repositories.socialCandidates instanceof SocialCandidateRepository);
+    assert.ok(store.repositories.customArticles instanceof CustomArticleRepository);
+    assert.ok(store.services.candidateSelection instanceof CandidateSelectionService);
+    assert.ok(store.services.databaseRestore instanceof DatabaseRestoreService);
+    assert.deepEqual(store.getEditorial(999), store.repositories.editorial.getArticle(999));
+    assert.deepEqual(store.getCardEditorial(999), store.repositories.editorial.getCard(999));
+    assert.equal(store.getRepositoryFactSheet(999), null);
+    assert.equal(store.getSocialScore(999), null);
+  } finally {
+    store?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('database restore service replaces data while Store remains a compatible facade', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-database-restore-'));
+  const backupPath = path.join(tempRoot, 'backup.db');
+  const targetPath = path.join(tempRoot, 'target.db');
+  let source; let target;
+  try {
+    source = new Store(backupPath);
+    source.createBatch({ date: '2026-08-01', title: 'backup batch' });
+    source.close(); source = null;
+    target = new Store(targetPath);
+    target.createBatch({ date: '2026-08-02', title: 'target batch' });
+    assert.equal(target.restoreFromDatabase(backupPath).count, 1);
+    assert.equal(target.listBatches()[0].title, 'backup batch');
+  } finally {
+    source?.close();
+    target?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
 
 test('自主写作创建请求按请求 ID 和内容指纹保持幂等并关联原候选',()=>{
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-custom-idempotency-'));let store;

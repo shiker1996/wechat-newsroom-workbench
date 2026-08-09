@@ -6,7 +6,7 @@ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
 const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8');
 const daily=fs.readFileSync(new URL('../public/src/views/daily.js',import.meta.url),'utf8');
-const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+const server=`${fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8')}\n${fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs',import.meta.url),'utf8')}`;
 
 test('article creation entries expose and submit compatible writer selections',()=>{
   assert.match(html,/id="editorial-writer-skill"/);
@@ -31,8 +31,8 @@ test('autonomous writing and batch daily expose the same per-run stage skill flo
   assert.match(tutorial,/input\.stageSkills=selectedStageSkills/);
   assert.match(daily,/batch-daily\/stage-skills/);
   assert.match(daily,/stageSkills=selectedStageSkills/);
-  assert.match(server,/entryPoint:'independent-writing',[\s\S]*?requested:input\.stageSkills/);
-  assert.match(server,/entryPoint:'batch-daily',requested:requestedStages/);
+  assert.match(server,/entryPoint: 'independent-writing',[\s\S]*?requested: input\.stageSkills/);
+  assert.match(server,/entryPoint: 'batch-daily',[\s\S]*?requested: requestedStages/);
   assert.match(server,/hasExplicitStages/);
 });
 
@@ -50,7 +50,7 @@ test('批次早报第二步在宽屏使用覆盖确认与成稿配置双区布�
 test('批次早报展示最近生成记录，失败可重试、执行中可续接',()=>{
   assert.match(html,/id="daily-job-history"/);
   // 服务端在 GET daily 中附带 ai_runs 里 type=daily 的最近记录
-  assert.match(server,/listAiRuns\(batchId,30\)\.filter\(\(job\)=>job\.type==='daily'\)/);
+  assert.match(server,/listAiRuns\(batchId, 30\)\.filter\(\(job\) => job\.type === 'daily'\)/);
   // 前端渲染记录、失败重试、执行中续接轮询
   assert.match(daily,/function renderJobs\(\)/);
   assert.match(daily,/data-daily-retry/);

@@ -23,6 +23,12 @@ test('autonomous writing placeholders are excluded from research progress', () =
   }
 });
 
+test('title and summary are both empty excludes the collected placeholder from research', () => {
+  assert.equal(isResearchEligibleHotspot({ title:'', raw_json:JSON.stringify({ summary:'' }) }), false);
+  assert.equal(isResearchEligibleHotspot({ title:'', raw_json:JSON.stringify({ summary:'有事实信息' }) }), true);
+  assert.equal(isResearchEligibleHotspot({ title:'有效标题', raw_json:'{}' }), true);
+});
+
 test('completed research keeps all previous steps completed', () => {
   const pipeline = buildBatchPipelineStatus({
     hotspotCount:317,
