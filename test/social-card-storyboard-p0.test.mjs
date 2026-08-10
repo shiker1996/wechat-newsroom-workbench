@@ -60,8 +60,8 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'8ccc3746cd8c76303c13ed3cdfb327e53bb81bbac0bc4865317de71901d67542',
-    'repository/xiaohongshu':'ed657cf391f2f62fb8fd5f6e974ae778c32a7f183a10295011983d52ef033068',
+    'repository/wechat':'7368a91e2f63bf9a7eb306f73df4f669526d0152b46c65e09132e735a7d90695',
+    'repository/xiaohongshu':'1f6101824eaad2c359aaf8069bb11e67472274936150a9bc088e0e1fc9e0fe86',
     'event/wechat':'5609fcfbf8fdd420bf65ff18b07225bf17774fcc65bd8c2b10bd4f9ca3f33899',
     'event/xiaohongshu':'ba2b0a8f46a9bb099ad9730feceb746cb61a2c4606d4ff374a5ed5a846525895',
     'custom/wechat':'5575e900dcf8f9e8058261112ef7234f0565c217108e63903004aae0cff22475',
@@ -108,6 +108,10 @@ test('P2 图文编辑室展示故事板技能选择并随请求提交',()=>{
   assert.match(source,/SOCIAL_ENTRY_POINTS=\{repository:'social-tool',event:'social-event',custom:'social-custom'\}/);
   assert.match(source,/stageSkills:selectedStageSkills\(document\.getElementById\('social-stage-skills'\)\)/);
   assert.match(source,/现有逐页编辑将被替换/);
+  assert.match(source,/data-storyboard-elapsed/);
+  assert.match(source,/模型仍在处理，接口请求保持等待/);
+  assert.match(source,/故事板规划摘要/);
+  assert.doesNotMatch(source,/summary>思考过程/);
   assert.match(skills,/storyboard: "故事板规划"/);
 });
 
@@ -146,6 +150,10 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.equal(delivery.manifest.inputContract,'social_card_storyboard');
   assert.equal(delivery.manifest.outputContract,'social_card_delivery');
   assert.match(repository.prompt,/核心能力怎样工作/);
+  assert.match(repository.prompt,/Star、Trending 和项目知名度只作为证据/);
+  assert.match(repository.prompt,/运行时继续允许 4～7 页/);
+  assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);
+  assert.match(repository.prompt,/不用“点赞、收藏、转发”代替内容结论/);
   assert.match(event.prompt,/传播张力不得高于证据强度/);
   assert.match(custom.prompt,/author_experience/);
   assert.match(delivery.prompt,/不负责选择故事线或首次规划故事板/);

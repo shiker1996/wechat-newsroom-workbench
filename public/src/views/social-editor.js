@@ -178,19 +178,47 @@ async function analyzeEditorial(candidateId=selectedId) {
     stageSkills:selectedStageSkills(document.getElementById('social-stage-skills')),
   })});
   if(candidateId===selectedId){
-    const reasoning=typeof data.reasoning==='string'&&data.reasoning.trim()?data.reasoning:'';
     renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);
     const preview=document.getElementById('card-plan-preview');
-    if(preview&&reasoning)preview.insertAdjacentHTML('afterbegin',`<details class="thinking-box"><summary>思考过程</summary><div class="thinking-text">${escapeHtml(reasoning)}</div></details>`);
+    const plan=Array.isArray(data.cardPlan)?data.cardPlan:[];
+    const summary=[
+      data.editorial?.target_reader?`目标读者：${data.editorial.target_reader}`:'',
+      data.editorial?.pain_point?`核心问题：${data.editorial.pain_point}`:'',
+      data.editorial?.tool_positioning?`工具定位：${data.editorial.tool_positioning}`:'',
+      plan.length?`页面规划：${plan.length} 页（${plan.map((page)=>page.title||page.kind).filter(Boolean).join(' → ')}）`:''
+    ].filter(Boolean).join('\n');
+    if(preview&&summary)preview.insertAdjacentHTML('afterbegin',`<details class="thinking-box"><summary>故事板规划摘要</summary><div class="thinking-text">${escapeHtml(summary)}</div></details>`);
     renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
-function renderStoryboardLoading(message){document.getElementById("card-plan-preview").innerHTML=`<div class="storyboard-loading"><span class="storyboard-spinner"></span><div><b>${escapeHtml(message)}</b><small>${selectedContentType==='event'?'正在读取事实、主张、时间线和来源风险，请勿重复点击。':'正在读取 README、提取能力并规划逐页内容，请勿重复点击。'}</small></div></div>`;}
+let storyboardProgressTimer=null;
+function stopStoryboardProgress(){if(storyboardProgressTimer){clearInterval(storyboardProgressTimer);storyboardProgressTimer=null;}}
+function renderStoryboardLoading(message){
+  stopStoryboardProgress();
+  const preview=document.getElementById("card-plan-preview");
+  const eventMode=selectedContentType==='event',customMode=selectedContentType==='custom';
+  const phases=eventMode
+    ? ['整理事件事实与来源','提炼传播问题与证据边界','规划逐页故事线','等待模型返回完整故事板']
+    : customMode
+      ? ['整理主题、读者与素材','提炼核心命题与来源等级','规划逐页故事线','等待模型返回完整故事板']
+      : ['整理 README 与仓库事实','提炼读者任务与工具定位','规划能力、上手与边界页面','等待模型返回完整故事板'];
+  const startedAt=Date.now();
+  preview.innerHTML=`<div class="storyboard-loading" role="status" aria-live="polite"><span class="storyboard-spinner"></span><div class="storyboard-progress-copy"><b>${escapeHtml(message)}</b><small data-storyboard-progress>正在提交事实基座…</small><ol>${phases.map((phase,index)=>`<li data-storyboard-phase="${index}">${escapeHtml(phase)}</li>`).join('')}</ol><small class="storyboard-elapsed" data-storyboard-elapsed>已等待 0 秒</small></div></div>`;
+  const update=()=>{
+    const elapsed=Math.max(0,Math.floor((Date.now()-startedAt)/1000));
+    const phaseIndex=elapsed<3?0:elapsed<12?1:elapsed<25?2:3;
+    preview.querySelectorAll('[data-storyboard-phase]').forEach((item,index)=>{item.classList.toggle('done',index<phaseIndex);item.classList.toggle('active',index===phaseIndex);});
+    const status=preview.querySelector('[data-storyboard-progress]');
+    if(status)status.textContent=phaseIndex===3?`模型仍在处理，接口请求保持等待（${elapsed} 秒）`:`当前：${phases[phaseIndex]}`;
+    const timer=preview.querySelector('[data-storyboard-elapsed]');if(timer)timer.textContent=`已等待 ${elapsed} 秒 · 完整 JSON 返回后自动展示`;
+  };
+  update();storyboardProgressTimer=setInterval(update,1000);
+}
 
 async function runStoryboard({inspect=false}={}){
   if(!selectedId)return;const candidateId=selectedId;const inspectButton=document.getElementById("inspect-repository");const analyzeButton=document.getElementById("analyze-card-editorial");
   const eventMode=selectedContentType==='event';const customMode=selectedContentType==='custom';const sourceButton=inspect?inspectButton:analyzeButton;const original=sourceButton.textContent;inspectButton.disabled=true;analyzeButton.disabled=true;sourceButton.textContent=eventMode?"正在规划事件故事板…":customMode?"正在规划故事板…":inspect?"正在分析 README…":"正在重新规划…";renderStoryboardLoading(eventMode?"正在根据事实基座生成事件故事板":customMode?"正在根据自定义事实基座生成故事板":inspect?"正在核验仓库并生成故事板":"正在根据已有事实重新生成故事板");
-  try{if(inspect&&selectedContentType==='repository'){const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});if(candidateId===selectedId){renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);}}await analyzeEditorial(candidateId);}catch(error){toast(error.message,'error');if(candidateId===selectedId)renderCardPlan(currentCardPlan,currentLayoutDecisions);}finally{inspectButton.disabled=false;analyzeButton.disabled=false;sourceButton.textContent=original;}
+  try{if(inspect&&selectedContentType==='repository'){const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});if(candidateId===selectedId){renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);renderStoryboardLoading('仓库事实已核验，正在规划故事板');}}await analyzeEditorial(candidateId);}catch(error){toast(error.message,'error');if(candidateId===selectedId)renderCardPlan(currentCardPlan,currentLayoutDecisions);}finally{stopStoryboardProgress();inspectButton.disabled=false;analyzeButton.disabled=false;sourceButton.textContent=original;}
 }
 
 // 布局审计失败时定位到对应故事板页：解析「P\d+」页码，展开该页编辑器并滚动高亮，
