@@ -458,10 +458,13 @@ async function loadWritingDesk() {
     request(`/api/batches/${encodeURIComponent(batch.id)}/candidates`),
     request(`/api/batches/${encodeURIComponent(batch.id)}/documents`),
   ]);
-  state.candidates = candidates.filter(
-    (item) => item.brief_status === "LOCKED" || (item.brief_status == null && item.status === "locked")
-  );
   state.documents = documents;
+  const documentedCandidateIds = new Set(documents
+    .filter((item) => item.candidate_row_id != null && (item.kind === "draft" || item.kind === "final"))
+    .map((item) => Number(item.candidate_row_id)));
+  state.candidates = candidates.filter((item) =>
+    item.status === "locked" || item.brief_status === "LOCKED" || documentedCandidateIds.has(Number(item.id))
+  );
   const dailyFinal=documents.find((item)=>item.kind==="daily-final"&&item.candidate_row_id==null);
   const select = document.getElementById("writing-candidate");
   if (!select) return;

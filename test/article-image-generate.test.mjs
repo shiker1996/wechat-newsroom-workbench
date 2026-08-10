@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { applyImagePlan, parseImagePlaceholders } from '../lib/llm/image-workflow.mjs';
-import { buildGenerateImageHtml } from '../lib/llm/article-image-generator.mjs';
+import { buildGenerateImageHtml, generateArticleImage } from '../lib/llm/article-image-generator.mjs';
 
 const base = '第一段话在这里结束。\n\n第二段。';
 const timeline = { kind:'timeline', title:'发布节奏', items:[{ label:'3 月', value:'v1 发布' }, { label:'6 月', value:'v2 发布' }] };
@@ -46,4 +48,33 @@ test('generate endpoint and workbench button are wired', () => {
   const preview = fs.readFileSync('public/src/views/preview.js', 'utf8');
   assert.ok(preview.includes('data-generate-image'));
   assert.ok(preview.includes('generateImageAsset'));
+});
+
+test('concurrent article image generation uses isolated screenshot directories', async () => {
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'article-image-concurrency-'));
+  const outputDirs = [];
+  const renderHtmlPages = async ({ htmlFile, outputDir }) => {
+    outputDirs.push(outputDir);
+    const html = fs.readFileSync(htmlFile, 'utf8');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const image = path.join(outputDir, 'page-01.png');
+    fs.writeFileSync(image, html.includes('时间线 A') ? 'image-a' : 'image-b');
+    return { success:true, data:{ images:[image] } };
+  };
+  try {
+    const [first, second] = await Promise.all([
+      generateArticleImage({ workdir, slotId:'资料:01', ratio:'16:9', renderHtmlPages,
+        generate:{ kind:'timeline', title:'时间线 A', items:[{ label:'1', value:'A' }, { label:'2', value:'B' }] } }),
+      generateArticleImage({ workdir, slotId:'资料:02', ratio:'16:9', renderHtmlPages,
+        generate:{ kind:'timeline', title:'时间线 B', items:[{ label:'1', value:'C' }, { label:'2', value:'D' }] } }),
+    ]);
+    assert.notEqual(outputDirs[0], outputDirs[1]);
+    assert.equal(fs.readFileSync(first.localPath, 'utf8'), 'image-a');
+    assert.equal(fs.readFileSync(second.localPath, 'utf8'), 'image-b');
+    assert.equal(fs.existsSync(first.htmlPath), true);
+    const leftovers = fs.readdirSync(path.join(workdir, 'images')).filter((name) => name.startsWith('.generate-'));
+    assert.deepEqual(leftovers, []);
+  } finally {
+    fs.rmSync(workdir, { recursive:true, force:true });
+  }
 });

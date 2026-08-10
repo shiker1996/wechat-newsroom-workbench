@@ -21,7 +21,7 @@ import { renderStoryboardSections } from '../lib/rendering/storyboard-page-rende
 import { renderStoryboardDocument } from '../lib/rendering/storyboard-document-renderer.mjs';
 import { markdownToHtml as renderPureMarkdown, normalizeDesignTokens as normalizePureDesignTokens } from '../lib/rendering/markdown-renderer.mjs';
 import { lineDiff as editorLineDiff, markdownHeadings as editorMarkdownHeadings, qualityIssues as editorQualityIssues, visibleChars as editorVisibleChars, writingStatistics as editorWritingStatistics } from '../public/src/views/editor-document-model.js';
-import { candidateMode as socialCandidateMode, cardBlockEditorHtml as socialCardBlockEditorHtml, socialFactsHtml, socialScoreView } from '../public/src/views/social-editor-model.js';
+import { candidateMode as socialCandidateMode, cardBlockEditorHtml as socialCardBlockEditorHtml, isStructuredCardBlockType, socialFactsHtml, socialScoreView } from '../public/src/views/social-editor-model.js';
 
 function workspace(prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -433,6 +433,8 @@ test('refactoring stage 4: social editor presentation rules are independent from
   assert.equal(socialCandidateMode('event-cards-wechat'), 'event');
   assert.equal(socialCandidateMode('repository-cards'), 'tools');
   assert.match(socialCardBlockEditorHtml({ type: 'text', title: '<标题>', content: '正文' }, 0), /value="&lt;标题&gt;"/);
+  assert.equal(isStructuredCardBlockType('timeline'), true);
+  assert.equal(isStructuredCardBlockType('text'), false);
   assert.match(socialFactsHtml({ contentType: 'repository', facts: { error: '<失败>' } }), /&lt;失败&gt;/);
   assert.deepEqual(socialScoreView({ score: { finalScore: 88 } }, 'custom'), {
     finalScore: 88,

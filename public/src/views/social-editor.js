@@ -3,7 +3,7 @@ import { request } from "../core/http.js";
 import { streamChat } from "../core/stream-chat.js";
 import { escapeHtml, toast, providerOptions, confirmAction } from "../core/ui.js";
 import { loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
-import { candidateMode, cardBlockEditorHtml, cardBlockTypeOptions, isCustomOutput, isEventOutput, socialFactsHtml, socialScoreView } from "./social-editor-model.js";
+import { candidateMode, cardBlockEditorHtml, cardBlockTypeOptions, isCustomOutput, isEventOutput, isStructuredCardBlockType, socialFactsHtml, socialScoreView } from "./social-editor-model.js";
 
 let selectedId = null;
 let delivery=null;let deliveryIndex=0;let proofTab='copy';
@@ -297,11 +297,11 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
         const type=node.querySelector('[data-storyboard-block-type]')?.value||'text';
         const block={type,title:node.querySelector('[data-storyboard-block-title]')?.value.trim()||''};
         const field=node.querySelector('[data-storyboard-block-content]');
-        if(CARD_STRUCTURED_BLOCK_TYPES.has(type))Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
+        if(isStructuredCardBlockType(type))Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
         else block.content=field?.value.trim()||'';
         contentBlocks.push(block);
       });
-    }catch{toast('结构化内容必须是有效 JSON');return;}
+    }catch(error){toast(error instanceof SyntaxError?'结构化内容必须是有效 JSON':`内容块读取失败：${error.message}`);return;}
     const originalText=button.textContent;button.disabled=true;button.textContent='保存中…';
     try{
       const data=await request(`/api/candidates/${selectedId}/card-pages/${pageNumber}`,{method:'PUT',body:JSON.stringify({
@@ -321,7 +321,7 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
     const title=fieldset.querySelector('[data-storyboard-block-title]')?.value||'';
     const currentValue=fieldset.querySelector('[data-storyboard-block-content]')?.value||'';
     let block={type,title};
-    if(CARD_STRUCTURED_BLOCK_TYPES.has(type)){
+    if(isStructuredCardBlockType(type)){
       try{Object.assign(block,JSON.parse(currentValue||'{}'));}catch{block.items=[];block.headers=[];block.rows=[];}
     }else{block.content=currentValue;}
     const div=document.createElement('div');div.innerHTML=cardBlockEditorHtml(block,Number(fieldset.dataset.storyboardBlock));

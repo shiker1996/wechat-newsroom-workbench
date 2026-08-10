@@ -14,6 +14,21 @@ import { skipBrowser } from './helpers/tiers.mjs';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
 
+test('图文管线在内部使用版式白名单时建立本地 ESM 绑定', () => {
+  const pipeline = fs.readFileSync(path.join(root, 'lib', 'llm', 'social-card-pipeline.mjs'), 'utf8');
+  assert.match(pipeline, /import \{ SOCIAL_CARD_LAYOUTS \} from '\.\.\/rendering\/social-card-layout\.mjs';/);
+  assert.match(pipeline, /layout_style:SOCIAL_CARD_LAYOUTS\.includes/);
+});
+
+test('故事板保存通过共享类型判断解析结构化内容，不引用未定义常量', () => {
+  const editor = fs.readFileSync(path.join(root, 'public', 'src', 'views', 'social-editor.js'), 'utf8');
+  const model = fs.readFileSync(path.join(root, 'public', 'src', 'views', 'social-editor-model.js'), 'utf8');
+  assert.match(editor, /import \{[^}]*isStructuredCardBlockType[^}]*\} from "\.\/social-editor-model\.js"/);
+  assert.match(editor, /if\(isStructuredCardBlockType\(type\)\)Object\.assign/);
+  assert.doesNotMatch(editor, /CARD_STRUCTURED_BLOCK_TYPES/);
+  assert.match(model, /export function isStructuredCardBlockType\(type\)/);
+});
+
 test('项目图文技能加载完整文案、标题、设计与布局契约', () => {
   const bundle = loadSkillBundle({ workspaceRoot:root, skillName:'xiaohongshu-article-generator' });
   assert.equal(bundle.fallback, false);

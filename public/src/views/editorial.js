@@ -16,6 +16,7 @@ function statusLabel(value) { return editorialStatusLabels[String(value || "")] 
 
 let bound = false;
 let editorialDirty = false;
+let editorialRequestPending = false;
 function bindEditorial() {
   if (bound) return;
   bound = true;
@@ -321,7 +322,11 @@ function renderEditorialReadiness() {
   const hint = document.getElementById("editorial-production-hint");
   if (hint) hint.textContent = ready ? "点击后会保存当前决策、锁定文章简报，并运行完整成稿链。" : `还需完成：${checks.filter((c) => !c.ok).map((c) => c.label).join("、")}`;
   const btn = document.getElementById("start-editorial-production");
-  if (btn) { btn.hidden = !ready; btn.textContent = locked ? "重新运行完整成稿链" : "确认简报并开始成稿"; }
+  if (btn) {
+    btn.hidden = !ready;
+    btn.disabled = editorialRequestPending;
+    btn.textContent = editorialRequestPending ? "等待 AI 编辑回应…" : (locked ? "重新运行完整成稿链" : "确认简报并开始成稿");
+  }
 }
 
 // 编辑室两步走：先备料（抓取全部事件来源原文），再开始对话。
@@ -382,23 +387,30 @@ async function sendEditorialAnswer() {
   const empty = messages.querySelector(".editorial-chat-empty");
   if (empty) empty.remove();
   if (answer) messages.insertAdjacentHTML("beforeend", `<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll("\n", "<br>")}</p></div>`);
-  await streamChat({
-    url: `/api/candidates/${candidateId}/ai/editorial/stream`,
-    body: { provider: document.getElementById("editorial-provider")?.value || "", answer },
-    messages,
-    button,
-    busyLabel: "AI 正在回应…",
-    doneLabel: "发送回答 / 让 AI 提问",
-    title: "AI 编辑",
-    errorLabel: "编辑会",
-    rethrow: true,
-    onDone: async () => {
-      const answerEl = document.getElementById("editorial-answer");
-      if (answerEl) answerEl.value = "";
-      await openEditorial(candidateId);
-      toast("编辑会决策已更新");
-    },
-  });
+  editorialRequestPending = true;
+  renderEditorialReadiness();
+  try {
+    await streamChat({
+      url: `/api/candidates/${candidateId}/ai/editorial/stream`,
+      body: { provider: document.getElementById("editorial-provider")?.value || "", answer },
+      messages,
+      button,
+      busyLabel: "AI 正在回应…",
+      doneLabel: "发送回答 / 让 AI 提问",
+      title: "AI 编辑",
+      errorLabel: "编辑会",
+      rethrow: true,
+      onDone: async (data) => {
+        const answerEl = document.getElementById("editorial-answer");
+        if (answerEl) answerEl.value = "";
+        await openEditorial(candidateId);
+        toast(data?.ignoredBecauseLocked ? "简报已锁定，本次 AI 回复未覆盖成稿决策" : "编辑会决策已更新");
+      },
+    });
+  } finally {
+    editorialRequestPending = false;
+    renderEditorialReadiness();
+  }
 }
 
 async function persistEditorialForm(opts) {
@@ -427,6 +439,7 @@ async function saveEditorial(event) {
 }
 
 async function startEditorialProduction() {
+  if (editorialRequestPending) return toast("请等待 AI 编辑回应完成后再开始成稿");
   const form = document.getElementById("editorial-form");
   if (!form) return;
   const candidateId = await persistEditorialForm({ refresh: false });

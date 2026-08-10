@@ -10,9 +10,13 @@ export function cardBlockTypeOptions(selected) {
   return CARD_ALLOWED_BLOCK_TYPES.map((type) => `<option value="${type}"${type === selected ? ' selected' : ''}>${CARD_BLOCK_TYPE_LABELS[type] || type}</option>`).join('');
 }
 
+export function isStructuredCardBlockType(type) {
+  return CARD_STRUCTURED_BLOCK_TYPES.has(type);
+}
+
 export function cardBlockEditorHtml(block, index) {
   const type = CARD_ALLOWED_BLOCK_TYPES.includes(block?.type) ? block.type : 'text';
-  const structured = CARD_STRUCTURED_BLOCK_TYPES.has(type);
+  const structured = isStructuredCardBlockType(type);
   const payload = structured ? JSON.stringify({ items: block.items || [], headers: block.headers || [], rows: block.rows || [] }, null, 2) : String(block.content || '');
   return `<fieldset class="storyboard-block-editor" data-storyboard-block="${index}"><legend>内容块 ${index + 1}<select data-storyboard-block-type>${cardBlockTypeOptions(type)}</select></legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title || '')}"></label><label>${structured ? '结构化内容（JSON）' : '正文'}<textarea data-storyboard-block-content rows="${structured ? 6 : 3}">${escapeHtml(payload)}</textarea></label><button type="button" class="text-button" data-remove-storyboard-block>删除此块</button></fieldset>`;
 }
