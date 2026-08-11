@@ -86,6 +86,25 @@ export async function openBatch(id, mode) {
   const pipeline = batch.pipeline_status?.steps || {};
   const stepClass = (name) => ({ completed:"done", active:"active", pending:"" })[pipeline[name]?.status] || "";
   const latestAiRun = batch.ai_runs?.[0];
+  const pipelineFailures = (batch.pipeline_failures || []).filter((item) => item.status === "open" || item.status === "retrying");
+  const decidedFailures = (batch.pipeline_failures || []).filter((item) => item.status === "skipped" || item.status === "resolved");
+  const failureStageLabel = { collect: "采集", tag: "语义打标", "event-card": "事件卡", research: "事件研判" };
+  const failureGroups = Object.entries(Object.groupBy(pipelineFailures, (item) => item.stage));
+  const pipelineFailureSection = pipelineFailures.length || decidedFailures.length ? `<section class="drawer-section pipeline-failure-section">
+    <div class="pipeline-heading"><div><span class="kicker">PENDING FAILURES</span><h3>待处理失败 · ${pipelineFailures.length}</h3></div><span class="failure-readonly-badge">可单条重试</span></div>
+    <p>重试只执行当前失败对象；成功后自动归档为已解决，不会清除原始执行日志。</p>
+    <div class="pipeline-failure-groups">${failureGroups.map(([stageName, failures]) => `<details open><summary>${escapeHtml(failureStageLabel[stageName] || stageName)} <b>${failures.length}</b></summary>
+      <div>${failures.map((item) => {
+        const detail = item.detail || {};
+        const meta = item.stage === "collect"
+          ? [detail.sourceType, detail.sourceKey].filter(Boolean).join(" · ")
+          : item.stage === "event-card" && detail.reportCount ? `${detail.reportCount} 条报道` : item.object_key;
+        const canRetry = !(item.object_type === "source" && item.title !== "reddit");
+        const canSkip=item.stage!=="research"&&item.object_type!=="stage";
+        return `<article class="pipeline-failure-item"><div><strong>${escapeHtml(item.title || item.object_key)}</strong><small>${escapeHtml(meta)}${item.retry_count ? ` · 已重试 ${item.retry_count} 次` : ""}</small></div><p>${escapeHtml(item.error_message)}</p><time>${escapeHtml(formatTime(item.last_failed_at))}</time><div class="pipeline-failure-actions">${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看原始记录</a>` : ""}${canRetry ? `<button class="ghost-button" data-retry-pipeline-failure="${item.id}" ${item.status === "retrying" ? "disabled" : ""}>${item.status === "retrying" ? "重试中…" : "重试"}</button>` : ""}${canSkip?`<button class="ghost-button danger" data-skip-pipeline-failure="${item.id}" data-failure-stage="${escapeHtml(item.stage)}">跳过</button>`:""}</div></article>`;
+      }).join("")}</div></details>`).join("")}</div>
+    ${decidedFailures.length?`<details class="pipeline-failure-history"><summary>已解决或已跳过 · ${decidedFailures.length}</summary><div>${decidedFailures.map((item)=>`<article class="pipeline-failure-item decided"><div><strong>${escapeHtml(item.title||item.object_key)}</strong><small>${item.status==="skipped"?`已跳过${item.skip_reason?` · ${escapeHtml(item.skip_reason)}`:""}`:"重试成功"}</small></div><time>${escapeHtml(formatTime(item.resolved_at||item.skipped_at||item.updated_at))}</time><div class="pipeline-failure-actions"><button class="ghost-button" data-reopen-pipeline-failure="${item.id}">恢复为待处理</button></div></article>`).join("")}</div></details>`:""}
+  </section>` : "";
   const pipelinePrimaryAction = researchDone
     ? `<button class="primary-button" data-view-research>查看研判结果 →</button>`
     : ai.tagged < ai.total || !ai.total
@@ -136,7 +155,7 @@ export async function openBatch(id, mode) {
     <section class="drawer-section batch-lifecycle"><div><span class="kicker">BATCH STATUS</span><h3>批次状态 · ${escapeHtml(statusLabel)}</h3><p>${lifecycle === "archived" ? "该批次已归档，仅保留历史查询与产物追溯。" : lifecycle === "completed" ? "生产工作已结束，可确认归档或重新打开。" : "完成当天生产后标记完成，确认无后续修改再归档。"}</p></div><div class="batch-lifecycle-actions">${lifecycleActions}</div></section>
     ${intakeSection}
     <section class="drawer-section"><h3>来源记录</h3>${batch.sources.length ? batch.sources.map((item) => `<div class="source-row ${item.status}"><i></i><div><strong>${escapeHtml(item.source)}</strong><small>${escapeHtml(item.error || item.ended_at || "执行中")}</small></div><b>${item.item_count}</b></div>`).join("") : '<p class="story-meta">尚未运行采集。</p>'}</section>
-    ${breakingAnalysisSection}${regularAiSection}
+    ${pipelineFailureSection}${breakingAnalysisSection}${regularAiSection}
     <section class="drawer-section"><h3>本批产物</h3><p>${batch.artifacts.length} 份已索引产物 · ${batch.hotspots.length} 条热点</p></section>
     <section class="drawer-section" data-section="logs"><h3>执行日志</h3><div class="job-console" id="job-console">等待任务…</div></section>
   </div>`;
@@ -336,6 +355,43 @@ export async function pollJob(id) {
   } catch (error) { toast(error.message); }
 }
 
+async function retryPipelineFailure(button) {
+  const batch=state.currentBatch;if(!batch)return;
+  const failureId=Number(button.dataset.retryPipelineFailure);if(!failureId)return;
+  const original=button.textContent;button.disabled=true;button.textContent="重试中…";
+  try {
+    const provider=document.getElementById("batch-ai-provider")?.value;
+    await request(`/api/batches/${encodeURIComponent(batch.id)}/pipeline-failures/${failureId}/retry`,{
+      method:"POST",body:JSON.stringify({provider}),
+    });
+    toast("单条重试成功，失败记录已标记为已解决");
+    await openBatch(batch.id);
+  } catch(error) {
+    toast(`重试失败：${error.message}`,"error");
+    await openBatch(batch.id);
+  } finally {
+    if(button.isConnected){button.disabled=false;button.textContent=original;}
+  }
+}
+
+async function decidePipelineFailure(button, action) {
+  const batch=state.currentBatch;if(!batch)return;const failureId=Number(button.dataset[`${action}PipelineFailure`]);if(!failureId)return;
+  let reason="";
+  if(action==="skip"){
+    reason=window.prompt(button.dataset.failureStage==="collect"?"可选：填写本批次跳过该来源的原因":"填写跳过原因（该对象将不进入本批次后续流程）","");
+    if(reason===null)return;
+    if(button.dataset.failureStage!=="collect"&&!reason.trim())return toast("请填写跳过原因","error");
+  }
+  button.disabled=true;
+  try{
+    await request(`/api/batches/${encodeURIComponent(batch.id)}/pipeline-failures/${failureId}/${action}`,{
+      method:"POST",body:JSON.stringify({reason}),
+    });
+    toast(action==="skip"?"已跳过该失败对象，可从历史记录恢复":"已恢复为待处理");
+    await openBatch(batch.id);
+  }catch(error){toast(`${action==="skip"?"跳过":"恢复"}失败：${error.message}`,"error");button.disabled=false;}
+}
+
 // 批次抽屉与新建批次对话框的事件绑定（原 app-bind.js 对应片段，由 main.js 启动时调用一次）
 export function bindBatchDrawer() {
   document.addEventListener("click", (event) => {
@@ -346,6 +402,12 @@ export function bindBatchDrawer() {
       openBatch(batch.dataset.batch, mode);
     }
     if (event.target.closest("[data-collect]")) startCollection().catch((error) => toast(error.message));
+    const failureRetryButton=event.target.closest("[data-retry-pipeline-failure]");
+    if(failureRetryButton)retryPipelineFailure(failureRetryButton);
+    const failureSkipButton=event.target.closest("[data-skip-pipeline-failure]");
+    if(failureSkipButton)decidePipelineFailure(failureSkipButton,"skip");
+    const failureReopenButton=event.target.closest("[data-reopen-pipeline-failure]");
+    if(failureReopenButton)decidePipelineFailure(failureReopenButton,"reopen");
     if (event.target.closest("[data-ai-tag]")) startBatchAi("tag").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-retag]")) startBatchAi("retag").catch((error) => toast(error.message));
     if (event.target.closest("[data-ai-event-cards-force]")) startBatchAi("event-cards-force").catch((error) => toast(error.message));

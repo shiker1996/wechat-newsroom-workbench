@@ -206,6 +206,18 @@ curl.exe -X POST http://127.0.0.1:4317/api/system/backup/restore ^
 
 ### POST /api/batches/:id/ai/event-cards
 为本批次补生成或重建事件事实卡。
+
+### POST /api/batches/:id/pipeline-failures/:failureId/retry
+
+只重试指定失败对象。采集按原 `subscription_run` 的单个来源执行，打标按单个热点执行，事件卡按单个 `event_id` 执行，研判阶段错误整体重跑研判；成功后失败记录自动转为 `resolved`，失败时回到 `open` 并更新原因。
+
+### POST /api/batches/:id/pipeline-failures/:failureId/skip
+
+将可安全隔离的失败对象标为已跳过。采集源只影响当前批次；打标热点退出研究范围；事件卡对应事件退出本批次研判。批次级研判错误不能跳过。
+
+### POST /api/batches/:id/pipeline-failures/:failureId/reopen
+
+把 `skipped` 或 `resolved` 记录恢复为 `open`；打标热点同步恢复研究资格，事件重新进入事件卡与研判范围。
 → 每日批次
 
 ### GET /api/batches/:id/overview

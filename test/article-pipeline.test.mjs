@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { articleLengthStatus, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
+import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
 import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
 
@@ -14,6 +14,12 @@ test('成稿规划兼容模型把数组字段返回为字符串', () => {
   assert.deepEqual(plan.titleCandidates,[{title:'一个可用标题',reason:''}]);
   assert.equal(plan.distributionLane,'通知池');
   assert.equal(plan.readerStake,'影响开发者成本');
+});
+
+test('文章阶段输出门禁识别工具操作说明和非完整文章',()=>{
+  assert.match(articleStageOutputIssue('我先读取相关契约文件，确认环境后开始处理 humanize 阶段。',{requireArticle:true}),/工具操作说明/);
+  assert.match(articleStageOutputIssue('这里只是一段说明。',{requireArticle:true}),/一级标题/);
+  assert.equal(articleStageOutputIssue('# 完整标题\n\n这是文章正文。',{requireArticle:true}),null);
 });
 
 test('终稿统一字数门禁默认1300–2000个可见字符', () => {
