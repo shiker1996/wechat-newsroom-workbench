@@ -722,10 +722,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .cal-empty-cell { background:#f0ede4; }
 .cal-date-label { font-size:11px;font-weight:700;margin-bottom:4px; }
 .cal-today-dot { color:var(--red);font-size: 11px;vertical-align:middle; }
-.cal-article { font-size: 11px;padding:3px 4px;margin-bottom:2px;border-left:2px solid var(--red);background:rgba(255,255,255,.55);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;box-sizing:border-box; }
-.cal-article span:hover { color:var(--red); }
+.cal-article { display:flex;align-items:center;gap:4px;font-size:11px;padding:3px 4px;margin-bottom:2px;border-left:2px solid var(--red);background:rgba(255,255,255,.55);line-height:1.35;overflow:hidden;max-width:100%;box-sizing:border-box; }
+.cal-article .inline-button { display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cal-article .inline-button:hover { color:var(--red); }
 .cal-article.cal-social { border-left-color:#357f78;background:rgba(53,127,120,.08); }
-.cal-content-type { display:inline-block;margin-right:4px;padding:0 3px;border-radius:2px;background:var(--red);color:#fff;font-size: 11px;line-height:1.5;vertical-align:1px; }
+.cal-content-type { flex:0 0 auto;display:inline-block;padding:0 3px;border-radius:2px;background:var(--red);color:#fff;font-size:11px;line-height:1.5;vertical-align:1px; }
 .cal-social .cal-content-type { background:#357f78; }
 
 /* Similar articles hint */

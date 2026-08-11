@@ -40,6 +40,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [collector-plugin-architecture-plan.md](./collector-plugin-architecture-plan.md) | 技能/工具动态配置、多字段凭据、采集插件化、Reddit 订阅源与声明式网页采集的架构及迁移方案 |
 | [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
 | [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |
 | [optional-feature-todos.md](./optional-feature-todos.md) | 可选功能扩展 TODO（各事项独立状态） |

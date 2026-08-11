@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { addSubscription, listSubscriptions, removeSubscription, updateSubscription } from '../lib/integrations/subscriptions.mjs';
+import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from '../lib/integrations/subscriptions.mjs';
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'write-assistant-subscriptions-'));
@@ -44,4 +44,10 @@ test('订阅台账把 GitHub Search 作为只读采集入口展示',()=>{
   assert.equal(search.kind,'github');
   assert.equal(search.managed,true);
   assert.equal(result.summary.github,2);
+});
+
+test('X 订阅测试同时兼容表单用户名和列表中的已保存路由',()=>{
+  assert.deepEqual(subscriptionTestInput({kind:'twitter',value:'@OpenAI'}),{kind:'twitter',value:'/twitter/user/OpenAI?limit=3'});
+  assert.deepEqual(subscriptionTestInput({kind:'twitter',value:'/twitter/user/Alibaba_Qwen?limit=30'}),{kind:'twitter',value:'/twitter/user/Alibaba_Qwen?limit=3'});
+  assert.throws(()=>subscriptionTestInput({kind:'twitter',value:'/readhub?limit=30'}),/有效的 X 用户名/);
 });
