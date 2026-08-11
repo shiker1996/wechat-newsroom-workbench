@@ -255,7 +255,9 @@ test('图文编辑室异步按钮使用稳定节点引用并清理旧监听器',
   assert.doesNotMatch(source, /event\.currentTarget/);
   assert.match(source, /current\.replaceWith\(fresh\)/);
   assert.match(source, /inspectButton\.disabled=false/);
-  assert.match(source, /正在读取 README、提取能力并规划逐页内容/);
+  assert.match(source, /整理 README 与仓库事实/);
+  assert.match(source, /data-storyboard-elapsed/);
+  assert.match(source, /模型仍在处理，接口请求保持等待/);
   assert.match(source, /watchSocialJob/);
   assert.match(source, /重新生成图文/);
 });
