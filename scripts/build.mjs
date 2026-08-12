@@ -9,6 +9,7 @@ const publicDir = path.join(root, "public");
 
 function walk(dir, extensions = new Set([".js", ".mjs"])) {
   const files = [];
+  if (!fs.existsSync(dir)) return files;
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name);
     const stat = fs.statSync(full);
