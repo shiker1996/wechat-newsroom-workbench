@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import fs from 'fs/promises'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import path from 'path'
@@ -26,7 +25,7 @@ async function main() {
     console.log(
       JSON.stringify({
         success: false,
-        message: '缺少 UPYUN 配置：需要 UPYUN_BUCKET / UPYUN_OPERATOR / UPYUN_PASSWORD（可用命令行参数覆盖）',
+        message: '又拍云上传配置不完整，请在工作台“系统与配置中心”完成配置',
       }),
     )
     process.exitCode = 1

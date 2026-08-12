@@ -3,178 +3,131 @@ import { request } from "../core/http.js";
 import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
 
-function subscriptionTypeLabel(kind) {
-  return { direct: "DIRECT", twitter: "X / TWITTER", rsshub: "RSSHUB", github:"GITHUB" }[kind] || kind;
+const LEGACY_KINDS = new Set(["direct", "twitter", "rsshub", "github"]);
+const CREATABLE_PLUGINS = new Set(["reddit-collector", "feed-collector", "rsshub-collector", "declarative-web-page", "browser-web-page"]);
+const LABELS = { direct: "DIRECT", twitter: "X / TWITTER", rsshub: "RSSHUB", github: "GITHUB", reddit: "REDDIT" };
+
+function pluginById(id) { return (state.collectorPlugins || []).find((item) => item.id === id); }
+function unifiedValue(item) { return item.config?.subreddit ? `r/${item.config.subreddit}` : item.config?.url || item.config?.route || item.source_key; }
+function unifiedItems() {
+  return (state.collectionSources || []).map((item) => ({
+    id: item.id, kind: item.source_type, value: unifiedValue(item), label: item.label,
+    enabled: Boolean(item.enabled), managed: item.origin === "managed", pluginId: item.plugin_id,
+    unified: true, pluginAvailable: pluginById(item.plugin_id)?.available !== false, health: item.health || (item.last_test_status ? { status: item.last_test_status, error: item.last_test_error } : null),
+  }));
 }
-function updateSubscriptionComposer() {
-  const kind = document.getElementById("subscription-kind").value;
-  const input = document.getElementById("subscription-value");
-  const labelText = document.getElementById("subscription-value-label-text");
-  const labelWrap = document.getElementById("subscription-label-wrap");
-  if (kind === "twitter") {
-    labelText.textContent = "X 用户名";
-    input.type = "text"; input.placeholder = "@OpenAI 或 OpenAI";
-    labelWrap.hidden = true;
-  } else if (kind === "rsshub") {
-    labelText.textContent = "RSSHub 路由";
-    input.type = "text"; input.placeholder = "/twitter/user/OpenAI 或 /readhub";
-    labelWrap.hidden = true;
-  } else {
-    labelText.textContent = "订阅地址";
-    input.type = "url"; input.placeholder = "https://example.com/feed.xml";
-    labelWrap.hidden = false;
+function allItems() {
+  const unified = unifiedItems();
+  const keys = new Set(unified.map((item) => `${item.kind}:${item.value}`));
+  return [...unified, ...(state.subscriptions?.items || []).filter((item) => !keys.has(`${item.kind}:${item.value}`))];
+}
+function currentPluginId() {
+  const kind = $("#subscription-kind").value;
+  if (kind === "reddit") return "reddit-collector";
+  if (kind === "more") return $("#subscription-plugin").value;
+  return null;
+}
+function schemaField(name, schema, required) {
+  const title = schema.title || { subreddit: "分区名称", sort: "排序", limit: "数量", route: "RSSHub 路由", url: "订阅地址" }[name] || name;
+  const requiredMark = required ? " required" : "";
+  if (schema.enum) return `<label>${escapeHtml(title)}<select data-plugin-field="${escapeHtml(name)}"${requiredMark}>${schema.enum.map((value) => `<option value="${escapeHtml(value)}" ${value === schema.default ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>`;
+  const type = schema.type === "integer" ? "number" : schema.format === "url" ? "url" : "text";
+  const bounds = `${schema.minimum != null ? ` min="${schema.minimum}"` : ""}${schema.maximum != null ? ` max="${schema.maximum}"` : ""}`;
+  return `<label>${escapeHtml(title)}<input data-plugin-field="${escapeHtml(name)}" type="${type}"${bounds}${requiredMark} value="${escapeHtml(schema.default ?? "")}"></label>`;
+}
+function renderPluginFields() {
+  const plugin = pluginById(currentPluginId());
+  const box = $("#source-plugin-fields");
+  if (!plugin) { box.hidden = true; box.innerHTML = ""; return; }
+  const schema = plugin.collector?.sourceConfigSchema || plugin.inputSchema || { properties: {} };
+  box.innerHTML = Object.entries(schema.properties || {}).map(([name, field]) => schemaField(name, field, (schema.required || []).includes(name))).join("");
+  box.hidden = false;
+}
+function updateComposer() {
+  const kind = $("#subscription-kind").value;
+  const dynamic = kind === "more" || kind === "reddit";
+  $("#subscription-plugin-wrap").hidden = kind !== "more";
+  $("#subscription-value-label").hidden = dynamic;
+  $("#subscription-label-wrap").hidden = kind === "twitter" || kind === "rsshub";
+  if (!dynamic) {
+    const input = $("#subscription-value");
+    const settings = kind === "twitter" ? ["X 用户名", "text", "@OpenAI 或 OpenAI"] : kind === "rsshub" ? ["RSSHub 路由", "text", "/twitter/user/OpenAI"] : ["订阅地址", "url", "https://example.com/feed.xml"];
+    $("#subscription-value-label-text").textContent = settings[0]; input.type = settings[1]; input.placeholder = settings[2];
   }
-  const result = document.getElementById("subscription-test-result");
-  result.className = "subscription-test-result";
-  result.textContent = "尚未测试。直连 RSS 不调用大模型，也不产生模型费用。";
+  renderPluginFields();
+  $("#subscription-test-result").className = "subscription-test-result";
+  $("#subscription-test-result").textContent = "尚未测试。测试只验证当前采集源，不会写入配置。";
 }
-function subscriptionFormPayload() {
-  return {
-    kind: document.getElementById("subscription-kind").value,
-    value: document.getElementById("subscription-value").value.trim(),
-    label: document.getElementById("subscription-label").value.trim(),
-  };
+function dynamicPayload() {
+  const config = {};
+  $$('[data-plugin-field]').forEach((field) => { config[field.dataset.pluginField] = field.type === "number" ? Number(field.value) : field.value.trim(); });
+  return { pluginId: currentPluginId(), label: $("#subscription-label").value.trim(), config };
 }
+function legacyPayload() { return { kind: $("#subscription-kind").value, value: $("#subscription-value").value.trim(), label: $("#subscription-label").value.trim() }; }
+function formPayload() { return currentPluginId() ? dynamicPayload() : legacyPayload(); }
+function itemStatus(item) { if (item.pluginAvailable === false) return "failed"; if (!item.enabled) return "disabled"; return item.health?.status === "success" ? "success" : item.health ? "failed" : "idle"; }
+
 function renderSubscriptions() {
-  if (!state.subscriptions) return;
-  const summary = state.subscriptions.summary;
-  const s = document.getElementById("subscription-summary");
-  s.innerHTML = [
-    ["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"],
-    ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github||0, "Trending / Search"],
-  ].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
-          // 健康状态点阵（最多 50 个竖椭圆：来源不超过 50 时一源一点，超过 50 按比例采样）
-  const allItems = state.subscriptions.items;
-  const oks = allItems.filter((i) => i.health && i.health.status === "success").length;
-  const bads = allItems.filter((i) => i.health && i.health.status !== "success").length;
-  const idles = allItems.filter((i) => !i.health).length;
-  const total = oks + bads + idles;
-  const maxDots = Math.min(total, 50);
-  if(total > 0){
-    let dotHtml = "<div class=\"health-dots\">";
-    const addDots = (cnt, cls, label) => { for(let d = 0; d < cnt; d++){ dotHtml += "<i class=\"health-dot " + cls + "\" title=\"" + label + "\"></i>"; } };
-    const ratio = maxDots / total;
-    let okDots = Math.round(oks * ratio) || (oks > 0 ? 1 : 0);
-    let badDots = Math.round(bads * ratio) || (bads > 0 ? 1 : 0);
-    let idleDots = Math.round(idles * ratio) || (idles > 0 ? 1 : 0);
-    let sum = okDots + badDots + idleDots;
-    while(sum > maxDots){ if(okDots > badDots && okDots > idleDots) okDots--; else if(badDots > idleDots) badDots--; else idleDots--; sum--; }
-    while(sum < maxDots){ if(oks > bads && oks > idles) okDots++; else if(bads > idles) badDots++; else idleDots++; sum++; }
-    addDots(okDots, "ok", oks + "个来源正常");
-    if(bads > 0) addDots(badDots, "bad", bads + "个来源异常");
-    if(idles > 0) addDots(idleDots, "idle", idles + "个未采集");
-    dotHtml += "</div>";
-    const hc = document.getElementById("subscription-health");
-    if(hc) hc.innerHTML = dotHtml;
-  }
-  const items = state.subscriptions.items.filter(
-    (item) => state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter
-  );
-  const list = document.getElementById("subscription-list");
-  list.innerHTML = items.length
-    ? items.map((item, index) => {
-        const health = item.health;
-        const hc = health?.status === "success" ? "ok" : health ? "bad" : "idle";
-        const ht = health?.status === "success"
-          ? `最近成功 · ${health.item_count} 条 · ${((Number(health.duration_ms) || 0) / 1000).toFixed(1)}s`
-          : health ? `最近${health.status === "interrupted" ? "中断" : "失败"} · ${health.error || "未返回内容"}`
-          : "尚无采集记录";
-        return `<article class="subscription-row health-${hc} ${item.enabled ? "" : "disabled"}" style="--row:${index}">
-          <span class="subscription-kind ${escapeHtml(item.kind)}">${subscriptionTypeLabel(item.kind)}</span>
-          <div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small class="source-health ${hc}" title="${escapeHtml(health?.error || "")}">${escapeHtml(ht)}</small></div>
-          ${item.managed?'<span class="story-meta">系统采集入口</span>':`<label class="source-switch"><input type="checkbox" data-source-toggle ${item.enabled ? "checked" : ""} data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>`}
-          <div class="subscription-actions">${item.managed?'<span class="story-meta">随 GitHub 采集执行</span>':`<button class="text-button" data-source-test data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}">测试</button><button class="source-remove" data-source-remove data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}" aria-label="删除订阅源：${escapeHtml(item.label)}">×</button>`}</div>
-        </article>`;
-      }).join("")
-    : '<div class="empty-state">这个分类下还没有订阅源。</div>';
+  const all = allItems();
+  const summary = { total: all.length, enabled: all.filter((i) => i.enabled).length, direct: all.filter((i) => i.kind === "direct").length, github: all.filter((i) => i.kind === "github").length };
+  $("#subscription-summary").innerHTML = [["TOTAL", summary.total, "全部入口"], ["ON DESK", summary.enabled, "当前启用"], ["DIRECT", summary.direct, "直连 Feed"], ["GITHUB", summary.github, "Trending / Search"]].map(([name, value, note]) => `<article><small>${name}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
+  const counts = { success: 0, failed: 0, idle: 0 }; all.forEach((item) => { const status = itemStatus(item); if (status !== "disabled") counts[status]++; });
+  $("#subscription-health").innerHTML = `<div class="health-dots">${Object.entries(counts).flatMap(([status, count]) => Array.from({ length: Math.min(count, 50) }, () => `<i class="health-dot ${status === "success" ? "ok" : status === "failed" ? "bad" : "idle"}" title="${count} 个来源：${status}"></i>`)).join("")}</div>`;
+  const pluginFilter = $("#source-plugin-filter").value || "all";
+  const statusFilter = $("#source-status-filter").value || "all";
+  const items = all.filter((item) => (state.subscriptionFilter === "all" || item.kind === state.subscriptionFilter) && (pluginFilter === "all" || item.pluginId === pluginFilter) && (statusFilter === "all" || itemStatus(item) === statusFilter));
+  $("#subscription-list").innerHTML = items.length ? items.map((item, index) => {
+    const status = itemStatus(item), hc = status === "success" ? "ok" : status === "failed" ? "bad" : "idle";
+    const healthText = item.pluginAvailable === false ? "插件不可用 · 来源配置已保留" : status === "disabled" ? "已暂停" : status === "success" ? `最近成功 · ${item.health?.item_count || 0} 条` : status === "failed" ? `最近失败 · ${item.health?.error || "未返回详情"}` : "尚无采集记录";
+    const identity = item.unified ? `data-source-id="${item.id}"` : `data-kind="${escapeHtml(item.kind)}" data-value="${escapeHtml(item.value)}"`;
+    return `<article class="subscription-row health-${hc} ${item.enabled ? "" : "disabled"}" style="--row:${index}"><span class="subscription-kind ${escapeHtml(item.kind)}">${escapeHtml(LABELS[item.kind] || item.kind)}</span><div class="subscription-identity"><b>${escapeHtml(item.label)}</b><code>${escapeHtml(item.value)}</code><small>${escapeHtml(pluginById(item.pluginId)?.name || (item.unified ? item.pluginId : "内置兼容来源"))}</small><small class="source-health ${hc}">${escapeHtml(healthText)}</small></div>${item.managed ? '<span class="story-meta">系统采集入口</span>' : `<label class="source-switch"><input type="checkbox" data-source-toggle ${identity} ${item.enabled ? "checked" : ""}><i></i><span>${item.enabled ? "启用" : "暂停"}</span></label>`}<div class="subscription-actions">${item.managed ? '<span class="story-meta">随系统任务执行</span>' : `<button class="text-button" data-source-test ${identity}>测试</button><button class="source-remove" data-source-remove ${identity} aria-label="删除订阅源：${escapeHtml(item.label)}">×</button>`}</div></article>`;
+  }).join("") : '<div class="empty-state">当前筛选条件下没有采集源。</div>';
 }
 async function loadSubscriptions() {
-  state.subscriptions = await request("/api/subscriptions");
-  renderSubscriptions();
+  const [subscriptions, plugins, sources] = await Promise.all([request("/api/subscriptions"), request("/api/collector-plugins"), request("/api/collection-sources")]);
+  state.subscriptions = subscriptions; state.collectorPlugins = plugins.items || []; state.collectionSources = sources.items || [];
+  const creatable = state.collectorPlugins.filter((item) => item.available && (item.builtin ? CREATABLE_PLUGINS.has(item.id) : true));
+  $("#subscription-plugin").innerHTML = creatable.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  $("#source-plugin-filter").innerHTML = '<option value="all">全部采集器</option>' + state.collectorPlugins.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}${item.available ? "" : "（不可用）"}</option>`).join("");
+  updateComposer(); renderSubscriptions();
 }
-async function testSubscription(payload, button) {
-  const output = document.getElementById("subscription-test-result");
-  if (button) button.disabled = true;
-  output.className = "subscription-test-result testing";
-  output.textContent = "正在连接并解析 Feed…";
-  try {
-    const result = await request("/api/subscriptions/test", { method: "POST", body: JSON.stringify(payload) });
-    output.className = "subscription-test-result ok";
-    output.textContent = `连接成功 · ${result.title} · 识别到 ${result.itemCount} 条内容`;
-    return result;
-  } catch (err) {
-    output.className = "subscription-test-result bad";
-    output.textContent = `测试失败：${err.message}`;
-    throw err;
-  } finally { if (button) button.disabled = false; }
+async function reloadSources() { const result = await request("/api/collection-sources"); state.collectionSources = result.items || []; renderSubscriptions(); }
+async function testSource(payload, button, id = null) {
+  const output = $("#subscription-test-result"); button.disabled = true; output.className = "subscription-test-result testing"; output.textContent = "正在连接并解析采集源…";
+  try { const result = await request(id ? `/api/collection-sources/${id}/test` : payload.pluginId ? "/api/collection-sources/test" : "/api/subscriptions/test", { method: "POST", body: JSON.stringify(payload) }); output.className = "subscription-test-result ok"; output.textContent = `连接成功 · ${result.title || result.sourceLabel || "采集源可用"} · ${result.itemCount ?? result.items?.length ?? 0} 条`; return result; }
+  catch (error) { output.className = "subscription-test-result bad"; output.textContent = `测试失败：${error.message}`; throw error; } finally { button.disabled = false; }
 }
-async function addSubscriptionFromForm(event) {
-  event.preventDefault();
-  const payload = subscriptionFormPayload();
-  if (!payload.value) return toast("订阅内容不能为空", "error");
-  if (payload.kind === "direct") {
-    try { new URL(payload.value); } catch { return toast("订阅地址不是有效的 URL，请检查格式", "error"); }
-  }
-  const duplicate = (state.subscriptions?.items || []).some((item) => item.kind === payload.kind && item.value === payload.value);
-  if (duplicate) return toast("该订阅已存在，请勿重复添加", "error");
-  state.subscriptions = await request("/api/subscriptions", { method: "POST", body: JSON.stringify(payload) });
-  if (event.currentTarget) event.currentTarget.reset();
-  updateSubscriptionComposer();
-  renderSubscriptions();
-  toast("订阅已写入本地配置，下一次采集生效");
+async function addSource(event) {
+  event.preventDefault(); const payload = formPayload();
+  if (payload.pluginId) await request("/api/collection-sources", { method: "POST", body: JSON.stringify(payload) });
+  else { if (!payload.value) throw new Error("订阅内容不能为空"); state.subscriptions = await request("/api/subscriptions", { method: "POST", body: JSON.stringify(payload) }); }
+  event.currentTarget.reset(); await reloadSources(); updateComposer(); toast("采集源已添加");
 }
-async function toggleSubscription(input) {
-  // 请求期间禁用开关，避免连续点击产生并发 PATCH（响应顺序不保证）
+async function toggleSource(input) {
   input.disabled = true;
-  state.subscriptions = await request("/api/subscriptions", {
-    method: "PATCH", body: JSON.stringify({ kind: input.dataset.kind, value: input.dataset.value, enabled: input.checked }),
-  });
-  renderSubscriptions();
-  toast(input.checked ? "订阅已启用" : "订阅已暂停");
-  input.disabled = false;
+  try { if (input.dataset.sourceId) await request(`/api/collection-sources/${input.dataset.sourceId}`, { method: "PATCH", body: JSON.stringify({ enabled: input.checked }) }); else state.subscriptions = await request("/api/subscriptions", { method: "PATCH", body: JSON.stringify({ kind: input.dataset.kind, value: input.dataset.value, enabled: input.checked }) }); await reloadSources(); }
+  finally { input.disabled = false; }
 }
-async function removeSubscription(button) {
-  if (!await confirmAction(`确定删除订阅"${button.dataset.value}"吗？`, { confirmText: "删除" })) return;
-  state.subscriptions = await request("/api/subscriptions", {
-    method: "DELETE", body: JSON.stringify({ kind: button.dataset.kind, value: button.dataset.value }),
-  });
-  renderSubscriptions();
-  toast("订阅已删除");
+async function removeSource(button) {
+  if (!await confirmAction("确定删除这个采集源吗？", { confirmText: "删除" })) return;
+  if (button.dataset.sourceId) await request(`/api/collection-sources/${button.dataset.sourceId}`, { method: "DELETE" }); else state.subscriptions = await request("/api/subscriptions", { method: "DELETE", body: JSON.stringify({ kind: button.dataset.kind, value: button.dataset.value }) });
+  await reloadSources(); toast("采集源已删除");
 }
-
 
 let bound = false;
 function bindSubscriptions() {
-  if (bound) return;
-  bound = true;
-  document.getElementById("subscription-kind").addEventListener("change", updateSubscriptionComposer);
-  document.getElementById("subscription-form").addEventListener("submit", (event) => addSubscriptionFromForm(event).catch((error) => toast(error.message)));
-  document.getElementById("test-subscription").addEventListener("click", (event) => testSubscription(subscriptionFormPayload(), event.currentTarget).catch((error) => toast(error.message)));
-  document.addEventListener("change", (event) => {
-    if (!event.target.closest("#view-sources")) return;
-    if (event.target.matches("[data-source-toggle]")) {
-      toggleSubscription(event.target).catch((error) => { event.target.disabled = false; event.target.checked = !event.target.checked; toast(error.message); });
-    }
-  });
+  if (bound) return; bound = true;
+  $("#subscription-kind").addEventListener("change", updateComposer); $("#subscription-plugin").addEventListener("change", renderPluginFields);
+  $("#subscription-form").addEventListener("submit", (event) => addSource(event).catch((error) => toast(error.message, "error")));
+  $("#test-subscription").addEventListener("click", (event) => testSource(formPayload(), event.currentTarget).catch(() => {}));
+  $("#source-plugin-filter").addEventListener("change", renderSubscriptions); $("#source-status-filter").addEventListener("change", renderSubscriptions);
+  document.addEventListener("change", (event) => { if (event.target.closest("#view-sources") && event.target.matches("[data-source-toggle]")) toggleSource(event.target).catch((error) => toast(error.message, "error")); });
   document.addEventListener("click", (event) => {
     if (!event.target.closest("#view-sources")) return;
-    const sourceTest = event.target.closest("[data-source-test]");
-    if (sourceTest) testSubscription({ kind: sourceTest.dataset.kind, value: sourceTest.dataset.value }, sourceTest).catch((error) => toast(error.message));
-    const sourceRemove = event.target.closest("[data-source-remove]");
-    if (sourceRemove) removeSubscription(sourceRemove).catch((error) => toast(error.message));
-    const sourceFilter = event.target.closest("[data-source-filter]");
-    if (sourceFilter) {
-      state.subscriptionFilter = sourceFilter.dataset.sourceFilter;
-      $$("[data-source-filter]").forEach((item) => {
-        item.classList.toggle("active", item === sourceFilter);
-        item.setAttribute("aria-selected", String(item === sourceFilter));
-      });
-      renderSubscriptions();
-    }
+    const test = event.target.closest("[data-source-test]"); if (test) testSource(test.dataset.sourceId ? {} : { kind: test.dataset.kind, value: test.dataset.value }, test, test.dataset.sourceId || null).then(reloadSources).catch(() => {});
+    const remove = event.target.closest("[data-source-remove]"); if (remove) removeSource(remove).catch((error) => toast(error.message, "error"));
+    const filter = event.target.closest("[data-source-filter]"); if (filter) { state.subscriptionFilter = filter.dataset.sourceFilter; $$('[data-source-filter]').forEach((item) => { item.classList.toggle("active", item === filter); item.setAttribute("aria-selected", String(item === filter)); }); renderSubscriptions(); }
   });
 }
 
-export default async function loadSubscriptionsView() {
-  bindSubscriptions();
-  return loadSubscriptions();
-}
+export default async function loadSubscriptionsView() { bindSubscriptions(); return loadSubscriptions(); }

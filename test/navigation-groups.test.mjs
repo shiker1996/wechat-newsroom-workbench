@@ -39,8 +39,9 @@ test('运行配置页区分服务状态、环境参数与本地恢复', () => {
   assert.match(html, /class="maintenance-panel"/);
   assert.doesNotMatch(html, /control-card backup-card/);
   assert.match(main, /system: "运行与配置中心"/);
-  assert.match(html,/class="config-tabbar"/);
-  assert.match(html,/data-config-panel="app"/);
-  assert.match(html,/data-config-panel="rsshub"/);
-  assert.match(system,/function selectConfigTab/);
+  assert.doesNotMatch(html,/configuration-console-strip/);
+  assert.doesNotMatch(html,/data-config-panel="app"/);
+  assert.match(html,/id="config-panel-extensions"/);
+  assert.doesNotMatch(html,/data-config-panel="rsshub"/);
+  assert.doesNotMatch(system,/selectConfigTab\("extensions"\)/);
 });

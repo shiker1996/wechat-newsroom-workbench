@@ -21,6 +21,8 @@ test('技能配置拒绝未知工具、非法字数和 Prompt/门禁冲突', () 
   assert.ok(issues.some((item)=>item.field==='gates.voice.firstPerson'));
 });
 
+test('allowedTools 兼容读取并规范化为能力授权覆盖层',()=>{const config=normalizeSkillConfig({prompt:'test',allowedTools:['content.url.fetch']});assert.deepEqual(config.capabilityAuthorization,{mode:'allow-list',capabilities:['content.url.fetch']});const modern=normalizeSkillConfig({prompt:'test',capabilityAuthorization:{capabilities:['content.web.search']}});assert.deepEqual(modern.allowedTools,['content.web.search']);});
+
 test('技能门禁配置深合并默认值并拒绝未知枚举', () => {
   const config=normalizeSkillConfig({prompt:'规则',gates:{
     facts:{unverifiedClaims:'warning'},voice:{firstPerson:'sometimes'},repair:{enabled:'yes'},

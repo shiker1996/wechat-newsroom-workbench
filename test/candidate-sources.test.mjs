@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../lib/core/store.mjs';
-import { fetchCandidateSourceImplementation } from '../lib/integrations/source-fetcher-core.mjs';
+import { fetchCandidateSourceImplementation } from '../plugins/url-fetch/implementation.mjs';
 import { eventGroupsForCandidate } from '../lib/domain/event-fact-base.mjs';
 
 function createStore() {

@@ -1,0 +1,2 @@
+import { runBrowserPageCollector } from './runner.mjs';
+export function createAdapter({config}={}){return {collect:(source)=>runBrowserPageCollector(source,{root:config.workspaceRoot,timeoutMs:90000}),test:async(source)=>{const result=await runBrowserPageCollector({...source,limit:Math.min(source.limit||5,5)},{root:config.workspaceRoot,timeoutMs:60000});return {ok:true,title:new URL(source.url).hostname,itemCount:result.items.length,matched:result.provenance.matched,items:result.items.slice(0,5)};}};}

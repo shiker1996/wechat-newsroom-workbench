@@ -32,36 +32,14 @@ if (fs.existsSync(configPath)) {
   warnings.push('未找到 config.local.json，将使用默认配置（端口 4317）。可参考 config.example.json 创建。');
 }
 
-// 4. .env 与 LLM API Key（至少配置一个 provider，否则 LLM 功能不可用）
-function readEnvFile(file) {
-  if (!fs.existsSync(file)) return {};
-  const result = {};
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (match && !line.trim().startsWith('#')) result[match[1]] = match[2].replace(/^["']|["']$/g, '');
-  }
-  return result;
-}
-const envPath = path.join(root, '.env');
-if (!fs.existsSync(envPath)) {
-  warnings.push('未找到 .env 文件。请复制 .env.example 为 .env 并至少填写一个 LLM API Key，否则成稿/排版功能不可用。');
-} else {
-  const env = readEnvFile(envPath);
-  const keys = ['DEEPSEEK_API_KEY', 'MINIMAX_API_KEY', 'MOONSHOT_API_KEY'];
-  const hasKey = keys.some((k) => (env[k] || process.env[k] || '').trim());
-  if (!hasKey) {
-    warnings.push(`.env 中未配置任何 LLM API Key（${keys.join(' / ')}），成稿等 AI 功能将不可用。`);
-  }
-}
-
-// 5. RSSHub 目录（热点采集依赖；缺失不阻断启动）
+// 4. RSSHub 目录（热点采集依赖；缺失不阻断启动）
 if (!fs.existsSync(path.join(root, 'RSSHub', 'lib'))) {
   warnings.push('未找到 RSSHub 目录，热点采集功能不可用。可运行 npm run setup 自动从 GitHub 克隆，或手动恢复 RSSHub/ 目录。');
 } else if (!fs.existsSync(path.join(root, 'RSSHub', 'node_modules', 'tsx', 'dist', 'cli.mjs'))) {
   warnings.push('RSSHub 已克隆但依赖未安装，热点采集功能不可用。可运行 npm run setup，或进入 RSSHub/ 目录执行 npm install --legacy-peer-deps。');
 }
 
-// 6. Mermaid 图表渲染（可选能力，不阻断普通文章启动）
+// 5. Mermaid 图表渲染（可选能力，不阻断普通文章启动）
 const mermaidCliCandidates = [
   path.join(root, 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),
   path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@mermaid-js', 'mermaid-cli', 'src', 'cli.js'),

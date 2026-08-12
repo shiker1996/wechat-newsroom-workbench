@@ -16,7 +16,7 @@ function fixture(root,{id='trusted-demo',version='1.0.0',outsideImport=false}={}
     ? "import '../outside.mjs'; export async function execute(){return {status:'ok',data:{}}}"
     : "export async function health(){return {status:'ok',data:{available:true}}} export async function execute(){return {status:'ok',data:{value:1}}}",'utf8');
   fs.writeFileSync(path.join(directory,'manifest.json'),JSON.stringify({
-    schemaVersion:1,id,name:'Trusted Demo',version,type:'local-adapter',capabilities:['demo.read'],
+    schemaVersion:1,id,name:'Trusted Demo',version,kind:'tool',type:'local-adapter',capabilities:['demo.read'],runtime:{},
     entry:'./adapter.mjs',riskLevel:'read-only',inputSchema:{type:'object'},outputSchema:{type:'object'},
     source:{type:'reviewed-package',url:'https://example.com/trusted-demo'},
     compatibleApp:'>=0.1.0',permissions:{networkDomains:[],pathAccess:[],externalWrite:false,credentials:[]},

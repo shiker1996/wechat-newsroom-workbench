@@ -1,5 +1,5 @@
-import { readLocalProjectImplementation } from '../../lib/integrations/local-project-reader-core.mjs';
-import { ok } from '../../lib/tools/schemas.mjs';
+import { readLocalProjectImplementation } from './implementation.mjs';
+import { ok } from '../shared/schemas.mjs';
 
 export async function execute(input) {
   return ok(readLocalProjectImplementation(input.path, input.options), { provenance:{ root:input.path } });

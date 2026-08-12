@@ -128,40 +128,13 @@ node scripts/check-env.mjs
 
 浏览器打开 `http://127.0.0.1:4317`。SQLite 的实验性警告已在 npm 脚本中隐藏；它不是运行错误。
 
-需要修改端口、RSSHub 路由、模型参数或内容目录时，把 `config.example.json` 复制为 `config.local.json` 后修改。该文件不会进入 Git。工作台的“设置与数据”页面也可维护 `.env` 中受支持的运行参数、控制 Reddit/RSSHub 进程并导出或恢复备份。
-账号定位（名称、读者画像、内容支柱、风格约束等）把 `account-context.example.json` 复制为 `account-context.json` 后按自己的账号修改，字段含义见示例文件与 `lib/domain/account-context.mjs`；该文件不会进入 Git，请勿提交真实账号画像。
-临时并行验收可在 `.env` 设置 `WORKBENCH_PORT=4318`；日常运行保持默认 `4317` 即可。
-全部配置项（`.env`、`config.local.json`、`account-context.json` 含选题评分参数、技能覆盖层）的字段说明见 [docs/configuration.md](./docs/configuration.md)；技能包与工具插件的编写和安装见 [docs/extending.md](./docs/extending.md)。
+运行参数、模型、工具与采集器配置统一在工作台“运行与配置”页面维护。服务密钥写入隔离凭据仓库，页面只显示是否已配置，不会回读原文。端口等部署参数也可通过 `config.local.json` 设置；账号定位继续使用 `account-context.json`。
 
 ## 接入大模型
 
-工作台内置 OpenAI 兼容模型网关，默认提供 DeepSeek、MiniMax、Kimi 三条路由。**目前只对 DeepSeek 链路做过完整验证；MiniMax 与 Kimi 路由已内置、可配置，但未在本项目跑通完整流水线测试，配置后如遇兼容问题需自行排障。** 推荐复制 `.env.example` 为 `.env`：
+工作台内置 OpenAI 兼容模型网关，默认提供 DeepSeek、MiniMax、Kimi 三条路由。启动工作台后，前往“运行与配置 → 模型”，选择服务商并填写 Base URL、模型名称和 API Key，再到“模型运行”执行连接测试。只需配置实际使用的服务商；修改后由统一配置立即接管，无需创建项目根 `.env`。
 
-```powershell
-Copy-Item .env.example .env
-```
-
-然后编辑 `.env`，只填写实际使用的服务商：
-
-```dotenv
-DEEPSEEK_API_KEY=你的密钥
-MINIMAX_API_KEY=你的密钥
-MOONSHOT_API_KEY=你的密钥
-```
-
-可选的 `TAVILY_API_KEY` 用于配置 Tavily 搜索，`FIRECRAWL_API_KEY` 用于提高 Firecrawl 抓取额度，`GITHUB_TOKEN` 用于提高 GitHub API 限额；又拍云上传仅在配置 `UPYUN_*` 且用户明确点击上传时执行。`.env.example` 给出了当前常用字段；开源前仍需按 [开源准备清单](./docs/open-source-readiness.md) 与运行时字段做一次完整对齐。
-
-`.env` 已被 Git 忽略。设置接口只返回密钥是否已配置，不返回密钥原文；模型调用审计也不保存密钥。工作台也支持在启动服务的 PowerShell 窗口设置环境变量：
-
-```powershell
-$env:DEEPSEEK_API_KEY = '你的密钥'
-$env:MINIMAX_API_KEY = '你的密钥'
-$env:MOONSHOT_API_KEY = '你的密钥'
-npm start
-```
-
-只需配置实际使用的服务商。系统环境变量的优先级高于 `.env`，因此 `.env` 不会覆盖外部已有设置。模型名、Base URL、上下文窗口和输出上限可在 `config.local.json` 的 `llm.providers` 中覆盖，参考结构见 `config.example.json`。修改 `.env`、环境变量或配置后需要重启工作台。
-
+Tavily、Firecrawl、GitHub 和又拍云等扩展凭据同样在对应工具或采集器配置中维护。配置接口只返回密钥状态，模型调用与工具审计均不保存密钥原文。
 “运行与配置 → 模型接入”负责模型服务商、端点、密钥与能力参数；“模型运行”提供最小连接测试、可用模型概览和调用审计。当前批次的打标、事件卡与研判操作统一在批次工作流中执行。编辑室、完整成稿链和杂志排版设计均可选择已配置服务商。第三方模型调用会产生费用，并会把对应标题、链接、简报或草稿发送给所选服务商。
 
 每日批次抽屉提供完整的采集后流水线：
@@ -233,13 +206,13 @@ npm start
 普通 Chrome 默认不开放外部控制端口，工作台不能直接接管用户日常浏览器。MVP 使用一个独立 Chrome 配置：
 
 ```powershell
-powershell -File .\scripts\start-reddit-chrome.ps1
+powershell -File .\plugins\collectors\reddit\scripts\start-chrome.ps1
 ```
 
 如需先检查 Chrome 路径而不启动浏览器：
 
 ```powershell
-powershell -File .\scripts\start-reddit-chrome.ps1 -ValidateOnly
+powershell -File .\plugins\collectors\reddit\scripts\start-chrome.ps1 -ValidateOnly
 ```
 
 脚本会：
@@ -295,9 +268,9 @@ Chrome 由用户启动和关闭。工作台不会在后台擅自启动可见浏�
 
 数据库使用 Node.js 24 内置的 `node:sqlite` 驱动（WAL 模式，启动命令已带 `--disable-warning=ExperimentalWarning` 抑制实验性提示），不依赖任何原生编译模块。运行期生成的目录：`data/`（数据库、来源与 GitHub 缓存、工具执行审计、技能包版本档案）、`articles/`、`topics/`、`social-cards/`（流水线产物）、`logs/`（运行日志），这些目录都被 `.gitignore` 排除，不会进入仓库。
 
-数据的生命周期管理：**导出**走「设置与数据 → 备份与恢复」下载完整备份；**按批次删除**分两级——归档（批次抽屉内操作，可恢复，数据仅不再出现在当前选择器）与彻底删除（仅已归档批次，先展示影响范围：热点 / 候选 / 文档计数与产物目录清单，确认后级联删除数据库记录并清理产物目录，审计类记录脱钩保留，不可恢复，建议先导出备份）；**缓存清理**在「备份与恢复」面板一键清空 GitHub API 与来源正文缓存（随采集自动重建）；**完整清空**即停止服务后删除上述目录和根目录 `.env`。
+数据的生命周期管理：**导出**走「设置与数据 → 备份与恢复」下载完整备份；**按批次删除**分两级——归档（批次抽屉内操作，可恢复，数据仅不再出现在当前选择器）与彻底删除（仅已归档批次，先展示影响范围：热点 / 候选 / 文档计数与产物目录清单，确认后级联删除数据库记录并清理产物目录，审计类记录脱钩保留，不可恢复，建议先导出备份）；**缓存清理**在「备份与恢复」面板一键清空 GitHub API 与来源正文缓存（随采集自动重建）；**完整清空**即停止服务后删除上述运行目录。
 
-备份包内含数据库快照、运行配置状态、技能包与插件目录，清单逐文件记录大小与 SHA-256（`schemaVersion: 1`）。彻底删除数据：先停止服务，再删除上述目录和根目录 `.env` 即可；LLM 与插件凭据不写入数据库。升级兼容：启动时自动执行幂等建表迁移，旧版本直接启动即可；跨大版本恢复备份时强制校验清单版本与文件哈希，恢复前自动保存快照，失败可回滚。
+备份包内含数据库快照、运行配置状态、技能包与插件目录，清单逐文件记录大小与 SHA-256（`schemaVersion: 1`）。彻底删除数据：先停止服务，再删除上述运行目录 即可；LLM 与插件凭据不写入数据库。升级兼容：启动时自动执行幂等建表迁移，旧版本直接启动即可；跨大版本恢复备份时强制校验清单版本与文件哈希，恢复前自动保存快照，失败可回滚。
 
 ## 当前边界
 

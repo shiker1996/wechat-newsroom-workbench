@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "id": "declarative-web-page",
+  "name": "静态网页采集",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "capabilities": [
+    "collect.web-page"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "url",
+      "itemSelector"
+    ],
+    "properties": {
+      "url": {
+        "type": "string",
+        "format": "url",
+        "title": "页面地址"
+      },
+      "itemSelector": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "title": "条目选择器"
+      },
+      "titleSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "标题选择器"
+      },
+      "linkSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "链接选择器"
+      },
+      "linkAttribute": {
+        "type": "string",
+        "maxLength": 50,
+        "default": "href",
+        "title": "链接属性"
+      },
+      "summarySelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "摘要选择器"
+      },
+      "authorSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "作者选择器"
+      },
+      "dateSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "时间选择器"
+      },
+      "dateAttribute": {
+        "type": "string",
+        "maxLength": 50,
+        "default": "datetime",
+        "title": "时间属性"
+      },
+      "nextPageSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "下一页选择器"
+      },
+      "maxPages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5,
+        "default": 1,
+        "title": "最多页数"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 30,
+        "title": "最多条数"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 60000,
+    "concurrency": "parallel"
+  },
+  "collector": {
+    "sourceTypes": [
+      "web-page"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "itemSelector"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "url",
+          "title": "页面地址"
+        },
+        "itemSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "条目选择器"
+        },
+        "titleSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "标题选择器"
+        },
+        "linkSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "链接选择器"
+        },
+        "linkAttribute": {
+          "type": "string",
+          "maxLength": 50,
+          "default": "href",
+          "title": "链接属性"
+        },
+        "summarySelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "摘要选择器"
+        },
+        "authorSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "作者选择器"
+        },
+        "dateSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "时间选择器"
+        },
+        "dateAttribute": {
+          "type": "string",
+          "maxLength": 50,
+          "default": "datetime",
+          "title": "时间属性"
+        },
+        "nextPageSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "下一页选择器"
+        },
+        "maxPages": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 1,
+          "title": "最多页数"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30,
+          "title": "最多条数"
+        }
+      }
+    }
+  }
+}

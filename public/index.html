@@ -648,15 +648,32 @@
       <div class="artifact-grid" id="artifact-list"></div>
     </section>
 
-    <section class="view skill-registry-view" id="view-skills">
-      <div class="section-intro"><div><span class="kicker">CREATION CAPABILITIES</span><h2>技能与工具</h2></div><p>技能决定内容怎么创作，工具负责获取资料与执行外部操作。默认配置可直接使用，需要时再安装或替换。</p></div>
-      <div class="runtime-path-strip skill-registry-summary" id="skill-registry-summary"><span>正在扫描项目技能…</span></div>
+    <section class="view skill-registry-view capability-studio" id="view-skills">
+      <header class="capability-studio-hero"><div><span class="kicker">CAPABILITY STUDIO / LOCAL FIRST</span><h2>能力编排台</h2><p>把创作规则、信息工具和采集插件组织成可检查、可替换的本机能力网络。</p></div><div class="capability-studio-seal"><span>LOCAL</span><b>能力<br>工作室</b></div></header>
+      <div class="runtime-path-strip skill-registry-summary capability-studio-summary" id="skill-registry-summary"><span>正在扫描本机能力…</span></div>
       <nav class="capability-section-tabs" role="tablist" aria-label="技能与工具管理分区">
-        <button type="button" class="active" data-capability-tab="skills" role="tab" aria-selected="true"><span>01</span><b>技能库</b><small>查看创作规则与契约</small></button>
-        <button type="button" data-capability-tab="tools" role="tab" aria-selected="false"><span>02</span><b>信息工具</b><small>查看写作资料能力是否就绪</small></button>
-        <button type="button" data-capability-tab="extensions" role="tab" aria-selected="false"><span>03</span><b>安装扩展</b><small>增加技能或连接外部服务</small></button>
+        <button type="button" class="active" data-capability-tab="skills" role="tab" aria-selected="true"><span>01</span><b>创作技能</b><small>规则、契约与适用环节</small><i>SKILLS</i></button>
+        <button type="button" data-capability-tab="tools" role="tab" aria-selected="false"><span>02</span><b>能力配置</b><small>为业务环节选择实现工具</small><i>ROUTING</i></button>
+        <button type="button" data-capability-tab="collectors" role="tab" aria-selected="false"><span>03</span><b>工具运行</b><small>执行、配置、权限与诊断</small><i>RUNTIME</i></button>
+        <button type="button" data-capability-tab="extensions" role="tab" aria-selected="false"><span>04</span><b>扩展工作室</b><small>校验、安装与连接服务</small><i>EXTEND</i></button>
       </nav>
+      <section class="panel collector-plugin-panel" data-capability-section="collectors" hidden><div class="panel-head"><div><span class="kicker">TOOL RUNTIME</span><h3>工具执行与配置</h3><small>统一管理信息工具的启用状态、优先级、依赖、配置与执行历史。</small></div></div>
+        <div class="collector-management-note"><span>这里只处理工具运行；安装、卸载和首次授权统一放在扩展工作室。</span><button type="button" class="text-button" data-go-extension-studio>前往扩展工作室 →</button></div>
+        <div class="tool-runtime-section-head"><span>INFORMATION TOOLS</span><b>信息工具</b><small>启用、优先级、依赖检查、配置与执行历史</small></div>
+        <div class="runtime-model-list" id="tool-capability-list"></div>
+        <section class="tool-execution-panel" id="tool-execution-panel" hidden><div class="skill-config-section-head"><div><b id="tool-execution-title">执行历史</b><small>仅记录参数名，不保存输入正文或密钥</small></div><button type="button" class="text-button" id="tool-execution-close">关闭</button></div><div class="runtime-model-list" id="tool-execution-list"></div></section>
+        <section class="extension-config-panel" id="tool-extension-config-panel" hidden><div class="skill-config-section-head"><div><b id="tool-extension-config-title">扩展配置</b><small>字段由插件 Manifest 动态声明；秘密值不会回显。</small></div><button type="button" class="text-button" data-extension-config-close>关闭</button></div><form id="tool-extension-config-form" class="extension-dynamic-form"></form></section>
+        <div class="tool-runtime-section-head collector-runtime-head"><span>COLLECTION TOOLS</span><b>采集工具</b><small>与信息工具使用相同的运行管理方式</small></div>
+        <div id="collector-runtime-list" class="runtime-model-list"></div>
+        <section class="capability-impact-panel" id="capability-impact-panel" hidden><div class="skill-config-section-head"><div><b id="capability-impact-title">影响范围</b><small>只读分析，不会修改工具状态</small></div><button type="button" class="text-button" id="capability-impact-close">关闭</button></div><div id="capability-impact-content"></div></section>
+      </section>
       <div class="extension-management-grid" data-capability-section="extensions" hidden>
+      <section class="runtime-commandbar collector-package-installer extension-card">
+        <div><b>安装采集插件</b><small>校验采集器 Manifest、来源 Schema 与网络权限；安装后在“采集插件”区启用和管理。</small></div>
+        <input id="collector-plugin-directory" type="text" placeholder="本地采集插件目录">
+        <button class="ghost-button" type="button" id="validate-collector-plugin">校验与权限摘要</button>
+        <button class="outline-button" type="button" id="install-collector-plugin">管理员安装</button>
+      </section>
       <section class="runtime-commandbar skill-package-installer extension-card">
         <div><b>安装第三方技能包</b><small>可先校验本地目录，或直接选择 ZIP；安装前不会执行包内代码。</small></div>
         <input id="skill-package-directory" type="text" placeholder="本地技能包目录">
@@ -705,29 +722,22 @@
       </section>
       </div>
       <section class="information-slot-panel" data-capability-section="tools" hidden>
-        <div class="information-slot-heading"><div><span class="kicker">TOOL CAPABILITIES</span><b>工具能力与实现切换</b><small>每张卡片是一项能力；有多个实现时可指定偏好，留空则由系统按优先级选择。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
-        <div class="information-slot-grid" id="information-slot-list"><div class="kv-empty">正在读取信息能力…</div></div>
+        <div class="information-slot-heading"><div><span class="kicker">CAPABILITY ROUTING</span><b>能力所需工具</b><small>这里只配置业务能力与工具实现的关系；工具本身的状态、参数和执行历史请到“工具运行”查看。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
+        <div class="capability-graph-toolbar"><label class="search-field"><span>⌕</span><input id="capability-graph-search" type="search" placeholder="搜索能力、技能、功能或工具"></label><select id="capability-graph-status"><option value="all">全部状态</option><option value="blocked">已阻断</option><option value="degraded">降级</option><option value="ready">就绪</option><option value="unused">未使用</option></select></div>
+        <div class="information-slot-grid capability-graph-list" id="information-slot-list"><div class="kv-empty">正在读取统一能力图…</div></div>
       </section>
-      <details class="tool-capability-disclosure" data-capability-section="tools" hidden>
-        <summary><span><b id="tool-capability-summary">正在检查工具运行状态…</b><small>供管理员排查版本、权限、优先级和执行记录</small></span><span>技术详情</span></summary>
-        <div class="runtime-model-list" id="tool-capability-list"></div>
-        <section class="tool-execution-panel" id="tool-execution-panel" hidden>
-          <div class="skill-config-section-head"><div><b id="tool-execution-title">执行历史</b><small>仅记录参数名，不保存输入正文或密钥</small></div><button type="button" class="text-button" id="tool-execution-close">关闭</button></div>
-          <div class="runtime-model-list" id="tool-execution-list"></div>
-        </section>
-      </details>
       <div class="skill-management-layout" data-capability-section="skills">
         <aside class="skill-browser" aria-label="创作技能列表">
-          <div class="skill-browser-head"><div><span class="kicker">SKILLS</span><h5>选择技能</h5></div><span id="skill-filter-count">—</span></div>
+          <div class="skill-browser-head"><div><span class="kicker">CREATIVE ROUTINES</span><h5>技能目录</h5><small>按创作职责分组</small></div><span id="skill-filter-count">—</span></div>
           <div class="skill-browser-controls">
-            <label><span>搜索</span><input id="skill-search" type="search" placeholder="名称或用途" autocomplete="off"></label>
-            <label><span>状态</span><select id="skill-status-filter"><option value="all">全部</option><option value="configured">存在历史覆盖</option><option value="builtin">纯内置</option></select></label>
+            <label class="skill-search-control"><span>⌕</span><input id="skill-search" type="search" placeholder="搜索名称、用途或 ID" autocomplete="off"></label>
+            <label><select id="skill-status-filter" aria-label="技能范围"><option value="all">全部技能</option><option value="configured">已有配置</option><option value="builtin">内置技能</option><option value="installed">已安装</option></select></label>
           </div>
           <div class="skill-list" id="skill-registry-list"></div>
         </aside>
         <div class="skill-detail">
           <div class="skill-detail-empty" id="skill-detail-empty">
-            <span>01</span><h5>先从左侧选择一个技能</h5><p>查看内置 SKILL.md、来源文件、版本和内容哈希。</p>
+            <span>SK</span><h5>选择一项创作能力</h5><p>查看它负责的环节、输入输出契约、来源版本以及完整 SKILL.md。</p>
           </div>
           <section class="model-config-panel skill-config-editor skill-readonly-view" id="skill-config-editor" hidden>
             <div class="panel-head skill-editor-head"><div><span class="kicker">BUILT-IN SKILL · READ ONLY</span><h3 id="skill-config-title">技能说明</h3><small id="skill-config-meta">选择技能后读取 SKILL.md</small></div><span class="status-pill ok">只读</span></div>
@@ -743,6 +753,10 @@
             </section>
             <section class="skill-markdown-section">
               <div class="skill-config-section-head"><div><b>SKILL.md</b><small>内置技能契约原文，不包含运行时安全附加段或历史覆盖层</small></div><span>02</span></div>
+              <section class="extension-config-panel" id="skill-extension-config-panel" hidden>
+                <div class="skill-config-section-head"><div><b>扩展配置</b><small>该表单由 skill.json 的 configuration Schema 自动生成。</small></div><span>动态</span></div>
+                <form id="skill-extension-config-form" class="extension-dynamic-form"></form>
+              </section>
               <pre class="skill-markdown-view" id="skill-markdown-view"></pre>
             </section>
             <details class="skill-version-panel">
@@ -783,23 +797,14 @@
         </article>
       </div>
       <div class="system-workspace">
-        <section class="runtime-config-panel">
-          <div class="runtime-config-head"><div><span class="kicker">ENVIRONMENT DESK</span><h3>本机配置</h3></div><p>留空保持现值；勾选“清除”才会移除配置。</p></div>
+        <section class="runtime-config-panel configuration-console">
+          <div class="runtime-config-head configuration-console-head"><div><span class="kicker">LOCAL CONFIGURATION REGISTRY</span><h3>本机能力配置</h3><p>统一管理模型、工具、采集器与工作台参数。密钥仅显示状态，不在页面回读。</p></div><div class="configuration-readiness" id="configuration-readiness"><strong>—</strong><span>正在扫描能力状态</span></div></div>
           <div class="runtime-path-strip" id="runtime-paths"><span>正在读取路径配置…</span></div>
-          <div class="config-tabbar" role="tablist" aria-label="配置文件">
-            <button type="button" class="active" role="tab" aria-selected="true" aria-controls="config-panel-app" data-config-tab="app"><span>01</span><b>工作台配置</b><small>抓取 · 图片 · 运行</small></button>
-            <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-rsshub" data-config-tab="rsshub"><span>02</span><b>RSSHub KV</b><small>平台 Token · 代理 · 扩展变量</small></button>
-            <button type="button" role="tab" aria-selected="false" aria-controls="config-panel-models" data-config-tab="models"><span>03</span><b>模型接入</b><small>端点 · 模型 · 密钥 · 能力</small></button>
-          </div>
-          <div class="config-panel active" id="config-panel-app" role="tabpanel" data-config-panel="app">
-            <div class="config-panel-heading"><div><span class="kicker">WORKBENCH.ENV</span><h4>工作台服务</h4></div><p>按用途展开需要修改的配置组。</p></div>
-            <div id="app-env-fields" class="env-field-list"></div>
-          </div>
-          <div class="config-panel" id="config-panel-rsshub" role="tabpanel" data-config-panel="rsshub" hidden>
+          <div class="config-panel legacy-config-panel" id="config-panel-rsshub" role="tabpanel" hidden>
             <div class="config-panel-heading"><div><span class="kicker">RSSHUB/.ENV</span><h4>RSSHub 环境</h4></div><p>已有值不会回显，修改后重启 RSSHub 生效。</p></div>
             <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div>
           </div>
-          <div class="config-panel" id="config-panel-models" role="tabpanel" data-config-panel="models" hidden>
+          <div class="config-panel legacy-config-panel" id="config-panel-models" role="tabpanel" hidden>
             <div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型接入配置</h4></div><p>保存后即时进入模型网关；密钥只写入服务端环境文件。</p></div>
             <div class="runtime-model-list" id="runtime-model-list"></div>
             <section class="model-config-panel">
@@ -823,7 +828,12 @@
               </form>
             </section>
           </div>
-          <div class="runtime-save-row"><span id="runtime-config-status">尚未修改 · 部分进程参数需重启后生效</span><button class="primary-button" id="save-runtime-settings">保存配置</button></div>
+          <div class="configuration-legend configuration-inline-legend"><span><i class="ready"></i>已就绪</span><span><i class="attention"></i>需要配置</span><span><i class="secret"></i>凭据隔离</span></div>
+          <div class="config-panel active" id="config-panel-extensions">
+            <div class="config-panel-heading"><div><span class="kicker">CONFIGURATION CATALOG</span><h4>统一配置资源</h4></div><p>字段由 Manifest 自动生成；模型、技能、工具和采集器使用相同的保存与测试流程。</p><button type="button" class="outline-button" id="add-model-provider">＋ 添加模型</button></div>
+            <div class="configuration-catalog-tools"><label class="configuration-search"><span>⌕</span><input id="system-extension-search" type="search" placeholder="搜索能力名称或 ID"></label><select id="system-extension-type"><option value="">全部能力</option><option value="model-provider">模型</option><option value="skill">技能</option><option value="tool">工具</option><option value="collector">采集器</option><option value="system">系统</option></select></div>
+            <div class="extension-settings-layout"><aside class="configuration-index"><div class="configuration-index-head"><span>能力索引</span><small id="configuration-filter-count">—</small></div><div id="system-extension-list" class="extension-settings-list"><div class="kv-empty">正在读取配置资源…</div></div></aside><section id="system-extension-editor" class="extension-settings-editor"><div class="configuration-empty"><b>选择一项能力</b><span>查看配置字段、凭据状态与运行诊断。</span></div></section></div>
+          </div>
         </section>
         <aside class="maintenance-panel">
           <div class="maintenance-number">BK</div><span class="kicker">LOCAL RECOVERY</span><h3>备份与恢复</h3>
@@ -977,7 +987,12 @@
               <option value="direct">直连 RSS / Atom</option>
               <option value="twitter">X 官方号 / 博主</option>
               <option value="rsshub">RSSHub 路由</option>
+              <option value="reddit">Reddit 分区</option>
+              <option value="more">更多采集器…</option>
             </select>
+          </label>
+          <label id="subscription-plugin-wrap" hidden>采集器
+            <select id="subscription-plugin"></select>
           </label>
           <label id="subscription-value-label"><span id="subscription-value-label-text">订阅地址</span>
             <input name="value" id="subscription-value" type="url" required placeholder="https://example.com/feed.xml">
@@ -985,6 +1000,7 @@
           <label id="subscription-label-wrap">显示名称（可选）
             <input name="label" id="subscription-label" placeholder="例如：机器之心">
           </label>
+          <div id="source-plugin-fields" class="source-plugin-fields" hidden></div>
           <div class="source-compose-actions">
             <button type="button" class="outline-button" id="test-subscription">先测试</button>
             <button type="submit" class="primary-button">添加订阅</button>
@@ -999,8 +1015,13 @@
               <button data-source-filter="direct" role="tab" aria-selected="false">直连</button>
               <button data-source-filter="twitter" role="tab" aria-selected="false">X</button>
               <button data-source-filter="rsshub" role="tab" aria-selected="false">RSSHub</button>
+              <button data-source-filter="reddit" role="tab" aria-selected="false">Reddit</button>
               <button data-source-filter="github" role="tab" aria-selected="false">GitHub</button>
             </div>
+          </div>
+          <div class="source-ledger-filters">
+            <label>采集器 <select id="source-plugin-filter"><option value="all">全部采集器</option></select></label>
+            <label>状态 <select id="source-status-filter"><option value="all">全部状态</option><option value="success">正常</option><option value="failed">失败</option><option value="idle">未运行</option><option value="disabled">已暂停</option></select></label>
           </div>
           <div class="subscription-list" id="subscription-list"><div class="empty-state">正在读取订阅配置…</div></div>
         </section>

@@ -5,6 +5,7 @@ node_modules/
 # Env & secrets
 .env
 .env.local
+.env.remote-plugins
 config.local.json
 account-context.json
 
@@ -21,6 +22,7 @@ social-cards/
 
 # Chrome / browser profiles
 data/reddit-chrome-profile/
+plugins/collectors/reddit/data/
 
 # Temp / scratch scripts
 check_btick.mjs
@@ -41,7 +43,7 @@ __pycache__/
 
 
 # 外部项目 / 临时文件
-RSSHub/
+/RSSHub/
 todo.md
 dist/
 

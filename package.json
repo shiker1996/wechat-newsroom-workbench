@@ -11,11 +11,16 @@
         "dev": "node --disable-warning=ExperimentalWarning --watch --watch-path=server.mjs --watch-path=lib server.mjs",
         "test": "node --disable-warning=ExperimentalWarning --test test/**/*.test.mjs",
         "test:fast": "node scripts/test-fast.mjs",
-        "build": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs",
+    "check:legacy-config-guidance": "node scripts/check-legacy-configuration-guidance.mjs",
         "postinstall": "node scripts/install-skill-deps.mjs",
         "build:watch": "node --watch scripts/build.mjs",
         "skill:validate": "node scripts/validate-skill-package.mjs",
         "plugin:validate": "node scripts/validate-tool-plugin.mjs",
+    "config:baseline": "node scripts/snapshot-legacy-configuration.mjs",
+    "config:migrate": "node --disable-warning=ExperimentalWarning scripts/migrate-legacy-configuration.mjs",
+        "capability:baseline": "node scripts/snapshot-tool-call-baseline.mjs",
+        "capability:migrate-routes": "node scripts/migrate-capability-routes.mjs",
         "release": "node scripts/release.mjs"
     },
     "engines": {

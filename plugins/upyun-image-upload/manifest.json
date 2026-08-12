@@ -1,7 +1,69 @@
 {
-  "id":"upyun-image-upload","name":"又拍云图片上传","version":"1.0.0",
-  "capabilities":["image.cdn.upload"],"entry":"./adapter.mjs","riskLevel":"external-write",
-  "pathInputs":["localPath"],
-  "inputSchema":{"type":"object","required":["localPath"],"properties":{"localPath":{"type":"string"}}},
-  "outputSchema":{"type":"object"},"healthCheck":true,"enabledByDefault":true
+  "id": "upyun-image-upload",
+  "name": "又拍云图片上传",
+  "version": "1.0.0",
+  "capabilities": [
+    "image.cdn.upload"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "external-write",
+  "pathInputs": [
+    "localPath"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "localPath"
+    ],
+    "properties": {
+      "localPath": {
+        "type": "string"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object"
+  },
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "bucket": {
+        "type": "string",
+        "title": "Bucket"
+      },
+      "operator": {
+        "type": "string",
+        "title": "操作员",
+        "secret": true,
+        "format": "password"
+      },
+      "password": {
+        "type": "string",
+        "title": "密码",
+        "secret": true,
+        "format": "password"
+      },
+      "domain": {
+        "type": "string",
+        "title": "访问域名",
+        "default": "img.shiker.tech"
+      },
+      "prefix": {
+        "type": "string",
+        "title": "目录前缀",
+        "default": "weedit"
+      }
+    },
+    "required": [
+      "bucket",
+      "operator",
+      "password"
+    ]
+  },
+  "healthCheck": true,
+  "enabledByDefault": true,
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
 }

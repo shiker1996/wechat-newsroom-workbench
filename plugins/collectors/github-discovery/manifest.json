@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "id": "github-discovery-collector",
+  "name": "GitHub 项目发现",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "credentialProfile": "github",
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "token": {
+        "type": "string",
+        "title": "GitHub Token",
+        "secret": true,
+        "format": "password"
+      },
+      "enabled": {
+        "type": "boolean",
+        "title": "启用项目发现",
+        "default": true
+      },
+      "createdWithinDays": {
+        "type": "integer",
+        "title": "创建时间窗口（天）",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 30
+      },
+      "minStars": {
+        "type": "integer",
+        "title": "最低 Star",
+        "minimum": 1,
+        "maximum": 1000000,
+        "default": 1000
+      },
+      "limit": {
+        "type": "integer",
+        "title": "最多项目数",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 30
+      },
+      "cacheTtlMs": {
+        "type": "integer",
+        "title": "缓存时间（毫秒）",
+        "minimum": 1000,
+        "maximum": 86400000,
+        "default": 1800000
+      },
+      "aiQueriesEnabled": {
+        "type": "boolean",
+        "title": "启用 AI 查询组",
+        "default": true
+      },
+      "refreshDays": {
+        "type": "integer",
+        "title": "查询组刷新天数",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 7
+      },
+      "maxQueries": {
+        "type": "integer",
+        "title": "最多查询组",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 6
+      },
+      "perQueryLimit": {
+        "type": "integer",
+        "title": "每组结果数",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 15
+      },
+      "relevanceFilter": {
+        "type": "boolean",
+        "title": "启用兴趣过滤",
+        "default": true
+      },
+      "minInterestScore": {
+        "type": "integer",
+        "title": "最低兴趣分",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 6
+      }
+    }
+  },
+  "capabilities": [
+    "collect.github"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "createdWithinDays": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 30
+      },
+      "minStars": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000,
+        "default": 1000
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 30
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 120000,
+    "concurrency": "parallel"
+  },
+  "collector": {
+    "sourceTypes": [
+      "github"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createdWithinDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30
+        },
+        "minStars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 1000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30
+        }
+      }
+    }
+  }
+}

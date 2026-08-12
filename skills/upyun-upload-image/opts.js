@@ -32,11 +32,11 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
 }
 
 export function resolveUpyunConfig({ file, opts }) {
-  const bucket = opts.bucket ?? process.env.UPYUN_BUCKET
-  const operator = opts.operator ?? process.env.UPYUN_OPERATOR
-  const password = opts.password ?? process.env.UPYUN_PASSWORD
-  const domain = opts.domain ?? process.env.UPYUN_DOMAIN ?? 'example.com'
-  const prefix = stripSlashes(opts.prefix ?? process.env.UPYUN_PREFIX ?? 'uploads')
+  const bucket = opts.bucket
+  const operator = opts.operator
+  const password = opts.password
+  const domain = opts.domain ?? 'img.shiker.tech'
+  const prefix = stripSlashes(opts.prefix ?? 'weedit')
 
   const inputFile = opts.file ?? file
   const contentType = opts.contentType ?? opts['content-type'] ?? undefined

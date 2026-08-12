@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "id": "reddit-collector",
+  "name": "Reddit 热门分区",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "browser-read",
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cdpUrl": {
+        "type": "string",
+        "title": "Chrome CDP 地址",
+        "format": "url",
+        "default": "http://localhost:9333"
+      },
+      "navigationTimeoutMs": {
+        "type": "integer",
+        "title": "页面导航超时（毫秒）",
+        "minimum": 5000,
+        "maximum": 120000,
+        "default": 30000
+      },
+      "browserLifecycle": {
+        "type": "string",
+        "title": "浏览器生命周期",
+        "enum": ["automatic", "persistent", "external"],
+        "default": "automatic"
+      },
+      "profileId": {
+        "type": "string",
+        "title": "登录 Profile",
+        "pattern": "^[A-Za-z0-9-]+$",
+        "default": "default"
+      },
+      "closeDelayMs": {
+        "type": "integer",
+        "title": "采集后延迟关闭（毫秒）",
+        "minimum": 0,
+        "maximum": 30000,
+        "default": 1000
+      }
+    }
+  },
+  "capabilities": [
+    "collect.reddit"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "subreddit"
+    ],
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_]{2,21}$"
+      },
+      "sort": {
+        "type": "string",
+        "enum": [
+          "hot",
+          "new",
+          "top"
+        ],
+        "default": "hot"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 15
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 60000,
+    "concurrency": "session"
+  },
+  "collector": {
+    "sourceTypes": [
+      "reddit"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subreddit"
+      ],
+      "properties": {
+        "subreddit": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{2,21}$"
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "hot",
+            "new",
+            "top"
+          ],
+          "default": "hot"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 15
+        }
+      }
+    }
+  }
+}

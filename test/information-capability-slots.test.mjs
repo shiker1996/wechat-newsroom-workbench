@@ -90,9 +90,8 @@ test('skills and plugins page shows slot status and supports implementation sele
   const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
   assert.match(html,/id="information-slot-list"/);
   assert.match(html,/id="information-slot-summary"/);
-  assert.match(html,/工具能力与实现切换/);
-  assert.match(skills,/\/api\/system\/information-capability-slots/);
-  assert.match(skills,/data-information-slot/);
-  assert.match(skills,/data-connect-information-tool/);
-  assert.match(skills,/selectCapabilityTab\("extensions"\)/);
+  assert.match(html,/能力所需工具/);
+  assert.doesNotMatch(skills,/\/api\/system\/information-capability-slots/);
+  assert.match(skills,/\/api\/system\/capability-routes/);
+  assert.match(skills,/data-capability-route/);
 });

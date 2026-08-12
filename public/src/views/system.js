@@ -5,6 +5,11 @@ import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 let bound = false;
 let validatedBackup = null;
 let runtimeModels = null;
+let runtimeSettings = null;
+let extensionConfigurations = [];
+let selectedExtension = null;
+let extensionQuery = "";
+let extensionType = "";
 
 function bindSystem() {
   if (bound) return;
@@ -19,11 +24,9 @@ function bindSystem() {
   document.querySelectorAll("[data-runtime-service]").forEach((button) => button.addEventListener("click", () => {
     controlRuntime(button).catch((error) => toast(error.message));
   }));
-  document.getElementById("save-runtime-settings")?.addEventListener("click", (event) => {
-    saveRuntimeSettings(event.currentTarget).catch((error) => toast(error.message));
-  });
   document.getElementById("add-rsshub-env")?.addEventListener("click", () => addRsshubKvRow());
   document.getElementById("new-model-config")?.addEventListener("click", () => resetModelForm());
+  document.getElementById("add-model-provider")?.addEventListener("click", () => openModelProviderManager());
   document.getElementById("model-config-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     saveModelConfig(event.submitter).catch((error) => toast(error.message));
@@ -39,6 +42,10 @@ function bindSystem() {
     const button = event.target.closest("[data-config-tab]");
     if (button) selectConfigTab(button.dataset.configTab);
   });
+  document.getElementById("system-extension-list")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-system-extension]");if(button)selectSystemExtension(button.dataset.systemExtension);});
+  document.getElementById("system-extension-search")?.addEventListener("input",(event)=>{extensionQuery=event.target.value.trim().toLowerCase();renderSystemExtensionList();});
+  document.getElementById("system-extension-type")?.addEventListener("change",(event)=>{extensionType=event.target.value;renderSystemExtensionList();});
+  document.getElementById("system-extension-editor")?.addEventListener("click",(event)=>{const remove=event.target.closest("[data-rsshub-remove]");if(!remove)return;const row=remove.closest(".rsshub-kv-row");if(row.dataset.existing==="true"){row.classList.toggle("pending-delete");row.querySelector("[data-rsshub-clear]").checked=row.classList.contains("pending-delete");remove.textContent=row.classList.contains("pending-delete")?"撤销":"删除";}else row.remove();updateRsshubPendingHint();});
   document.getElementById("rsshub-env-fields")?.addEventListener("click", (event) => {
     const remove = event.target.closest("[data-rsshub-remove]");
     if (!remove) return;
@@ -151,37 +158,14 @@ function selectConfigTab(name) {
   try { sessionStorage.setItem("runtime-config-tab", name); } catch {}
 }
 
-const APP_ENV_GROUPS = [
-  { id: "fetch", label: "原文抓取", hint: "Python、Firecrawl、搜索增强与抓取策略", keys: ["WRITE_ASSISTANT_PYTHON", "SOURCE_FETCH_PROVIDER", "FIRECRAWL_MCP_URL", "FIRECRAWL_API_KEY", "GITHUB_TOKEN", "TAVILY_API_KEY"] },
-  { id: "storage", label: "图片存储", hint: "又拍云上传与访问地址", keys: ["UPYUN_BUCKET", "UPYUN_OPERATOR", "UPYUN_PASSWORD", "UPYUN_DOMAIN", "UPYUN_PREFIX"] },
-  { id: "runtime", label: "工作台运行", hint: "本机 Web 服务参数", keys: ["WORKBENCH_PORT"] },
-];
-const LEGACY_MODEL_ENV_KEYS = ["DEEPSEEK_API_KEY", "MINIMAX_API_KEY", "MOONSHOT_API_KEY"];
-
-function envFieldMarkup(field) {
-  return `<label class="env-field">
-    <span><b>${escapeHtml(field.label)}</b><code>${escapeHtml(field.key)}</code></span>
-    <span class="env-state ${field.configured ? "configured" : ""}">${field.configured ? "已配置" : "未配置"}</span>
-    <input data-env-key="${escapeHtml(field.key)}" data-env-secret="${field.secret}" type="${field.secret ? "password" : "text"}" value="${escapeHtml(field.value || "")}" placeholder="${field.secret && field.configured ? "留空保持现值" : "输入配置值"}" autocomplete="off">
-    <label class="env-clear"><input type="checkbox" data-env-clear="${escapeHtml(field.key)}"> 清除</label>
-  </label>`;
-}
-
-function renderAppEnvGroups(fields) {
-  const byKey = new Map(fields.map((field) => [field.key, field]));
-  const assigned = new Set([...APP_ENV_GROUPS.flatMap((group) => group.keys), ...LEGACY_MODEL_ENV_KEYS]);
-  const groups = [...APP_ENV_GROUPS];
-  const other = fields.filter((field) => !assigned.has(field.key));
-  if (other.length) groups.push({ id: "other", label: "其他服务", hint: "其他可选运行参数", keys: other.map((field) => field.key) });
-  document.getElementById("app-env-fields").innerHTML = groups.map((group) => {
-    const items = group.keys.map((key) => byKey.get(key)).filter(Boolean);
-    const configured = items.filter((item) => item.configured).length;
-    return `<details class="env-group" data-env-group="${group.id}">
-      <summary><span><b>${escapeHtml(group.label)}</b><small>${escapeHtml(group.hint)}</small></span><em>${configured} / ${items.length} 已配置</em></summary>
-      <div class="env-group-fields">${items.map(envFieldMarkup).join("")}</div>
-    </details>`;
-  }).join("");
-}
+function extensionRoute(item,suffix=""){return `/api/system/configuration/${encodeURIComponent(item.type)}/${encodeURIComponent(item.id)}${suffix}`;}
+function renderSystemExtensionList(){const node=document.getElementById("system-extension-list");if(!node)return;const labels={system:"系统",'model-provider':"模型",skill:"技能",tool:"工具",collector:"采集器"};const marks={system:"SYS",'model-provider':"AI",skill:"SK",tool:"TL",collector:"CL"};const items=extensionConfigurations.filter((item)=>(!extensionType||item.type===extensionType)&&(!extensionQuery||`${item.name||''} ${item.id}`.toLowerCase().includes(extensionQuery)));const count=document.getElementById("configuration-filter-count");if(count)count.textContent=`${items.length} / ${extensionConfigurations.length}`;node.innerHTML=items.length?items.map((item)=>`<button type="button" class="${selectedExtension===`${item.type}:${item.id}`?'active':''}" data-system-extension="${escapeHtml(`${item.type}:${item.id}`)}"><span class="configuration-resource-mark">${marks[item.type]||'EX'}</span><span class="configuration-resource-copy"><b>${escapeHtml(item.name||item.id)}</b><small>${labels[item.type]||item.type} · ${escapeHtml(item.id)}</small></span><i class="configuration-resource-state ${item.state.configured?'ready':'attention'}" title="${item.state.configured?'已就绪':'需要配置'}"></i></button>`).join(""):'<div class="configuration-empty"><b>没有匹配项</b><span>试试清空搜索或切换能力类型。</span></div>';}function systemSchemaField(name,rule,value){const id=`system-extension-${name}`,common=`id="${id}" data-system-extension-field="${escapeHtml(name)}" data-value-type="${escapeHtml(rule.type||'string')}"`;const heading=`${escapeHtml(rule.title||name)}${rule.description?`<small>${escapeHtml(rule.description)}</small>`:''}`;if(rule.enum)return `<label>${heading}<select ${common}>${rule.enum.map((item,index)=>`<option value="${escapeHtml(item)}" ${item===value?'selected':''}>${escapeHtml(rule.enumNames?.[index]||item)}</option>`).join("")}</select></label>`;if(rule.type==='boolean')return `<label><span>${heading}</span><input ${common} type="checkbox" ${value?'checked':''}></label>`;if(rule.type==='array'){const text=Array.isArray(value)?value.join("\n"):"";return `<label>${heading}<textarea ${common} rows="4" placeholder="每行一项">${escapeHtml(text)}</textarea></label>`;}const configured=value==='__configured__';if(rule.format==='textarea')return `<label>${heading}<textarea ${common} rows="5" ${configured?'placeholder="已配置；留空保持不变"':''}>${configured?'':escapeHtml(value??'')}</textarea></label>`;const type=rule.secret||rule.format==='password'?'password':rule.type==='integer'||rule.type==='number'?'number':rule.format==='url'?'url':'text';return `<label>${heading}<input ${common} type="${type}" value="${configured?'':escapeHtml(value??'')}" ${configured?'placeholder="已配置；留空保持不变"':''}></label>`;}
+function parkModelProviderManager(){const legacy=document.getElementById("config-panel-models"),list=document.getElementById("runtime-model-list"),panel=document.querySelector(".model-config-panel");if(legacy&&list&&panel&&list.parentElement!==legacy)legacy.append(list,panel);}
+function renderSystemExtensionEditor(item){parkModelProviderManager();const node=document.getElementById("system-extension-editor");if(!node)return;if(!item){node.innerHTML='<div class="configuration-empty"><b>选择一项能力</b><span>查看配置字段、凭据状态与运行诊断。</span></div>';return;}const state=item.state,schema=state.schema||{properties:{}};const issues=state.issues||[];const advanced=item.renderer==='key-value-secret'?`<section class="resource-advanced"><div class="config-panel-heading"><div><span class="kicker">KEY-VALUE SECRET</span><h4>RSSHub 扩展变量</h4></div><p>键名受控校验，秘密值只显示配置状态。</p></div><div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" data-add-rsshub-kv>＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div><button type="button" class="outline-button" data-save-rsshub-kv>保存扩展变量</button></section>`:'';node.innerHTML=`<header class="configuration-editor-head"><div><span class="kicker">${escapeHtml(item.type.toUpperCase())} / ${escapeHtml(item.id)}</span><h4>${escapeHtml(item.name||item.id)}</h4><p>${state.configured?'该能力已通过配置校验，可以投入运行。':'完成以下配置后，能力才会进入运行队列。'}</p></div><span class="configuration-status-badge ${state.configured?'ready':'attention'}"><i></i>${state.configured?'已就绪':'需要配置'}</span></header>${issues.length?`<div class="configuration-issues"><b>需要处理</b>${issues.map((issue)=>`<span>${escapeHtml(issue.message||issue.field)}</span>`).join('')}</div>`:''}<form id="system-extension-form"><div class="configuration-fields">${Object.entries(schema.properties||{}).map(([name,rule])=>systemSchemaField(name,rule,state.values?.[name])).join("")}</div><div class="configuration-form-actions"><small>保存前会校验字段格式；密钥不会在页面回显。</small><div><button type="button" class="ghost-button" data-system-extension-test>测试配置</button><button type="submit" class="primary-button">保存并应用</button></div></div></form>${advanced}`;const form=node.querySelector("form");form.onsubmit=(event)=>{event.preventDefault();saveSystemExtension(item,form).catch((error)=>toast(error.message));};form.querySelector("[data-system-extension-test]").onclick=()=>testSystemExtension(item).catch((error)=>toast(error.message));if(advanced){renderRsshubKv(runtimeSettings?.rsshub||[]);node.querySelector('[data-add-rsshub-kv]').onclick=addRsshubKvRow;node.querySelector('[data-save-rsshub-kv]').onclick=(event)=>saveRsshubConfiguration(event.currentTarget);}}function selectSystemExtension(key){selectedExtension=key;try{sessionStorage.setItem("system-extension-selection",key);const [type,id]=key.split(':');history.replaceState(null,"",`#system/configuration/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);}catch{}renderSystemExtensionList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===key));}
+function readSystemExtensionForm(form){return Object.fromEntries([...form.querySelectorAll("[data-system-extension-field]")].map((field)=>{let value=field.type==='checkbox'?field.checked:field.value;const type=field.dataset.valueType;if(type==='array')value=String(value).split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);if((type==='integer'||type==='number')&&value!=='')value=Number(value);return [field.dataset.systemExtensionField,value];}));}
+async function loadExtensionConfigurations(){const result=await request("/api/system/configuration/catalog");extensionConfigurations=result.items||[];const ready=extensionConfigurations.filter((item)=>item.state.configured).length,attention=extensionConfigurations.length-ready;const summary=document.getElementById("configuration-readiness");if(summary)summary.innerHTML=`<strong>${ready}/${extensionConfigurations.length}</strong><span>${attention?`${attention} 项需要处理`:'全部能力已就绪'}</span>`;const match=location.hash.match(/^#system\/configuration\/([^/]+)\/(.+)$/);if(match)selectedExtension=`${decodeURIComponent(match[1])}:${decodeURIComponent(match[2])}`;else if(!selectedExtension)try{selectedExtension=sessionStorage.getItem("system-extension-selection")||"";}catch{}const current=extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension);if(!current)selectedExtension=extensionConfigurations[0]?`${extensionConfigurations[0].type}:${extensionConfigurations[0].id}`:null;renderSystemExtensionList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension));}
+async function saveSystemExtension(item,form){const state=await request(extensionRoute(item),{method:"PUT",body:JSON.stringify(readSystemExtensionForm(form))});item.state=state;toast("扩展配置已保存");renderSystemExtensionList();renderSystemExtensionEditor(item);}
+async function testSystemExtension(item){const result=await request(extensionRoute(item,"/test"),{method:"POST",body:"{}"});toast(result.pass?"扩展配置测试通过":"扩展配置尚未就绪");}
 
 function rsshubKvMarkup(field = { key: "", configured: false }, existing = false) {
   return `<div class="rsshub-kv-row" data-existing="${existing}">
@@ -219,6 +203,19 @@ function renderModelSettings() {
   if (!node) return;
   const providers = runtimeModels?.providers || [];
   node.innerHTML = providers.length ? providers.map((provider) => `<button type="button" class="runtime-model-item ${provider.enabled === false ? "disabled" : ""}" data-model-edit="${escapeHtml(provider.name)}"><b>${escapeHtml(provider.label)}</b><small>${escapeHtml(provider.model)} · ${escapeHtml(provider.baseUrl)}</small><em>${provider.enabled === false ? "已停用" : provider.configured ? "已配置" : "缺少 Key"}${provider.name === runtimeModels.defaultProvider ? " · 默认" : ""}</em></button>`).join("") : '<div class="kv-empty">暂无模型配置。</div>';
+}
+
+function openModelProviderManager(editId = "") {
+  const editor=document.getElementById("system-extension-editor");
+  const legacy=document.getElementById("config-panel-models");
+  const list=document.getElementById("runtime-model-list");
+  const panel=legacy?.querySelector(".model-config-panel");
+  if(!editor||!list||!panel)return;
+  editor.innerHTML='<div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型接入</h4></div><p>添加兼容 OpenAI Chat Completions API 的模型渠道；保存后即时进入模型网关。</p></div><div id="model-provider-manager"></div>';
+  const manager=document.getElementById("model-provider-manager");
+  manager.append(list,panel);
+  if(editId)editModelConfig(editId);else resetModelForm();
+  document.getElementById("model-label")?.focus();
 }
 
 async function loadModelSettings() {
@@ -294,7 +291,8 @@ async function saveModelConfig(button) {
     const result = await request("/api/models/config", { method: "POST", body: JSON.stringify(modelFormPayload()) });
     toast("模型配置已保存并即时生效");
     await loadModelSettings();
-    editModelConfig(result.id);
+    await loadExtensionConfigurations();
+    openModelProviderManager(result.id);
   } finally {
     if (button) {
       button.disabled = false;
@@ -328,17 +326,15 @@ async function deleteModelConfig(button) {
 
 async function loadRuntimeSettings() {
   const data = await request("/api/system/settings");
-  renderAppEnvGroups(data.app);
+  runtimeSettings = data;
   renderRsshubKv(data.rsshub);
   document.getElementById("runtime-paths").innerHTML = `<span><b>工作区</b>${escapeHtml(data.paths.workspaceRoot)}</span><span><b>RSSHub</b>${escapeHtml(data.paths.rsshubRoot)}</span><span><b>服务</b>${escapeHtml(data.paths.rsshubUrl)} · ${escapeHtml(data.paths.redditCdpUrl)}</span>`;
 }
 
-function collectEnvFields(target) {
-  return [...document.querySelectorAll(`#${target} [data-env-key]`)].map((input) => ({
-    key: input.dataset.envKey,
-    value: input.value,
-    clear: document.querySelector(`#${target} [data-env-clear="${CSS.escape(input.dataset.envKey)}"]`)?.checked === true,
-  }));
+async function saveRsshubConfiguration(button) {
+  const original=button.textContent;button.disabled=true;button.textContent="保存中…";
+  try{await request("/api/system/settings",{method:"PUT",body:JSON.stringify({app:[],rsshub:collectRsshubFields()})});await loadRuntimeSettings();const item=extensionConfigurations.find((entry)=>entry.id==='rsshub-collector');if(item)renderSystemExtensionEditor(item);toast("RSSHub 扩展变量已保存");}
+  finally{button.disabled=false;button.textContent=original;}
 }
 
 function collectRsshubFields() {
@@ -347,24 +343,6 @@ function collectRsshubFields() {
     value: row.querySelector("[data-rsshub-value]").value,
     clear: row.querySelector("[data-rsshub-clear]").checked,
   }));
-}
-
-async function saveRuntimeSettings(button) {
-  const original = button.textContent;
-  button.disabled = true;
-  button.textContent = "保存中…";
-  try {
-    await request("/api/system/settings", {
-      method: "PUT",
-      body: JSON.stringify({ app: collectEnvFields("app-env-fields"), rsshub: collectRsshubFields() }),
-    });
-    document.getElementById("runtime-config-status").textContent = "已保存 · 密钥供后续任务立即使用；端口、进程路径与 RSSHub 配置重启对应服务后生效";
-    await loadRuntimeSettings();
-    toast("本机配置已安全保存");
-  } finally {
-    button.disabled = false;
-    button.textContent = original;
-  }
 }
 
 async function controlRuntime(button) {
@@ -420,7 +398,7 @@ async function loadSystem(target = "all", button = null) {
     if (quota) {
       quota.textContent = gh.limit
         ? `REST ${gh.resource || "core"} · 剩余 ${gh.remaining}/${gh.limit} · 重置 ${gh.resetAt ? new Date(gh.resetAt).toLocaleString() : "未知"} · 缓存命中 ${gh.cacheHits || 0}`
-        : `${gh.authenticated ? "Token 已配置" : "未配置 Token"} · 缓存命中 ${gh.cacheHits || 0}${gh.lastError ? ` · ${gh.lastError}` : ""}`;
+        : `${gh.tokenConfigured ? "Token 已配置，等待首次请求" : "未配置 Token"} · 缓存命中 ${gh.cacheHits || 0}${gh.lastError ? ` · ${gh.lastError}` : ""}`;
     }
   }
   const checked = document.getElementById("system-last-checked");
@@ -440,11 +418,5 @@ async function loadSystem(target = "all", button = null) {
 
 export default async function loadSystemView() {
   bindSystem();
-  try {
-    const saved = sessionStorage.getItem("runtime-config-tab");
-    selectConfigTab(["app", "rsshub", "models"].includes(saved) ? saved : "app");
-  } catch {
-    selectConfigTab("app");
-  }
-  await Promise.all([loadSystem(), loadRuntimeSettings(), loadModelSettings()]);
+  await Promise.all([loadSystem(), loadRuntimeSettings(), loadModelSettings(), loadExtensionConfigurations()]);
 }

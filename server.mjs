@@ -11,10 +11,9 @@ import { Store } from './lib/core/store.mjs';
 import { loadConfig } from './lib/core/config.mjs';
 import { isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
 import { JobManager } from './lib/jobs/job-manager.mjs';
-import { ensureStarted } from './collectors/rsshub.mjs';
+import { ensureStarted } from './plugins/collectors/rsshub/collector.mjs';
 import { ModelGateway } from './lib/llm/gateway.mjs';
 import { draftArticle } from './lib/llm/tasks.mjs';
-import { loadEnv } from './lib/core/env.mjs';
 import { AiJobManager } from './lib/llm/ai-job-manager.mjs';
 import { runEditorialTurn, runEditorialTurnStream } from './lib/llm/editorial-room.mjs';
 import { fetchCandidateSource } from './lib/integrations/source-fetcher.mjs';
@@ -23,7 +22,7 @@ import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
 import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
 import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
 import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
-import { loadSkillBundle } from './lib/llm/skill-runtime.mjs';
+import { loadSkillBundle, setSkillConfigurationResolver } from './lib/llm/skill-runtime.mjs';
 import { createZip } from './lib/artifacts/zip-bundle.mjs';
 import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
 import { getBatchDeleteImpact, deleteBatchPermanently } from './lib/domain/batch-deletion.mjs';
@@ -41,14 +40,21 @@ import { handleBatchRoutes } from './lib/http/routes/batch-routes.mjs';
 import { handleCandidateRoutes } from './lib/http/routes/candidate-routes.mjs';
 import { handleTaskRoutes } from './lib/http/routes/task-routes.mjs';
 import { createRouteHelpers, writeUtf8 as routeWriteUtf8 } from './lib/http/route-helpers.mjs';
+import { setToolConfigurationResolver } from './lib/tools/index.mjs';
+import { ExtensionConfigurationService } from './lib/extensions/configuration-service.mjs';
+import { modelProviderManifest } from './lib/extensions/model-provider-configuration.mjs';
 import { seedDemoData } from './lib/demo/seed.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-loadEnv(root);
 const config = loadConfig(root);
 // --demo / WORKBENCH_DEMO=1：无模型服务商时也能预览各视图，使用独立演示库，不污染真实数据。
 const demo = process.argv.includes('--demo') || process.env.WORKBENCH_DEMO === '1';
 const store = new Store(path.join(root, 'data', demo ? 'demo.db' : 'workbench.db'));
+const extensionConfigurationService=new ExtensionConfigurationService({root,repository:store.repositories.extensionSettings});
+setToolConfigurationResolver((manifest)=>{
+  return extensionConfigurationService.resolve({extensionType:'tool',extensionId:manifest.id,manifest});
+});
+setSkillConfigurationResolver((manifest)=>extensionConfigurationService.resolve({extensionType:'skill',extensionId:manifest.id,manifest}));
 if (demo) {
   const seedResult = seedDemoData(store, { root });
   if (seedResult.seeded) console.log(`演示模式：已写入演示批次（${seedResult.todayBatchId} / ${seedResult.yesterdayBatchId}）`);
@@ -57,7 +63,7 @@ const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
 const jobs = new JobManager(store, config, () => models);
 
-const models = new ModelGateway(config, store);
+const models = new ModelGateway(config, store,(id,provider)=>extensionConfigurationService.resolve({extensionType:'model-provider',extensionId:id,manifest:modelProviderManifest(id,provider)}));
 const aiJobs = new AiJobManager(store, models, config);
 const artifactRoots = [config.workspaceRoot, ...config.contentRoots];
 const publicRoot = path.join(root, 'public');
@@ -126,11 +132,11 @@ async function createWorkbenchBackup() {
       if(fs.existsSync(settingsFile))files.push({name:`data/${name}`,path:settingsFile});
     }
     for(const name of ['skill-packages.json','skill-install-events.jsonl','tool-plugins.json','tool-plugin-install-events.jsonl',
-      'remote-tool-plugins.json','remote-tool-plugin-events.jsonl']){
+      'remote-tool-plugins.json','remote-tool-plugin-events.jsonl','collector-plugins.json','collector-plugin-events.jsonl']){
       const filePath=path.join(root,'data',name);
       if(fs.existsSync(filePath))files.push({name:`data/${name}`,path:filePath});
     }
-    for(const directoryName of ['installed-skills','skill-package-archive','installed-tool-plugins','tool-plugin-archive']){
+    for(const directoryName of ['installed-skills','skill-package-archive','installed-tool-plugins','tool-plugin-archive','installed-collector-plugins']){
       const directory=path.join(root,'data',directoryName);
       if(fs.existsSync(directory)){
         const visit=(current)=>{
@@ -151,7 +157,7 @@ async function createWorkbenchBackup() {
       }
     }
     const manifest={schemaVersion:1,createdAt:new Date().toISOString(),appVersion:'0.1.0',
-      excludes:['.env','API tokens','node_modules','cache/log files'],
+      excludes:['.env','API tokens','node_modules','cache/log files','data/browser-profiles（登录 Cookie 与会话）'],
       files:files.map((file)=>({name:file.name,size:fs.statSync(file.path).size,
         sha256:crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex')}))};
     const manifestPath=path.join(tempDir,'manifest.json');

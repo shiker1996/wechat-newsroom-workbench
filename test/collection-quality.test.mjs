@@ -22,7 +22,7 @@ test('采集质量门兼容正文类字段并拒绝空白内容', () => {
 
 test('Reddit 与 RSSHub 采集结果均在入库前经过统一质量门', () => {
   const manager = fs.readFileSync(new URL('../lib/jobs/job-manager.mjs', import.meta.url), 'utf8');
-  assert.match(manager, /collectReddit[\s\S]*filterCollectedItems\(items\)[\s\S]*addHotspots\(job\.batchId,source,quality\.kept\)/);
-  assert.match(manager, /collectRssHub[\s\S]*filterCollectedItems\(items\)[\s\S]*let filtered=quality\.kept/);
+  assert.match(manager, /runner\.run[\s\S]*filterCollectedItems\(run\.items\)[\s\S]*addHotspots\(job\.batchId,source,selected\)/);
+  assert.match(manager, /createCollectorRuntime/);
   assert.match(manager, /过滤空内容|采集质量过滤/);
 });

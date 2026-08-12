@@ -42,3 +42,10 @@ test('completed research keeps all previous steps completed', () => {
     'completed', 'completed', 'completed', 'completed',
   ]);
 });
+
+test('pending failure keeps its stage active and all downstream stages pending', () => {
+  const tagFailure=buildBatchPipelineStatus({hotspotCount:20,tagged:20,total:20,cardsCount:18,cardsTotal:18,failures:[{stage:'tag',status:'open'}]});
+  assert.deepEqual(Object.values(tagFailure.steps).map((step)=>step.status),['completed','active','pending','pending']);
+  const cardFailure=buildBatchPipelineStatus({hotspotCount:20,tagged:20,total:20,cardsCount:18,cardsTotal:18,failures:[{stage:'event-card',status:'retrying'}]});
+  assert.deepEqual(Object.values(cardFailure.steps).map((step)=>step.status),['completed','completed','active','pending']);
+});

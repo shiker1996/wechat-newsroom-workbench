@@ -30,13 +30,13 @@ test('tavily-search plugin implements web and news search capabilities', async (
   }
 });
 
-test('missing TAVILY_API_KEY fails explicitly instead of falling back', async () => {
+test('missing Tavily credential points to the configuration center', async () => {
   const registry = await getToolRegistry();
   await withKey(undefined, async () => {
     const result = await registry.execute('content.web.search', { query: '测试' });
     assert.equal(result.status, 'error');
     assert.equal(result.error.code, 'DEPENDENCY_MISSING');
-    assert.match(result.error.message, /TAVILY_API_KEY/);
+    assert.match(result.error.message, /凭据未配置/);
   });
 });
 
@@ -94,7 +94,7 @@ test('health reports missing credential with configuration action', async () => 
     const result = await registry.health('content.web.search');
     assert.equal(result.status, 'error');
     assert.equal(result.error.code, 'DEPENDENCY_MISSING');
-    assert.equal(result.error.action, '在 .env 或系统环境变量中配置 TAVILY_API_KEY');
+    assert.equal(result.error.action, '前往系统与配置中心完成 Tavily 搜索配置');
   });
   await withKey('test-key', async () => {
     const result = await registry.health('content.web.search');

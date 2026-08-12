@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { failure, ok } from '../../lib/tools/schemas.mjs';
+import { failure, ok } from '../shared/schemas.mjs';
 
 // 本地知识库检索（content.document.search）：
 // 只读扫描用户明确授权的文档根目录（如 Obsidian vault），按关键词打分返回片段。
@@ -76,14 +76,15 @@ function snippetOf(content, firstIndex) {
   return { snippet, lineRange: `${startLine}-${endLine}` };
 }
 
-export async function execute(input) {
+export async function execute(input,context={}) {
   const queryTerms = terms(input.query);
   if (!queryTerms.length) return failure('INVALID_INPUT', '查询词过短，至少需要 2 个字符的有效关键词');
-  const root = String(input.root || '');
+  const configuredRoots=context.configuration?.roots||[];const root = String(input.root || configuredRoots[0] || '');
+  if(configuredRoots.length&&!configuredRoots.includes(root))return failure('PERMISSION_DENIED','知识库目录不在插件授权配置中');
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     return failure('INVALID_INPUT', `知识库目录不存在或不是目录：${root}`);
   }
-  const maxResults = Number.isInteger(input.maxResults) ? Math.min(Math.max(input.maxResults, 1), 10) : 5;
+  const maxResults = Number.isInteger(input.maxResults) ? Math.min(Math.max(input.maxResults, 1), 10) : Number(context.configuration?.maxResults||5);
   const documents = [];
   for (const file of walk(root)) {
     let content;
@@ -112,6 +113,7 @@ export async function execute(input) {
   );
 }
 
-export async function health() {
-  return ok({ available: true, provider: 'document-folder-search', note: '需在 config.local.json 的 documentSearch.roots 中配置授权知识库目录' });
+export async function health(context={}) {
+  const roots=context.configuration?.roots||[];
+  return ok({ available: true, provider: 'document-folder-search',configuredRoots:roots.length,note:roots.length?'授权目录已配置':'可前往系统与配置中心添加授权知识库目录' });
 }

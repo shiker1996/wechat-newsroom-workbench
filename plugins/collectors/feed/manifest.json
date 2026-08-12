@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "id": "feed-collector",
+  "name": "RSS / Atom 直连",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "capabilities": [
+    "collect.direct"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "url"
+    ],
+    "properties": {
+      "url": {
+        "type": "string",
+        "format": "url"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 60000,
+    "concurrency": "parallel"
+  },
+  "collector": {
+    "sourceTypes": [
+      "direct"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "url"
+        }
+      }
+    }
+  }
+}

@@ -43,8 +43,10 @@ test('模型接入承载增删改，模型运行只负责诊断与观测',()=>{
   const systemView=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
   const modelRoutes=fs.readFileSync(new URL('../lib/http/routes/model-routes.mjs',import.meta.url),'utf8');
   for(const id of ['model-base-url','model-name','model-api-key','model-max-token-field','model-json-mode'])assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(html,/data-config-tab="models"/);
-  assert.match(html,/data-config-tab="models"><span>03<\/span><b>模型接入<\/b>/);
+  assert.doesNotMatch(html,/data-config-tab="models"/);
+  assert.match(html,/id="system-extension-list"/);
+  assert.match(html,/模型接入配置/);
+  assert.match(systemView,/model-provider/);
   assert.match(html,/data-view="models">[\s\S]*?<b>模型运行<\/b>/);
   assert.match(systemView,/method: "POST"[\s\S]*modelFormPayload/);
   assert.match(systemView,/method: "DELETE"/);

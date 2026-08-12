@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "repository manifests and capability-call markers",
+  "tools": [
+    {
+      "id": "document-folder-search",
+      "name": "本地知识库检索",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.document.search"
+      ],
+      "riskLevel": "read-only"
+    },
+    {
+      "id": "echarts-render",
+      "name": "ECharts 图片渲染",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "diagram.echarts.render"
+      ],
+      "riskLevel": "local-write"
+    },
+    {
+      "id": "local-passage-retrieval",
+      "name": "本地段落检索",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.passage.retrieve"
+      ],
+      "riskLevel": "read-only"
+    },
+    {
+      "id": "local-project-reader",
+      "name": "本地项目读取",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "filesystem.project.read"
+      ],
+      "riskLevel": "read-only"
+    },
+    {
+      "id": "mermaid-render",
+      "name": "Mermaid 图片渲染",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "diagram.mermaid.render"
+      ],
+      "riskLevel": "local-write"
+    },
+    {
+      "id": "repository-inspector",
+      "name": "GitHub 仓库分析",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.repository.inspect"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
+      "id": "tavily-search",
+      "name": "Tavily 搜索",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.web.search",
+        "content.news.search"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
+      "id": "upyun-image-upload",
+      "name": "又拍云图片上传",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "image.cdn.upload"
+      ],
+      "riskLevel": "external-write"
+    },
+    {
+      "id": "url-fetch",
+      "name": "URL 内容抓取",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.url.fetch"
+      ],
+      "riskLevel": "network-read"
+    }
+  ],
+  "collectors": [
+    {
+      "id": "browser-web-page",
+      "name": "浏览器网页采集",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.browser-page"
+      ],
+      "riskLevel": "browser-read"
+    },
+    {
+      "id": "declarative-web-page",
+      "name": "静态网页采集",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.web-page"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
+      "id": "feed-collector",
+      "name": "RSS / Atom 直连",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.direct"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
+      "id": "github-discovery-collector",
+      "name": "GitHub 项目发现",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.github"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
+      "id": "reddit-collector",
+      "name": "Reddit 热门分区",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.reddit"
+      ],
+      "riskLevel": "browser-read"
+    },
+    {
+      "id": "rsshub-collector",
+      "name": "RSSHub 路由",
+      "version": "1.0.0",
+      "kind": "collector",
+      "capabilities": [
+        "collect.rsshub",
+        "collect.twitter"
+      ],
+      "riskLevel": "network-read"
+    }
+  ],
+  "skills": [
+    {
+      "id": "article-image-placeholders",
+      "name": "文章配图占位规划",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "article-reviewer",
+      "name": "文章审阅与修订",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "article-visual-planner",
+      "name": "文章图表建议规划",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "custom-card-storyboard",
+      "name": "自定义图文故事板",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.web.search",
+        "content.news.search",
+        "content.document.search"
+      ]
+    },
+    {
+      "id": "editorial-room",
+      "name": "公众号编辑会",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "event-card-generator",
+      "name": "事件事实卡生成",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "event-card-storyboard",
+      "name": "事件图文故事板",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "hotspot-brainstorm",
+      "name": "热点探索脑暴",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "hotspot-synthesis",
+      "name": "热点综合研判",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "hotspot-tagging",
+      "name": "热点语义标注与预评估",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "html-pages-to-images",
+      "name": "HTML 页面截图",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "humanizer-zh",
+      "name": "中文表达自然化",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "magazine-design-advisor",
+      "name": "杂志风设计顾问",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "mermaid-render",
+      "name": "Mermaid 图表转图",
+      "requiredCapabilities": [
+        "diagram.mermaid.render"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "repository-card-storyboard",
+      "name": "工具图文故事板",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "seo-content-optimizer",
+      "name": "SEO 内容优化",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "seo-keyword-scoring",
+      "name": "SEO 关键词评分",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "title-generator",
+      "name": "标题生成与筛选",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "upyun-upload-image",
+      "name": "图片 CDN 上传",
+      "requiredCapabilities": [
+        "image.cdn.upload"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-article-typeset",
+      "name": "公众号文章排版",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "diagram.mermaid.render",
+        "diagram.echarts.render",
+        "image.cdn.upload"
+      ]
+    },
+    {
+      "id": "wechat-echarts-blocks-to-images",
+      "name": "ECharts 图表转图",
+      "requiredCapabilities": [
+        "diagram.echarts.render"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-html-check-no-div",
+      "name": "公众号 HTML 最终门禁",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-html-normalizer",
+      "name": "公众号 HTML 规范化",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-md-render",
+      "name": "公众号 Markdown 预渲染",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-md-to-draft",
+      "name": "公众号 HTML 初稿",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-mp-composite",
+      "name": "综合热点文章",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-daily",
+      "name": "批次早报",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-deep-dive",
+      "name": "深度分析文章",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-gossip-chill",
+      "name": "轻松职场趣闻",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-personal-writing",
+      "name": "心得经验文章",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.web.search",
+        "content.news.search",
+        "content.document.search"
+      ]
+    },
+    {
+      "id": "wechat-mp-tech-deep",
+      "name": "技术深解文章",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-tech-hotspot",
+      "name": "技术热点快评",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "id": "wechat-mp-topic-to-article",
+      "name": "热点文章编排",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "wechat-mp-tutorial",
+      "name": "技术使用教程",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.web.search",
+        "content.news.search",
+        "content.document.search"
+      ]
+    },
+    {
+      "id": "xiaohongshu-article-generator",
+      "name": "图文生成与交付",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    }
+  ],
+  "features": [
+    {
+      "id": "feature.information-research",
+      "name": "资料检索与事实补充",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/integrations/information-search.mjs",
+        "lib/integrations/local-project-reader.mjs",
+        "lib/integrations/repository-inspector.mjs",
+        "lib/integrations/source-fetcher.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "content.url.fetch",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        },
+        {
+          "capability": "content.web.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        },
+        {
+          "capability": "content.news.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        },
+        {
+          "capability": "content.document.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        },
+        {
+          "capability": "content.repository.inspect",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        },
+        {
+          "capability": "filesystem.project.read",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning"
+        }
+      ]
+    },
+    {
+      "id": "feature.article-passage-retrieval",
+      "name": "文章段落检索",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/http/routes/article-routes.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "content.passage.retrieve",
+          "requirement": "required",
+          "failurePolicy": "block"
+        }
+      ]
+    },
+    {
+      "id": "feature.wechat-typeset",
+      "name": "公众号文章排版",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/llm/typeset-pipeline.mjs",
+        "lib/llm/image-workflow.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "diagram.mermaid.render",
+          "requirement": "conditional",
+          "failurePolicy": "block"
+        },
+        {
+          "capability": "diagram.echarts.render",
+          "requirement": "conditional",
+          "failurePolicy": "block"
+        },
+        {
+          "capability": "image.cdn.upload",
+          "requirement": "conditional",
+          "failurePolicy": "block"
+        }
+      ]
+    },
+    {
+      "id": "feature.diagram-preview",
+      "name": "图表预览",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/http/routes/media-routes.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "diagram.mermaid.render",
+          "requirement": "conditional",
+          "failurePolicy": "block"
+        },
+        {
+          "capability": "diagram.echarts.render",
+          "requirement": "conditional",
+          "failurePolicy": "block"
+        }
+      ]
+    }
+  ],
+  "codeCalls": [
+    {
+      "sourceFile": "lib/http/routes/article-routes.mjs",
+      "capabilities": [
+        "content.passage.retrieve"
+      ]
+    },
+    {
+      "sourceFile": "lib/http/routes/media-routes.mjs",
+      "capabilities": [
+        "diagram.echarts.render",
+        "diagram.mermaid.render"
+      ]
+    },
+    {
+      "sourceFile": "lib/integrations/information-search.mjs",
+      "capabilities": [
+        "content.document.search",
+        "content.news.search",
+        "content.web.search"
+      ]
+    },
+    {
+      "sourceFile": "lib/integrations/local-project-reader.mjs",
+      "capabilities": [
+        "filesystem.project.read"
+      ]
+    },
+    {
+      "sourceFile": "lib/integrations/repository-inspector.mjs",
+      "capabilities": [
+        "content.repository.inspect"
+      ]
+    },
+    {
+      "sourceFile": "lib/integrations/source-fetcher.mjs",
+      "capabilities": [
+        "content.url.fetch"
+      ]
+    },
+    {
+      "sourceFile": "lib/llm/image-workflow.mjs",
+      "capabilities": [
+        "image.cdn.upload"
+      ]
+    },
+    {
+      "sourceFile": "lib/llm/typeset-pipeline.mjs",
+      "capabilities": [
+        "diagram.echarts.render",
+        "diagram.mermaid.render"
+      ]
+    }
+  ],
+  "audit": {
+    "pass": true,
+    "issues": []
+  }
+}

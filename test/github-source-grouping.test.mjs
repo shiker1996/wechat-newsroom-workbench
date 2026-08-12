@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collectionScopeAllows } from '../collectors/rsshub.mjs';
+import { collectionScopeAllows } from '../plugins/collectors/rsshub/collector.mjs';
 
 test('采集触发层把 GitHub Trending 与普通 RSSHub 路由分组',()=>{
   const github={kind:'route',value:'/github/trending/daily/any?limit=30'};

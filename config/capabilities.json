@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "capabilities": {
+    "content.url.fetch": {"name":"网页正文读取","description":"读取指定网页并提取可引用的正文内容。","category":"信息获取"},
+    "content.web.search": {"name":"网络搜索","description":"按查询词检索公开网页和参考资料。","category":"信息获取"},
+    "content.news.search": {"name":"新闻搜索","description":"检索带来源和发布时间的新闻结果。","category":"信息获取"},
+    "content.document.search": {"name":"文档检索","description":"从已授权的知识库或文档目录检索材料。","category":"信息获取"},
+    "content.repository.inspect": {"name":"代码仓库分析","description":"核验代码仓库的元数据、README、版本与安装入口。","category":"信息获取"},
+    "content.passage.retrieve": {"name":"文章段落检索","description":"从文章内容池中检索可复用或可引用的相关段落。","category":"内容检索"},
+    "filesystem.project.read": {"name":"本地项目读取","description":"只读提取已授权本地项目的结构和文本材料。","category":"本地内容"},
+    "diagram.mermaid.render": {"name":"Mermaid 图表渲染","description":"将 Mermaid 图表定义渲染为可交付图片。","category":"内容渲染"},
+    "diagram.echarts.render": {"name":"ECharts 图表渲染","description":"将 ECharts 配置渲染为可交付图片。","category":"内容渲染"},
+    "image.cdn.upload": {"name":"图片存储上传","description":"将本地图片上传到已配置的图片存储并返回公开地址。","category":"内容交付"},
+    "collect.direct": {"name":"RSS／Atom 直连采集","description":"从标准 RSS 或 Atom 地址采集内容。","category":"内容采集"},
+    "collect.rsshub": {"name":"RSSHub 路由采集","description":"通过配置的 RSSHub 路由采集内容。","category":"内容采集"},
+    "collect.twitter": {"name":"X 内容采集","description":"通过 RSSHub 等实现采集指定 X 账号内容。","category":"内容采集"},
+    "collect.reddit": {"name":"Reddit 内容采集","description":"从配置的 Reddit 分区采集热门内容。","category":"内容采集"},
+    "collect.github": {"name":"GitHub 项目发现","description":"按时间、Star 和查询条件发现 GitHub 项目。","category":"内容采集"},
+    "collect.web-page": {"name":"静态网页采集","description":"使用声明式选择器从公开静态网页采集内容。","category":"内容采集"},
+    "collect.browser-page": {"name":"浏览器网页采集","description":"使用隔离浏览器和声明式动作采集动态网页内容。","category":"内容采集"}
+  }
+}

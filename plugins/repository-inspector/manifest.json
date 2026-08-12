@@ -1,13 +1,48 @@
 {
-  "id":"repository-inspector",
-  "name":"GitHub 仓库分析",
-  "version":"1.0.0",
-  "capabilities":["content.repository.inspect"],
-  "entry":"./adapter.mjs",
-  "riskLevel":"network-read",
-  "pathInputs":["cacheDir"],
-  "inputSchema":{"type":"object","required":["sourceUrl"],"properties":{"sourceUrl":{"type":"string"},"cacheDir":{"type":"string"}}},
-  "outputSchema":{"type":"object"},
-  "healthCheck":true,
-  "enabledByDefault":true
+  "id": "repository-inspector",
+  "name": "GitHub 仓库分析",
+  "version": "1.0.0",
+  "capabilities": [
+    "content.repository.inspect"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "pathInputs": [
+    "cacheDir"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "sourceUrl"
+    ],
+    "properties": {
+      "sourceUrl": {
+        "type": "string"
+      },
+      "cacheDir": {
+        "type": "string"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object"
+  },
+  "healthCheck": true,
+  "enabledByDefault": true,
+  "credentialProfile": "github",
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "token": {
+        "type": "string",
+        "title": "GitHub Token",
+        "secret": true,
+        "format": "password"
+      }
+    }
+  },
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
 }

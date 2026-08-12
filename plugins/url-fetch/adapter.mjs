@@ -1,8 +1,8 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
-import { fetchUrlContentImplementation } from '../../lib/integrations/source-fetcher-core.mjs';
-import { privateIp } from '../../lib/tools/remote-adapter.mjs';
-import { failure, ok } from '../../lib/tools/schemas.mjs';
+import { fetchUrlContentImplementation } from './implementation.mjs';
+import { privateIp } from '../shared/network-safety.mjs';
+import { failure, ok } from '../shared/schemas.mjs';
 
 // SSRF 第一级防线：仅校验初始 URL 的解析结果，后续重定向由抓取侧（Python/Firecrawl）自行处理
 async function publicTargetError(url) {
@@ -17,7 +17,7 @@ async function publicTargetError(url) {
   return '';
 }
 
-export async function execute(input) {
+export async function execute(input,context={}) {
   let url;
   try { url = new URL(input.targetUrl); } catch { return failure('INVALID_INPUT', 'URL 格式无效'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
@@ -26,7 +26,7 @@ export async function execute(input) {
   const blocked = await publicTargetError(url);
   if (blocked) return failure('INVALID_INPUT', blocked);
   try {
-    const record = await fetchUrlContentImplementation(input);
+    const configuration=context.configuration||{};const record = await fetchUrlContentImplementation({...input,sourceFetch:{...configuration,...(input.sourceFetch||{})},firecrawlOptions:{endpoint:configuration.endpoint,apiKey:configuration.apiKey},repositoryOptions:{token:configuration.githubToken||''}});
     return ok(record, {
       provenance:{
         requestedUrl:input.targetUrl,

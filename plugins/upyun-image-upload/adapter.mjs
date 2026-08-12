@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { failure, ok } from '../../lib/tools/schemas.mjs';
+import { failure, ok } from '../shared/schemas.mjs';
 
 const run = promisify(execFile);
 const skillRoot = path.join(process.env.USERPROFILE || 'C:\\Users\\Administrator', '.codex', 'skills', 'upyun-upload-image');
 const script = path.join(skillRoot, 'upyun-upload-image.js');
 
-export async function health() {
+export async function health(context={}) {
+  if(!context.configuration?.bucket||!context.configuration?.operator||!context.configuration?.password)return failure('DEPENDENCY_MISSING','又拍云上传配置尚未完成',{action:'前往系统与配置中心完成又拍云图片上传配置'});
   return fs.existsSync(script)
     ? ok({ available:true })
     : failure('DEPENDENCY_MISSING', '未安装 upyun-upload-image 技能', { action:'安装并配置 upyun-upload-image 技能' });
@@ -18,7 +19,7 @@ export async function execute(input, context = {}) {
   if (!fs.existsSync(input.localPath)) return failure('INVALID_INPUT', '本地图片不存在');
   if (!fs.existsSync(script)) return failure('DEPENDENCY_MISSING', '未安装 upyun-upload-image 技能');
   try {
-    const { stdout } = await run(process.execPath, [script, input.localPath], {
+    const configuration=context.configuration||{};const args=[script,input.localPath,'--bucket',configuration.bucket,'--operator',configuration.operator,'--password',configuration.password,'--domain',configuration.domain||'img.shiker.tech','--prefix',configuration.prefix||'weedit'];const { stdout } = await run(process.execPath, args, {
       cwd:skillRoot, windowsHide:true, timeout:context.timeoutMs || 120000, maxBuffer:1_000_000,
     });
     const result = JSON.parse(String(stdout).trim().split(/\r?\n/).at(-1));

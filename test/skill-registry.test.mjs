@@ -46,6 +46,10 @@ test('生成快照冻结技能、工具和模型版本', () => {
   assert.match(snapshot.skills[0].promptHash, /^sha256:/);
   assert.ok(snapshot.skills[0].prompt.length>0);
   assert.equal(snapshot.tools[0].version, '1.0.0');
+  assert.equal(snapshot.schemaVersion,2);
+  assert.deepEqual(snapshot.capabilityAuthorization.capabilities,[snapshot.tools[0].capability]);
+  assert.equal(snapshot.capabilityRoutes[0].candidates[0].plugin,snapshot.tools[0].plugin);
+  assert.equal(snapshot.resolutionPolicy.strictHistoricalBinding,false);
   assert.equal(snapshot.model, 'model-a');
 });
 

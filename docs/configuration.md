@@ -2,22 +2,60 @@
 
 # 配置项参考
 
+## 配置中心结构
+
+> 配置页面已迁入统一声明式配置中心。项目根 `.env` 已停止读取；RSSHub 扩展变量由配置中心托管，部署参数仍可使用 `config.local.json`。
+
+“运行与配置中心”分为工作台配置和统一配置资源两层。模型、技能、工具和采集器自动读取 Manifest 的 `configuration` Schema；RSSHub KV 由 Collector 的 `key-value-secret` 受控编辑器管理。安装新扩展后，只要声明 Schema，就会自动出现在配置中心，不需要修改前端代码。
+
+扩展的普通配置保存到 `extension_settings`，秘密字段保存到隔离凭据 Profile，页面只显示“已配置”状态。采集插件的全局配置会在测试和正式采集前合并进来源配置；来源自身的地址、选择器等仍保存在 `collection_sources.config_json`。
+
+## 声明式静态网页采集源
+
+在“采集源 → 更多采集器”选择“静态网页采集”，填写公开页面 URL 和条目选择器。标题、链接、摘要、作者、时间和下一页选择器均为声明式字段。选择器仅支持标签、类、ID、属性和后代关系，不支持伪类、兄弟关系或用户 JavaScript。
+
+静态网页采集只允许 HTTP/HTTPS 公网地址，禁止本机、内网、保留地址和带内嵌凭据的 URL。系统会逐跳检查重定向，最多读取 2 MB HTML、最多跟随 3 次重定向、最多采集 5 页。复杂交互、登录态或依赖客户端渲染的页面应使用后续受控浏览器插件或专业爬虫。
+
+## 第三方采集插件
+
+“技能与工具 → 采集器”统一管理采集能力，可校验并安装插件目录。插件必须声明 `kind: collector`、`type: local-collector|remote-collector`、来源 Schema、工作台兼容范围和权限摘要。第一期采集插件不允许本地路径权限或外部写入；远程端点必须使用权限白名单中的 HTTPS 域名，并在首次执行前人工确认。
+
+“采集源”页面只维护来源实例，包括新增、测试、启停、删除和运行状态。这样插件生命周期与具体订阅配置相互独立：一个采集器可以服务多个来源，停用采集器也不会删除来源。
+
+停用或卸载插件不会删除关联来源。来源会显示“插件不可用”，恢复同 ID 插件并启用后可继续使用原配置。示例见 `docs/examples/collector-plugin/local` 和 `docs/examples/collector-plugin/remote`。
+
+## 浏览器网页采集
+
+“更多采集器 → 浏览器网页采集”用于需要客户端渲染或简单点击/输入才能出现内容的页面。配置只允许声明页面地址、等待元素、一次点击、一次输入、固定等待和内容选择器，不支持用户 JavaScript。每个来源使用 `profileId` 对应的独立浏览器 Profile，登录 Cookie 不与其他来源混用。
+
+浏览器运行在独立 Node 子进程中，环境变量仅保留系统路径、临时目录和 Puppeteer 缓存位置；父进程实施 5～120 秒硬超时并强制终止失控进程。导航及子资源请求均拒绝本机、内网和保留地址。可配置 `loginSelector` 识别登录页，命中后返回 `AUTH_REQUIRED`，提示重新建立该 Profile 的登录状态。
+
+工作台备份包含采集插件清单、安装目录、事件日志和数据库中的来源实例，但不会包含 `data/browser-profiles`。Profile 可能保存登录 Cookie 和网站会话，出于安全原因恢复后需重新建立登录状态。
+
+## 扩展动态配置
+
+技能的 `skill.json` 与工具插件的 `manifest.json` 可以声明 `configuration` 对象 Schema。工作台会在“技能与工具”页面自动生成表单，无需为每个扩展修改固定页面。
+
+- 支持 `object`、`string`、`number`、`integer`、`boolean` 和标量数组。
+- 支持必填、默认值、枚举、数值范围、字符串长度、正则和 HTTP/HTTPS URL 校验。
+- 使用 `secret: true` 或 `format: "password"` 声明秘密字段；秘密只保存到隔离凭据 Profile，页面和数据库不会回读原文。
+- 普通配置保存在 `extension_settings`，配置不完整的扩展状态为 `needs_configuration`，不能执行。
+- 工具执行审计只记录配置状态快照，不记录秘密值或完整配置正文。
+
+配置接口为：
+
+- `GET|PUT /api/system/skills/:id/configuration`
+- `POST /api/system/skills/:id/configuration/test`
+- `GET|PUT /api/system/tool-plugins/:id/configuration`
+- `POST /api/system/tool-plugins/:id/configuration/test`
+
 本文汇总工作台全部用户可配置项：改什么、写在哪、什么时候生效。技能包与工具插件的**编写和安装**不在本文范围，见 [extending.md](./extending.md)。
 
-配置优先级（高到低）：系统环境变量 → `.env` → `config.local.json` → `config.example.json`（默认值参考）。`.env`、`config.local.json`、`account-context.json` 均被 `.gitignore` 排除，不要提交。修改后需重启工作台生效（技能配置覆盖层除外，见第 4 节）。
+配置优先级（高到低）：统一配置与隔离凭据 → Manifest 默认值。`config.local.json` 仅保留部署与兼容运行参数，不再承载业务密钥。
 
-## 1. `.env`：密钥与端口
+## 1. 统一配置与隔离凭据
 
-| 键 | 必需 | 说明 |
-|---|---|---|
-| `DEEPSEEK_API_KEY` / `MINIMAX_API_KEY` / `KIMI_API_KEY` | 至少一个 | LLM 服务商密钥；全部缺失时界面可打开但 AI 功能降级报错 |
-| `TAVILY_API_KEY` | 可选 | Tavily 搜索补证 |
-| `FIRECRAWL_API_KEY` | 可选 | 原文抓取升级额度 |
-| `GITHUB_TOKEN` | 可选 | 提高 GitHub API 限额（项目发现、仓库检查） |
-| `UPYUN_*` | 可选 | 又拍云 CDN 上传，仅在用户明确点击上传时使用 |
-| `WORKBENCH_PORT` | 可选 | 覆盖监听端口（日常保持默认 4317；并行验收用 4318） |
-
-设置接口只返回密钥是否已配置，不返回原文；模型调用审计不保存密钥。当前字段全集以 `.env.example` 为准。
+模型、工具、技能和采集器根据 Manifest Schema 自动出现在配置中心。普通字段保存到统一配置表，秘密字段写入隔离凭据 Profile；页面与 API 只返回配置状态。项目根 .env、系统业务密钥环境变量和 .env.example 均不再作为配置入口。
 
 ## 2. `config.local.json`：运行参数
 

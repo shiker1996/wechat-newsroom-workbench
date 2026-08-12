@@ -1,0 +1,2 @@
+export async function collect(config){const response=await fetch(config.url);if(!response.ok)throw new Error(`HTTP ${response.status}`);const items=await response.json();return {status:'ok',items:items.map((item)=>({title:item.title,url:item.url,summary:item.summary||''})),warnings:[],provenance:{fetchMethod:'example-json'}};}
+export async function test(config){const result=await collect(config);return {ok:true,title:'示例 JSON 来源',itemCount:result.items.length,items:result.items.slice(0,5)};}
