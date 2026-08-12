@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "id": "rsshub-collector",
+  "name": "RSSHub 路由",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "configurationRenderer": "key-value-secret",
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "title": "RSSHub 地址",
+        "format": "url",
+        "default": "http://127.0.0.1:1200"
+      },
+      "rootDir": {
+        "type": "string",
+        "title": "RSSHub 目录"
+      },
+      "startScript": {
+        "type": "string",
+        "title": "启动脚本"
+      },
+      "stopScript": {
+        "type": "string",
+        "title": "停止脚本"
+      },
+      "pidFile": {
+        "type": "string",
+        "title": "PID 文件"
+      },
+      "startupTimeoutMs": {
+        "type": "integer",
+        "title": "启动超时（毫秒）",
+        "minimum": 1000,
+        "maximum": 600000,
+        "default": 180000
+      },
+      "keepAlive": {
+        "type": "boolean",
+        "title": "保持运行",
+        "default": true
+      },
+      "maxAgeHours": {
+        "type": "integer",
+        "title": "内容有效期（小时）",
+        "minimum": 1,
+        "maximum": 8760,
+        "default": 168
+      },
+      "allowUndated": {
+        "type": "boolean",
+        "title": "保留无日期内容",
+        "default": true
+      },
+      "concurrency": {
+        "type": "integer",
+        "title": "并发数",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 5
+      }
+    }
+  },
+  "capabilities": [
+    "collect.rsshub",
+    "collect.twitter"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "route"
+    ],
+    "properties": {
+      "route": {
+        "type": "string",
+        "pattern": "^/[^/].*"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 120000,
+    "concurrency": "parallel"
+  },
+  "collector": {
+    "sourceTypes": [
+      "rsshub",
+      "twitter"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route"
+      ],
+      "properties": {
+        "route": {
+          "type": "string",
+          "pattern": "^/[^/].*"
+        }
+      }
+    }
+  }
+}
