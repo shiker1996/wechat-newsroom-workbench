@@ -9,13 +9,8 @@ import { APP_FIELDS } from '../lib/integrations/runtime-settings.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('.env.example 字段与运行时设置支持项一一对应', () => {
-  const example = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
-  const exampleKeys = [...example.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]).sort();
-  const supported = APP_FIELDS.map(([key]) => key).sort();
-  assert.deepEqual(exampleKeys, supported,
-    `.env.example 与 APP_FIELDS 漂移：多出 ${exampleKeys.filter((k) => !supported.includes(k))}，缺少 ${supported.filter((k) => !exampleKeys.includes(k))}`);
-  assert.ok(!example.includes('�'), '.env.example 注释存在乱码（UTF-8 损坏）');
+test('项目不再提供根 .env 配置模板', () => {
+  assert.equal(fs.existsSync(path.join(root, '.env.example')), false);
 });
 
 function leafEntries(value, prefix = '', into = new Map()) {

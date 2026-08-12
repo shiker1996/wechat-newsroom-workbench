@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { firecrawlScrape } from './firecrawl-mcp.mjs';
-import { inspectRepository } from './repository-inspector.mjs';
-import { assessSourceQuality, FETCH_UPGRADE_THRESHOLD } from '../domain/source-quality.mjs';
+import { firecrawlScrape } from './firecrawl-client.mjs';
+import { inspectRepository } from '../repository-inspector/implementation.mjs';
+import { assessSourceQuality, FETCH_UPGRADE_THRESHOLD } from './source-quality.mjs';
 
 const execFileAsync=promisify(execFile);
 
@@ -53,13 +53,13 @@ function rssRecord({ targetUrl, title, summary, method }) {
 const GITHUB_REPO_RE=/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/i;
 
 // 抓取路由（待办 7-P2）：RSS 已有内容 → GitHub API → Python 本地（免费）→ Firecrawl（计费，仅质量不足时升级）
-// 阈值默认值与 lib/core/config.mjs 的 sourceFetch 段一致，调用方可用 config.sourceFetch 覆盖
+// 阈值由插件提供默认值，调用方可通过 sourceFetch 配置覆盖。
 const SOURCE_FETCH_DEFAULTS = { upgradeThreshold: FETCH_UPGRADE_THRESHOLD, rssContentMinChars: 800, rssFallbackMinChars: 200, githubMinChars: 200 };
 
-export async function fetchUrlContentImplementation({targetUrl,title='',root,hotspot=null,firecrawlImpl=firecrawlScrape,inspectImpl=inspectRepository,pythonImpl=null,sourceFetch={}}) {
+export async function fetchUrlContentImplementation({targetUrl,title='',root,hotspot=null,firecrawlImpl=firecrawlScrape,firecrawlOptions={},inspectImpl=inspectRepository,repositoryOptions={},pythonImpl=null,sourceFetch={}}) {
   const cfg={...SOURCE_FETCH_DEFAULTS,...sourceFetch};
   const script=path.join(root,'scripts','fetch-hotspot-url.py');
-  const provider=(process.env.SOURCE_FETCH_PROVIDER||'auto').toLowerCase();
+  const provider=String(sourceFetch.provider||process.env.SOURCE_FETCH_PROVIDER||'auto').toLowerCase();
   const summary=hotspotSummary(hotspot);
 
   // 路由 1：RSS 已带内容——推文即全文；长摘要视为可用正文，均不再二次抓取
@@ -74,7 +74,7 @@ export async function fetchUrlContentImplementation({targetUrl,title='',root,hot
   // 路由 2：GitHub 仓库走 API + README，不消耗 Firecrawl
   if(provider!=='firecrawl'&&GITHUB_REPO_RE.test(targetUrl)){
     try {
-      const facts=await inspectImpl(targetUrl,{cacheDir:path.join(root,'data','github-cache')});
+      const facts=await inspectImpl(targetUrl,{cacheDir:path.join(root,'data','github-cache'),...repositoryOptions});
       const content=facts.readme?.markdown||facts.description||'';
       if(content.length>=cfg.githubMinChars){
         return withQuality({ status:'ok', url:targetUrl, final_url:targetUrl, title:facts.repository||title, description:facts.description||'',
@@ -84,7 +84,7 @@ export async function fetchUrlContentImplementation({targetUrl,title='',root,hot
   }
 
   const failures=[];
-  const fetchFirecrawl=async()=>{ try{ return await firecrawlImpl(targetUrl); }catch(error){ failures.push(`Firecrawl MCP：${error.message}`); return null; } };
+  const fetchFirecrawl=async()=>{ try{ return await firecrawlImpl(targetUrl,firecrawlOptions); }catch(error){ failures.push(`Firecrawl MCP：${error.message}`); return null; } };
   const fetchPython=async()=>{
     try {
       const {stdout}=pythonImpl?await pythonImpl(targetUrl):await runPython(script,['--url',targetUrl,'--timeout','25','--max-chars','30000'],

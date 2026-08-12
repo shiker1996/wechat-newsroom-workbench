@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "id": "browser-web-page",
+  "name": "浏览器网页采集",
+  "version": "1.0.0",
+  "kind": "collector",
+  "entry": "./adapter.mjs",
+  "riskLevel": "browser-read",
+  "capabilities": [
+    "collect.browser-page"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "url",
+      "itemSelector"
+    ],
+    "properties": {
+      "url": {
+        "type": "string",
+        "format": "url",
+        "title": "页面地址"
+      },
+      "profileId": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "default": "default",
+        "title": "隔离 Profile"
+      },
+      "waitForSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "等待元素"
+      },
+      "clickSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "点击元素"
+      },
+      "typeSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "输入框元素"
+      },
+      "typeValue": {
+        "type": "string",
+        "maxLength": 1000,
+        "title": "输入内容"
+      },
+      "waitMilliseconds": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 5000,
+        "default": 0,
+        "title": "动作后等待毫秒"
+      },
+      "loginSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "登录页识别元素"
+      },
+      "itemSelector": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "title": "条目选择器"
+      },
+      "titleSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "标题选择器"
+      },
+      "linkSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "链接选择器"
+      },
+      "linkAttribute": {
+        "type": "string",
+        "maxLength": 50,
+        "default": "href",
+        "title": "链接属性"
+      },
+      "summarySelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "摘要选择器"
+      },
+      "authorSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "作者选择器"
+      },
+      "dateSelector": {
+        "type": "string",
+        "maxLength": 200,
+        "title": "时间选择器"
+      },
+      "dateAttribute": {
+        "type": "string",
+        "maxLength": 50,
+        "default": "datetime",
+        "title": "时间属性"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 30,
+        "title": "最多条数"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "items"
+    ],
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "runtime": {
+    "timeoutMs": 90000,
+    "concurrency": "sequential"
+  },
+  "collector": {
+    "sourceTypes": [
+      "browser-page"
+    ],
+    "sourceConfigSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "itemSelector"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "url",
+          "title": "页面地址"
+        },
+        "profileId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "default": "default",
+          "title": "隔离 Profile"
+        },
+        "waitForSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "等待元素"
+        },
+        "clickSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "点击元素"
+        },
+        "typeSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "输入框元素"
+        },
+        "typeValue": {
+          "type": "string",
+          "maxLength": 1000,
+          "title": "输入内容"
+        },
+        "waitMilliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000,
+          "default": 0,
+          "title": "动作后等待毫秒"
+        },
+        "loginSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "登录页识别元素"
+        },
+        "itemSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "条目选择器"
+        },
+        "titleSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "标题选择器"
+        },
+        "linkSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "链接选择器"
+        },
+        "linkAttribute": {
+          "type": "string",
+          "maxLength": 50,
+          "default": "href",
+          "title": "链接属性"
+        },
+        "summarySelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "摘要选择器"
+        },
+        "authorSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "作者选择器"
+        },
+        "dateSelector": {
+          "type": "string",
+          "maxLength": 200,
+          "title": "时间选择器"
+        },
+        "dateAttribute": {
+          "type": "string",
+          "maxLength": 50,
+          "default": "datetime",
+          "title": "时间属性"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30,
+          "title": "最多条数"
+        }
+      }
+    }
+  }
+}

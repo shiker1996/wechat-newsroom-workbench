@@ -60,6 +60,8 @@ test('第三方技能可按创作入口和阶段设置默认',()=>{
 test('技能注册表支持搜索筛选与主从编辑',()=>{
   assert.match(html,/class="skill-management-layout"/);
   assert.match(html,/id="skill-search"/);
+  assert.match(html,/class="skill-search-control"><span>⌕<\/span>/);
+  assert.doesNotMatch(html,/<span>范围<\/span><select id="skill-status-filter"/);
   assert.match(html,/id="skill-status-filter"/);
   assert.match(html,/id="skill-detail-empty"/);
   assert.match(skills,/function renderSkillList\(/);
@@ -82,7 +84,7 @@ test('技能列表严格按 kind 分组且每个技能只出现一次',()=>{
 
 test('技能与工具作为独立一级页面而非运行配置标签',()=>{
   assert.match(html,/class="nav-utility" data-view="skills">[\s\S]*?<b>技能与工具<\/b>/);
-  assert.match(html,/<section class="view skill-registry-view" id="view-skills">/);
+  assert.match(html,/<section class="view skill-registry-view capability-studio" id="view-skills">/);
   assert.doesNotMatch(html,/data-config-tab="skills"/);
   assert.doesNotMatch(html,/id="config-panel-skills"/);
   assert.match(main,/skills: "\.\/views\/skills\.js"/);
@@ -101,12 +103,17 @@ test('技能详情区分主技能和阶段子技能并展示工具最近执行�
 
 test('插件管理支持启停、优先级、依赖检查和执行历史',()=>{
   assert.match(skills,/data-tool-enabled=/);
+  assert.match(skills,/function implementationDisableState/);
+  assert.match(skills,/disableBlocked\?'disabled'/);
+  assert.match(skills,/必需能力唯一实现/);
   assert.match(skills,/data-tool-priority=/);
   assert.match(skills,/data-tool-test=/);
   assert.match(skills,/data-tool-history=/);
   assert.match(skills,/async function updateToolPlugin/);
   assert.match(skills,/async function loadToolHistory/);
   assert.match(html,/id="tool-execution-panel"/);
+  assert.match(skills,/placeRuntimeDetail\("tool-execution-panel","tool-capability-list"\)/);
+  assert.match(skills,/placeExecutionHistory\("collector-runtime-list"\)/);
   assert.match(html,/仅记录参数名，不保存输入正文或密钥/);
 });
 
@@ -118,4 +125,57 @@ test('远程工具入口明确要求 Manifest 而不是单独 URL',()=>{
   assert.match(html,/placeholder='\{\s*"schemaVersion": 1,[\s\S]*"capabilities": \["content\.web\.search"\][\s\S]*"compatibleApp": ">=0\.1\.0"\s*\}'/);
   assert.match(html,/保存远程工具/);
   assert.match(styles,/\.remote-manifest-notice/);
+});
+
+test('能力配置包含信息与采集能力，工具运行只保留信息工具运行操作',()=>{
+  assert.match(html,/data-capability-tab="tools"[\s\S]*?<b>能力配置<\/b>/);
+  assert.match(html,/data-capability-tab="collectors"[\s\S]*?<b>工具运行<\/b>/);
+  const runtime=html.slice(html.indexOf('data-capability-section="collectors"'),html.indexOf('data-capability-section="extensions"'));
+  assert.match(runtime,/id="tool-capability-list"/);
+  assert.match(runtime,/id="collector-runtime-list"/);
+  assert.doesNotMatch(runtime,/id="collector-plugin-list"/);
+  const routing=html.slice(html.indexOf('data-capability-section="tools"'),html.indexOf('data-capability-section="skills"'));
+  assert.match(routing,/id="information-slot-list"/);
+  assert.doesNotMatch(routing,/id="collector-plugin-list"/);
+  assert.doesNotMatch(routing,/id="tool-capability-list"/);
+});
+
+test('阶段 2 在能力配置和工具运行中可视化依赖链与影响范围',()=>{
+  assert.match(html,/id="capability-graph-search"/);
+  assert.match(html,/id="capability-impact-panel"/);
+  assert.match(skills,/\/api\/system\/capability-graph/);
+  assert.match(skills,/renderCapabilityGraph/);
+  assert.match(skills,/openImplementationImpact/);
+  assert.match(skills,/placeRuntimeDetail\('capability-impact-panel',type==='collector'\?'collector-runtime-list':'tool-capability-list'\)/);
+  assert.match(styles,/\.collector-plugin-panel \.tool-execution-panel,\.collector-plugin-panel \.capability-impact-panel/);
+  assert.match(skills,/data-tool-impact/);
+  assert.match(skills,/data-collector-impact/);
+  assert.match(styles,/\.capability-chain-card/);
+  assert.doesNotMatch(styles,/\.capability-studio \.capability-section-tabs button\.active\{border-bottom-color/);
+  assert.doesNotMatch(styles,/\.capability-studio \.information-slot-heading\{border-top/);
+  assert.match(skills,/capability-route-control/);
+  assert.match(skills,/tool-runtime-settings/);
+  assert.match(skills,/tool-runtime-actions/);
+  assert.match(styles,/\.capability-route-select select:focus-visible/);
+  assert.match(styles,/\.tool-runtime-actions \.danger-action/);
+});
+
+test('阶段 3 停用前展示影响并携带影响版本执行',()=>{
+  assert.match(skills,/confirmDisableImpact/);
+  assert.match(skills,/impact\.canDisable/);
+  assert.match(skills,/仅禁止新任务使用该工具/);
+  assert.match(skills,/impactVersion/);
+  assert.match(skills,/停用会造成必需能力断链/);
+  assert.match(skills,/可停用，但部分能力将不可用/);
+  assert.match(skills,/!item\.remainingImplementations\.length\?'将不可用'/);
+});
+
+test('阶段 5 执行历史展示候选尝试和兜底来源',()=>{assert.match(skills,/item\.attempt/);assert.match(skills,/item\.fallback_from/);assert.match(skills,/兜底/);});
+
+test('技能与工具页面提供 Manifest 驱动的动态扩展配置表单',()=>{
+  assert.match(skills,/renderExtensionConfigForm/);
+  assert.match(skills,/data-tool-config/);
+  assert.match(html,/skill-extension-config-form/);
+  assert.match(html,/tool-extension-config-form/);
+  assert.doesNotMatch(skills,/accessToken|secretKey/);
 });

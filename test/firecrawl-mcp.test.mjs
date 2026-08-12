@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { firecrawlScrape } from '../lib/integrations/firecrawl-mcp.mjs';
+import { firecrawlScrape } from '../plugins/url-fetch/firecrawl-client.mjs';
 
 test('Firecrawl MCP 客户端完成握手并调用 firecrawl_scrape', async (t) => {
   const methods=[];

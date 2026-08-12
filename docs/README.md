@@ -18,6 +18,8 @@
 | [release.md](./release.md) | 发布、升级、降级、备份恢复流程 |
 | [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线 |
 | [configuration.md](./configuration.md) | 配置项参考：`.env`、`config.local.json`、`account-context.json`（含选题评分）、技能覆盖层 |
+| [configuration-migration-and-system-center-redesign.md](./configuration-migration-and-system-center-redesign.md) | 旧配置迁移、统一配置资源模型与系统配置中心重构实施方案 |
+| [configuration-migration-inventory.json](./configuration-migration-inventory.json) | 阶段 0 旧配置字段、秘密属性、消费点和迁移目标机器清单 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |
 
@@ -35,11 +37,13 @@
 | [social-card-storyboard-skill-extension-plan.md](./social-card-storyboard-skill-extension-plan.md) | 图文故事板技能化改造方案 |
 | [2026-08-07-cover-image-and-ai-repo-discovery-plan.md](./2026-08-07-cover-image-and-ai-repo-discovery-plan.md) | 封面图、AI 兴趣仓库、事实基座链接入库的工作事项与实施方案（已实施，0.3.0） |
 | [2026-08-07-cover-image-design.md](./2026-08-07-cover-image-design.md) | 公众号封面图设计方案：组件契约、AI 排版决策、确定性渲染与封面主题体系（已实施，0.3.0） |
+| [2026-08-12-extension-architecture-refactor-summary.md](./2026-08-12-extension-architecture-refactor-summary.md) | 动态配置、能力图、工具与采集插件统一、流水线失败治理的阶段总结及遗留待办 |
 
 ## 未来计划
 
 | 文档 | 内容 |
 |---|---|
+| [tool-call-chain-and-dependency-refactor.md](./tool-call-chain-and-dependency-refactor.md) | 工具调用链、统一能力依赖图、停用影响门禁、执行兜底与可视化重构方案 |
 | [collector-plugin-architecture-plan.md](./collector-plugin-architecture-plan.md) | 技能/工具动态配置、多字段凭据、采集插件化、Reddit 订阅源与声明式网页采集的架构及迁移方案 |
 | [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
 | [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |

@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+test('工作台备份与恢复覆盖采集插件但明确排除浏览器 Profile',()=>{assert.match(server,/collector-plugins\.json/);assert.match(server,/collector-plugin-events\.jsonl/);assert.match(server,/installed-collector-plugins/);assert.match(server,/browser-profiles（登录 Cookie 与会话）/);assert.match(routes,/installed-collector-plugins/);assert.match(routes,/collector-plugins\\\.json/);assert.doesNotMatch(server,/directoryName of \[[^\]]*browser-profiles/);});

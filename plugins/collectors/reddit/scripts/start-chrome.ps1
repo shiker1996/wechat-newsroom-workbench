@@ -1,9 +1,10 @@
 param(
   [int]$Port = 9333,
-  [switch]$ValidateOnly
+  [switch]$ValidateOnly,
+  [string]$ProfilePath = ''
 )
 
-$profilePath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\data\reddit-chrome-profile'))
+$profilePath = if ($ProfilePath) { [System.IO.Path]::GetFullPath($ProfilePath) } else { [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\data\reddit-chrome-profile')) }
 $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
 $chromeCandidates = @(
   (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),

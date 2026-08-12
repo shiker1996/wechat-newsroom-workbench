@@ -1,7 +1,109 @@
 {
-  "id":"url-fetch","name":"URL 内容抓取","version":"1.0.0",
-  "capabilities":["content.url.fetch"],"entry":"./adapter.mjs","riskLevel":"network-read",
-  "pathInputs":["root"],
-  "inputSchema":{"type":"object","required":["targetUrl","root"],"properties":{"targetUrl":{"type":"string"},"title":{"type":"string"},"root":{"type":"string"},"sourceFetch":{"type":"object"}}},
-  "outputSchema":{"type":"object"},"healthCheck":true,"enabledByDefault":true
+  "id": "url-fetch",
+  "name": "URL 内容抓取",
+  "version": "1.0.0",
+  "capabilities": [
+    "content.url.fetch"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "network-read",
+  "pathInputs": [
+    "root"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "targetUrl",
+      "root"
+    ],
+    "properties": {
+      "targetUrl": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "root": {
+        "type": "string"
+      },
+      "sourceFetch": {
+        "type": "object"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object"
+  },
+  "configuration": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "provider": {
+        "type": "string",
+        "title": "抓取策略",
+        "enum": [
+          "auto",
+          "firecrawl",
+          "python"
+        ],
+        "enumNames": [
+          "自动",
+          "仅 Firecrawl",
+          "仅 Python"
+        ],
+        "default": "auto"
+      },
+      "endpoint": {
+        "type": "string",
+        "title": "Firecrawl MCP 地址",
+        "format": "url",
+        "default": "https://mcp.firecrawl.dev/v2/mcp"
+      },
+      "apiKey": {
+        "type": "string",
+        "title": "Firecrawl API Key",
+        "secret": true,
+        "format": "password"
+      },
+      "githubToken": {
+        "type": "string",
+        "title": "GitHub Token",
+        "secret": true,
+        "format": "password"
+      },
+      "upgradeThreshold": {
+        "type": "integer",
+        "title": "升级抓取质量分阈值",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 55
+      },
+      "rssContentMinChars": {
+        "type": "integer",
+        "title": "RSS 正文免抓字符数",
+        "minimum": 0,
+        "maximum": 100000,
+        "default": 800
+      },
+      "rssFallbackMinChars": {
+        "type": "integer",
+        "title": "RSS 兜底摘要字符数",
+        "minimum": 0,
+        "maximum": 100000,
+        "default": 200
+      },
+      "githubMinChars": {
+        "type": "integer",
+        "title": "GitHub README 最少字符数",
+        "minimum": 0,
+        "maximum": 100000,
+        "default": 200
+      }
+    }
+  },
+  "healthCheck": true,
+  "enabledByDefault": true,
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
 }

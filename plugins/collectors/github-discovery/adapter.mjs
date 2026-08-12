@@ -1,0 +1,2 @@
+import path from 'node:path';import { discoverGitHubRepositories } from './collector.mjs';import { ok } from '../_shared/result.mjs';
+export function createAdapter({config,onProgress=()=>{},githubQueries=[],configuration={}}={}){const github={...config.githubDiscovery,...configuration};return {collect:async(source)=>ok(await discoverGitHubRepositories([],{...github,...source,searchEnabled:github.enabled,aiQueries:githubQueries,cacheDir:path.join(config.workspaceRoot,'data','github-cache')},onProgress),{fetchMethod:'github-api'})};}

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { sanitizeQueries, loadCachedQueries, planRepoDiscoveryQueries, filterRepositoriesByInterest } from '../lib/llm/repo-discovery.mjs';
-import { discoverGitHubRepositories } from '../collectors/github-discovery.mjs';
+import { discoverGitHubRepositories } from '../plugins/collectors/github-discovery/collector.mjs';
 
 function tmpRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'repo-discovery-'));

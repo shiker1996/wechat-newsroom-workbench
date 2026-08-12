@@ -1,6 +1,6 @@
-param([int]$Port = 9333)
+param([int]$Port = 9333, [string]$ProfilePath = '')
 
-$profilePath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\data\reddit-chrome-profile'))
+$profilePath = if ($ProfilePath) { [System.IO.Path]::GetFullPath($ProfilePath) } else { [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\data\reddit-chrome-profile')) }
 $chromeProcesses = @()
 try {
   $chromeProcesses = @(Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction Stop |

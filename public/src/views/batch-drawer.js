@@ -87,6 +87,7 @@ export async function openBatch(id, mode) {
   const stepClass = (name) => ({ completed:"done", active:"active", pending:"" })[pipeline[name]?.status] || "";
   const latestAiRun = batch.ai_runs?.[0];
   const pipelineFailures = (batch.pipeline_failures || []).filter((item) => item.status === "open" || item.status === "retrying");
+  const pendingCollectionFailures = pipelineFailures.filter((item) => item.stage === "collect");
   const decidedFailures = (batch.pipeline_failures || []).filter((item) => item.status === "skipped" || item.status === "resolved");
   const failureStageLabel = { collect: "采集", tag: "语义打标", "event-card": "事件卡", research: "事件研判" };
   const failureGroups = Object.entries(Object.groupBy(pipelineFailures, (item) => item.stage));
@@ -108,7 +109,7 @@ export async function openBatch(id, mode) {
   const pipelinePrimaryAction = researchDone
     ? `<button class="primary-button" data-view-research>查看研判结果 →</button>`
     : ai.tagged < ai.total || !ai.total
-      ? `<button class="primary-button" data-ai-tag ${!batch.hotspots.length ? "disabled" : ""}>${ai.tagged ? `继续打标（还差 ${ai.total - ai.tagged} 条）` : "开始打标"}</button>`
+      ? `<button class="primary-button" data-ai-tag ${!batch.hotspots.length || pendingCollectionFailures.length ? "disabled" : ""}>${pendingCollectionFailures.length ? `先处理 ${pendingCollectionFailures.length} 个采集失败` : ai.tagged ? `继续打标（还差 ${ai.total - ai.tagged} 条）` : "开始打标"}</button>`
       : !cardsReady
         ? `<button class="primary-button" data-ai-event-cards>${cards.count ? "继续生成事件卡" : "生成事件卡"}</button>`
         : `<button class="primary-button" data-ai-research>开始事件研判</button>`;
@@ -264,6 +265,8 @@ export async function startCollection() {
 }
 
 export async function startBatchAi(type) {
+  const pendingCollectionFailures=(state.currentBatch?.pipeline_failures||[]).filter((item)=>item.stage==="collect"&&(item.status==="open"||item.status==="retrying"));
+  if(pendingCollectionFailures.length)return toast(`仍有 ${pendingCollectionFailures.length} 个采集源失败，请先重试或跳过`,"error");
   const provider = $("#batch-ai-provider")?.value;
   if (!provider) return toast("请先在运行与配置 → 模型接入中配置服务商");
   // 重打会覆盖全部已有语义标注，因此在批次工作流中统一执行二次确认。
@@ -321,6 +324,15 @@ export async function pollJob(id) {
     }
     if (job.status === "completed" && job.type === "collect" && state.currentBatch?.batch_type !== "breaking") {
       try {
+        const batch=await request(`/api/batches/${encodeURIComponent(job.batchId || job.batch_id)}`);
+        state.currentBatch=batch;
+        const collectionFailures=(batch.pipeline_failures||[]).filter((item)=>item.stage==="collect"&&(item.status==="open"||item.status==="retrying"));
+        if(collectionFailures.length){
+          toast(`采集完成，但有 ${collectionFailures.length} 个采集源失败；流程已暂停，请先重试或跳过`,"error");
+          await loadOverview();
+          await openBatch(batch.id);
+          return;
+        }
         const provider = $("#batch-ai-provider")?.value;
         const autoJob = await request(`/api/batches/${encodeURIComponent(job.batchId || job.batch_id)}/ai/auto`, { method: "POST", body: JSON.stringify({ provider }) });
         toast("采集完成，已自动进入打标与事件研判");

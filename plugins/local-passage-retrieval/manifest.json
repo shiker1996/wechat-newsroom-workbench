@@ -1,13 +1,94 @@
 {
-  "id":"local-passage-retrieval","name":"本地段落检索","version":"1.0.0",
-  "capabilities":["content.passage.retrieve"],"entry":"./adapter.mjs","riskLevel":"read-only",
-  "inputSchema":{"type":"object","required":["documents","query"],"additionalProperties":false,"properties":{
-    "documents":{"type":"array","minItems":1,"items":{"type":"object","required":["id","content"],"additionalProperties":false,"properties":{"id":{"type":"string"},"content":{"type":"string"}}}},
-    "query":{"type":"string"},
-    "k":{"type":"integer"},
-    "headChars":{"type":"integer"},
-    "chunkChars":{"type":"integer"},
-    "maxCharsPerDoc":{"type":"integer"}}},
-  "outputSchema":{"type":"object","required":["selections"],"properties":{"selections":{"type":"array","items":{"type":"object","required":["id","excerpt","chunks","totalChunks"],"properties":{"id":{"type":"string"},"excerpt":{"type":"string"},"chunks":{"type":"integer"},"totalChunks":{"type":"integer"}}}}}},
-  "healthCheck":true,"enabledByDefault":true
+  "id": "local-passage-retrieval",
+  "name": "本地段落检索",
+  "version": "1.0.0",
+  "capabilities": [
+    "content.passage.retrieve"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "read-only",
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "documents",
+      "query"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "documents": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "content"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "query": {
+        "type": "string"
+      },
+      "k": {
+        "type": "integer"
+      },
+      "headChars": {
+        "type": "integer"
+      },
+      "chunkChars": {
+        "type": "integer"
+      },
+      "maxCharsPerDoc": {
+        "type": "integer"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "selections"
+    ],
+    "properties": {
+      "selections": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "excerpt",
+            "chunks",
+            "totalChunks"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "excerpt": {
+              "type": "string"
+            },
+            "chunks": {
+              "type": "integer"
+            },
+            "totalChunks": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  "healthCheck": true,
+  "enabledByDefault": true,
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
 }

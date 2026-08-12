@@ -34,7 +34,8 @@ const titles = {
   logs: "任务日志", calendar: "内容日历",
 };
 
-async function go(view) {
+async function go(route) {
+  const view = String(route || "").split("/")[0];
   if (!(view in titles)) return;
   if(view!=="editor")document.body.classList.remove("editor-focus");
   const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
@@ -71,7 +72,8 @@ async function go(view) {
     scroller.scrollLeft = 0;
   }
   // 保留浏览器前进/后退能力；hash 相同（如批次切换重载当前视图）不重复压栈
-  if (!navigatingFromHistory && location.hash !== `#${view}`) history.pushState(null, "", `#${view}`);
+  const targetHash=`#${route}`;
+  if (!navigatingFromHistory && location.hash !== targetHash) history.pushState(null, "", targetHash);
 
   const modPath = viewModules[view];
   if (modPath) {
@@ -143,10 +145,14 @@ function bindGlobal() {
     go(current);
   });
   window.addEventListener("hashchange", () => {
-    const view = location.hash.slice(1);
+    const route = location.hash.slice(1);
+    const view = route.split("/")[0];
     if (view in titles && !document.querySelector(".nav-item.active,.nav-utility.active")?.matches(`[data-view="${view}"]`)) {
       navigatingFromHistory = true;
-      go(view).finally(() => { navigatingFromHistory = false; });
+      go(route).finally(() => { navigatingFromHistory = false; });
+    } else if(view in titles){
+      navigatingFromHistory = true;
+      go(route).finally(() => { navigatingFromHistory = false; });
     }
   });
   window.addEventListener("keydown", (event) => {
@@ -199,8 +205,9 @@ async function onReady() {
   setInterval(tick, 30000);
   pollJobNotifications();
   // 首屏视图激活：切导航/视图样式、设置标题、加载 ESM 视图（go 内部已处理 batch-switcher 显隐）
-  const view = location.hash.slice(1);
-  const current = view in titles ? view : "dashboard";
+  const route = location.hash.slice(1);
+  const view = route.split("/")[0];
+  const current = view in titles ? route : "dashboard";
   // 批次切换器与各视图共用 state.batches/overview；dashboard 视图会由 go 自行加载，避免重复请求
   if (current !== "dashboard") {
     try { await loadOverview(); } catch (error) { toast("工作台加载失败：" + error.message, "error"); }

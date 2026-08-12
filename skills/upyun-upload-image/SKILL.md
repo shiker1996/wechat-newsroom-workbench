@@ -9,12 +9,18 @@ description: 在用户明确授权外部上传后，将本地 PNG、JPEG、GIF �
 
 ## 前置
 
-从环境变量读取 `UPYUN_BUCKET`、`UPYUN_OPERATOR`、`UPYUN_PASSWORD`、可选 `UPYUN_DOMAIN` 和 `UPYUN_PREFIX`。不要在命令参数、日志、文章或最终回复中传递或显示密码。目录中的本地 `.env` 若存在也视为敏感文件，不读取或回显其内容。
+图片上传配置统一由工作台“系统与配置中心”的 `upyun-image-upload` 工具资源维护，并在调用 `image.cdn.upload` 时由工具运行时注入。技能不得读取项目或技能目录中的 `.env`，也不得直接读取 `UPYUN_*` 环境变量；日志、文章和最终回复不得显示凭据。
 
 ## 执行
 
 ```powershell
-node upyun-upload-image.js <image-path>
+图片上传由 `image.cdn.upload` 工具能力执行。Bucket、域名与凭据统一在工作台“系统与配置中心”维护；技能不读取或回显凭据。配置未完成时工具返回 `needs_configuration`，请先完成“又拍云图片上传”配置。
+
+仅用于工具适配器的底层脚本必须显式接收完整参数，不会读取 `.env`：
+
+```bash
+node upyun-upload-image.js <image-path> --bucket <bucket> --operator <operator> --password <password> --domain <domain> [--prefix uploads]
+```
 ```
 
 上传前检查文件存在、非空且扩展名受支持。成功 stdout 必须是：

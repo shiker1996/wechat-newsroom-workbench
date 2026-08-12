@@ -46,6 +46,25 @@ test('批次一键自动化路由与手动重试入口并存', () => {
   assert.match(ui, /一键采集并研判/);
 });
 
+test('采集失败未处理时中断打标及全部下游流程', () => {
+  const routes = fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8');
+  const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
+  assert.match(routes, /PIPELINE_FAILURES_PENDING/);
+  assert.match(routes, /pipelineFailureGate\(batchId,\['collect'\],'打标'\)/);
+  assert.match(routes, /pipelineFailureGate\(batchId,\['collect','tag'\],'生成事件卡'\)/);
+  assert.match(routes, /pipelineFailureGate\(batchId,\['collect','tag','event-card'\],'研判'\)/);
+  assert.match(routes, /pipelineFailureGate\(batchId,\['collect'\],'继续流程'\)/);
+  assert.match(ui, /流程已暂停，请先重试或跳过/);
+  assert.match(ui, /pendingCollectionFailures\.length \? "disabled"/);
+});
+
+test('自动流程在打标或事件卡存在待处理失败时中断后续环节', () => {
+  const auto = fs.readFileSync(new URL('../lib/jobs/auto-pipeline.mjs', import.meta.url), 'utf8');
+  assert.match(auto, /stages:\['tag'\][\s\S]*流程已暂停/);
+  assert.match(auto, /stages:\['event-card'\][\s\S]*流程已暂停/);
+  assert.doesNotMatch(auto, /事件卡生成失败（不阻塞自动流程）/);
+});
+
 test('一键流程实时刷新四步进度并把 auto 视为研判任务', () => {
   const batchQueries = fs.readFileSync(new URL('../lib/persistence/queries/batch-query-service.mjs', import.meta.url), 'utf8');
   assert.match(batchQueries, /type IN \('research','auto'\)/);

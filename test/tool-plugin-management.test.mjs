@@ -8,8 +8,9 @@ const index=fs.readFileSync(new URL('../lib/tools/index.mjs',import.meta.url),'u
 
 test('插件管理 API 具备变更确认、即时重载和单项检查',()=>{
   assert.match(routes,/\/api\\\/system\\\/tool-plugins/);
-  assert.match(routes,/requiresConfirmation:true,affectedSkills/);
-  assert.match(routes,/input\.confirmDisable!==true/);
+  assert.match(routes,/validateDisableImpact/);
+  assert.match(routes,/requiresImpactConfirmation:true/);
+  assert.match(routes,/impactVersion/);
   assert.match(routes,/writeToolPluginSetting/);
   assert.match(routes,/await reloadToolRegistry\(\)/);
   assert.match(routes,/toolPluginTestMatch/);

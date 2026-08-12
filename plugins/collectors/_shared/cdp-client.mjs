@@ -53,4 +53,3 @@ export async function waitForReady(client, timeoutMs = 30000) {
   }
   throw new Error('Reddit 页面加载超时');
 }
-

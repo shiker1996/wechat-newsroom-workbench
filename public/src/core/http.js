@@ -17,7 +17,7 @@ export async function request(url, options = {}) {
   if (!response.ok) {
     // 非 JSON 响应（如 HTML 错误页）：给出状态码和可读摘要
     const summary = !isJson && text ? `：${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120)}` : "";
-    const error=new Error(data.error ?? `HTTP ${response.status}${summary}`);error.status=response.status;error.code=data.code||'';error.issues=data.issues||[];throw error;
+    const error=new Error(data.error ?? `HTTP ${response.status}${summary}`);error.status=response.status;error.code=data.code||'';error.issues=data.issues||[];error.data=data;throw error;
   }
   return isJson && text ? data : null;
 }

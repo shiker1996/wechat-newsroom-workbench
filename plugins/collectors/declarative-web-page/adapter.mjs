@@ -1,0 +1,2 @@
+import { collectDeclarativePage } from './collector.mjs';
+export function createAdapter({pageDependencies={}}={}){return {collect:(source)=>collectDeclarativePage(source,pageDependencies),test:async(source)=>{const result=await collectDeclarativePage({...source,maxPages:1,limit:Math.min(source.limit||5,5)},pageDependencies);return {ok:true,title:new URL(source.url).hostname,itemCount:result.items.length,matched:result.provenance.matched,items:result.items.slice(0,5).map(({title,url})=>({title,url}))};}};}

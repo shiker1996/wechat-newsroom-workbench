@@ -5,6 +5,16 @@ let bound = false;
 let skillRegistryData = null;
 let selectedSkillId = "";
 let credentialPluginId = "";
+let capabilityGraphData = null;
+
+function implementationDisableState(type,id){
+  const blocking=(capabilityGraphData?.capabilities||[]).filter((capability)=>{
+    if(!capability.implementations.some((item)=>item.type===type&&item.id===id))return false;
+    const remaining=capability.implementations.filter((item)=>!(item.type===type&&item.id===id)&&item.available);
+    return remaining.length===0&&capability.consumers.some((consumer)=>consumer.enabled&&consumer.requirement==='required');
+  });
+  return {canDisable:blocking.length===0,blocking};
+}
 
 // 工具列表更新后会整体重渲染，焦点所在的控件被替换；按 data 属性找回等价控件恢复焦点
 function restoreToolControlFocus(pluginId, attribute) {
@@ -26,12 +36,16 @@ function bindSkills() {
     const uninstallButton = event.target.closest("[data-tool-uninstall]");
     const credentialButton = event.target.closest("[data-tool-credential]");
     const firstRunButton = event.target.closest("[data-tool-first-run]");
+    const configButton = event.target.closest("[data-tool-config]");
+    const impactButton = event.target.closest("[data-tool-impact]");
     if (testButton) testToolPlugin(testButton.dataset.toolTest, testButton).catch((error) => toast(error.message));
     if (historyButton) loadToolHistory(historyButton.dataset.toolHistory).catch((error) => toast(error.message));
     if (versionsButton) manageToolPluginVersions(versionsButton.dataset.toolVersions).catch((error) => toast(error.message));
     if (uninstallButton) uninstallManagedToolPlugin(uninstallButton.dataset.toolUninstall).catch((error) => toast(error.message));
     if (credentialButton) openRemoteCredential(credentialButton.dataset.toolCredential);
     if (firstRunButton) confirmRemoteFirstRun(firstRunButton.dataset.toolFirstRun).catch((error) => toast(error.message));
+    if (configButton) openUnifiedExtensionConfiguration("tool", configButton.dataset.toolConfig);
+    if (impactButton) openImplementationImpact("tool", impactButton.dataset.toolImpact).catch((error)=>toast(error.message));
   });
   document.getElementById("tool-capability-list")?.addEventListener("change", (event) => {
     const toggle = event.target.closest("[data-tool-enabled]");
@@ -42,15 +56,16 @@ function bindSkills() {
       .catch((error) => toast(error.message));
   });
   document.getElementById("information-slot-list")?.addEventListener("change", (event) => {
-    const select = event.target.closest("[data-information-slot]");
-    if (select) updateInformationSlot(select.dataset.informationSlot, select.value, select).catch((error) => toast(error.message));
-  });
-  document.getElementById("information-slot-list")?.addEventListener("click", (event) => {
-    if (event.target.closest("[data-connect-information-tool]")) selectCapabilityTab("extensions");
+    const select = event.target.closest("[data-capability-route]");
+    if (select) updateCapabilityRoute(select.dataset.capabilityRoute, select.value, select).catch((error) => toast(error.message));
   });
   document.getElementById("tool-execution-close")?.addEventListener("click", () => {
     document.getElementById("tool-execution-panel").hidden = true;
   });
+  document.getElementById("capability-impact-close")?.addEventListener("click",()=>{document.getElementById("capability-impact-panel").hidden=true;});
+  document.getElementById("capability-graph-search")?.addEventListener("input",debounce(renderCapabilityGraph));
+  document.getElementById("capability-graph-status")?.addEventListener("change",renderCapabilityGraph);
+  document.querySelector("[data-extension-config-close]")?.addEventListener("click", () => { document.getElementById("tool-extension-config-panel").hidden = true; });
   document.getElementById("skill-search")?.addEventListener("input", debounce(() => renderSkillList()));
   document.getElementById("skill-status-filter")?.addEventListener("change", () => renderSkillList());
   const skillStatusFilter = document.getElementById("skill-status-filter");
@@ -71,6 +86,11 @@ function bindSkills() {
   });
   document.getElementById("validate-tool-package")?.addEventListener("click", () => submitToolPackage(false).catch((error) => toast(error.message)));
   document.getElementById("install-tool-package")?.addEventListener("click", () => submitToolPackage(true).catch((error) => toast(error.message)));
+  document.getElementById("validate-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(false).catch((error) => toast(error.message)));
+  document.getElementById("install-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(true).catch((error) => toast(error.message)));
+  document.querySelector("[data-go-extension-studio]")?.addEventListener("click", () => selectCapabilityTab("extensions"));
+  document.getElementById("collector-runtime-list")?.addEventListener("click",(event)=>{const check=event.target.closest("[data-collector-check]");if(check)testCollectorTool(check.dataset.collectorCheck,check).catch((error)=>toast(error.message));const configure=event.target.closest("[data-collector-config]");if(configure)openCollectorConfiguration(configure.dataset.collectorConfig);const history=event.target.closest("[data-collector-history]");if(history)loadCollectorHistory(history.dataset.collectorHistory).catch((error)=>toast(error.message));const impact=event.target.closest("[data-collector-impact]");if(impact)openImplementationImpact("collector",impact.dataset.collectorImpact).catch((error)=>toast(error.message));});
+  document.getElementById("collector-runtime-list")?.addEventListener("change",(event)=>{const enabled=event.target.closest("[data-collector-enabled]");if(enabled)updateCollectorTool(enabled.dataset.collectorEnabled,{enabled:enabled.checked}).catch((error)=>toast(error.message));const priority=event.target.closest("[data-collector-priority]");if(priority)updateCollectorTool(priority.dataset.collectorPriority,{priority:Number(priority.value)}).catch((error)=>toast(error.message));});
   document.getElementById("validate-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(false).catch((error) => toast(error.message)));
   document.getElementById("install-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(true).catch((error) => toast(error.message)));
   document.getElementById("save-remote-credential")?.addEventListener("click", () => saveRemoteCredential().catch((error) => toast(error.message)));
@@ -82,26 +102,27 @@ function bindSkills() {
 }
 
 async function loadSkillRegistry() {
-  const [data, slotData] = await Promise.all([
+  const [data, collectorData, graphData] = await Promise.all([
     request("/api/system/skills"),
-    request("/api/system/information-capability-slots"),
+    request("/api/collector-plugins"),
+    request("/api/system/capability-graph"),
   ]);
   skillRegistryData = data;
+  capabilityGraphData = graphData;
   const summary = document.getElementById("skill-registry-summary");
-  const availableTools = data.tools.filter((tool) => tool.health?.status === "ok" && tool.health.data?.available !== false).length;
+  const runtimeTools=[...new Map(data.tools.map((tool)=>[tool.plugin,{...tool,name:tool.name||tool.plugin,capabilities:data.tools.filter((item)=>item.plugin===tool.plugin).map((item)=>item.capability),recentExecution:data.tools.filter((item)=>item.plugin===tool.plugin).map((item)=>item.recentExecution).filter(Boolean).sort((a,b)=>Number(b.id)-Number(a.id))[0]||null}])).values()];
+  const availableTools = runtimeTools.filter((tool) => tool.health?.status === "ok" && tool.health.data?.available !== false).length;
   const configuredSkills = data.skills.filter((skill) => skill.configured).length;
   const thirdPartySkills = data.skills.filter((skill) => skill.thirdParty).length;
-  const connectedSlots = (slotData.items || []).filter((slot) => slot.available).length;
+  const connectedSlots = graphData.capabilities.filter((item)=>!item.id.startsWith('collect.')&&['ready','degraded'].includes(item.status)).length;
+  const informationCapabilityCount=graphData.capabilities.filter((item)=>!item.id.startsWith('collect.')&&item.consumers.length).length;
   if (summary) {
-    summary.innerHTML = `<span><b>${data.total}</b><small>创作技能</small><em>${thirdPartySkills ? `${thirdPartySkills} 个已安装` : "全部为内置"}</em></span><span><b>${connectedSlots}/${slotData.items.length}</b><small>信息能力就绪</small><em>${connectedSlots === slotData.items.length ? "写作资料能力完整" : `${slotData.items.length - connectedSlots} 项可继续连接`}</em></span><span><b>${configuredSkills}</b><small>自定义配置</small><em>任务启动后冻结</em></span>`;
+    const unavailableTools = runtimeTools.length - availableTools;
+    summary.innerHTML = `<span><b>${data.total}</b><small>创作技能</small><em>${thirdPartySkills ? `${thirdPartySkills} 项来自扩展` : "全部来自内置"}</em></span><span><b>${connectedSlots}/${informationCapabilityCount}</b><small>工具能力已连接</small><em>${connectedSlots === informationCapabilityCount ? "能力链路完整" : `${informationCapabilityCount - connectedSlots} 项待处理`}</em></span><span><b>${collectorData.items?.length || 0}</b><small>采集插件</small><em>管理来源接入能力</em></span><span class="${unavailableTools?'attention':'ready'}"><b>${availableTools}/${runtimeTools.length}</b><small>工具运行正常</small><em>${unavailableTools ? `${unavailableTools} 项需要处理` : "全部工具可用"}</em></span>`;
   }
-  const toolSummary = document.getElementById("tool-capability-summary");
-  if (toolSummary) toolSummary.textContent = availableTools === data.tools.length ? `${data.tools.length} 个工具运行正常` : `${data.tools.length - availableTools} 个工具需要处理`;
-  const disclosure = document.querySelector(".tool-capability-disclosure");
-  if (disclosure && availableTools < data.tools.length) disclosure.open = true;
   const toolList = document.getElementById("tool-capability-list");
   if (toolList) {
-    toolList.innerHTML = data.tools.length ? data.tools.map((tool) => {
+    toolList.innerHTML = runtimeTools.length ? runtimeTools.map((tool) => {
       const checked = Boolean(tool.health);
       const healthy = checked && tool.health.status === "ok" && tool.health.data?.available !== false;
       const status = !tool.enabled ? "已停用" : checked ? (healthy ? "可用" : "不可用") : "待检查";
@@ -109,61 +130,74 @@ async function loadSkillRegistry() {
       const recent = tool.recentExecution;
       const audit = recent ? `最近执行：${recent.status} · ${new Date(recent.finished_at || recent.started_at).toLocaleString("zh-CN")}${recent.error_code ? ` · ${recent.error_code}` : ""}` : "尚无执行记录";
       const permissionSummary = tool.thirdParty ? `来源：${tool.source?.type || "未声明"} ${tool.source?.url || ""} · 兼容 ${tool.compatibleApp || "未声明"} · 完整性 ${tool.contentHash || "未记录"} · 网络域名 ${(tool.permissions?.networkDomains || []).join("、") || "无"} · 路径 ${(tool.permissions?.pathAccess || []).join("、") || "无"} · 外部写入 ${tool.permissions?.externalWrite ? "是" : "否"}${tool.remote ? ` · 端点 ${tool.endpointHost || "未声明"} · 首次执行 ${tool.firstRunConfirmedAt ? "已确认" : "待确认"}` : ""}` : "内置受信实现";
+      const disableState=implementationDisableState('tool',tool.plugin),disableBlocked=tool.enabled&&!disableState.canDisable;
       return `<article class="runtime-model-item tool-plugin-item ${tool.enabled ? "" : "disabled"}">
-        <div class="tool-plugin-title"><div><b>${escapeHtml(tool.capability)}</b><small>${escapeHtml(tool.plugin)} @ ${escapeHtml(tool.version)} · ${escapeHtml(tool.riskLevel)}</small></div><em class="${tool.enabled ? (checked ? (healthy ? "ok" : "bad") : "unknown") : "unknown"}">${status}</em></div>
+        <div class="tool-plugin-title"><div><b>${escapeHtml(tool.name||tool.plugin)}</b><small>${escapeHtml(tool.plugin)} · 信息工具 · ${escapeHtml(tool.version)} · ${escapeHtml(tool.riskLevel)}</small></div></div>
+        <div class="tool-provided-capabilities"><small>提供能力</small><div>${tool.capabilities.map((capability)=>`<code>${escapeHtml(capability)}</code>`).join('')}</div></div>
         <small>${escapeHtml(detail)}</small><small>${escapeHtml(audit)}</small>
         <small>${escapeHtml(permissionSummary)}${tool.restartRequired ? " · 需要重启" : ""}</small>
         <div class="tool-plugin-controls">
-          <label class="tool-plugin-toggle"><input type="checkbox" data-tool-enabled="${escapeHtml(tool.plugin)}" ${tool.enabled ? "checked" : ""}><span>启用工具</span></label>
-          ${tool.thirdParty ? "" : `<label>优先级 <input type="number" min="-100" max="100" value="${Number(tool.priority) || 0}" data-tool-priority="${escapeHtml(tool.plugin)}"></label>`}
-          <button type="button" class="ghost-button" data-tool-test="${escapeHtml(tool.plugin)}">检查依赖</button>
-          <button type="button" class="text-button" data-tool-history="${escapeHtml(tool.capability)}">执行历史</button>
-          ${tool.remote ? `${!tool.firstRunConfirmedAt ? `<button type="button" class="ghost-button" data-tool-first-run="${escapeHtml(tool.plugin)}">确认首次执行</button>` : ""}<button type="button" class="text-button" data-tool-credential="${escapeHtml(tool.plugin)}">配置凭据</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">删除连接</button>` : tool.thirdParty ? `<button type="button" class="text-button" data-tool-versions="${escapeHtml(tool.plugin)}">版本与回滚</button><button type="button" class="text-button" data-tool-uninstall="${escapeHtml(tool.plugin)}">卸载</button>` : ""}
+          <div class="tool-runtime-settings"><label class="tool-plugin-toggle ${disableBlocked?'disable-blocked':''}" title="${disableBlocked?`停用会阻断：${escapeHtml(disableState.blocking.map((item)=>item.id).join('、'))}`:'启用或停用工具'}"><input type="checkbox" data-tool-enabled="${escapeHtml(tool.plugin)}" ${tool.enabled ? "checked" : ""} ${disableBlocked?'disabled':''}><span>${disableBlocked?'必需能力唯一实现':'启用工具'}</span></label><label class="tool-priority-control"><span>优先级</span><input type="number" min="-100" max="100" value="${Number(tool.priority) || 0}" data-tool-priority="${escapeHtml(tool.plugin)}"></label></div>
+          <div class="tool-runtime-actions"><button type="button" class="ghost-button" data-tool-test="${escapeHtml(tool.plugin)}">检查依赖</button>${tool.configuration ? `<button type="button" class="ghost-button action-config" data-tool-config="${escapeHtml(tool.plugin)}">${tool.extensionConfiguration?.configured ? "配置" : "完成配置"}</button>` : ""}<button type="button" class="text-button" data-tool-history="${escapeHtml(tool.plugin)}">执行历史</button><button type="button" class="text-button" data-tool-impact="${escapeHtml(tool.plugin)}">影响范围</button>${tool.remote ? `${!tool.firstRunConfirmedAt ? `<button type="button" class="ghost-button" data-tool-first-run="${escapeHtml(tool.plugin)}">确认首次执行</button>` : ""}<button type="button" class="text-button" data-tool-credential="${escapeHtml(tool.plugin)}">配置凭据</button><button type="button" class="text-button danger-action" data-tool-uninstall="${escapeHtml(tool.plugin)}">删除连接</button>` : tool.thirdParty ? `<button type="button" class="text-button" data-tool-versions="${escapeHtml(tool.plugin)}">版本与回滚</button><button type="button" class="text-button danger-action" data-tool-uninstall="${escapeHtml(tool.plugin)}">卸载</button>` : ""}</div>
         </div>
       </article>`;
     }).join("") : '<div class="kv-empty">没有已注册的工具能力。</div>';
   }
-  renderInformationSlots(slotData.items || []);
+  renderCapabilityGraph();
+  renderCollectorPlugins(collectorData.items || []);
   renderSkillList();
 }
 
-function renderInformationSlots(items) {
-  const node = document.getElementById("information-slot-list");
-  if (!node) return;
-  const connected = items.filter((slot) => slot.available).length;
-  const summary = document.getElementById("information-slot-summary");
-  if (summary) summary.innerHTML = `<b>${connected}/${items.length}</b><span>已就绪</span>`;
-  const ordered = [...items].sort((a, b) => Number(b.available) - Number(a.available));
-  node.innerHTML = ordered.map((slot) => {
-    const enabled = slot.implementations.filter((item) => item.enabled);
-    return `<article class="information-slot-card ${slot.available ? "available" : "missing"}">
-      <div><span>${escapeHtml(slot.stage)}</span><b>${escapeHtml(slot.name)}</b><small>${escapeHtml(slot.description)}</small></div>
-      <em>${escapeHtml(slot.available ? "已就绪" : "待连接")}</em>
-      ${slot.available ? `<label>使用的服务<select data-information-slot="${escapeHtml(slot.id)}">
-        <option value="">系统自动选择</option>
-        ${enabled.map((item) => `<option value="${escapeHtml(item.plugin)}" ${slot.preferredPlugin === item.plugin ? "selected" : ""}>${escapeHtml(item.plugin)} @ ${escapeHtml(item.version)}</option>`).join("")}
-      </select></label>` : '<button type="button" class="outline-button information-slot-connect" data-connect-information-tool>连接可用工具</button>'}
-      <details class="information-slot-technical"><summary>技术标识</summary><code>${escapeHtml(slot.capability)}</code></details>
-    </article>`;
-  }).join("");
+function renderCollectorPlugins(items) {
+  const runtime=document.getElementById("collector-runtime-list");if(!runtime)return;
+  runtime.innerHTML=items.map((plugin)=>{const disableState=implementationDisableState('collector',plugin.id),disableBlocked=plugin.enabled!==false&&!disableState.canDisable;return `<article class="runtime-model-item tool-plugin-item ${plugin.available?'':'disabled'}"><div class="tool-plugin-title"><div><b>${escapeHtml(plugin.name)}</b><small>${escapeHtml(plugin.id)} · 采集工具 · ${escapeHtml(plugin.version)} · ${escapeHtml(plugin.riskLevel)}</small></div></div><div class="tool-provided-capabilities"><small>提供能力</small><div>${(plugin.capabilities||[]).map((capability)=>`<code>${escapeHtml(capability)}</code>`).join('')}</div></div><small>关联采集源 ${plugin.sourceCount||0}</small><div class="tool-plugin-controls"><div class="tool-runtime-settings"><label class="tool-plugin-toggle ${disableBlocked?'disable-blocked':''}" title="${disableBlocked?`停用会阻断：${escapeHtml(disableState.blocking.map((item)=>item.id).join('、'))}`:'启用或停用工具'}"><input type="checkbox" data-collector-enabled="${escapeHtml(plugin.id)}" ${plugin.enabled!==false?'checked':''} ${disableBlocked?'disabled':''}><span>${disableBlocked?'必需能力唯一实现':'启用工具'}</span></label><label class="tool-priority-control"><span>优先级</span><input type="number" min="-100" max="100" value="${Number(plugin.priority)||0}" data-collector-priority="${escapeHtml(plugin.id)}"></label></div><div class="tool-runtime-actions"><button type="button" class="ghost-button" data-collector-check="${escapeHtml(plugin.id)}">检查依赖</button>${plugin.configuration?`<button type="button" class="ghost-button action-config" data-collector-config="${escapeHtml(plugin.id)}">配置</button>`:''}<button type="button" class="text-button" data-collector-history="${escapeHtml(plugin.id)}">执行历史</button><button type="button" class="text-button" data-collector-impact="${escapeHtml(plugin.id)}">影响范围</button></div></div></article>`;}).join('');
 }
 
-async function updateInformationSlot(slotId, pluginId, control) {
-  control.disabled = true;
-  try {
-    const result = await request(`/api/system/information-capability-slots/${encodeURIComponent(slotId)}`, {
-      method: "PUT", body: JSON.stringify({ pluginId }),
-    });
-    toast(result.available ? `${result.name} 已使用 ${result.selectedPlugin}` : `${result.name} 当前没有可用实现`);
-    await loadSkillRegistry();
-    document.querySelector(`#information-slot-list [data-information-slot="${CSS.escape(slotId)}"]`)?.focus();
-  } finally {
-    control.disabled = false;
-  }
+const CAPABILITY_STATUS={ready:'就绪',degraded:'降级',blocked:'阻断',unused:'未使用'};
+function capabilityRouteControl(item){const selected=item.implementations.find((implementation)=>implementation.id===item.preferredImplementationId);return `<div class="capability-route-control ${selected?'manual':'automatic'}"><div class="capability-route-label"><span>路由策略</span><em>${selected?'指定首选':'自动兜底'}</em></div><div class="capability-route-select"><select aria-label="${escapeHtml(item.id)} 的首选工具" data-capability-route="${escapeHtml(item.id)}"><option value="">按优先级自动选择</option>${item.implementations.map((implementation)=>`<option value="${escapeHtml(implementation.id)}" ${item.preferredImplementationId===implementation.id?'selected':''}>${escapeHtml(implementation.name)} · ${escapeHtml(implementation.id)}</option>`).join('')}</select><span aria-hidden="true">⌄</span></div><small>${selected?`优先调用 ${escapeHtml(selected.name)}，失败后继续尝试候选链`:'根据可用状态和优先级依次尝试候选工具'}</small></div>`;}
+function renderCapabilityGraph(){
+  const node=document.getElementById('information-slot-list');if(!node||!capabilityGraphData)return;
+  const query=(document.getElementById('capability-graph-search')?.value||'').trim().toLowerCase(),status=document.getElementById('capability-graph-status')?.value||'all';
+  const items=capabilityGraphData.capabilities.filter((item)=>(status==='all'||item.status===status)&&(!query||`${item.id} ${item.name||''} ${item.description||''} ${item.category||''} ${item.consumers.map((x)=>`${x.consumerName} ${x.consumerId}`).join(' ')} ${item.implementations.map((x)=>`${x.name} ${x.id}`).join(' ')}`.toLowerCase().includes(query)));
+  const summary=document.getElementById('information-slot-summary');if(summary)summary.innerHTML=`<b>${capabilityGraphData.summary.ready}</b><span>就绪 · ${capabilityGraphData.summary.degraded} 降级 · ${capabilityGraphData.summary.blocked} 阻断</span>`;
+  node.innerHTML=items.map((item)=>`<article class="capability-chain-card status-${item.status}"><header><div><span>${escapeHtml(item.category||'扩展能力')} · ${item.id.startsWith('collect.')?'采集能力':'工具能力'}</span><b>${escapeHtml(item.name||item.id)}</b><small>${escapeHtml(item.id)}</small><p>${escapeHtml(item.description||'暂无能力说明')}</p></div><em>${CAPABILITY_STATUS[item.status]||item.status}</em></header><section><small>消费者 · ${item.consumers.length}</small><div class="capability-consumer-list">${item.consumers.length?item.consumers.map((consumer)=>`<span class="${consumer.requirement}"><b>${escapeHtml(consumer.consumerName)}</b><i>${escapeHtml(consumer.consumerType)} · ${escapeHtml(consumer.requirement)}</i></span>`).join(''):'<span class="empty">当前没有消费者</span>'}</div></section><section>${capabilityRouteControl(item)}<small>候选工具链 · ${item.implementations.length}</small><ol class="capability-fallback-chain">${item.implementations.length?item.implementations.map((implementation,index)=>`<li class="${implementation.available?'available':'missing'}"><b>${index+1}</b><span>${escapeHtml(implementation.name)}<small>${escapeHtml(implementation.type)} · ${escapeHtml(implementation.id)} · 优先级 ${implementation.priority}</small></span><em>${implementation.available?'可用':implementation.enabled?'配置未就绪':'已停用'}</em></li>`).join(''):'<li class="missing"><span>没有实现该能力的工具</span></li>'}</ol></section></article>`).join('')||'<div class="kv-empty">没有匹配的能力。</div>';
 }
+
+async function updateCapabilityRoute(capability,preferredImplementationId,control){
+  control.disabled=true;
+  try{await request(`/api/system/capability-routes/${encodeURIComponent(capability)}`,{method:'PUT',body:JSON.stringify({preferredImplementationId})});toast(preferredImplementationId?'首选工具已更新':'已恢复自动选择');await loadSkillRegistry();document.querySelector(`#information-slot-list [data-capability-route="${CSS.escape(capability)}"]`)?.focus();}
+  finally{control.disabled=false;}
+}
+
+async function openImplementationImpact(type,id){
+  const result=await request(`/api/system/${type==='collector'?'collectors':'tools'}/${encodeURIComponent(id)}/status-impact`),panel=placeRuntimeDetail('capability-impact-panel',type==='collector'?'collector-runtime-list':'tool-capability-list'),content=document.getElementById('capability-impact-content');
+  const unavailable=result.capabilities.filter((item)=>!item.wouldBlock&&item.remainingImplementations.length===0),verdict=!result.canDisable?'停用会造成必需能力断链':unavailable.length?'可停用，但部分能力将不可用':'存在可控迁移路径';
+  document.getElementById('capability-impact-title').textContent=`${id} · 影响范围`;
+  content.innerHTML=`<div class="impact-verdict ${result.canDisable?'safe':'blocked'}"><b>${verdict}</b><span>${result.capabilities.length} 项能力受影响 · ${result.blocking.length} 项阻断 · ${result.degraded.length} 项降级 · ${unavailable.length} 项将不可用</span></div><div class="impact-capability-list">${result.capabilities.map((item)=>`<article><header><b>${escapeHtml(item.capability)}</b><em class="${item.wouldBlock?'blocked':item.wouldDegrade||!item.remainingImplementations.length?'degraded':'safe'}">${item.wouldBlock?'将阻断':!item.remainingImplementations.length?'将不可用':item.wouldDegrade?'将降级':'可安全切换'}</em></header><small>剩余实现：${item.remainingImplementations.length?item.remainingImplementations.map((entry)=>escapeHtml(entry.name)).join('、'):'无'}</small><div>${item.consumers.map((consumer)=>`<span>${escapeHtml(consumer.consumerName)} · ${escapeHtml(consumer.requirement)}</span>`).join('')}</div></article>`).join('')}</div>`;
+  panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function openCollectorConfiguration(id){openUnifiedExtensionConfiguration("collector",id);}
+function openUnifiedExtensionConfiguration(type,id){const key=`${type}:${id}`,route=`system/configuration/${encodeURIComponent(type)}/${encodeURIComponent(id)}`;try{sessionStorage.setItem("system-extension-selection",key);}catch{}window.go?.(route);}
+
+function placeRuntimeDetail(panelId,afterElementId){
+  const panel=document.getElementById(panelId),anchor=document.getElementById(afterElementId);
+  if(panel&&anchor&&panel.previousElementSibling!==anchor)anchor.insertAdjacentElement("afterend",panel);
+  return panel;
+}
+function placeExecutionHistory(afterElementId){return placeRuntimeDetail("tool-execution-panel",afterElementId);}
+
+async function submitCollectorPackage(install){const directory=document.getElementById("collector-plugin-directory").value.trim();if(!directory)throw new Error("请输入插件目录");const result=await request(`/api/system/collector-plugin-packages/${install?"install":"validate"}`,{method:"POST",headers:install?{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"}:{},body:JSON.stringify({directory})});toast(install?`已安装 ${result.name||result.id}，默认保持停用`:`校验通过：${result.manifest?.name||result.manifest?.id}`);await loadSkillRegistry();}
+async function updateCollectorStatus(id,status){const impactVersion=status==='disabled'?await confirmDisableImpact('collector',id):null;if(status==='disabled'&&!impactVersion)return;await request(`/api/system/collector-plugins/${encodeURIComponent(id)}/status`,{method:"PATCH",headers:{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"},body:JSON.stringify({status,impactVersion})});await loadSkillRegistry();}
+async function confirmDisableImpact(type,id){const impact=await request(`/api/system/${type==='collector'?'collectors':'tools'}/${encodeURIComponent(id)}/status-impact`);if(!impact.canDisable){await openImplementationImpact(type,id);throw new Error('停用会造成必需能力断链，操作已阻止');}const lines=impact.capabilities.map((item)=>`${item.capability}：${!item.remainingImplementations.length?'将不可用':item.wouldDegrade?'将降级':'可切换'}${item.remainingImplementations.length?` → ${item.remainingImplementations.map((entry)=>entry.name).join('、')}`:''}`);const confirmed=await confirmAction(`此操作仅禁止新任务使用该工具，历史记录继续保留。\n${lines.join('\n')}\n是否继续？`,{confirmText:'确认停用'});return confirmed?impact.impactVersion:null;}
+async function updateCollectorTool(id,input){if(input.enabled===false){const impactVersion=await confirmDisableImpact('collector',id);if(!impactVersion)return;input={...input,impactVersion};}await request(`/api/system/collector-tools/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});await loadSkillRegistry();}
+async function testCollectorTool(id,button){const original=button.textContent;button.disabled=true;button.textContent="检查中…";try{const result=await request(`/api/system/collector-plugins/${encodeURIComponent(id)}/configuration/test`,{method:"POST",body:"{}"});toast(result.pass?"采集工具依赖正常":"采集工具依赖不可用");}finally{button.disabled=false;button.textContent=original;}}
+async function loadCollectorHistory(id){const result=await request("/api/system/collector-plugin-events?limit=100");const panel=placeExecutionHistory("collector-runtime-list"),list=document.getElementById("tool-execution-list");document.getElementById("tool-execution-title").textContent=`${id} · 采集执行历史`;const items=(result.items||[]).filter((item)=>item.pluginId===id);list.innerHTML=items.length?items.map((item)=>`<article class="runtime-model-item"><b>${escapeHtml(item.action||'执行')} · ${escapeHtml(item.result||'记录')}</b><small>${escapeHtml(item.createdAt||'')}</small></article>`).join(''):'<div class="kv-empty">尚无执行记录。</div>';panel.hidden=false;panel.scrollIntoView({behavior:"smooth",block:"nearest"});}
+async function confirmCollectorFirstRun(id){await request(`/api/system/collector-plugins/${encodeURIComponent(id)}/first-run-confirm`,{method:"POST",body:"{}"});await loadSkillRegistry();}
+async function uninstallCollector(id,sourceCount){const impactVersion=await confirmDisableImpact('collector',id);if(!impactVersion)return;if(!await confirmAction(`卸载后 ${sourceCount} 个关联来源和历史记录会保留，但新任务不再使用该实现。确定继续吗？`,{confirmText:"卸载"}))return;await request(`/api/system/collector-plugins/${encodeURIComponent(id)}`,{method:"DELETE",headers:{"x-admin-confirm":"TRUSTED-LOCAL-PLUGIN"},body:JSON.stringify({impactVersion})});await loadSkillRegistry();}
 
 function selectCapabilityTab(tab) {
-  const selected = ["skills", "tools", "extensions"].includes(tab) ? tab : "skills";
+  const selected = ["skills", "tools", "collectors", "extensions"].includes(tab) ? tab : "skills";
   document.querySelectorAll("[data-capability-tab]").forEach((button) => {
     const active = button.dataset.capabilityTab === selected;
     button.classList.toggle("active", active);
@@ -296,13 +330,14 @@ async function manageToolPluginVersions(pluginId) {
 
 async function uninstallManagedToolPlugin(pluginId) {
   const remote = skillRegistryData?.tools.some((tool) => tool.plugin === pluginId && tool.remote);
+  const impactVersion=await confirmDisableImpact('tool',pluginId);if(!impactVersion)return;
   const confirmed = remote
     ? await confirmAction(`删除连接 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`, { confirmText: "删除连接" })
     : await confirmAction(`卸载 ${pluginId}？依赖其能力的技能将无法启动，历史归档和审计记录会保留。`, { confirmText: "确认卸载" });
   if (!confirmed) return;
   await request(remote ? `/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}` : `/api/system/tool-plugins/${encodeURIComponent(pluginId)}`, {
     method: "DELETE", headers: remote ? {} : { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" },
-    body: JSON.stringify({ confirmImpact: true }),
+    body: JSON.stringify({ impactVersion }),
   });
   toast(remote ? "远程连接已删除" : "工具已卸载，重启工作台后完成卸载");
   await loadSkillRegistry();
@@ -323,15 +358,12 @@ async function confirmRemoteFirstRun(pluginId) {
 async function updateToolPlugin(pluginId, changes, control) {
   const refocusAttr = control?.dataset.toolEnabled !== undefined ? "data-tool-enabled" : control?.dataset.toolPriority !== undefined ? "data-tool-priority" : null;
   const pluginView = skillRegistryData?.tools.find((tool) => tool.plugin === pluginId);
+  if(changes.enabled===false){const impactVersion=await confirmDisableImpact('tool',pluginId);if(!impactVersion){if(control?.matches('[type=checkbox]'))control.checked=true;return;}changes.impactVersion=impactVersion;}
   if (pluginView?.thirdParty) {
-    if (changes.enabled === false && !await confirmAction(`停用工具 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`, { confirmText: "停用工具" })) {
-      if (control?.matches("[type=checkbox]")) control.checked = true;
-      return;
-    }
     if (control) control.disabled = true;
     try {
       const endpoint = pluginView.remote ? `/api/system/remote-tool-plugins/${encodeURIComponent(pluginId)}/status` : `/api/system/tool-plugins/${encodeURIComponent(pluginId)}/status`;
-      await request(endpoint, { method: "PATCH", headers: pluginView.remote ? {} : { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: JSON.stringify({ status: changes.enabled === false ? "disabled" : "enabled" }) });
+      await request(endpoint, { method: "PATCH", headers: pluginView.remote ? {} : { "x-admin-confirm": "TRUSTED-LOCAL-PLUGIN" }, body: JSON.stringify({ status: changes.enabled === false ? "disabled" : "enabled",impactVersion:changes.impactVersion }) });
       toast(pluginView.remote ? "远程连接状态已即时生效" : "工具状态已保存，重启工作台后生效");
       await loadSkillRegistry();
       restoreToolControlFocus(pluginId, refocusAttr);
@@ -339,14 +371,6 @@ async function updateToolPlugin(pluginId, changes, control) {
       if (control) control.disabled = false;
     }
     return;
-  }
-  if (changes.enabled === false) {
-    const confirmed = await confirmAction(`停用工具 ${pluginId} 后，依赖其能力的技能将无法启动。是否继续？`, { confirmText: "停用工具" });
-    if (!confirmed) {
-      if (control?.matches("[type=checkbox]")) control.checked = true;
-      return;
-    }
-    changes.confirmDisable = true;
   }
   if (control) control.disabled = true;
   try {
@@ -374,15 +398,56 @@ async function testToolPlugin(pluginId, button) {
   }
 }
 
-async function loadToolHistory(capability) {
-  const result = await request(`/api/system/tool-executions?capability=${encodeURIComponent(capability)}&limit=50`);
-  const panel = document.getElementById("tool-execution-panel");
+function dynamicField(name, rule, value, required) {
+  const id=`extension-field-${name}`;const title=rule.title || name;const marker=required ? " *" : "";
+  let control;
+  if (Array.isArray(rule.enum)) control=`<select id="${id}" name="${escapeHtml(name)}">${rule.enum.map((item,index)=>`<option value="${escapeHtml(String(item))}" ${String(value ?? rule.default ?? "")===String(item)?"selected":""}>${escapeHtml(rule.enumNames?.[index] || String(item))}</option>`).join("")}</select>`;
+  else if (rule.type === "boolean") control=`<input id="${id}" name="${escapeHtml(name)}" type="checkbox" ${value===true?"checked":""}>`;
+  else if (rule.format === "textarea") control=`<textarea id="${id}" name="${escapeHtml(name)}" rows="4">${escapeHtml(String(value ?? ""))}</textarea>`;
+  else {
+    const type=rule.secret || rule.format === "password" ? "password" : rule.type === "number" || rule.type === "integer" ? "number" : rule.format === "url" ? "url" : "text";
+    const configured=value === "__configured__";control=`<input id="${id}" name="${escapeHtml(name)}" type="${type}" value="${configured?"":escapeHtml(String(value ?? ""))}" ${configured?'placeholder="已配置；留空保持不变"':""} ${rule.minimum!==undefined?`min="${rule.minimum}"`:""} ${rule.maximum!==undefined?`max="${rule.maximum}"`:""}>`;
+  }
+  return `<label class="extension-dynamic-field ${rule.format === "textarea" ? "wide" : ""}"><span>${escapeHtml(title)}${marker}</span>${control}${rule.description?`<small>${escapeHtml(rule.description)}</small>`:""}</label>`;
+}
+
+function readDynamicForm(form, schema) {
+  return Object.fromEntries(Object.entries(schema.properties || {}).map(([name,rule])=>{
+    const node=form.elements.namedItem(name);let value;
+    if(rule.type === "boolean")value=node.checked;
+    else if(rule.type === "integer")value=node.value===""?undefined:Number.parseInt(node.value,10);
+    else if(rule.type === "number")value=node.value===""?undefined:Number(node.value);
+    else if(rule.type === "array")value=String(node.value||"").split(/[,\n]/).map((item)=>item.trim()).filter(Boolean);
+    else value=node.value;
+    return [name,value];
+  }));
+}
+
+function renderExtensionConfigForm(form, type, id, state) {
+  if(!state.schema){form.innerHTML='<div class="kv-empty">该扩展没有动态配置。</div>';return;}
+  form.innerHTML=`${Object.entries(state.schema.properties || {}).map(([name,rule])=>dynamicField(name,rule,state.values?.[name],(state.schema.required||[]).includes(name))).join("")}
+    <div class="extension-dynamic-actions"><button type="submit" class="outline-button">保存配置</button><button type="button" class="ghost-button" data-extension-config-test>测试配置</button><span class="extension-config-status">${state.configured?"配置已就绪":"需要完成配置"}</span></div>`;
+  form.onsubmit=async(event)=>{event.preventDefault();const result=await request(`/api/system/${type === "skill" ? "skills" : "tool-plugins"}/${encodeURIComponent(id)}/configuration`,{method:"PUT",body:JSON.stringify(readDynamicForm(form,state.schema))});toast("扩展配置已保存");renderExtensionConfigForm(form,type,id,result);await loadSkillRegistry();};
+  form.querySelector("[data-extension-config-test]").onclick=async()=>{const result=await request(`/api/system/${type === "skill" ? "skills" : "tool-plugins"}/${encodeURIComponent(id)}/configuration/test`,{method:"POST",body:"{}"});toast(result.pass?"配置测试通过":"配置测试未通过");};
+}
+
+async function openExtensionConfig(type,id,state=null) {
+  const result=state || await request(`/api/system/${type === "skill" ? "skills" : "tool-plugins"}/${encodeURIComponent(id)}/configuration`);
+  const panel=document.getElementById(type === "skill" ? "skill-extension-config-panel" : "tool-extension-config-panel");
+  const form=document.getElementById(type === "skill" ? "skill-extension-config-form" : "tool-extension-config-form");
+  if(type === "tool")document.getElementById("tool-extension-config-title").textContent=`${id} · 扩展配置`;
+  panel.hidden=!result.schema;if(result.schema){renderExtensionConfigForm(form,type,id,result);panel.scrollIntoView({behavior:"smooth",block:"nearest"});}
+}
+
+async function loadToolHistory(plugin) {
+  const result = await request(`/api/system/tool-executions?plugin=${encodeURIComponent(plugin)}&limit=50`);
+  const panel = placeRuntimeDetail("tool-execution-panel","tool-capability-list");
   const list = document.getElementById("tool-execution-list");
-  document.getElementById("tool-execution-title").textContent = `${capability} · 执行历史`;
+  document.getElementById("tool-execution-title").textContent = `${plugin} · 工具执行历史`;
   list.innerHTML = result.items.length ? result.items.map((item) => `<article class="runtime-model-item">
-    <b>${escapeHtml(item.status)}${item.error_code ? ` · ${escapeHtml(item.error_code)}` : ""}</b>
+    <b>${escapeHtml(item.status)}${item.error_code ? ` · ${escapeHtml(item.error_code)}` : ""}${item.attempt>1?` · 第 ${item.attempt} 次尝试`:""}</b>
     <small>${new Date(item.finished_at || item.started_at).toLocaleString("zh-CN")} · ${item.duration_ms} ms</small>
-    <small>${escapeHtml(item.plugin || "未解析实现")} @ ${escapeHtml(item.plugin_version || "—")} · 技能 ${escapeHtml(item.skill_id || "未关联")}</small>
+    <small>${escapeHtml(item.plugin || "未解析实现")} @ ${escapeHtml(item.plugin_version || "—")} · 技能 ${escapeHtml(item.skill_id || "未关联")}${item.fallback_from?` · 从 ${escapeHtml(item.fallback_from)} 兜底`:""}</small>
     <small>参数：${escapeHtml((item.input_keys || []).join("、") || "无")}</small>
   </article>`).join("") : '<div class="kv-empty">尚无执行记录。</div>';
   panel.hidden = false;
@@ -407,11 +472,11 @@ function skillKindGroup(skill) {
 }
 
 function skillListItem(skill) {
+  const state=skill.manifestStatus === "invalid" ? "invalid" : skill.thirdParty ? "installed" : "builtin";
+  const label=state === "invalid" ? "清单无效" : state === "installed" ? "已安装" : "内置";
   return `<button type="button" class="skill-list-item ${skill.id === selectedSkillId ? "active" : ""}" data-skill-edit="${escapeHtml(skill.id)}" aria-pressed="${skill.id === selectedSkillId}">
-    <span class="skill-list-item-top"><b>${escapeHtml(skill.name || skill.id)}</b><em>${skill.manifestStatus === "invalid" ? "清单无效" : skill.kind || "stage"}</em></span>
-    <small>${escapeHtml(skill.id)} · 包 v${escapeHtml(skill.packageVersion || "legacy")} · ${skill.fileCount} 文件</small>
-    ${skill.description ? `<span>${escapeHtml(skill.description)}</span>` : ""}
-    <code title="${escapeHtml(skill.promptHash)}">${escapeHtml(skill.promptHash.slice(0, 20))}…</code>
+    <span class="skill-list-item-top"><span class="skill-list-symbol">${escapeHtml(String(skill.kind||"SK").slice(0,2).toUpperCase())}</span><span><b>${escapeHtml(skill.name || skill.id)}</b><small>${escapeHtml(skill.description || "创作流程能力")}</small></span><em class="${state}">${label}</em></span>
+    <span class="skill-list-meta"><code>${escapeHtml(skill.id)}</code><i>v${escapeHtml(skill.packageVersion || "legacy")}</i><i>${skill.fileCount} 文件</i></span>
   </button>`;
 }
 
@@ -480,6 +545,7 @@ async function openSkillConfig(id) {
   document.getElementById("skill-file-list").innerHTML = (data.files || []).map((file, index) => `<article class="runtime-model-item">
     <b>${index === 0 ? "主契约" : "关联规则"}</b><code>${escapeHtml(file)}</code>
   </article>`).join("") || '<div class="kv-empty">没有关联规则文件。</div>';
+  await openExtensionConfig("skill",id,data.extensionConfiguration);
 }
 
 export default async function loadSkillsView() {

@@ -1,8 +1,8 @@
-import { webSearch } from '../../lib/llm/web-search.mjs';
-import { failure, ok } from '../../lib/tools/schemas.mjs';
+import { webSearch } from './client.mjs';
+import { failure, ok } from '../shared/schemas.mjs';
 
 const NEWS_CAPABILITY = 'content.news.search';
-const MISSING_KEY_ACTION = '在 .env 或系统环境变量中配置 TAVILY_API_KEY';
+const MISSING_KEY_ACTION = '前往系统与配置中心完成 Tavily 搜索配置';
 
 function hostname(url) {
   try { return new URL(url).hostname; } catch { return ''; }
@@ -21,10 +21,11 @@ function mapResults(data) {
 }
 
 export async function execute(input, context) {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) return failure('DEPENDENCY_MISSING', 'TAVILY_API_KEY 未配置', { action: MISSING_KEY_ACTION });
+  const {apiKey='',enabled=true,maxResults:configuredMax=5}=context?.configuration||{};
+  if (!enabled) return failure('DEPENDENCY_MISSING','Tavily 搜索已停用',{action:MISSING_KEY_ACTION});
+  if (!apiKey) return failure('DEPENDENCY_MISSING', 'Tavily 搜索凭据未配置', { action: MISSING_KEY_ACTION });
   const isNews = context?.capability === NEWS_CAPABILITY;
-  const maxResults = Number.isInteger(input.maxResults) ? Math.min(Math.max(input.maxResults, 1), 10) : 5;
+  const maxResults = Number.isInteger(input.maxResults) ? Math.min(Math.max(input.maxResults, 1), 10) : configuredMax;
   try {
     const data = await webSearch(String(input.query), {
       apiKey,
@@ -59,9 +60,9 @@ export async function execute(input, context) {
   }
 }
 
-export async function health() {
-  if (!process.env.TAVILY_API_KEY) {
-    return failure('DEPENDENCY_MISSING', 'TAVILY_API_KEY 未配置', { action: MISSING_KEY_ACTION });
+export async function health(context={}) {
+  if (!context.configuration?.apiKey) {
+    return failure('DEPENDENCY_MISSING', 'Tavily 搜索凭据未配置', { action: MISSING_KEY_ACTION });
   }
   return ok({ available: true, provider: 'tavily', capabilities: ['content.web.search', NEWS_CAPABILITY] });
 }

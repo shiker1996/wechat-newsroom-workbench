@@ -1,4 +1,4 @@
-import { CdpClient, waitForReady } from './cdp-client.mjs';
+import { CdpClient, waitForReady } from '../_shared/cdp-client.mjs';
 
 async function getJson(url, options) {
   const response = await fetch(url, { signal: AbortSignal.timeout(5000), ...options });
@@ -72,7 +72,7 @@ export async function collectReddit(config, onProgress = () => {}, onSourceResul
     onProgress(`已连接 Reddit Chrome：${resolvedCdpUrl}`);
     target = await acquireTarget(resolvedCdpUrl);
   } catch (error) {
-    throw new Error(`无法连接专用 Chrome。请先运行 scripts/start-reddit-chrome.ps1 并在窗口中登录 Reddit。${error.message}`);
+    throw new Error(`无法连接 Reddit 专用 Chrome。可运行插件内 scripts/start-chrome.ps1 进行手动诊断。${error.message}`);
   }
   const client = new CdpClient(target.webSocketDebuggerUrl);
   await client.connect();

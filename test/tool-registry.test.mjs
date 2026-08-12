@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { getToolRegistry, PHASE_A_PLUGINS } from '../lib/tools/index.mjs';
 import { ToolRegistry } from '../lib/tools/registry.mjs';
-import { ok } from '../lib/tools/schemas.mjs';
+import { failure, ok } from '../lib/tools/schemas.mjs';
 import { readToolPluginSettings, writeToolPluginSetting } from '../lib/tools/settings.mjs';
 
 test('阶段 A 插件通过白名单加载并暴露稳定能力', async () => {
@@ -213,4 +213,19 @@ test('注册中心按管理设置排除停用实现并按优先级选择默认�
   assert.equal(registry.listCapabilities({includeDisabled:true}).find((item)=>item.plugin==='off').enabled,false);
   const preferred=registry.resolve('test.managed',{plugin:'low'});
   assert.equal(preferred.manifest.id,'low');
+});
+
+test('普通工具对可重试失败执行候选兜底并记录每次尝试',async()=>{
+  const records=[],manifest=(id)=>({id,version:'1.0.0',capabilities:['test.fallback'],riskLevel:'read-only',inputSchema:{type:'object'},outputSchema:{type:'object'}});
+  const registry=new ToolRegistry({settings:{primary:{priority:10},backup:{priority:1}}})
+    .register({manifest:manifest('primary'),adapter:{execute:async()=>failure('TIMEOUT','超时',{retryable:true})}})
+    .register({manifest:manifest('backup'),adapter:{execute:async()=>ok({provider:'backup'})}});
+  const result=await registry.execute('test.fallback',{}, {consumerId:'feature.test',executionLog:(record)=>records.push(record)});
+  assert.equal(result.status,'ok');assert.equal(result.provenance.plugin,'backup');assert.equal(result.provenance.attempt,2);assert.equal(records.length,2);assert.equal(records[1].fallbackFrom,'primary');assert.equal(records[0].resolutionId,records[1].resolutionId);
+});
+
+test('非法输入和权限错误不会切换到其他工具',async()=>{
+  let backupCalls=0;const manifest=(id)=>({id,version:'1.0.0',capabilities:['test.terminal'],riskLevel:'read-only',inputSchema:{type:'object',required:['query'],properties:{query:{type:'string'}}},outputSchema:{type:'object'}});
+  const registry=new ToolRegistry().register({manifest:manifest('primary'),adapter:{execute:async()=>ok({})}}).register({manifest:manifest('backup'),adapter:{execute:async()=>{backupCalls+=1;return ok({});}}});
+  const result=await registry.execute('test.terminal',{});assert.equal(result.error.code,'INVALID_INPUT');assert.equal(backupCalls,0);
 });

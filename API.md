@@ -1,5 +1,18 @@
 # API 接口文档
 
+## 能力依赖图（只读）
+
+- `GET /api/system/capability-graph`：返回技能、编码功能、采集源、能力和实现组成的统一依赖图，以及各能力的 `ready / degraded / blocked / unused` 状态。
+- `GET /api/system/tools/:id/status-impact`：模拟停用普通工具后的能力阻断、降级和剩余候选。
+- `GET /api/system/collectors/:id/status-impact`：模拟停用采集器后的采集源影响。
+
+阶段 1 的影响接口只读，不会修改工具状态。
+
+停用或卸载工具时，客户端必须先读取对应 `status-impact`，确认 `canDisable=true` 后将返回的 `impactVersion` 放入状态修改请求。服务端会重新计算影响：版本过期返回 `409 requiresImpactConfirmation`；断开必需能力返回 `409 blocked`。停用仅影响新任务，历史记录继续保留。
+
+- `GET /api/system/tool-invocations/:resolutionId`：按尝试顺序返回一次能力调用的首选实现、失败原因、兜底来源和最终实现。
+- `PUT /api/system/capability-routes/:capability`：设置统一能力首选实现，正文为 `{ "preferredImplementationId": "plugin-id" }`；传空值表示恢复自动选择。
+
 ## 概览
 
 | 页面（视图） | 加载模块 |
@@ -580,7 +593,7 @@ AI 规划配图占位
 → 模型中心
 
 ### POST /api/models/config
-新增或更新运行时模型配置。密钥写入 `.env`，非密钥参数写入本地配置；响应不回传密钥原文。
+旧模型配置兼容接口。新配置应使用统一配置资源接口；密钥写入隔离凭据 Profile，响应不回传密钥原文。
 → 模型中心
 
 ### DELETE /api/models/config/:provider
@@ -630,7 +643,6 @@ AI 规划配图占位
 清理采集缓存 { kind: 'github-cache' | 'source-cache' | 'all' } → { cleared: [{ kind, removed }] }；缓存随采集自动重建，不影响数据库与产物
 → 设置与数据（备份与恢复面板）
 
-### GET /api/system/settings
 读取可在 UI 中维护的应用 / RSSHub 环境变量和解析后的路径。敏感字段只返回 `configured`。
 
 ### PUT /api/system/settings
@@ -777,3 +789,76 @@ AI 规划配图占位
 - `GET /api/system/remote-tool-plugin-events`：读取安装、启停和卸载事件。
 
 远程连接仅允许 HTTPS，并实施域名、DNS、重定向、超时、响应大小和本地路径隔离策略。`external-write` 能力仍需每次工具调用明确授权。
+### GET|PUT /api/system/skills/:id/configuration
+
+读取或保存技能/工具 Manifest 声明的动态配置。普通字段写入 `extension_settings`，秘密字段只写入隔离凭据 Profile；读取接口仅返回秘密字段是否已配置。工具使用对应路径 `GET|PUT /api/system/tool-plugins/:id/configuration`。
+
+### POST /api/system/skills/:id/configuration/test
+
+校验当前动态配置是否完整。工具使用对应路径 `POST /api/system/tool-plugins/:id/configuration/test`，并继续执行插件健康检查。
+### GET /api/collector-plugins
+
+返回已注册的内置采集器 Manifest。阶段 0 仅提供协议与发现能力，`executionStatus: "legacy-active"` 表示生产采集仍走原有 `JobManager`。
+
+### GET /api/collection-sources
+
+返回 `collection_sources` 中的统一来源实例。阶段 0 会先从旧订阅配置幂等同步，旧 `/api/subscriptions` 响应和写入行为保持不变。
+
+内置 `declarative-web-page` 采集器支持公开静态 HTML 页面。来源配置使用声明式 CSS 子集（标签、类、ID、属性与后代选择器），可配置标题、链接、摘要、作者、时间及有限分页；不执行页面脚本。页面请求逐跳执行公网地址校验，并限制响应类型、大小和重定向次数。
+
+内置 `browser-web-page` 采集器支持客户端渲染页面及受控的点击、输入、等待动作。每个来源使用隔离 Profile，浏览器在受限环境的独立子进程运行并受父进程硬超时控制；页面导航和资源请求继续执行公网地址校验。登录识别元素命中时返回 `AUTH_REQUIRED`。
+
+### 可安装采集插件
+
+- `POST /api/system/collector-plugin-packages/validate`：校验本地或远程采集插件目录。
+- `POST /api/system/collector-plugin-packages/install`：安装已校验插件；需要受信管理确认头，初始状态为停用。
+- `PATCH /api/system/collector-plugins/:id/status`：启用或停用第三方采集插件。
+- `POST /api/system/collector-plugins/:id/first-run-confirm`：确认远程采集端点和权限摘要后允许首次真实执行。
+- `DELETE /api/system/collector-plugins/:id`：卸载插件；有关联来源时必须传 `confirmImpact:true`，来源记录始终保留。
+- `GET /api/system/collector-plugin-events`：查询安装、启停、确认和卸载审计事件。
+
+### GET /api/system/extension-configurations
+
+返回所有声明动态 `configuration` Schema 的技能、工具和采集器，以及配置状态和脱敏后的当前值，供运行与配置中心自动生成扩展配置目录。
+
+### GET /api/system/configuration/catalog
+
+返回统一配置资源目录。资源类型包括 `system`、`model-provider`、`tool`、`collector` 和 `skill`；响应只包含 Schema、配置状态及脱敏值。
+
+### GET|PUT /api/system/configuration/:type/:id
+
+通过统一资源标识读取或保存配置。秘密字段写入隔离凭据 Profile，不通过读取接口回显；既有技能、工具、采集器和模型专用接口在迁移期继续兼容。
+
+### POST /api/system/configuration/:type/:id/test
+
+校验指定统一配置资源的当前有效配置是否完整。阶段 1 只执行通用 Schema 完整性检查，具体工具和服务的连接测试由后续迁移阶段接入。
+
+### GET|PUT /api/system/collector-plugins/:id/configuration
+
+读取或保存采集插件的全局动态配置。普通字段进入 `extension_settings`，秘密字段进入隔离凭据 Profile。
+
+### POST /api/system/collector-plugins/:id/configuration/test
+
+校验采集插件全局配置是否完整；正式采集与单源测试使用同一份解析结果。
+
+### POST /api/collection-sources
+
+创建统一来源实例。当前支持 Reddit、RSSHub/X 和直连 Feed；服务端负责规范化稳定 `sourceKey` 和重复检查。
+
+### PATCH|DELETE /api/collection-sources/:id
+
+编辑、启停或删除来源实例。`managed=1` 的系统来源不允许删除或编辑。
+
+### POST /api/collection-sources/test
+
+保存前按 `pluginId + config` 测试来源。
+
+### POST /api/collection-sources/:id/test
+
+使用服务端已保存配置测试指定来源，并更新最近测试状态。
+### GET /api/system/configuration/migration-status
+
+返回统一配置资源迁移覆盖率、仍命中 legacy fallback 的资源与字段，以及是否达到停止兼容读取的安全条件。响应不包含秘密原值。
+### PATCH /api/system/collector-tools/:id
+
+更新采集工具的启用状态或优先级。停用操作受能力影响门禁保护。

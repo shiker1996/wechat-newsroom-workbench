@@ -38,7 +38,7 @@ test('search runs unconditionally; without API key it records notes instead of f
       assert.deepEqual(result.attached, []);
       assert.equal('web_search' in fact, false);
       assert.equal('news_search' in fact, false);
-      assert.ok(result.notes.some((item) => /TAVILY_API_KEY/.test(item)));
+      assert.ok(result.notes.some((item) => /Tavily.*凭据未配置/.test(item)));
       assert.ok(result.notes.some((item) => /不阻止创建/.test(item)));
       assert.ok(result.notes.some((item) => /未配置授权知识库目录|无可用实现/.test(item)));
       assert.deepEqual(fact.search_notes, result.notes);

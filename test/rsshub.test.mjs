@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterRecentItems, parseFeed, githubTrendingPeriod, normalizeGitHubTrendingItem } from '../collectors/rsshub.mjs';
+import { filterRecentItems, parseFeed, githubTrendingPeriod, normalizeGitHubTrendingItem } from '../plugins/collectors/rsshub/collector.mjs';
 
 test('解析 RSS 与 CDATA', () => {
   const xml = `<rss><channel><item><guid>x1</guid><title><![CDATA[AI &amp; 开源]]></title><link>https://example.com/a</link><pubDate>Sun, 19 Jul 2026 08:00:00 GMT</pubDate></item></channel></rss>`;
