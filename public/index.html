@@ -228,7 +228,13 @@
           <div class="editorial-reply"><textarea id="tutorial-chat-input" rows="2" placeholder="例如：把项目文件夹的绝对路径发给我，我就能写一篇这个工具的使用教程"></textarea><button type="button" class="ink-button" id="tutorial-chat-send">发送</button></div>
           <small>在对话中直接提供本地目录，AI 会自动调用只读项目工具；依赖目录、密钥、二进制和符号链接会被跳过，代码内容不等于已实际运行成功。</small>
         </section>
-        <div class="tutorial-project-reader" id="tutorial-project-reader"><label>本地项目目录（使用教程可选）<input name="localProjectPath" id="tutorial-local-project" placeholder="E:\projects\my-app"></label><button type="button" class="outline-button" id="tutorial-read-project">读取项目</button><span id="tutorial-project-status"></span></div>
+        <section class="tutorial-project-reader" id="tutorial-project-reader" aria-labelledby="tutorial-project-title">
+          <div class="tutorial-project-icon" aria-hidden="true"><span>⌁</span><small>LOCAL</small></div>
+          <div class="tutorial-project-copy"><span class="kicker">OPTIONAL PROJECT CONTEXT</span><h4 id="tutorial-project-title">导入本地项目素材</h4><p>写使用教程时，可读取 README、配置和代码结构，让 AI 更准确地理解安装步骤与实际环境。</p></div>
+          <span class="tutorial-project-badge">可选</span>
+          <label class="tutorial-project-path"><span>项目文件夹绝对路径</span><div><input name="localProjectPath" id="tutorial-local-project" placeholder="例如 E:\projects\my-app" autocomplete="off" spellcheck="false"><button type="button" class="primary-button" id="tutorial-read-project"><span>读取项目</span><i aria-hidden="true">→</i></button></div><small>仅只读支持的文本文件；自动跳过依赖、密钥、二进制文件和符号链接。</small></label>
+          <output id="tutorial-project-status" class="tutorial-project-status" aria-live="polite"><i aria-hidden="true">○</i><span>尚未读取，不影响继续对话或填写表单。</span></output>
+        </section>
         <details class="editorial-decision-details" id="tutorial-form-details">
           <summary><span><b>自主写作事实表单</b><small id="tutorial-form-progress">等待 AI 补齐主题、读者与核心素材</small></span><span class="decision-detail-state">收起 / 展开</span></summary>
           <div class="editorial-decision-body">

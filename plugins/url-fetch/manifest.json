@@ -5,6 +5,9 @@
   "capabilities": [
     "content.url.fetch"
   ],
+  "optionalCapabilities": [
+    "content.repository.inspect"
+  ],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",
   "pathInputs": [
@@ -62,12 +65,6 @@
       "apiKey": {
         "type": "string",
         "title": "Firecrawl API Key",
-        "secret": true,
-        "format": "password"
-      },
-      "githubToken": {
-        "type": "string",
-        "title": "GitHub Token",
         "secret": true,
         "format": "password"
       },

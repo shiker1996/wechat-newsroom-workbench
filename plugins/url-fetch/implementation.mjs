@@ -2,15 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { firecrawlScrape } from './firecrawl-client.mjs';
-import { inspectRepository } from '../repository-inspector/implementation.mjs';
 import { assessSourceQuality, FETCH_UPGRADE_THRESHOLD } from './source-quality.mjs';
 
 const execFileAsync=promisify(execFile);
 
 function pythonCandidates() {
-  const bundled=process.env.USERPROFILE?path.join(process.env.USERPROFILE,'.cache','codex-runtimes','codex-primary-runtime','dependencies','python','python.exe'):'';
-  return [process.env.WRITE_ASSISTANT_PYTHON,bundled&&fs.existsSync(bundled)?bundled:null,'py','python','python3'].filter(Boolean)
+  return [process.env.WRITE_ASSISTANT_PYTHON,'py','python','python3'].filter(Boolean)
     .map((command)=>({command,args:command==='py'?['-3','-X','utf8']:['-X','utf8']}));
 }
 
@@ -56,9 +55,9 @@ const GITHUB_REPO_RE=/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/
 // 阈值由插件提供默认值，调用方可通过 sourceFetch 配置覆盖。
 const SOURCE_FETCH_DEFAULTS = { upgradeThreshold: FETCH_UPGRADE_THRESHOLD, rssContentMinChars: 800, rssFallbackMinChars: 200, githubMinChars: 200 };
 
-export async function fetchUrlContentImplementation({targetUrl,title='',root,hotspot=null,firecrawlImpl=firecrawlScrape,firecrawlOptions={},inspectImpl=inspectRepository,repositoryOptions={},pythonImpl=null,sourceFetch={}}) {
+export async function fetchUrlContentImplementation({targetUrl,title='',root,hotspot=null,firecrawlImpl=firecrawlScrape,firecrawlOptions={},inspectImpl=null,repositoryOptions={},pythonImpl=null,sourceFetch={}}) {
   const cfg={...SOURCE_FETCH_DEFAULTS,...sourceFetch};
-  const script=path.join(root,'scripts','fetch-hotspot-url.py');
+  const script=fileURLToPath(new URL('./scripts/fetch-hotspot-url.py',import.meta.url));
   const provider=String(sourceFetch.provider||process.env.SOURCE_FETCH_PROVIDER||'auto').toLowerCase();
   const summary=hotspotSummary(hotspot);
 
@@ -72,7 +71,7 @@ export async function fetchUrlContentImplementation({targetUrl,title='',root,hot
   }
 
   // 路由 2：GitHub 仓库走 API + README，不消耗 Firecrawl
-  if(provider!=='firecrawl'&&GITHUB_REPO_RE.test(targetUrl)){
+  if(provider!=='firecrawl'&&inspectImpl&&GITHUB_REPO_RE.test(targetUrl)){
     try {
       const facts=await inspectImpl(targetUrl,{cacheDir:path.join(root,'data','github-cache'),...repositoryOptions});
       const content=facts.readme?.markdown||facts.description||'';

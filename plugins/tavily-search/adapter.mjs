@@ -1,5 +1,5 @@
 import { webSearch } from './client.mjs';
-import { failure, ok } from '../shared/schemas.mjs';
+const fallback={ok:(data={},extras={})=>({status:'ok',data,artifacts:[],provenance:{},warnings:[],metrics:{durationMs:0},...extras}),failure:(code,message,options={})=>({status:'error',error:{code,message:String(message),retryable:Boolean(options.retryable),...(options.action?{action:options.action}:{})}})};
 
 const NEWS_CAPABILITY = 'content.news.search';
 const MISSING_KEY_ACTION = '前往系统与配置中心完成 Tavily 搜索配置';
@@ -21,6 +21,7 @@ function mapResults(data) {
 }
 
 export async function execute(input, context) {
+  const {failure,ok}=context?.result||fallback;
   const {apiKey='',enabled=true,maxResults:configuredMax=5}=context?.configuration||{};
   if (!enabled) return failure('DEPENDENCY_MISSING','Tavily 搜索已停用',{action:MISSING_KEY_ACTION});
   if (!apiKey) return failure('DEPENDENCY_MISSING', 'Tavily 搜索凭据未配置', { action: MISSING_KEY_ACTION });
@@ -61,6 +62,7 @@ export async function execute(input, context) {
 }
 
 export async function health(context={}) {
+  const {failure,ok}=context.result||fallback;
   if (!context.configuration?.apiKey) {
     return failure('DEPENDENCY_MISSING', 'Tavily 搜索凭据未配置', { action: MISSING_KEY_ACTION });
   }

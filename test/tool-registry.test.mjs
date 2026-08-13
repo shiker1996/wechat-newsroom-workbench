@@ -229,3 +229,23 @@ test('非法输入和权限错误不会切换到其他工具',async()=>{
   const registry=new ToolRegistry().register({manifest:manifest('primary'),adapter:{execute:async()=>ok({})}}).register({manifest:manifest('backup'),adapter:{execute:async()=>{backupCalls+=1;return ok({});}}});
   const result=await registry.execute('test.terminal',{});assert.equal(result.error.code,'INVALID_INPUT');assert.equal(backupCalls,0);
 });
+
+test('plugin capability context invokes child implementation with an auditable consumer', async () => {
+  const records=[];const schema={type:'object'};
+  const registry=new ToolRegistry()
+    .register({manifest:{id:'parent',version:'1.0.0',capabilities:['test.parent'],optionalCapabilities:['test.child'],riskLevel:'read-only',inputSchema:schema,outputSchema:schema},adapter:{execute:async(_input,context)=>{const child=await context.capabilities.invoke('test.child',{value:'x'});return ok({child:child.data.value});}}})
+    .register({manifest:{id:'child',version:'1.0.0',capabilities:['test.child'],riskLevel:'read-only',inputSchema:schema,outputSchema:schema},adapter:{execute:async(input)=>ok(input)}});
+  const result=await registry.execute('test.parent',{}, {consumerId:'feature.root',executionLog:(record)=>records.push(record)});
+  assert.equal(result.status,'ok');assert.equal(result.data.child,'x');
+  assert.equal(records.find((record)=>record.capability==='test.child').consumerId,'parent');
+});
+
+test('required capability blocks resolution while optional capability permits degradation', () => {
+  const schema={type:'object'},adapter={execute:async()=>ok({})};
+  const registry=new ToolRegistry()
+    .register({manifest:{id:'required',version:'1.0.0',capabilities:['test.required'],requiredCapabilities:['test.missing'],riskLevel:'read-only',inputSchema:schema,outputSchema:schema},adapter})
+    .register({manifest:{id:'optional',version:'1.0.0',capabilities:['test.optional'],optionalCapabilities:['test.missing'],riskLevel:'read-only',inputSchema:schema,outputSchema:schema},adapter});
+  assert.equal(registry.resolve('test.required'),null);
+  assert.equal(registry.listPlugins().find((item)=>item.id==='required').available,false);
+  assert.equal(registry.resolve('test.optional').manifest.id,'optional');
+});

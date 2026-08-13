@@ -22,7 +22,8 @@ social-cards/
 
 # Chrome / browser profiles
 data/reddit-chrome-profile/
-plugins/collectors/reddit/data/
+plugins/reddit/data/
+data/plugin-runtime/
 
 # Temp / scratch scripts
 check_btick.mjs

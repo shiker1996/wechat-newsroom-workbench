@@ -13,6 +13,8 @@ test('插件管理 API 具备变更确认、即时重载和单项检查',()=>{
   assert.match(routes,/impactVersion/);
   assert.match(routes,/writeToolPluginSetting/);
   assert.match(routes,/await reloadToolRegistry\(\)/);
+  assert.match(routes,/const result=uninstallToolPlugin\(root,pluginId\);\s*await reloadToolRegistry\(\)/);
+  assert.match(routes,/pluginCatalog\.plugins\[item\.plugin\]\?\.status!==['"]uninstalled['"]/);
   assert.match(routes,/toolPluginTestMatch/);
 });
 

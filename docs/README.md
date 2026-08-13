@@ -18,9 +18,13 @@
 | [release.md](./release.md) | 发布、升级、降级、备份恢复流程 |
 | [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线 |
 | [configuration.md](./configuration.md) | 配置项参考：`.env`、`config.local.json`、`account-context.json`（含选题评分）、技能覆盖层 |
+| [user-guide.md](./user-guide.md) | 面向使用者的完整手册：安装、配置、采集、选题、成稿、图文、自主写作、备份与排障 |
+| [plugin-development.md](./plugin-development.md) | 技能包、工具插件和采集器插件的 Manifest、Adapter、安全与发布指南 |
 | [configuration-migration-and-system-center-redesign.md](./configuration-migration-and-system-center-redesign.md) | 旧配置迁移、统一配置资源模型与系统配置中心重构实施方案 |
 | [configuration-migration-inventory.json](./configuration-migration-inventory.json) | 阶段 0 旧配置字段、秘密属性、消费点和迁移目标机器清单 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
+| [ai-assisted-web-source-configuration-plan.md](./ai-assisted-web-source-configuration-plan.md) | 网页自动采集的静态优先、动态降级、AI 排序和字段复验方案（Phase 0–3 已实施） |
+| [collector-plugin-architecture-plan.md](./collector-plugin-architecture-plan.md) | 采集插件、统一来源服务和动态配置架构（核心阶段已实施） |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |
 
 ## 历史决策
@@ -43,8 +47,8 @@
 
 | 文档 | 内容 |
 |---|---|
+| [plugin-boundary-convergence-plan.md](./plugin-boundary-convergence-plan.md) | 插件独立安装边界、跨插件依赖收敛、Plugin SDK 与分阶段实施方案（Phase 0–1 已完成） |
 | [tool-call-chain-and-dependency-refactor.md](./tool-call-chain-and-dependency-refactor.md) | 工具调用链、统一能力依赖图、停用影响门禁、执行兜底与可视化重构方案 |
-| [collector-plugin-architecture-plan.md](./collector-plugin-architecture-plan.md) | 技能/工具动态配置、多字段凭据、采集插件化、Reddit 订阅源与声明式网页采集的架构及迁移方案 |
 | [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
 | [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |
 | [optional-feature-todos.md](./optional-feature-todos.md) | 可选功能扩展 TODO（各事项独立状态） |

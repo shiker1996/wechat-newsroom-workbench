@@ -11,7 +11,7 @@ import { Store } from './lib/core/store.mjs';
 import { loadConfig } from './lib/core/config.mjs';
 import { isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
 import { JobManager } from './lib/jobs/job-manager.mjs';
-import { ensureStarted } from './plugins/collectors/rsshub/collector.mjs';
+import { ensureStarted } from './plugins/rsshub/collector.mjs';
 import { ModelGateway } from './lib/llm/gateway.mjs';
 import { draftArticle } from './lib/llm/tasks.mjs';
 import { AiJobManager } from './lib/llm/ai-job-manager.mjs';

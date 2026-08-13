@@ -1,4 +1,3 @@
-import { requestGitHubJson } from '../shared/github-client.mjs';
 import { parseRepositoryUrl } from './repository-url.mjs';
 
 // capability-call: content.repository.inspect
@@ -36,7 +35,9 @@ function extractReadmeKnowledge(readme='') {
   return {readmeMarkdown:normalized.slice(0,18000),readmeSections:useful,capabilities};
 }
 
-export async function inspectRepository(sourceUrl,{fetchImpl=fetch,token=process.env.GITHUB_ACCESS_TOKEN,cacheDir=null}={}) {
+export async function inspectRepository(sourceUrl,{fetchImpl=fetch,token=process.env.GITHUB_ACCESS_TOKEN,cacheDir=null,requestGitHubJson}={}) {
+  requestGitHubJson ||= async(apiPath,options={})=>{const response=await fetchImpl(`https://api.github.com${apiPath}`,options);if(!response.ok){if(options.optional&&response.status===404)return null;throw new Error(`GitHub API ${response.status}`);}return response.json();};
+  if(typeof requestGitHubJson!=='function')throw new Error('GitHub 宿主服务未注入');
   const parsed=parseRepositoryUrl(sourceUrl); if(!parsed)throw new Error('候选来源不是有效的 GitHub 仓库地址');
   const get=(apiPath,options={})=>requestGitHubJson(apiPath,{fetchImpl,token,cacheDir,...options});
   const base=`/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`;

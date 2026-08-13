@@ -1,5 +1,7 @@
 # 扩展开发：技能包与工具插件
 
+> 本文保留扩展类型的快速索引。包含采集器插件、完整 Manifest 字段、Adapter 示例、配置 Schema、安全检查和发布流程的最新版指南见 [plugin-development.md](./plugin-development.md)。
+
 工作台支持三类扩展，均有最小可运行示例（可直接用校验命令验证），统一遵循 [CHANGELOG.md](../CHANGELOG.md)「兼容政策」一节：以 `schemaVersion`（当前均为 1）与 `compatibleApp`（ semver 下限，如 `>=0.1.0`）判定兼容，不兼容在安装时明确报错，不静默加载。
 
 | 类型 | 示例 | 校验命令 | 安装方式 |

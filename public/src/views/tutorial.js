@@ -150,6 +150,13 @@ function updateProgress() {
   updateWritingSteps(writingGenerating || writingCompleted || ready ? 3 : 2);
 }
 
+function setProjectStatus(message, tone = "idle") {
+  const output = document.getElementById("tutorial-project-status");
+  const symbols = { idle: "○", loading: "↻", success: "✓", error: "!" };
+  output.className = `tutorial-project-status ${tone}`;
+  output.innerHTML = `<i aria-hidden="true">${symbols[tone] || symbols.idle}</i><span>${escapeHtml(message)}</span>`;
+}
+
 function updateTutorialSkillSummary(){
   const summary=document.getElementById("tutorial-skill-summary");
   if(!summary)return;
@@ -229,9 +236,9 @@ async function sendChat() {
   applyUpdates(result.formUpdates);
   if (result.project) {
     field("localProjectPath").value = result.project.root;
-    document.getElementById("tutorial-project-status").textContent = `${result.project.summary}${result.project.truncated ? "（已截断）" : ""}`;
+    setProjectStatus(`${result.project.summary}${result.project.truncated ? "（内容较多，已截断）" : ""}`, "success");
   } else if (result.projectReadError) {
-    document.getElementById("tutorial-project-status").textContent = `读取失败：${result.projectReadError}`;
+    setProjectStatus(`读取失败：${result.projectReadError}`, "error");
   }
   if (answer) history.push({ role: "user", content: answer });
   history.push({ role: "assistant", content: result.reply });
@@ -240,9 +247,16 @@ async function sendChat() {
 
 async function inspectProject() {
   const projectPath = field("localProjectPath").value.trim();
-  const result = await request("/api/tools/local-project/read", { method: "POST", body: JSON.stringify({ path: projectPath }) });
-  document.getElementById("tutorial-project-status").textContent = `${result.summary}${result.truncated ? "（已截断）" : ""}`;
-  toast("本地项目已读取，发送消息后 AI 会据此填写教程表单");
+  if (!projectPath) { setProjectStatus("请先填写项目文件夹的绝对路径。", "error"); field("localProjectPath").focus(); return; }
+  setProjectStatus("正在读取项目结构与支持的文本文件…", "loading");
+  try {
+    const result = await request("/api/tools/local-project/read", { method: "POST", body: JSON.stringify({ path: projectPath }) });
+    setProjectStatus(`${result.summary}${result.truncated ? "（内容较多，已截断）" : ""}`, "success");
+    toast("项目素材已就绪，AI 将在后续对话中使用");
+  } catch (error) {
+    setProjectStatus(`读取失败：${error.message}`, "error");
+    throw error;
+  }
 }
 
 async function poll(id) {
@@ -345,6 +359,7 @@ function bind() {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.getElementById("tutorial-chat-send").click(); }
   });
   document.getElementById("tutorial-read-project").addEventListener("click", () => withLoading(document.getElementById("tutorial-read-project"), "读取中…", () => inspectProject().catch((error) => { toast(error.message); throw error; })));
+  document.getElementById("tutorial-local-project").addEventListener("input", (event) => { if (!event.currentTarget.value.trim()) setProjectStatus("尚未读取，不影响继续对话或填写表单。", "idle"); });
   document.querySelectorAll("[data-writing-mode]").forEach((button) => button.addEventListener("click", () => {
     field("articleMode").value = button.dataset.writingMode;
     syncMode();

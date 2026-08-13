@@ -1,5 +1,7 @@
 # API 接口文档
 
+> 当前版本：0.5.x。本文是本地 REST/NDJSON 接口的完整路由参考，并由 `test/api-docs-routes.test.mjs` 与代码双向校验。面向用户的操作流程见 [详细使用手册](./docs/user-guide.md)，扩展契约见 [插件开发指南](./docs/plugin-development.md)。
+
 ## 能力依赖图（只读）
 
 - `GET /api/system/capability-graph`：返回技能、编码功能、采集源、能力和实现组成的统一依赖图，以及各能力的 `ready / degraded / blocked / unused` 状态。
@@ -814,6 +816,8 @@ AI 规划配图占位
 - `POST /api/system/collector-plugin-packages/install`：安装已校验插件；需要受信管理确认头，初始状态为停用。
 - `PATCH /api/system/collector-plugins/:id/status`：启用或停用第三方采集插件。
 - `POST /api/system/collector-plugins/:id/first-run-confirm`：确认远程采集端点和权限摘要后允许首次真实执行。
+- `GET /api/system/collector-plugins/:id/versions`：列出升级时归档的可回滚历史版本。
+- `POST /api/system/collector-plugins/:id/rollback`：回滚到指定归档版本并保持停用，等待人工确认后重新启用；需要管理员确认头。
 - `DELETE /api/system/collector-plugins/:id`：卸载插件；有关联来源时必须传 `confirmImpact:true`，来源记录始终保留。
 - `GET /api/system/collector-plugin-events`：查询安装、启停、确认和卸载审计事件。
 
@@ -855,6 +859,17 @@ AI 规划配图占位
 
 ### POST /api/collection-sources/assist
 
+分析网页中的重复内容结构，返回最多 3 组经过真实提取验证的候选。静态 HTML 没有列表时自动使用隔离浏览器进行无点击动态渲染，并通过 `targetPluginId` 指示前端使用静态或动态采集器。可选 `intent` 用于多个候选的 AI 语义排序；摘要、作者、日期只从确定性白名单中选择，并在二次提取达到填充率门槛后返回。只分析公开 HTTP/HTTPS 页面，不保存或启用来源。
+
+```json
+{
+  "pluginId": "declarative-web-page",
+  "url": "https://example.com/news",
+  "intent": "采集页面中的主新闻列表"
+}
+```
+
+响应中的 `page.mode` 为 `static` 或 `dynamic`；`targetPluginId` 为实际应保存的底层插件；`candidates[].config` 可直接提交到来源测试接口，`preview` 用于人工确认。AI 不可用或输出无效时仍返回确定性候选。
 分析静态网页中的重复内容结构，返回最多 3 组已经过真实提取验证的声明式采集候选。静态 HTML 没有列表时自动使用隔离浏览器进行一次无点击动态渲染分析，并通过 `targetPluginId` 指示前端切换采集器。请求体为 `{ pluginId: "declarative-web-page", url }`；只分析公开 HTTP/HTTPS 页面，不保存或启用采集源。
 
 ### POST /api/collection-sources/:id/test

@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { loadPluginManifests } from '../lib/tools/manifest-loader.mjs';
 import {
-  installToolPlugin, listToolPluginInstallEvents, listToolPluginVersions, readToolPluginCatalog,
+  acknowledgeToolPluginRestarts, installToolPlugin, listToolPluginInstallEvents, listToolPluginVersions, readToolPluginCatalog,
   rollbackToolPlugin, setInstalledToolPluginStatus, uninstallToolPlugin, validateToolPluginDirectory,
 } from '../lib/tools/package-manager.mjs';
 
@@ -33,7 +33,11 @@ test('trusted local plugin lifecycle preserves versions and requires explicit en
     const installed=installToolPlugin({workspaceRoot:root,directory:source,builtinIds:[]});
     assert.equal(installed.status,'disabled');
     assert.equal(installed.restartRequired,true);
+    acknowledgeToolPluginRestarts(root,{pluginIds:['trusted-demo'],processStartedAt:Date.now()+1000});
+    assert.equal(readToolPluginCatalog(root).plugins['trusted-demo'].restartRequired,false);
     setInstalledToolPluginStatus(root,'trusted-demo','enabled');
+    acknowledgeToolPluginRestarts(root,{pluginIds:['trusted-demo'],processStartedAt:0});
+    assert.equal(readToolPluginCatalog(root).plugins['trusted-demo'].restartRequired,true);
     const activeRoot=path.join(root,'data','installed-tool-plugins');
     const loaded=await loadPluginManifests({pluginsRoot:activeRoot,allowlist:['trusted-demo']});
     assert.equal(loaded[0].manifest.source.type,'reviewed-package');
@@ -59,5 +63,17 @@ test('plugin validation rejects built-in collisions, escaping imports and incomp
     manifest.compatibleApp='>=9.0.0';
     fs.writeFileSync(path.join(incompatible,'manifest.json'),JSON.stringify(manifest),'utf8');
     assert.throws(()=>validateToolPluginDirectory(incompatible),/当前工作台/);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('tool plugin validation rejects project scripts and user Codex Skill paths',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'tool-plugin-boundary-'));
+  try{
+    const projectScript=fixture(root,{id:'project-script-demo'});
+    fs.writeFileSync(path.join(projectScript,'adapter.mjs'),"import path from 'node:path'; const script=path.join(root,'scripts','run.py'); export async function execute(){return {status:'ok',data:{script}}}",'utf8');
+    assert.throws(()=>validateToolPluginDirectory(projectScript),/禁止引用项目 skills\/scripts/);
+    const userSkill=fixture(root,{id:'user-skill-demo'});
+    fs.writeFileSync(path.join(userSkill,'adapter.mjs'),"const root=process.env.USERPROFILE+'/.codex/skills/demo'; export async function execute(){return {status:'ok',data:{root}}}",'utf8');
+    assert.throws(()=>validateToolPluginDirectory(userSkill),/禁止依赖用户目录/);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
