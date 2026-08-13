@@ -868,6 +868,7 @@ AI 规划配图占位
 ```
 
 响应中的 `page.mode` 为 `static` 或 `dynamic`；`targetPluginId` 为实际应保存的底层插件；`candidates[].config` 可直接提交到来源测试接口，`preview` 用于人工确认。AI 不可用或输出无效时仍返回确定性候选。
+分析静态网页中的重复内容结构，返回最多 3 组已经过真实提取验证的声明式采集候选。静态 HTML 没有列表时自动使用隔离浏览器进行一次无点击动态渲染分析，并通过 `targetPluginId` 指示前端切换采集器。请求体为 `{ pluginId: "declarative-web-page", url }`；只分析公开 HTTP/HTTPS 页面，不保存或启用采集源。
 
 ### POST /api/collection-sources/:id/test
 
