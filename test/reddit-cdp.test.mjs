@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { cdpCandidates } from '../plugins/collectors/reddit/collector.mjs';
-import { ensureRedditBrowser, releaseRedditBrowser } from '../plugins/collectors/reddit/browser-lifecycle.mjs';
+import { ensureRedditBrowser, releaseRedditBrowser, redditBrowserOptions } from '../plugins/collectors/reddit/browser-lifecycle.mjs';
 
 test('Reddit CDP loopback fallback includes localhost for modern Chrome Host validation', () => {
   assert.deepEqual(cdpCandidates('http://127.0.0.1:9222'), [
@@ -20,6 +20,13 @@ test('Reddit Chrome launcher waits for IPv4 CDP readiness without PowerShell loc
   assert.match(script, /Arguments = "--remote-debugging-port=\$Port/);
   assert.match(script, /CDP did not become ready/);
   assert.doesNotMatch(script, /Start-Process "https:\/\/old\.reddit\.com/);
+});
+
+test('手动启动和批次采集默认使用同一个 Reddit Profile', () => {
+  const script = fs.readFileSync(new URL('../plugins/collectors/reddit/scripts/start-chrome.ps1', import.meta.url), 'utf8');
+  const options = redditBrowserOptions({ cdpUrl: 'http://localhost:9333' });
+  assert.match(script, /data\\reddit-chrome-profile/);
+  assert.match(options.profilePath, /data[\\/]reddit-chrome-profile$/);
 });
 
 test('Reddit Chrome stopper falls back to the dedicated listening port when CIM is unavailable', () => {

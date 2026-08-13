@@ -853,6 +853,10 @@ AI 规划配图占位
 
 保存前按 `pluginId + config` 测试来源。
 
+### POST /api/collection-sources/assist
+
+分析静态网页中的重复内容结构，返回最多 3 组已经过真实提取验证的声明式采集候选。静态 HTML 没有列表时自动使用隔离浏览器进行一次无点击动态渲染分析，并通过 `targetPluginId` 指示前端切换采集器。请求体为 `{ pluginId: "declarative-web-page", url }`；只分析公开 HTTP/HTTPS 页面，不保存或启用采集源。
+
 ### POST /api/collection-sources/:id/test
 
 使用服务端已保存配置测试指定来源，并更新最近测试状态。
