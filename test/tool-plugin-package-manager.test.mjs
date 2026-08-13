@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { loadPluginManifests } from '../lib/tools/manifest-loader.mjs';
 import {
-  installToolPlugin, listToolPluginInstallEvents, listToolPluginVersions, readToolPluginCatalog,
+  acknowledgeToolPluginRestarts, installToolPlugin, listToolPluginInstallEvents, listToolPluginVersions, readToolPluginCatalog,
   rollbackToolPlugin, setInstalledToolPluginStatus, uninstallToolPlugin, validateToolPluginDirectory,
 } from '../lib/tools/package-manager.mjs';
 
@@ -33,7 +33,11 @@ test('trusted local plugin lifecycle preserves versions and requires explicit en
     const installed=installToolPlugin({workspaceRoot:root,directory:source,builtinIds:[]});
     assert.equal(installed.status,'disabled');
     assert.equal(installed.restartRequired,true);
+    acknowledgeToolPluginRestarts(root,{pluginIds:['trusted-demo'],processStartedAt:Date.now()+1000});
+    assert.equal(readToolPluginCatalog(root).plugins['trusted-demo'].restartRequired,false);
     setInstalledToolPluginStatus(root,'trusted-demo','enabled');
+    acknowledgeToolPluginRestarts(root,{pluginIds:['trusted-demo'],processStartedAt:0});
+    assert.equal(readToolPluginCatalog(root).plugins['trusted-demo'].restartRequired,true);
     const activeRoot=path.join(root,'data','installed-tool-plugins');
     const loaded=await loadPluginManifests({pluginsRoot:activeRoot,allowlist:['trusted-demo']});
     assert.equal(loaded[0].manifest.source.type,'reviewed-package');

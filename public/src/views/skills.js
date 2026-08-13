@@ -125,17 +125,20 @@ async function loadSkillRegistry() {
     toolList.innerHTML = runtimeTools.length ? runtimeTools.map((tool) => {
       const checked = Boolean(tool.health);
       const healthy = checked && tool.health.status === "ok" && tool.health.data?.available !== false;
-      const status = !tool.enabled ? "已停用" : checked ? (healthy ? "可用" : "不可用") : "待检查";
-      const detail = !tool.enabled ? "不会参与新任务的能力解析" : checked ? (healthy ? "依赖正常" : (tool.health.error?.message || "依赖不可用")) : "服务尚未返回健康检查结果，请重启工作台服务后刷新";
+      const pendingRestart = Boolean(tool.restartRequired);
+      const status = pendingRestart ? "待重启" : !tool.enabled ? "已停用" : checked ? (healthy ? "可用" : "不可用") : "待检查";
+      const detail = pendingRestart
+        ? (tool.enabled ? "重启工作台后启用并加载此工具" : "重启工作台后完成停用或安装状态更新")
+        : !tool.enabled ? "不会参与新任务的能力解析" : checked ? (healthy ? "依赖正常" : (tool.health.error?.message || "依赖不可用")) : "服务尚未返回健康检查结果";
       const recent = tool.recentExecution;
       const audit = recent ? `最近执行：${recent.status} · ${new Date(recent.finished_at || recent.started_at).toLocaleString("zh-CN")}${recent.error_code ? ` · ${recent.error_code}` : ""}` : "尚无执行记录";
       const permissionSummary = tool.thirdParty ? `来源：${tool.source?.type || "未声明"} ${tool.source?.url || ""} · 兼容 ${tool.compatibleApp || "未声明"} · 完整性 ${tool.contentHash || "未记录"} · 网络域名 ${(tool.permissions?.networkDomains || []).join("、") || "无"} · 路径 ${(tool.permissions?.pathAccess || []).join("、") || "无"} · 外部写入 ${tool.permissions?.externalWrite ? "是" : "否"}${tool.remote ? ` · 端点 ${tool.endpointHost || "未声明"} · 首次执行 ${tool.firstRunConfirmedAt ? "已确认" : "待确认"}` : ""}` : "内置受信实现";
       const disableState=implementationDisableState('tool',tool.plugin),disableBlocked=tool.enabled&&!disableState.canDisable;
       return `<article class="runtime-model-item tool-plugin-item ${tool.enabled ? "" : "disabled"}">
-        <div class="tool-plugin-title"><div><b>${escapeHtml(tool.name||tool.plugin)}</b><small>${escapeHtml(tool.plugin)} · 信息工具 · ${escapeHtml(tool.version)} · ${escapeHtml(tool.riskLevel)}</small></div></div>
+        <div class="tool-plugin-title"><div><b>${escapeHtml(tool.name||tool.plugin)}</b><small>${tool.thirdParty ? "第三方本地工具" : "内置工具"} · ${escapeHtml(tool.plugin)} · ${escapeHtml(tool.version)} · ${escapeHtml(tool.riskLevel)}</small></div><em class="tool-state-badge ${pendingRestart ? "pending" : healthy ? "ready" : "muted"}">${escapeHtml(status)}</em></div>
         <div class="tool-provided-capabilities"><small>提供能力</small><div>${tool.capabilities.map((capability)=>`<code>${escapeHtml(capability)}</code>`).join('')}</div></div>
         <small>${escapeHtml(detail)}</small><small>${escapeHtml(audit)}</small>
-        <small>${escapeHtml(permissionSummary)}${tool.restartRequired ? " · 需要重启" : ""}</small>
+        <small>${escapeHtml(permissionSummary)}</small>
         <div class="tool-plugin-controls">
           <div class="tool-runtime-settings"><label class="tool-plugin-toggle ${disableBlocked?'disable-blocked':''}" title="${disableBlocked?`停用会阻断：${escapeHtml(disableState.blocking.map((item)=>item.id).join('、'))}`:'启用或停用工具'}"><input type="checkbox" data-tool-enabled="${escapeHtml(tool.plugin)}" ${tool.enabled ? "checked" : ""} ${disableBlocked?'disabled':''}><span>${disableBlocked?'必需能力唯一实现':'启用工具'}</span></label><label class="tool-priority-control"><span>优先级</span><input type="number" min="-100" max="100" value="${Number(tool.priority) || 0}" data-tool-priority="${escapeHtml(tool.plugin)}"></label></div>
           <div class="tool-runtime-actions"><button type="button" class="ghost-button" data-tool-test="${escapeHtml(tool.plugin)}">检查依赖</button>${tool.configuration ? `<button type="button" class="ghost-button action-config" data-tool-config="${escapeHtml(tool.plugin)}">${tool.extensionConfiguration?.configured ? "配置" : "完成配置"}</button>` : ""}<button type="button" class="text-button" data-tool-history="${escapeHtml(tool.plugin)}">执行历史</button><button type="button" class="text-button" data-tool-impact="${escapeHtml(tool.plugin)}">影响范围</button>${tool.remote ? `${!tool.firstRunConfirmedAt ? `<button type="button" class="ghost-button" data-tool-first-run="${escapeHtml(tool.plugin)}">确认首次执行</button>` : ""}<button type="button" class="text-button" data-tool-credential="${escapeHtml(tool.plugin)}">配置凭据</button><button type="button" class="text-button danger-action" data-tool-uninstall="${escapeHtml(tool.plugin)}">删除连接</button>` : tool.thirdParty ? `<button type="button" class="text-button" data-tool-versions="${escapeHtml(tool.plugin)}">版本与回滚</button><button type="button" class="text-button danger-action" data-tool-uninstall="${escapeHtml(tool.plugin)}">卸载</button>` : ""}</div>
