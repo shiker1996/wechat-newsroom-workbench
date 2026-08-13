@@ -11,7 +11,8 @@ export function redditBrowserOptions(configuration={}){
   if(!['localhost','127.0.0.1','[::1]','::1'].includes(cdp.hostname))return {managed:false,cdpUrl:cdp.href.replace(/\/$/,'')};
   const port=Number(cdp.port||9222);
   const profileId=String(configuration.profileId||'default').replace(/[^a-z0-9-]/gi,'-').toLowerCase();
-  return {managed:configuration.browserLifecycle!=='external',mode:configuration.browserLifecycle||'automatic',port,cdpUrl:`http://127.0.0.1:${port}`,profilePath:path.join(pluginRoot,'data',`profile-${profileId}`)};
+  const profileDirectory=profileId==='default'?'reddit-chrome-profile':`profile-${profileId}`;
+  return {managed:configuration.browserLifecycle!=='external',mode:configuration.browserLifecycle||'automatic',port,cdpUrl:`http://127.0.0.1:${port}`,profilePath:path.join(pluginRoot,'data',profileDirectory)};
 }
 
 async function cdpReady(cdpUrl,fetchImpl=fetch){

@@ -982,6 +982,8 @@
           <div class="compose-stamp">ADD<br>SOURCE</div>
           <span class="kicker">NEW SUBSCRIPTION</span>
           <h3>增加一个情报入口</h3>
+          <p class="source-compose-intro">选择来源，验证连接，然后保存到采集队列。</p>
+          <div class="source-form-step"><i>01</i><span>选择接入方式</span></div>
           <label>来源类型
             <select name="kind" id="subscription-kind">
               <option value="direct">直连 RSS / Atom</option>
@@ -1001,27 +1003,23 @@
             <input name="label" id="subscription-label" placeholder="例如：机器之心">
           </label>
           <div id="source-plugin-fields" class="source-plugin-fields" hidden></div>
+          <div class="source-form-step source-form-step-action"><i>02</i><span>验证并保存</span></div>
           <div class="source-compose-actions">
-            <button type="button" class="outline-button" id="test-subscription">先测试</button>
-            <button type="submit" class="primary-button">添加订阅</button>
+            <button type="button" class="outline-button" id="test-subscription">测试连接</button>
+            <button type="submit" class="primary-button">保存订阅源</button>
           </div>
           <output id="subscription-test-result" class="subscription-test-result">尚未测试。直连 RSS 不调用大模型，也不产生模型费用。</output>
         </form>
         <section class="source-ledger-panel">
           <div class="source-ledger-head">
-            <div><span class="kicker">ACTIVE INTELLIGENCE DESK</span><h3>当前订阅</h3></div>
-            <div class="source-filter-tabs" id="subscription-filters" role="tablist" aria-label="来源筛选">
-              <button class="active" data-source-filter="all" role="tab" aria-selected="true">全部</button>
-              <button data-source-filter="direct" role="tab" aria-selected="false">直连</button>
-              <button data-source-filter="twitter" role="tab" aria-selected="false">X</button>
-              <button data-source-filter="rsshub" role="tab" aria-selected="false">RSSHub</button>
-              <button data-source-filter="reddit" role="tab" aria-selected="false">Reddit</button>
-              <button data-source-filter="github" role="tab" aria-selected="false">GitHub</button>
-            </div>
+            <div><span class="kicker">ACTIVE INTELLIGENCE DESK</span><h3>当前订阅</h3><p>检查运行状态，快速定位需要处理的来源。</p></div>
           </div>
           <div class="source-ledger-filters">
-            <label>采集器 <select id="source-plugin-filter"><option value="all">全部采集器</option></select></label>
-            <label>状态 <select id="source-status-filter"><option value="all">全部状态</option><option value="success">正常</option><option value="failed">失败</option><option value="idle">未运行</option><option value="disabled">已暂停</option></select></label>
+            <label class="source-search"><span>搜索订阅源</span><input id="source-search" type="search" placeholder="搜索名称或地址…" autocomplete="off"></label>
+            <label><span>来源类型</span><select id="source-type-filter"><option value="all">全部类型</option></select></label>
+            <label><span>状态</span><select id="source-status-filter"><option value="all">全部状态</option><option value="success">正常</option><option value="failed">失败</option><option value="idle">未运行</option><option value="disabled">已暂停</option></select></label>
+            <button type="button" class="source-filter-clear" id="source-filter-clear" hidden>清除筛选</button>
+            <output class="source-filter-count" id="source-filter-count" aria-live="polite"></output>
           </div>
           <div class="subscription-list" id="subscription-list"><div class="empty-state">正在读取订阅配置…</div></div>
         </section>
