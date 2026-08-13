@@ -16,6 +16,8 @@
 
 ## 2. 通用设计原则
 
+> 插件边界正在按 [插件边界收敛与独立安装改造方案](./plugin-boundary-convergence-plan.md) 统一。新增插件不得直接 import 其他插件、项目 `lib/` / `scripts/` / `skills/` 或用户目录文件；插件间协作应声明并调用 capability。现有内置插件的少量跨目录依赖属于待迁移项，不应作为开发范例。
+
 1. Manifest 是唯一能力与权限声明，不要在运行时偷偷扩大范围。
 2. 输入输出必须是 JSON 可序列化对象，并通过 Schema 校验。
 3. 本地 Adapter 只允许 `node:` 和包内相对 import，不允许未审计 npm 依赖。
@@ -241,6 +243,20 @@ my-skill/
 
 `skill.json` 主要字段：`id`、`kind`、`entryPoints`、`inputContract`、`outputContract`、`requiredCapabilities`、`optionalCapabilities`、`compatibleApp` 和 `source`。技能声明的能力还会与用户配置白名单求交集，不能自行获得未授权工具。
 
+工具插件也可以在 Manifest 中声明 `requiredCapabilities` 和 `optionalCapabilities`。必需能力缺失时插件不会参与能力解析；可选能力缺失时插件仍可运行，并应实现明确的降级路径。Adapter 通过 `context.capabilities.invoke(capability, input)` 调用其他实现，不得 import 其他插件源码。
+
+### 宿主运行上下文
+
+工具 Adapter 的 `execute(input, context)` 和 `health(context)` 可使用以下只读服务：
+
+- `context.result.ok/failure`：构造标准工具结果；
+- `context.network.privateIp`：执行宿主统一的内网地址判定；
+- `context.github.requestGitHubJson`：使用统一限流、缓存和健康状态的 GitHub 请求；
+- `context.capabilities.invoke`：按 capability 调用其他插件实现并保留审计链；
+- `context.configuration`：当前插件解析后的配置，不包含其他插件配置。
+
+插件不得通过相对路径 import `lib/`、其他插件或历史 `plugins/shared`。采集插件通过 `createAdapter(context)` 接收对应的 `network`、`github` 与配置服务。
+
 包只允许 Markdown、JSON、TXT、LICENSE、NOTICE 等静态文件，最多 100 个文件、5 MB。Markdown 引用必须存在且不能越界。
 
 ```powershell
@@ -264,7 +280,7 @@ npm run skill:validate -- docs/examples/skill-package
 
 - `compatibleApp` 表示最低兼容应用版本，例如 `>=0.5.0`。
 - 未知 `schemaVersion` 或不兼容版本会在安装前拒绝。
-- 工具/技能可以保留版本历史并回滚；采集器目录记录安装事件。
+- 工具、技能和采集器都保留版本历史并支持回滚；采集器目录同时记录安装事件。
 - 停用不会删除配置和来源；卸载后来源配置仍可保留为不可用状态，便于恢复。
 - 发布新版本时应保持已有 capability、sourceType 和配置字段的兼容；破坏性变化使用新的 ID 或主版本。
 
@@ -283,6 +299,8 @@ npm run skill:validate -- docs/examples/skill-package
 - [ ] 已运行 `npm run build`、相关测试和秘密扫描；
 - [ ] README 说明数据发送位置、保留策略和卸载影响。
 
+独立分发前运行 `npm run plugin:verify-distribution`。内置插件会先生成与第三方插件相同结构的临时分发包，再执行 Manifest、包边界和依赖校验。分发包不会包含 `data/`、浏览器 Profile 或 `node_modules/`。插件需要宿主提供的外部包时，必须在 `runtimeDependencies` 中声明，未声明或不在宿主白名单中的依赖会被拒绝。
+
 ## 10. 调试建议
 
 1. 先运行目录校验，不要直接复制到 `data/installed-*`。
@@ -292,5 +310,4 @@ npm run skill:validate -- docs/examples/skill-package
 5. 出现完整性错误时重新安装，不要直接修改已安装目录。
 6. 出现能力未找到时检查 capability 拼写、启用状态、优先级和技能工具白名单。
 
-实现参考以 `lib/tools/manifest-loader.mjs`、`plugins/shared/manifest-contract.mjs`、`lib/collectors/contracts.mjs` 和各 package manager 为准。
-
+实现参考以 `lib/tools/manifest-loader.mjs`、`lib/plugin-sdk/manifest-contract.mjs`、`lib/collectors/contracts.mjs` 和各 package manager 为准。

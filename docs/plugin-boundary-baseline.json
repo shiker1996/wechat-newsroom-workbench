@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "plugins source boundary scan",
+  "policy": "baseline may only shrink; new violations fail CI",
+  "violations": []
+}

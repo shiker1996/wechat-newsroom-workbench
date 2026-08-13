@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discoverGitHubRepositories, repositoryFromUrl } from '../plugins/collectors/github-discovery/collector.mjs';
+import { discoverGitHubRepositories, repositoryFromUrl } from '../plugins/github-discovery/collector.mjs';
 
 function response(data){return {status:200,ok:true,headers:{get(){return null;}},async json(){return data;},async text(){return JSON.stringify(data);}};}
 test('识别其他热点中提及的 GitHub 仓库',async()=>{const items=[{title:'新闻提到工具',url:'https://news.example/a',sourceName:'新闻',githubRepositories:['https://github.com/o/tool']}];const result=await discoverGitHubRepositories(items,{enabled:false});assert.equal(result.length,2);assert.equal(result.find((item)=>item.sourceGroup==='github').sourceType,'mentioned');assert.equal(repositoryFromUrl('https://github.com/o/tool/issues').repository,'o/tool');});

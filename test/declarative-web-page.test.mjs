@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertPublicPageUrl, collectDeclarativePage, extractPageItems, fetchPublicPage } from '../plugins/collectors/declarative-web-page/collector.mjs';
+import { assertPublicPageUrl, collectDeclarativePage, extractPageItems, fetchPublicPage } from '../plugins/declarative-web-page/collector.mjs';
 
 const cards=`<!doctype html><main><article class="card"><h2><a href="/a">Alpha</a></h2><p class="summary">First story</p><time datetime="2026-08-12T08:00:00Z"></time></article><article class="card"><h2><a href="https://example.com/b">Beta</a></h2><p class="summary">Second story</p></article></main>`;
 const list=`<ul id="news"><li data-entry><a class="headline" href="post/1">One</a><span class="by">Alice</span></li><li data-entry><a class="headline" href="post/2">Two</a><span class="by">Bob</span></li></ul>`;

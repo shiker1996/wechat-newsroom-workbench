@@ -47,6 +47,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [plugin-boundary-convergence-plan.md](./plugin-boundary-convergence-plan.md) | 插件独立安装边界、跨插件依赖收敛、Plugin SDK 与分阶段实施方案（Phase 0–1 已完成） |
 | [tool-call-chain-and-dependency-refactor.md](./tool-call-chain-and-dependency-refactor.md) | 工具调用链、统一能力依赖图、停用影响门禁、执行兜底与可视化重构方案 |
 | [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
 | [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |

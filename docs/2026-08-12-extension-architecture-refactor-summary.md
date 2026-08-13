@@ -26,7 +26,7 @@
 
 ### 3. 插件物理隔离与 Manifest 统一
 
-- 将 RSSHub、GitHub、Reddit 等采集器的实现物理迁入 `plugins/collectors/`。
+- 将 RSSHub、GitHub、Reddit 等采集器的实现物理迁入并打平到 `plugins/`。
 - 将原先散落在 `lib/integrations/`、`lib/collectors/` 的具体工具实现迁入插件目录。
 - 为采集插件与信息工具统一 Manifest 基础结构，采集器只保留领域扩展字段。
 - 增加插件分层门禁，保证插件不直接引用项目 `lib/`。
@@ -68,5 +68,5 @@
 ## 提交边界
 
 - `.env.remote-plugins` 属于本机凭据，不进入版本库。
-- `plugins/collectors/reddit/data/` 是浏览器 Profile 与运行数据，不进入版本库。
+- `plugins/reddit/data/` 是浏览器 Profile 与运行数据，不进入版本库。
 - 本文记录的是本轮主体成果与明确遗留项；详细设计仍以对应架构文档和测试为准。

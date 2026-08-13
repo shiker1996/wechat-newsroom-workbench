@@ -74,7 +74,7 @@ RSSHub 来源填写路由；X 来源由 RSSHub 兼容入口处理。工作台默
 Reddit 使用专用 Chrome Profile。首次使用运行：
 
 ```powershell
-powershell -File .\plugins\collectors\reddit\scripts\start-chrome.ps1
+powershell -File .\plugins\reddit\scripts\start-chrome.ps1
 ```
 
 在打开的窗口登录 Reddit。手动窗口与批次采集统一使用 `data/reddit-chrome-profile`，Cookie 会持续保留。然后在采集源中填写 subreddit 并测试。
@@ -214,4 +214,3 @@ powershell -File .\plugins\collectors\reddit\scripts\start-chrome.ps1
 ## 12. 安全提醒
 
 工作台没有公网鉴权，不要修改监听地址并公开部署。`x-admin-confirm` 和 `x-restore-confirm` 只用于防误触，不是访问控制。外部上传、远程插件和模型调用会把对应内容发送给第三方，具体数据流见[data-flow.md](./data-flow.md)。
-

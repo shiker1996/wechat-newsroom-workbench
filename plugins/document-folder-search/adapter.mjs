@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { failure, ok } from '../shared/schemas.mjs';
+const fallback={ok:(data={},extras={})=>({status:'ok',data,artifacts:[],provenance:{},warnings:[],metrics:{durationMs:0},...extras}),failure:(code,message,options={})=>({status:'error',error:{code,message:String(message),retryable:Boolean(options.retryable),...(options.action?{action:options.action}:{})}})};
 
 // 本地知识库检索（content.document.search）：
 // 只读扫描用户明确授权的文档根目录（如 Obsidian vault），按关键词打分返回片段。
@@ -77,6 +77,7 @@ function snippetOf(content, firstIndex) {
 }
 
 export async function execute(input,context={}) {
+  const {failure,ok}=context.result||fallback;
   const queryTerms = terms(input.query);
   if (!queryTerms.length) return failure('INVALID_INPUT', '查询词过短，至少需要 2 个字符的有效关键词');
   const configuredRoots=context.configuration?.roots||[];const root = String(input.root || configuredRoots[0] || '');
@@ -114,6 +115,7 @@ export async function execute(input,context={}) {
 }
 
 export async function health(context={}) {
+  const {ok}=context.result||fallback;
   const roots=context.configuration?.roots||[];
   return ok({ available: true, provider: 'document-folder-search',configuredRoots:roots.length,note:roots.length?'授权目录已配置':'可前往系统与配置中心添加授权知识库目录' });
 }

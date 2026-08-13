@@ -816,6 +816,8 @@ AI 规划配图占位
 - `POST /api/system/collector-plugin-packages/install`：安装已校验插件；需要受信管理确认头，初始状态为停用。
 - `PATCH /api/system/collector-plugins/:id/status`：启用或停用第三方采集插件。
 - `POST /api/system/collector-plugins/:id/first-run-confirm`：确认远程采集端点和权限摘要后允许首次真实执行。
+- `GET /api/system/collector-plugins/:id/versions`：列出升级时归档的可回滚历史版本。
+- `POST /api/system/collector-plugins/:id/rollback`：回滚到指定归档版本并保持停用，等待人工确认后重新启用；需要管理员确认头。
 - `DELETE /api/system/collector-plugins/:id`：卸载插件；有关联来源时必须传 `confirmImpact:true`，来源记录始终保留。
 - `GET /api/system/collector-plugin-events`：查询安装、启停、确认和卸载审计事件。
 

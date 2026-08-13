@@ -1,0 +1,2 @@
+export function standardItem(item){return {externalId:item.id||item.externalId||'',title:item.title,url:item.url,discussionUrl:item.redditUrl||item.discussionUrl||null,summary:item.summary||item.description||'',author:item.author||'',publishedAt:item.publishedAt||item.timestamp||null,metrics:{...(item.scoreText?{scoreText:item.scoreText}:{}),...(item.stars!==undefined?{stars:item.stars}:{})},raw:item};}
+export function ok(items,provenance={}){return {status:'ok',items:items.map(standardItem),warnings:[],provenance};}

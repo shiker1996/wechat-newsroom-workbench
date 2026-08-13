@@ -1,10 +1,10 @@
 import { readLocalProjectImplementation } from './implementation.mjs';
-import { ok } from '../shared/schemas.mjs';
+const ok=(context,data,extras)=>context.result?.ok(data,extras)||{status:'ok',data,artifacts:[],provenance:{},warnings:[],metrics:{durationMs:0},...extras};
 
-export async function execute(input) {
-  return ok(readLocalProjectImplementation(input.path, input.options), { provenance:{ root:input.path } });
+export async function execute(input,context={}) {
+  return ok(context,readLocalProjectImplementation(input.path, input.options), { provenance:{ root:input.path } });
 }
 
-export async function health() {
-  return ok({ available:true });
+export async function health(context={}) {
+  return ok(context,{ available:true });
 }

@@ -1,0 +1,2 @@
+import { collectRssHub, testSubscription } from './collector.mjs';import { ok } from './result.mjs';
+export function createAdapter({config,onProgress=()=>{},configuration={}}={}){const rsshub={...config.rsshub,...configuration};return {test:(source)=>testSubscription(rsshub,{value:source.route}),collect:async(source)=>ok(await collectRssHub({...rsshub,routes:[source.route],disabledRoutes:[],collectionScope:/^\/github\/trending\//i.test(source.route)?'github':'rsshub'},onProgress),{fetchMethod:'rsshub'})};}

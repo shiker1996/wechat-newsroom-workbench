@@ -12,8 +12,10 @@ test('技能与工具页展示工具健康状态',()=>{
   assert.match(html,/id="tool-capability-list"/);
   assert.match(skills,/Boolean\(tool\.health\)/);
   assert.match(skills,/依赖正常/);
-  assert.match(skills,/服务尚未返回健康检查结果，请重启工作台服务后刷新/);
+  assert.match(skills,/服务尚未返回健康检查结果/);
   assert.match(skills,/"待检查"/);
+  assert.match(skills,/"待重启"/);
+  assert.match(skills,/重启工作台后启用并加载此工具/);
 });
 
 test('内置技能详情直接只读展示 SKILL.md',()=>{

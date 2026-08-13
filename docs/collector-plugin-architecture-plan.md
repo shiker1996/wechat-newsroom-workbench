@@ -9,8 +9,8 @@
 
 当前采集能力已经覆盖三类来源：
 
-- Reddit：`plugins/collectors/reddit/collector.mjs` 通过专用 Chrome CDP 复用登录态，按采集源配置读取 Reddit 分区，页面选择器写在 Collector 插件实现中。
-- RSSHub 与直连 Feed：`plugins/collectors/rsshub/collector.mjs` 读取统一采集源与 Collector 配置。
+- Reddit：`plugins/reddit/collector.mjs` 通过专用 Chrome CDP 复用登录态，按采集源配置读取 Reddit 分区，页面选择器写在 Collector 插件实现中。
+- RSSHub 与直连 Feed：`plugins/rsshub/collector.mjs` 读取统一采集源与 Collector 配置。
 - GitHub：Trending 通过 RSSHub，增长发现和兴趣查询通过 GitHub API 与现有发现逻辑完成。
 
 批次采集由 `lib/jobs/job-manager.mjs` 直接导入并调用具体采集器。订阅源页面目前只管理 RSSHub、X、直连 Feed 和只读 GitHub 入口，Reddit 分区尚未纳入统一管理。
