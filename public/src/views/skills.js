@@ -158,20 +158,22 @@ async function loadSkillRegistry() {
   const thirdPartySkills = data.skills.filter((skill) => skill.thirdParty).length;
   // 汇总条按三层模型统计：消费者 → 能力 → 工具实现（另附创作技能数量）
   // 消费者计数与下方列表口径一致：技能消费者只算实际渲染的（排除挂在 Agent 入口下和无声明能力的）；
-  // 采集源消费者（每个启用的采集源消费一项 collect.* 能力）不参与列表，在计数旁单独注明
-  const collectionSourceCount = (consumerList.consumers || []).filter((consumer) => consumer.type === "collection-source").length;
-  const listedConsumers = (consumerList.consumers || []).filter((consumer) => consumer.type !== "collection-source"
-    && (consumer.type !== "skill" || (!agentOwnedSkillIds.has(consumer.consumerId) && consumer.summary?.total > 0)));
+  // 采集源消费者在"采集源"tab 单独成组展示，计入总数
+  const listedConsumers = (consumerList.consumers || []).filter((consumer) => consumer.type !== "skill"
+    || (!agentOwnedSkillIds.has(consumer.consumerId) && consumer.summary?.total > 0));
   const listedConsumerIds = new Set(listedConsumers.map((consumer) => consumer.consumerId));
   const consumerTotal = listedConsumers.length;
   const consumerBlocked = (graphData.consumerStates || []).filter((state) => listedConsumerIds.has(state.consumerId) && !state.available).length;
-  const consumerNote = `${consumerBlocked ? `${consumerBlocked} 项接入缺失或阻断` : "全部接入可用"}${collectionSourceCount ? ` · 另含 ${collectionSourceCount} 个采集源（见工具分区）` : ""}`;
-  const capabilityTotal = graphData.capabilities.filter((item) => !item.id.startsWith('collect.')).length;
+  // 能力计数与"能力"tab 口径一致：含 collect.* 采集能力
+  const capabilityTotal = graphData.capabilities.length;
   const capabilityBlocked = graphData.summary.blocked || 0, capabilityDegraded = graphData.summary.degraded || 0;
   const collectorToolCount = collectorData.items?.length || 0;
+  // 分母含采集器，分子也要含：采集器用 available 字段判定（与工具分区的卡片状态一致）
+  const availableCollectors = (collectorData.items || []).filter((item) => item.available !== false).length;
+  const availableTotal = availableTools + availableCollectors, implementationTotal = runtimeTools.length + collectorToolCount;
   if (summary) {
-    const unavailableTools = runtimeTools.length - availableTools;
-    summary.innerHTML = `<span class="${consumerBlocked?'attention':'ready'}"><b>${consumerTotal}</b><small>消费者</small><em>${consumerNote}</em></span><span class="${capabilityBlocked||capabilityDegraded?'attention':'ready'}"><b>${capabilityTotal}</b><small>能力</small><em>${capabilityBlocked || capabilityDegraded ? `${capabilityBlocked} 阻断 · ${capabilityDegraded} 降级` : "全部就绪"}</em></span><span class="${unavailableTools?'attention':'ready'}"><b>${availableTools}/${runtimeTools.length + collectorToolCount}</b><small>工具实现可用</small><em>${unavailableTools ? `${unavailableTools} 项需要处理` : "全部工具可用"}</em></span><span><b>${data.total}</b><small>创作技能</small><em>${thirdPartySkills ? `${thirdPartySkills} 项来自扩展` : "全部来自内置"}</em></span>`;
+    const unavailableTools = implementationTotal - availableTotal;
+    summary.innerHTML = `<span class="${consumerBlocked?'attention':'ready'}"><b>${consumerTotal}</b><small>消费者</small><em>${consumerBlocked ? `${consumerBlocked} 项接入缺失或阻断` : "全部接入可用"}</em></span><span class="${capabilityBlocked||capabilityDegraded?'attention':'ready'}"><b>${capabilityTotal}</b><small>能力</small><em>${capabilityBlocked || capabilityDegraded ? `${capabilityBlocked} 阻断 · ${capabilityDegraded} 降级` : "全部就绪"}</em></span><span class="${unavailableTools?'attention':'ready'}"><b>${availableTotal}/${implementationTotal}</b><small>工具实现可用</small><em>${unavailableTools ? `${unavailableTools} 项需要处理` : "全部工具可用"}</em></span><span><b>${data.total}</b><small>创作技能</small><em>${thirdPartySkills ? `${thirdPartySkills} 项来自扩展` : "全部来自内置"}</em></span>`;
   }
   const toolList = document.getElementById("tool-capability-list");
   if (toolList) {
@@ -245,15 +247,17 @@ function renderConsumerAccess(){
   const status=document.getElementById('consumer-access-status')?.value||'all';
   const skillById=new Map((skillRegistryData?.skills||[]).map((skill)=>[skill.id,skill]));
   const all=capabilityGraphData.consumers||[];
-  // 阶段 C 三分组（设计文档 §4.2/§5.1）：Agent / 技能 / 流水线功能；
-  // 挂在 Agent 入口下的技能（runtimeSkillIds）不在技能组重复出现；无声明能力的技能不产生消费者行
+  // 阶段 C 分组（设计文档 §4.2/§5.1）：Agent / 技能 / 流水线功能 / 采集源；
+  // 挂在 Agent 入口下的技能（runtimeSkillIds）不在技能组重复出现；无声明能力的技能不产生消费者行；
+  // 采集源消费者由后端按启用的采集源生成（每个消费一项 collect.* 能力），单独成组
   const agentOwnedSkillIds=new Set(all.filter((consumer)=>consumer.type==='agent').flatMap((consumer)=>consumer.runtimeSkillIds||[]));
   const rawGroups=[
     {key:'agent',label:'Agent 消费者',consumers:all.filter((consumer)=>consumer.type==='agent')},
     {key:'skill',label:'技能消费者',consumers:all.filter((consumer)=>consumer.type==='skill'&&!agentOwnedSkillIds.has(consumer.id)&&states.some((state)=>state.consumerId===consumer.id))},
     {key:'feature',label:'流水线功能消费者',consumers:all.filter((consumer)=>consumer.type==='feature')},
+    {key:'source',label:'采集源消费者',consumers:all.filter((consumer)=>consumer.type==='collection-source')},
   ];
-  // tab 数量标签与列表口径一致：按三分组过滤后的数量，不含采集源消费者
+  // tab 数量标签与列表口径一致：按分组过滤后的数量
   for(const group of rawGroups){const count=document.getElementById(`consumer-${group.key}-count`);if(count)count.textContent=String(group.consumers.length);}
   const matchesConsumer=(consumer)=>{
     const rows=consumerAccessDetails.get(consumer.id)?.capabilities||states.filter((state)=>state.consumerId===consumer.id);
@@ -277,8 +281,8 @@ function renderConsumerAccess(){
       const finalLabel=!state.declared?'缺少接入':CONSUMER_FINAL_LABELS[state.status]||state.status;
       const reasons=[...state.reasons,...state.warnings].map((code)=>`<code class="consumer-reason">${escapeHtml(code)} · ${escapeHtml(CONSUMER_REASON_LABELS[code]||code)}</code>`).join('')||'<small>链路完整</small>';
       const implementations=state.implementations.length?state.implementations.map((impl)=>`<li class="${impl.available?'available':'missing'}"><span>${escapeHtml(impl.name)}<small>${escapeHtml(impl.id)} · 优先级 ${impl.priority}</small></span><em>${impl.available?'可用':impl.enabled?'配置未就绪':'已停用'}</em><button type="button" class="text-button" data-consumer-impact="${escapeHtml(impl.id)}" data-consumer-impact-type="${escapeHtml(impl.type)}">停用影响</button></li>`).join(''):'<li class="missing"><span>没有实现该能力的工具</span></li>';
-      // feature 消费者无授权开关（§4.2）；技能消费者的"已适配"为固有值（适配即 Manifest 声明 + 白名单过滤，§5.1）
-      const authSection=consumer.type==='feature'?'':`<small>技能授权</small>
+      // feature / 采集源消费者无授权开关（§4.2）；技能消费者的"已适配"为固有值（适配即 Manifest 声明 + 白名单过滤，§5.1）
+      const authSection=consumer.type==='feature'||consumer.type==='collection-source'?'':`<small>技能授权</small>
           <div class="consumer-auth-list">${(state.skillAuthorizations||[]).map((auth)=>auth.editable
             ?`<label class="tool-plugin-toggle consumer-auth-toggle" title="启停该技能对此能力的授权（${escapeHtml(auth.skillId)}）"><input type="checkbox" data-consumer-auth="${escapeHtml(auth.skillId)}" data-consumer-auth-capability="${escapeHtml(state.capability)}" ${auth.allowed?'checked':''}><span>${escapeHtml(skillLabel(auth.skillId))}</span></label>`
             :`<span class="consumer-auth-locked" title="${escapeHtml(auth.skillId)}"><i>${escapeHtml(skillLabel(auth.skillId))}</i>${escapeHtml(auth.lockedReason||(state.declared?'':'能力未声明，不提供开关'))}</span>`).join('')||'<small>无运行时技能</small>'}</div>`;
@@ -306,12 +310,13 @@ function renderConsumerAccess(){
     }).join('');
     const sourceLine=consumer.type==='skill'?'技能消费者 · 适配=Manifest 声明'
       :consumer.type==='feature'?`流水线功能${consumer.purpose?` · ${escapeHtml(consumer.purpose)}`:''}`
+      :consumer.type==='collection-source'?'采集源 · 每个启用的采集源消费一项 collect.* 能力'
       :(consumer.runtimeSkillIds||[]).map((skillId)=>escapeHtml(skillLabel(skillId))).join('、')||'无运行时技能';
     const availableCount=rows.filter((state)=>state.available).length,hasAttention=availableCount<rows.length;
     // 阶段 4：Agent 适配声明只读展示（config adaptation 原样透传；结果处理器仅列出非默认项）
     const adaptation=detail?.adaptation,adaptationHandlers=Object.entries(adaptation?.resultHandlers||{});
     const adaptationLine=adaptation?`<div class="consumer-access-grid consumer-adaptation"><span><i>资源来源</i><b>${(adaptation.resourceSources||[]).map((entry)=>escapeHtml(ADAPTATION_SOURCE_LABELS[entry.source]||entry.source)).join('、')||'—'}</b></span>${adaptationHandlers.length?`<span><i>结果处理器</i><b>${adaptationHandlers.map(([capability,name])=>`${escapeHtml(capability)} → ${escapeHtml(name)}`).join('、')}</b></span>`:''}</div>`:'';
-    const typeLabel=consumer.type==='agent'?'AGENT':consumer.type==='skill'?'SKILL':'PIPELINE';
+    const typeLabel=consumer.type==='agent'?'AGENT':consumer.type==='skill'?'SKILL':consumer.type==='collection-source'?'SOURCE':'PIPELINE';
     return `<article class="consumer-access-card is-consumer-${escapeHtml(consumer.type)} ${hasAttention?'needs-attention':'is-ready'}" data-consumer-card="${escapeHtml(consumer.id)}"><header><div><span><i class="consumer-type-badge">${typeLabel}</i> ${sourceLine}</span><b>${escapeHtml(consumer.name)}</b><small>${escapeHtml(consumer.id)} · ${consumer.type==='agent'?'管理该 Agent 可调用的能力与授权':'查看声明、授权和工具实现链路'}</small></div><em>${hasAttention?'需要处理':`${availableCount}/${rows.length} 可用`}</em></header>
       ${adaptationLine}
       ${manifestWarnings.length?`<div class="consumer-manifest-warnings"><small>技能 Manifest 与登记不一致（警告）：</small>${manifestWarnings.map((item)=>`<small>· ${escapeHtml(item)}</small>`).join('')}</div>`:''}

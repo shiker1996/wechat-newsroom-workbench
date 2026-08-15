@@ -741,13 +741,14 @@
         <div class="information-slot-grid capability-graph-list" id="information-slot-list"><div class="kv-empty">正在读取统一能力图…</div></div>
       </section>
       <section class="information-slot-panel" data-capability-section="consumers" hidden>
-        <div class="information-slot-heading consumer-access-heading"><div><span class="kicker">CONSUMER ACCESS</span><b>谁在使用这些能力？</b><small>优先检查 Agent 的可用性、授权和工具链；技能与流水线关系可按需切换查看。</small></div><strong id="consumer-access-summary" aria-live="polite">正在检查…</strong></div>
+        <div class="information-slot-heading consumer-access-heading"><div><span class="kicker">CONSUMER ACCESS</span><b>谁在使用这些能力？</b><small>优先检查 Agent 的可用性、授权和工具链；技能、流水线与采集源关系可按需切换查看。</small></div><strong id="consumer-access-summary" aria-live="polite">正在检查…</strong></div>
         <div class="consumer-access-toolbar" aria-label="消费者筛选">
           <label class="consumer-search"><span aria-hidden="true">⌕</span><input id="consumer-access-search" type="search" aria-label="搜索消费者" placeholder="搜索 Agent、能力或 ID" autocomplete="off"></label>
           <div class="consumer-type-filter" role="group" aria-label="消费者类型">
             <button type="button" class="active" data-consumer-type="agent" aria-pressed="true">Agent <span id="consumer-agent-count">—</span></button>
             <button type="button" data-consumer-type="skill" aria-pressed="false">技能 <span id="consumer-skill-count">—</span></button>
             <button type="button" data-consumer-type="feature" aria-pressed="false">流水线 <span id="consumer-feature-count">—</span></button>
+            <button type="button" data-consumer-type="source" aria-pressed="false">采集源 <span id="consumer-source-count">—</span></button>
             <button type="button" data-consumer-type="all" aria-pressed="false">全部</button>
           </div>
           <label class="consumer-status-filter"><span>状态</span><select id="consumer-access-status"><option value="all">全部状态</option><option value="attention">需要处理</option><option value="ready">全部可用</option></select></label>
