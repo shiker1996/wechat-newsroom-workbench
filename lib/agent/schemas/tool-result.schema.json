@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jianzi.local/schemas/conversation-agent/tool-result.v1.json",
+  "title": "Conversation Agent ToolResult v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "capability", "status", "data", "warnings", "provenance"],
+      "properties": {
+        "requestId": { "type": "string", "pattern": "^tr_[A-Za-z0-9_-]{1,61}$" },
+        "capability": { "type": "string" },
+        "status": { "const": "ok" },
+        "data": { "type": "object" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "fetchedAt"],
+          "properties": {
+            "provider": { "type": "string" },
+            "fetchedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "capability", "status", "error"],
+      "properties": {
+        "requestId": { "type": "string", "pattern": "^tr_[A-Za-z0-9_-]{1,61}$" },
+        "capability": { "type": "string" },
+        "status": { "const": "error" },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string", "minLength": 1 },
+            "retryable": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  ]
+}
+

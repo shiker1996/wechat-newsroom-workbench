@@ -16,9 +16,8 @@ test("文章评分默认显示中文含义并提供公式说明", () => {
   assert.doesNotMatch(html, /继续使用 H\/B\/P\/S\/D\/F 评分/);
 });
 
-test("编辑状态保留机器值但向用户显示结果语言", () => {
-  assert.match(html, /option value="DISCUSS">继续讨论/);
-  assert.match(html, /option value="WRITE_NOW">可以成稿/);
+test("编辑状态由代码推导并向用户显示结果语言（不再提供人工状态选择）", () => {
+  assert.doesNotMatch(html, /name="next_action"/);
   assert.match(editorial, /DISCUSS: "讨论中"[\s\S]*LOCKED: "简报已锁定"/);
 });
 

@@ -198,12 +198,10 @@ async function openEditorial(id) {
   form.elements.angle.value = candidate.angle || "";
   form.elements.thesis.value = candidate.thesis || "";
   const editorial = candidate.editorial || {};
-  for (const key of ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "open_questions", "forbidden_claims", "next_action"]) {
+  for (const key of ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "open_questions", "forbidden_claims"]) {
     const el = form.elements[key];
     if (el) el.value = editorial[key] || "";
   }
-  const expReq = form.elements.experience_required;
-  if (expReq) expReq.checked = Boolean(editorial.experience_required);
   const cid = document.getElementById("editorial-candidate-id");
   if (cid) cid.textContent = candidate.candidate_id;
   const title = document.getElementById("editorial-hotspot-title");
@@ -288,23 +286,27 @@ async function loadSimilarArticles(id) {
 }
 
 function renderEditorialReadiness() {
-  // 与 lib/domain/open-questions.mjs 保持一致：模型常把"没有未决问题"写成
-  // "无"或"无。……（补充说明）"，按清零处理；不误伤"无版权数据能否使用？"这类真问题。
-  const isNoneOpenQuestions = (value) => !value || /^(?:无|没有了?|暂无|无未决问题|none|n\/a)(?:[。．.，,、：:；;\s]|$)/i.test(value);
+  // 与 lib/domain/editorial-readiness.mjs 的 evaluateEditorialReadiness 保持一致：
+  // 5 个必填表单项填好（非占位符）即可成稿；2 个选填项只展示不阻塞。
+  const PLACEHOLDER = /(?:待定|未定|待确认|待锁定|暂无|尚未|需作者|待作者|待主线|未明确|TBD)/i;
+  const substantive = (value) => Boolean(String(value || "").trim()) && !PLACEHOLDER.test(String(value));
   const gate = document.getElementById("editorial-production-gate");
   if (!gate) return;
   const form = document.getElementById("editorial-form");
   if (!form) return;
   const text = (name) => form.elements[name]?.value?.trim() || "";
   const checks = [
-    { label: "锁定命题", field: "thesis", ok: Boolean(text("thesis")) },
-    { label: "事实基座", field: "confirmed_facts", ok: Boolean(text("confirmed_facts")) },
-    { label: "未决问题清零", field: "open_questions", ok: isNoneOpenQuestions(text("open_questions")) },
-    { label: "可以立即写作", field: "next_action", ok: text("next_action") === "WRITE_NOW" },
-    { label: "实践证据", field: "confirmed_experiences", ok: !form.elements.experience_required?.checked || Boolean(text("confirmed_experiences")) },
+    { label: "已确认事实", field: "confirmed_facts", ok: substantive(text("confirmed_facts")) },
+    { label: "明确观点", field: "author_opinions", ok: substantive(text("author_opinions")) },
+    { label: "写作角度", field: "angle", ok: substantive(text("angle")) },
+    { label: "锁定命题", field: "thesis", ok: substantive(text("thesis")) },
+    { label: "禁止写入", field: "forbidden_claims", ok: substantive(text("forbidden_claims")) },
+    { label: "已确认实践（选填）", field: "confirmed_experiences", ok: substantive(text("confirmed_experiences")), optional: true },
+    { label: "否定角度/反证边界（选填）", field: "rejected_angles", ok: substantive(text("rejected_angles")), optional: true },
   ];
-  const passed = checks.filter((c) => c.ok).length;
-  const ready = passed === checks.length;
+  const required = checks.filter((c) => !c.optional);
+  const passed = required.filter((c) => c.ok).length;
+  const ready = passed === required.length;
   const locked = state.editorialCandidate?.brief_status === "LOCKED" || state.editorialCandidate?.editorial?.brief_status === "LOCKED";
   gate.classList.toggle("ready", ready);
   document.querySelector(".editorial-focus-grid")?.classList.toggle("is-ready", ready);
@@ -314,13 +316,13 @@ function renderEditorialReadiness() {
     replyButton.classList.toggle("ghost-button", ready);
   }
   const count = document.getElementById("editorial-gate-count");
-  if (count) count.textContent = `${passed} / ${checks.length}`;
+  if (count) count.textContent = `${passed} / ${required.length}`;
   const list = document.getElementById("editorial-gate-checks");
-  if (list) list.innerHTML = checks.map((c) => `<button type="button" class="editorial-gate-check ${c.ok ? "done" : ""}" data-gate-field="${c.field}"${c.ok ? " disabled" : ""}>${escapeHtml(c.label)}</button>`).join("");
+  if (list) list.innerHTML = checks.map((c) => `<button type="button" class="editorial-gate-check ${c.ok ? "done" : ""}"${c.field ? ` data-gate-field="${c.field}"` : ""}${c.ok || !c.field ? " disabled" : ""}>${escapeHtml(c.label)}</button>`).join("");
   const title = document.getElementById("editorial-production-title");
   if (title) title.textContent = ready ? "编辑决策已完整，可以进入成稿" : "尚未达到成稿条件";
   const hint = document.getElementById("editorial-production-hint");
-  if (hint) hint.textContent = ready ? "点击后会保存当前决策、锁定文章简报，并运行完整成稿链。" : `还需完成：${checks.filter((c) => !c.ok).map((c) => c.label).join("、")}`;
+  if (hint) hint.textContent = ready ? "点击后会保存当前决策、锁定文章简报，并运行完整成稿链。" : `还需完成：${required.filter((c) => !c.ok).map((c) => c.label).join("、")}`;
   const btn = document.getElementById("start-editorial-production");
   if (btn) {
     btn.hidden = !ready;
@@ -400,6 +402,7 @@ async function sendEditorialAnswer() {
       title: "AI 编辑",
       errorLabel: "编辑会",
       rethrow: true,
+      confirmation: /[A-Za-z]:\\|(?:^|\s)\//.test(answer) ? "local-project-read" : "",
       onDone: async (data) => {
         const answerEl = document.getElementById("editorial-answer");
         if (answerEl) answerEl.value = "";
@@ -423,9 +426,8 @@ async function persistEditorialForm(opts) {
     method: "PATCH",
     body: JSON.stringify({ angle: form.elements.angle.value, thesis: form.elements.thesis.value }),
   });
-  const fields = ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "open_questions", "forbidden_claims", "next_action"];
+  const fields = ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "forbidden_claims"];
   const editorial = Object.fromEntries(fields.map((k) => [k, form.elements[k].value]));
-  editorial.experience_required = form.elements.experience_required?.checked ? 1 : 0;
   await request(`/api/candidates/${candidateId}/editorial`, { method: "PUT", body: JSON.stringify(editorial) });
   editorialDirty = false;
   if (opts.refresh !== false) await openEditorial(candidateId);

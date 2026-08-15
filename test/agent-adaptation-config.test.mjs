@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { buildAdaptation, loadAgentAdaptation } from '../lib/agent/resource-adaptation.mjs';
+
+// 阶段 4（agent-adapter-configurability-design.md）：Agent 适配声明挪到 capability-consumers.json 的
+// adaptation 字段，config 为权威来源；config 缺失/无字段时 Adapter 回退内联声明，行为一致。
+
+const projectRoot=path.resolve(import.meta.dirname,'..');
+
+function makeRoot(t,mutate){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-adaptation-config-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  fs.mkdirSync(path.join(dir,'config'),{recursive:true});
+  const consumers=JSON.parse(fs.readFileSync(path.join(projectRoot,'config','capability-consumers.json'),'utf8'));
+  mutate?.(consumers);
+  fs.writeFileSync(path.join(dir,'config','capability-consumers.json'),JSON.stringify(consumers));
+  return dir;
+}
+
+test('loadAgentAdaptation：真实 config 三个 agent 条目均有合法 adaptation 声明',()=>{
+  const editorial=loadAgentAdaptation(projectRoot,'agent.editorial');
+  assert.deepEqual(editorial,{resourceSources:[{source:'hotspotSources'},{source:'candidateUrls'},{source:'project'}],resultHandlers:{},defaultResultHandler:'sanitize-only',handlerOptions:{}});
+  const tutorial=loadAgentAdaptation(projectRoot,'agent.independent-writing');
+  assert.deepEqual(tutorial,{resourceSources:[{source:'materials',limit:5},{source:'documentRoots'},{source:'project'}],resultHandlers:{'filesystem.project.read':'project-fact-attachment'},defaultResultHandler:'fact-attachment',handlerOptions:{}});
+  const social=loadAgentAdaptation(projectRoot,'agent.custom-social');
+  assert.deepEqual(social,{resourceSources:[{source:'materials',limit:8},{source:'documentRoots'},{source:'project'}],resultHandlers:{},defaultResultHandler:'fact-attachment',handlerOptions:{entryPoint:'custom-social',collectSources:true}});
+});
+
+test('config 驱动与内联声明的 buildAdaptation 行为一致（资源目录 + 参数改写）',(t)=>{
+  const root=makeRoot(t);
+  const inputs={materialUrls:['https://a.example.com/1','https://b.example.com/2'],answer:'参考 https://c.example.com/3',documentRoots:['/docs'],projectPath:'/proj'};
+  const fromConfig=buildAdaptation({adaptation:loadAgentAdaptation(root,'agent.independent-writing'),inputs,workspaceRoot:root});
+  const inline=buildAdaptation({adaptation:{resourceSources:[{source:'materials',limit:5},{source:'documentRoots'},{source:'project'}],resultHandlers:{'filesystem.project.read':'project-fact-attachment'},defaultResultHandler:'fact-attachment'},inputs,workspaceRoot:root});
+  assert.deepEqual([...fromConfig.resources.entries()],[...inline.resources.entries()]);
+  assert.deepEqual([...fromConfig.resources.keys()],['material:1','material:2','material:3','document-root:1','project:current']);
+  const request={capability:'content.url.fetch'};
+  assert.deepEqual(fromConfig.resolveArguments({resourceId:'material:1'},request),inline.resolveArguments({resourceId:'material:1'},request));
+});
+
+test('config 缺失或无 adaptation 字段时 loadAgentAdaptation 返回 null（Adapter 回退内联声明）',(t)=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-adaptation-empty-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  assert.equal(loadAgentAdaptation(dir,'agent.editorial'),null,'登记文件缺失回退 null');
+  const root=makeRoot(t,(consumers)=>{delete consumers.consumers.find((item)=>item.id==='agent.editorial').adaptation;});
+  assert.equal(loadAgentAdaptation(root,'agent.editorial'),null,'条目无 adaptation 字段回退 null');
+});
+
+test('非法 source / handler 名在读取处报错',(t)=>{
+  const badSource=makeRoot(t,(consumers)=>{consumers.consumers.find((item)=>item.id==='agent.editorial').adaptation.resourceSources.push({source:'bogus-source'});});
+  assert.throws(()=>loadAgentAdaptation(badSource,'agent.editorial'),/未知资源注册器/);
+  const badHandler=makeRoot(t,(consumers)=>{consumers.consumers.find((item)=>item.id==='agent.custom-social').adaptation.resultHandlers={'content.web.search':'bogus-handler'};});
+  assert.throws(()=>loadAgentAdaptation(badHandler,'agent.custom-social'),/未知结果处理器/);
+  const badDefault=makeRoot(t,(consumers)=>{consumers.consumers.find((item)=>item.id==='agent.editorial').adaptation.defaultResultHandler='bogus';});
+  assert.throws(()=>loadAgentAdaptation(badDefault,'agent.editorial'),/默认结果处理器未知/);
+});
+
+test('inputs 缺某来源时该注册器跳过不炸（空输入不产出条目）',()=>{
+  const adaptation=buildAdaptation({adaptation:{resourceSources:[{source:'hotspotSources'},{source:'candidateUrls'},{source:'project'},{source:'materials',limit:5},{source:'documentRoots'}]},inputs:{}});
+  assert.deepEqual([...adaptation.resources.keys()],[]);
+});
+
+test('materials 的 limit 来自声明条目（去重 + 截断语义同 mergeMaterialUrls）',()=>{
+  const inputs={materialUrls:['https://a.example.com/1','https://a.example.com/1','https://b.example.com/2'],answer:'见 https://c.example.com/3 与 https://d.example.com/4'};
+  const limited=buildAdaptation({adaptation:{resourceSources:[{source:'materials',limit:3}]},inputs});
+  assert.deepEqual([...limited.resources.keys()],['material:1','material:2','material:3']);
+});

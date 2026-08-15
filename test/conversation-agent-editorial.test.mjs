@@ -1,0 +1,206 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import {Store} from '../lib/core/store.mjs';
+import {ToolRegistry} from '../lib/tools/registry.mjs';
+import {runEditorialAgentTurn} from '../lib/agent/editorial-adapter.mjs';
+import {reconcileEditorialAnswer} from '../lib/llm/editorial-room.mjs';
+
+function registry(){const value=new ToolRegistry();value.register({manifest:{id:'mock-url',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',pathInputs:['root'],inputSchema:{type:'object',required:['targetUrl','root'],properties:{targetUrl:{type:'string'},title:{type:'string'},root:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,title:input.title,content:'原文证据：产品实测数据为 42。'},artifacts:[],warnings:[],provenance:{requestedUrl:input.targetUrl,finalUrl:input.targetUrl}};}}});value.register({manifest:{id:'mock-project',name:'本地项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',pathInputs:['path'],inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'},options:{type:'object'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{summary:'读取 1 个文件',files:[{path:'体验.md',size:20,excerpt:'本人安装运行后感觉交互一般',truncated:false}],totalFiles:1,totalChars:15,truncated:false,skipped:{}},artifacts:[],warnings:[],provenance:{root:input.path}};}}});return value;}
+function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'editorial-agent-')),store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});const batch=store.createBatch({date:'2026-08-14',title:'Agent 试点'});store.addHotspots(batch.id,'manual',[{title:'测试事件',url:'https://example.com/source'}]);const hotspot=store.getBatch(batch.id).hotspots[0],candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];return {root,store,hotspot,candidate};}
+// 填满就绪判定要求的全部字段（角度/命题/分发池/读者利益/事实基座/作者观点/命题边界）
+function completeBrief(store,candidate){store.updateCandidate(candidate.id,{angle:'实测角度',thesis:'工具链需要产品验证',distribution_lane:'实验池',reader_stake:'开发者在选型时需要评估实测数据，否则会采信夸大宣传'});store.saveEditorial(candidate.id,{confirmed_facts:'来源显示实测数据为 42',author_opinions:'作者主张实测优先',forbidden_claims:'不扩大样本',experience_required:0,brief_status:'WRITE_NOW'});}
+
+test('编辑室使用统一 ToolRequest 读取原文，并在同轮基于结果提交决策',async(t)=>{const {root,store,hotspot,candidate}=fixture(t);let calls=0,sawToolResult=false;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){calls+=1;if(calls===1)return {callId:'m1',content:JSON.stringify({type:'tool_requests',assistant_note:'读取原文',requests:[{requestId:'tr_source',capability:'content.url.fetch',arguments:{resourceId:`source:${hotspot.id}`},reason:'核对实测数据'}]}),usage:{},model:'mock'};sawToolResult=messages.some((item)=>item.role==='tool'&&item.content.includes('产品实测数据为 42'));return {callId:'m2',content:JSON.stringify({type:'final',assistantReply:'证据已核对，你的判断是什么？',briefUpdates:{angle:'实测角度',thesis:'工具链需要产品验证',confirmed_facts:'来源显示实测数据为 42',forbidden_claims:'不扩大样本'}}),usage:{total_tokens:20},model:'mock'};}};const events=[{event_id:'E001',title:'测试事件',hotspots:[{...hotspot,sourceDoc:null}]}],stream=[];const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',events,workspaceRoot:root,onEvent:(event)=>stream.push(event)});assert.equal(calls,2);assert.equal(sawToolResult,true);assert.equal(result.toolCalls,1);assert.equal(result.editorial.confirmed_facts,'来源显示实测数据为 42');assert.ok(stream.some((event)=>event.type==='tool.completed'&&event.sources?.[0]?.url==='https://example.com/source'));assert.equal(store.getAgentRun(result.agentRunId).status,'completed');});
+
+test('编辑室 Agent 拒绝读取不属于当前候选的资源，锁定候选不进入模型',async(t)=>{const {root,store,candidate}=fixture(t);store.saveEditorial(candidate.id,{brief_status:'LOCKED'});let called=false;await assert.rejects(runEditorialAgentTurn({gateway:{config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:10}}},async complete(){called=true;}},store,registry:registry(),candidateId:candidate.id,events:[],workspaceRoot:root}),/锁定/);assert.equal(called,false);});
+
+test('编辑室对已缓存来源正文的 url.fetch 直接复用缓存，不触发插件执行',async(t)=>{
+  const {root,store,hotspot,candidate}=fixture(t);
+  const tools=registry(),original=tools.execute.bind(tools);let executions=0;
+  tools.execute=async(...args)=>{executions+=1;return original(...args);};
+  let calls=0,sawCached=false;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){calls+=1;if(calls===1)return {callId:'c1',content:JSON.stringify({type:'tool_requests',assistant_note:'再读原文',requests:[{requestId:'tr_source',capability:'content.url.fetch',arguments:{resourceId:`source:${hotspot.id}`},reason:'换理由再核对'}]}),usage:{},model:'mock'};sawCached=messages.some((item)=>item.role==='tool'&&item.content.includes('缓存正文'));return {callId:'c2',content:JSON.stringify({type:'final',assistantReply:'已复用缓存，你的判断？',briefUpdates:{confirmed_facts:'缓存正文事实'}}),usage:{},model:'mock'};}};
+  const events=[{event_id:'E001',title:'测试事件',hotspots:[{...hotspot,sourceDoc:{url:'https://example.com/source',final_url:'https://example.com/source',title:'来源标题',content:'缓存正文：已抓取的热点原文。'}}]}];
+  const result=await runEditorialAgentTurn({gateway,store,registry:tools,candidateId:candidate.id,provider:'mock',events,workspaceRoot:root});
+  assert.equal(executions,0,'已缓存资源不应触发插件执行');
+  assert.equal(sawCached,true,'缓存正文应进入模型上下文');
+  assert.equal(result.toolCalls,1);
+  assert.equal(result.editorial.confirmed_facts,'缓存正文事实');
+});
+
+test('编辑室 Agent 对非法 JSON 只执行一次结构修复并完成本轮',async(t)=>{
+  const {root,store,candidate}=fixture(t);let calls=0,sawSignal=false;
+  const output={type:'final',assistantReply:'已修复，你的判断是什么？',briefUpdates:{confirmed_facts:'事实'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;sawSignal=sawSignal||Boolean(input.signal);return calls===1?{callId:'bad',content:'{"type":"final" "assistantReply":}',usage:{},model:'mock'}:{callId:'fixed',content:JSON.stringify(output),usage:{total_tokens:12},model:'mock'};}};
+  const controller=new AbortController();
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,events:[],workspaceRoot:root,signal:controller.signal});
+  assert.equal(calls,2);assert.equal(sawSignal,true);assert.equal(result.reply.includes('已修复'),true);assert.equal(store.getAgentRun(result.agentRunId).status,'completed');
+});
+
+test('编辑室 Agent 将模型 reasoning 作为统一 thinking 事件转发',async(t)=>{
+  const {root,store,candidate}=fixture(t);const events=[];
+  const output={type:'final',assistantReply:'完成，下一步？',briefUpdates:{confirmed_facts:'事实'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async streamComplete(input,onDelta,onThinking){onThinking('正在核对事实');onThinking('与观点边界');return {callId:'streamed',content:JSON.stringify(output),usage:{},model:'mock'};},async complete(){throw new Error('主步骤不应退回非流式调用');}};
+  await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,events:[],workspaceRoot:root,onEvent:(event)=>events.push(event)});
+  assert.deepEqual(events.filter((event)=>event.type==='assistant.thinking').map((event)=>event.text),['正在核对事实','与观点边界']);
+  assert.ok(events.filter((event)=>event.type==='assistant.thinking').every((event)=>event.agentRunId));
+});
+
+test('编辑室检测到本地项目后先确定性调用读取工具，再让模型判断体验',async(t)=>{
+  const {root,store,candidate}=fixture(t);const project=path.join(root,'outputs');fs.mkdirSync(project);let modelCalls=0,sawProjectMaterial=false;
+  const output={type:'final',assistantReply:'已核对本地材料，具体哪部分体验一般？',briefUpdates:{angle:'实际使用体验',author_opinions:'体验一般',confirmed_experiences:'本人已实际安装并运行；本地材料记录了运行结果',experience_required:true}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){modelCalls+=1;sawProjectMaterial=messages.some((item)=>item.role==='tool'&&item.content.includes('本人安装运行后感觉交互一般'));return {callId:'project-final',content:JSON.stringify(output),usage:{},model:'mock'};}};
+  const events=[];const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,answer:`我的体验在 ${project}`,projectPath:project,events:[],workspaceRoot:root,onEvent:(event)=>events.push(event)});
+  assert.equal(modelCalls,1);assert.equal(sawProjectMaterial,true);assert.equal(result.toolCalls,1);assert.match(result.editorial.confirmed_experiences,/实际安装并运行/);assert.ok(events.some((event)=>event.type==='tool.requested'&&event.capability==='filesystem.project.read'));
+});
+
+test('编辑室 Agent 直接接受打平的 final 信封（assistantReply+briefUpdates 平铺顶层），无需修复',async(t)=>{
+  const {root,store,candidate}=fixture(t);let calls=0;
+  const flat={type:'final',assistantReply:'已记录体验，具体哪里体验一般？',briefUpdates:{angle:'实际体验',author_opinions:'体验一般',confirmed_experiences:'已安装并运行'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(flat),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,events:[],workspaceRoot:root});
+  assert.equal(calls,1,'打平格式应一次通过，不触发修复');assert.equal(result.editorial.confirmed_experiences,'已安装并运行');assert.equal(result.candidate.angle,'实际体验');
+});
+
+test('旧嵌套 final（output 层包裹 briefUpdates）仍被兼容展开',async(t)=>{
+  const {root,store,candidate}=fixture(t);let calls=0;
+  const nested={type:'final',assistantReply:'已记录体验，具体哪里体验一般？',output:{assistantReply:'已记录体验，具体哪里体验一般？',briefUpdates:{angle:'实际体验',confirmed_experiences:'已安装并运行'}}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(nested),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,events:[],workspaceRoot:root});
+  assert.equal(calls,1,'嵌套旧格式应被兼容，不触发修复');assert.equal(result.candidate.angle,'实际体验');assert.equal(result.editorial.confirmed_experiences,'已安装并运行');
+});
+
+test('编辑室业务 Prompt 定义打平的 final 信封（业务字段平铺顶层）',()=>{
+  for(const file of ['../lib/llm/editorial-room.mjs','../skills/editorial-room/SKILL.md']){
+    const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
+    assert.match(source,/平铺在 final 信封顶层/);assert.match(source,/不要再套 output 层/);
+    assert.doesNotMatch(source,/读取当前决策和对话后返回严格JSON/);
+  }
+});
+
+test('用户明确陈述亲身实践时，确定性沉淀进 confirmed_experiences（本地路径脱敏）',()=>{
+  const result=reconcileEditorialAnswer({answer:'已经实际安装并运行过 DeepSeek Harness，但是感觉体验一般，我的使用体验在 C:\\Users\\Tester\\outputs 这里',current:{editorial:{confirmed_experiences:''}},parsed:{assistantReply:'仍需确认',briefUpdates:{}}});
+  assert.match(result.briefUpdates.confirmed_experiences,/实际安装并运行过 DeepSeek Harness/);assert.doesNotMatch(result.briefUpdates.confirmed_experiences,/C:\\/);
+});
+
+test('用户说"实测了"也确定性沉淀进 confirmed_experiences',()=>{
+  const result=reconcileEditorialAnswer({answer:'实测了，但是实测现在deepseek harness和v4pro搭配开发在win平台会遇到工具无法调用以及模型无法支持图片的问题',current:{editorial:{confirmed_experiences:''}},parsed:{assistantReply:'收到',briefUpdates:{}}});
+  assert.match(result.briefUpdates.confirmed_experiences,/实测了/);
+});
+
+test('无亲身实践陈述时不改动体验字段',()=>{
+  const parsed={assistantReply:'确认一下',briefUpdates:{author_opinions:'作者倾向批判'}};
+  const result=reconcileEditorialAnswer({answer:'继续',current:{editorial:{confirmed_experiences:'作者已实际安装并运行 DSH'}},parsed});
+  assert.equal(result.briefUpdates.confirmed_experiences,undefined,'不应凭空写入体验');
+  assert.equal(result.briefUpdates.author_opinions,'作者倾向批判');
+});
+
+test('用户作答后决策字段冻结：强制一次决策补写并落库',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  const frozen={type:'final',assistantReply:'收到，你最想主攻哪一条主线？',briefUpdates:{}};
+  let calls=0,sawAnswer=false;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
+    if(calls===1)return {callId:'frozen',content:JSON.stringify(frozen),usage:{},model:'mock'};
+    assert.equal(input.purpose,'editorial-room-decision-repair');
+    sawAnswer=input.messages.some((item)=>typeof item.content==='string'&&item.content.includes('主打涨价对选型的影响'));
+    return {callId:'patch',content:JSON.stringify({briefUpdates:{angle:'涨价与峰谷定价对选型的影响',author_opinions:'作者主攻涨价对选型的影响'}}),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'主打涨价对选型的影响',events:[],workspaceRoot:root});
+  assert.equal(calls,2);assert.equal(sawAnswer,true);
+  assert.equal(result.candidate.angle,'涨价与峰谷定价对选型的影响');
+  assert.match(result.editorial.author_opinions,/主攻涨价/);
+});
+
+test('占位符式搪塞（待定/未定逐轮抖动措辞）视为字段冻结，触发决策补写',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  store.updateCandidate(candidate.id,{angle:'待定：工具接入实践 vs 模型定价与选型影响'});
+  const wobble={type:'final',assistantReply:'主线未定，主线选哪头？',briefUpdates:{angle:'待定：工具接入实践 vs 模型定价与选型影响（需作者明确）',thesis:'未定（待主线确认）',reader_stake:'待确认',author_opinions:'暂无（尚未征询作者意见）'}};
+  let calls=0;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
+    if(calls===1)return {callId:'wobble',content:JSON.stringify(wobble),usage:{},model:'mock'};
+    assert.equal(input.purpose,'editorial-room-decision-repair');
+    return {callId:'patch',content:JSON.stringify({briefUpdates:{angle:'V4 Pro 涨价与峰谷定价对开发者成本/选型的影响',distribution_lane:'通知池',author_opinions:'作者主张以涨价为主线服务选型决策者'}}),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'走定价与选型主线',events:[],workspaceRoot:root});
+  assert.equal(calls,2,'占位符抖动应触发决策补写');
+  assert.equal(result.candidate.angle,'V4 Pro 涨价与峰谷定价对开发者成本/选型的影响');
+  assert.match(result.editorial.author_opinions,/涨价为主线/);
+});
+
+test('占位符值不写入候选也不覆盖已有实质观点',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  store.updateCandidate(candidate.id,{angle:'已有实质角度'});
+  store.saveEditorial(candidate.id,{author_opinions:'已有实质观点'});
+  const placeholder={type:'final',assistantReply:'待定，主线？',briefUpdates:{angle:'待定：需作者明确',thesis:'未定',author_opinions:'暂无（尚未征询）'}};
+  let calls=0;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
+    if(calls===1)return {callId:'p1',content:JSON.stringify(placeholder),usage:{},model:'mock'};
+    return {callId:'p2',content:JSON.stringify({briefUpdates:{angle:'待定',author_opinions:'待定'}}),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'再想想',events:[],workspaceRoot:root});
+  assert.equal(calls,2);
+  assert.equal(result.candidate.angle,'已有实质角度','占位符不得覆盖已有角度');
+  assert.equal(result.editorial.author_opinions,'已有实质观点','占位符补丁不得覆盖已有观点');
+});
+
+test('用户作答且决策字段有更新：不触发决策补写',async(t)=>{
+  const {root,store,candidate}=fixture(t);let calls=0;
+  const normal={type:'final',assistantReply:'已记录，读者利益怎么落？',briefUpdates:{angle:'实测角度',author_opinions:'作者主张实测'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(normal),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'从实测角度写',events:[],workspaceRoot:root});
+  assert.equal(calls,1);assert.equal(result.candidate.angle,'实测角度');
+});
+
+test('无用户作答（开场）时即使字段未更新也不触发决策补写',async(t)=>{
+  const {root,store,candidate}=fixture(t);let calls=0;
+  const opening={type:'final',assistantReply:'开场，你的立场是什么？',briefUpdates:{}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(opening),usage:{},model:'mock'};}};
+  await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',events:[],workspaceRoot:root});
+  assert.equal(calls,1);
+});
+
+test('briefUpdates 空串不覆盖已有实践记录',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  store.saveEditorial(candidate.id,{confirmed_experiences:'作者已实际安装并运行 DSH'});
+  const output={type:'final',assistantReply:'已记录，命题边界怎么划？',briefUpdates:{author_opinions:'作者倾向批判定性',confirmed_experiences:''}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'m1',content:JSON.stringify(output),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'继续',events:[],workspaceRoot:root});
+  assert.equal(result.editorial.confirmed_experiences,'作者已实际安装并运行 DSH','空串不得覆盖已有实践记录');
+  assert.equal(result.editorial.author_opinions,'作者倾向批判定性');
+});
+
+test('信封层 assistantReply 为空时回退（旧嵌套 output.assistantReply 为空），不产生无声轮次',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  const envelope={type:'final',assistantReply:'信封层回复：事实基座已确认',output:{assistantReply:'',briefUpdates:{confirmed_facts:'事实'}}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'m1',content:JSON.stringify(envelope),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',events:[],workspaceRoot:root});
+  assert.match(result.reply,/信封层回复/);
+});
+
+test('底稿字段齐备时由代码推导 WRITE_NOW（不再由模型声明）',async(t)=>{
+  const {root,store,candidate}=fixture(t);completeBrief(store,candidate);
+  const output={type:'final',assistantReply:'继续讨论',briefUpdates:{author_opinions:'作者补充了新观点'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'m1',content:JSON.stringify(output),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'补充一点',events:[],workspaceRoot:root});
+  assert.equal(result.editorial.brief_status,'WRITE_NOW','字段齐备应保持可成稿');
+  assert.equal(result.editorial.open_questions,'','齐备时缺失项为空');
+});
+
+test('底稿字段不齐时保持 DISCUSS，缺失项由代码推导写入 open_questions 供展示',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  const premature={type:'final',assistantReply:'就写批判方向',briefUpdates:{author_opinions:'作者主张批判'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'m1',content:JSON.stringify(premature),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'就写批判方向',events:[],workspaceRoot:root});
+  assert.equal(result.editorial.brief_status,'DISCUSS','底稿不齐不得成稿');
+  assert.match(result.editorial.open_questions,/已确认事实/,'缺失项应包含已确认事实');
+});
+
+test('已有对话时留空作答不再触发开场分支，而是继续推进',async(t)=>{
+  const {buildEditorialMessages}=await import('../lib/llm/editorial-room.mjs');
+  const fresh=await buildEditorialMessages({editorial:{},messages:[]},'',[],null,'');
+  assert.match(fresh[1].content,/编辑会刚开始/);
+  const ongoing=await buildEditorialMessages({editorial:{},messages:[{role:'user',content:'上轮回答'}]},'',[],null,'');
+  assert.match(ongoing[1].content,/未输入新内容/);assert.doesNotMatch(ongoing[1].content,/编辑会刚开始/);
+});
+
+test('编辑室生产路由只使用统一 Agent 与共享工具事件渲染器',()=>{const source=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/core/stream-chat.js',import.meta.url),'utf8'),events=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');assert.match(source,/runEditorialAgentTurn/);assert.doesNotMatch(source,/runEditorialTurnStream/);assert.match(source,/onEvent:send/);assert.match(client,/consumeAgentEvent/);assert.match(events,/tool\.requested/);assert.match(events,/assistant\.delta/);});

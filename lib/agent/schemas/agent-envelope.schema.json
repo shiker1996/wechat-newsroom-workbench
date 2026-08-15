@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jianzi.local/schemas/conversation-agent/agent-envelope.v1.json",
+  "title": "Conversation Agent Envelope v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "assistant_note", "requests"],
+      "properties": {
+        "type": { "const": "tool_requests" },
+        "assistant_note": { "type": "string", "maxLength": 300 },
+        "requests": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "tool-request.schema.json" }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "assistantReply", "output"],
+      "properties": {
+        "type": { "const": "final" },
+        "assistantReply": { "type": "string" },
+        "output": { "type": "object" }
+      }
+    }
+  ]
+}

@@ -21,7 +21,7 @@ test('技能文本与代码 fallback 的核心 JSON 契约一致', () => {
     ['hotspot-brainstorm', 'lib/llm/research-pipeline.mjs', ['"writeReadiness"', '"bScores"', '"hProfile"', '探索']],
     ['hotspot-synthesis', 'lib/llm/research-pipeline.mjs', ['"saturationPenalty"', '"metaNarratives"', '"combination"']],
     ['event-card-generator', 'lib/llm/research-pipeline.mjs', ['"confirmed_facts"', '"source_increment"', '"unverified"']],
-    ['editorial-room', 'lib/llm/editorial-room.mjs', ['"nextQuestion"', '"next_action"', 'WRITE_NOW', '"fetchEvents"']],
+    ['editorial-room', 'lib/llm/editorial-room.mjs', ['"briefUpdates"', 'assistantReply', '"forbidden_claims"', '不要再套 output 层']],
   ];
   for (const [skillName, sourceFile, markers] of cases) {
     const skillText = fs.readFileSync(path.join(workspaceRoot, 'skills', skillName, 'SKILL.md'), 'utf8');

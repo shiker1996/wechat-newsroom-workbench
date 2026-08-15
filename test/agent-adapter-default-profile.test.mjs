@@ -1,0 +1,90 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { deriveAgentEntryCapabilities } from '../lib/agent/entry-capabilities.mjs';
+import { EDITORIAL_AGENT_CAPABILITIES } from '../lib/agent/editorial-adapter.mjs';
+import { applyCatalogSchemas, buildAdaptation, resolveCatalogResourceProfiles, RESOURCE_ID_SCHEMA } from '../lib/agent/resource-adaptation.mjs';
+import { addCapabilityCatalogEntries, readCapabilityCatalog } from '../lib/tools/capability-catalog.mjs';
+import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
+
+// 阶段 3（agent-adapter-configurability-design.md §4）：新资源类能力走默认档案路径——
+// 目录条目声明 resourceKind + 消费者登记即接入，全程不改任何 .mjs（不进 Adapter 常量）。
+
+const projectRoot=path.resolve(import.meta.dirname,'..');
+const CLOUDDOC={capability:'vendor.clouddoc.read',requirement:'optional',failurePolicy:'continue-with-warning',declaration:'optional',adapterStatus:'ready',resourceKinds:['cloud-document-url'],triggerPolicy:'explicit-resource',authorizationAction:null,resultPolicy:'fact-attachment',source:'test'};
+
+function makeRoot(t,{resourceKind='url-fetch'}={}){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-default-profile-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  fs.mkdirSync(path.join(dir,'config'),{recursive:true});
+  fs.mkdirSync(path.join(dir,'skills','editorial-room'),{recursive:true});
+  fs.copyFileSync(path.join(projectRoot,'skills','editorial-room','skill.json'),path.join(dir,'skills','editorial-room','skill.json'));
+  const catalog=JSON.parse(fs.readFileSync(path.join(projectRoot,'config','capabilities.json'),'utf8'));
+  catalog.capabilities['vendor.clouddoc.read']={name:'云文档读取',description:'读取指定云文档的正文内容。',category:'信息获取',...(resourceKind?{resourceKind}:{})};
+  fs.writeFileSync(path.join(dir,'config','capabilities.json'),JSON.stringify(catalog));
+  const consumers=JSON.parse(fs.readFileSync(path.join(projectRoot,'config','capability-consumers.json'),'utf8'));
+  consumers.consumers.find((item)=>item.id==='agent.editorial').dependencies.push({...CLOUDDOC});
+  fs.writeFileSync(path.join(dir,'config','capability-consumers.json'),JSON.stringify(consumers));
+  return dir;
+}
+
+test('目录条目 resourceKind 派生映射：新能力命中 url-fetch 档案，静态表不受影响',(t)=>{
+  const root=makeRoot(t);
+  const profiles=resolveCatalogResourceProfiles(root);
+  assert.equal(profiles['vendor.clouddoc.read'],'url-fetch');
+  assert.ok(!('content.url.fetch' in profiles),'静态表内能力无 catalog 声明，不出现在派生映射');
+});
+
+test('新资源类能力登记 ready 即派生进入口目录（无 Adapter 常量、无代码）',(t)=>{
+  const root=makeRoot(t);
+  const derived=deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES);
+  assert.ok(derived.includes('vendor.clouddoc.read'));
+  assert.equal(derived.length,EDITORIAL_AGENT_CAPABILITIES.length+1);
+});
+
+test('能力图谱：新能力实现健康且授权放行时链路 available',(t)=>{
+  const root=makeRoot(t);
+  const tool={id:'clouddoc-reader',name:'云文档读取',version:'1.0.0',capabilities:['vendor.clouddoc.read'],enabled:true,priority:0,riskLevel:'network-read'};
+  const state=buildCapabilityGraph({root,tools:[tool]}).consumerStates
+    .find((item)=>item.consumerId==='agent.editorial'&&item.capability==='vendor.clouddoc.read');
+  assert.equal(state.available,true);
+  assert.deepEqual(state.reasons,[]);
+});
+
+test('buildAdaptation：新能力按 url-fetch 档案改写参数，越界 resourceId 抛 RESOURCE_NOT_ALLOWED',(t)=>{
+  const root=makeRoot(t);
+  const adaptation=buildAdaptation({adaptation:{resourceSources:[{source:'materials'}]},inputs:{materialUrls:['https://docs.example.com/a'],answer:''},workspaceRoot:root,messages:{urlFetch:'素材 URL 未授权'}});
+  const resolved=adaptation.resolveArguments({resourceId:'material:1'},{capability:'vendor.clouddoc.read',arguments:{resourceId:'material:1'}});
+  assert.deepEqual(resolved,{targetUrl:'https://docs.example.com/a',root});
+  const denied=adaptation.resolveArguments.bind(null,{resourceId:'material:9'},{capability:'vendor.clouddoc.read'});
+  assert.throws(denied,(error)=>error.code==='RESOURCE_NOT_ALLOWED'&&error.message==='素材 URL 未授权');
+});
+
+test('applyCatalogSchemas：目录声明 resourceKind 的能力自动注入档案 Schema（无 bindings）',(t)=>{
+  const root=makeRoot(t);
+  const catalog=[
+    {capability:'vendor.clouddoc.read',inputSchema:{type:'object'}},
+    {capability:'content.web.search',inputSchema:{type:'object',properties:{query:{type:'string'}}}},
+  ];
+  const [clouddoc,web]=applyCatalogSchemas(catalog,[],root);
+  assert.deepEqual(clouddoc.inputSchema,RESOURCE_ID_SCHEMA);
+  assert.deepEqual(web.inputSchema,{type:'object',properties:{query:{type:'string'}}});
+});
+
+test('非法 resourceKind 被目录校验拒绝（读取与 R3 入库）',(t)=>{
+  const root=makeRoot(t,{resourceKind:'bogus-kind'});
+  assert.throws(()=>readCapabilityCatalog(root),/resourceKind 无效/);
+  const valid=makeRoot(t);
+  assert.throws(()=>addCapabilityCatalogEntries(valid,[{id:'vendor.other.read',name:'x',description:'y',category:'z',resourceKind:'bogus-kind'}]),/resourceKind 无效/);
+});
+
+test('catalog 声明与静态档案映射冲突时报错（静态优先，冲突即配置错误）',(t)=>{
+  const root=makeRoot(t);
+  const file=path.join(root,'config','capabilities.json');
+  const catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.capabilities['content.url.fetch'].resourceKind='document-root';
+  fs.writeFileSync(file,JSON.stringify(catalog));
+  assert.throws(()=>resolveCatalogResourceProfiles(root),/冲突/);
+});

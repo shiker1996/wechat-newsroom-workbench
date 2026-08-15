@@ -4,8 +4,11 @@
 // onDone（收到 done 事件后的回调，参数为 event.data，无 data 时为 {}）、
 // rethrow（失败时是否把错误抛给调用方，true 时不再 toast）。
 import { toast } from "./ui.js";
+import { consumeAgentEvent } from "./agent-events.js";
+import { securityHeaders } from "./http.js";
+// Unified stream contract: tool.requested, assistant.delta.
 
-export async function streamChat({ url, body, messages, button, busyLabel, doneLabel, title, errorLabel, onDone, rethrow = false }) {
+export async function streamChat({ url, body, messages, button, busyLabel, doneLabel, title, errorLabel, onDone, rethrow = false, confirmation = "" }) {
   const sm = document.createElement("div");
   sm.className = "editorial-message assistant streaming";
   sm.innerHTML = `<b>${title} · 实时回应</b><details class="thinking-box" hidden><summary>思考过程</summary><div class="thinking-text"></div></details><p class="reply-text"></p>`;
@@ -14,13 +17,16 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
   const st = sm.querySelector(".reply-text");
   const thinkingText = sm.querySelector(".thinking-text");
   const thinkingBox = sm.querySelector(".thinking-box");
+  const toolCards = document.createElement("div");
+  toolCards.className = "agent-tool-cards";
+  sm.insertBefore(toolCards, st);
   button.disabled = true;
   button.textContent = busyLabel;
   let done = null;
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(await securityHeaders({ confirmation })) },
       body: JSON.stringify(body),
     });
     if (!response.ok) { const d = await response.json().catch(() => ({})); throw new Error(d.error || `HTTP ${response.status}`); }
@@ -31,10 +37,8 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
     const consume = (line) => {
       if (!line.trim()) return;
       const event = JSON.parse(line);
-      if (event.type === "thinking") { if (thinkingBox) { thinkingBox.hidden = false; thinkingBox.open = true; } if (thinkingText) { thinkingText.textContent += event.text || ""; thinkingText.scrollTop = thinkingText.scrollHeight; } }
-      if (event.type === "delta" && st) st.textContent += event.text || "";
-      if (event.type === "error") throw new Error(event.error || `${errorLabel}调用失败`);
-      if (event.type === "done") { done = event.data || true; if (thinkingBox) thinkingBox.open = false; }
+      const completed=consumeAgentEvent(event,{toolCards,replyText:st,thinkingBox,thinkingText,errorLabel});
+      if(completed)done=completed;
       messages.scrollTop = messages.scrollHeight;
     };
     while (true) {

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "status": "phase-5-converged",
+  "generatedAt": "2026-08-14",
+  "productionAgentEnabled": true,
+  "entries": [
+    {"id":"editorial","route":"POST /api/candidates/:id/ai/editorial/stream","modelPurpose":"editorial-room","triggerModel":["explicit_tool_requests"],"capabilities":["content.url.fetch","content.passage.retrieve","content.web.search","content.news.search"],"modelDeclaredToolIntent":"ToolRequest[]","finalGate":"editorial decision normalization, distribution decision, locked brief guard"},
+    {"id":"independent-writing","route":"POST /api/batches/:id/tutorial-chat/stream","modelPurpose":"tutorial-chat","triggerModel":["explicit_tool_requests"],"capabilities":["filesystem.project.read","content.url.fetch","content.web.search","content.news.search","content.document.search","content.passage.retrieve"],"modelDeclaredToolIntent":"ToolRequest[]","finalGate":"evaluateTutorialChatReadiness and custom fact base gate"},
+    {"id":"custom-social","route":"POST /api/batches/:id/custom-social-chat/stream","modelPurpose":"custom-social-chat","triggerModel":["explicit_tool_requests"],"capabilities":["content.url.fetch","content.web.search","content.news.search","content.document.search","content.repository.inspect","content.passage.retrieve"],"modelDeclaredToolIntent":"ToolRequest[]","finalGate":"sanitizeFormUpdates and custom social fact gate"}
+  ],
+  "callsiteMarkers":{"editorial":"agent-callsite: editorial","independent-writing":"agent-callsite: independent-writing","custom-social":"agent-callsite: custom-social"},
+  "auditMetadata":{"required":["agentRunId","entryPoint","batchId","skillId","capability"],"knownGaps":["pre-candidate conversations cannot attach candidateId by design"]}
+}

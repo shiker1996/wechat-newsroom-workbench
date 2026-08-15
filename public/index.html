@@ -498,12 +498,12 @@
             <details class="editorial-decision-details" id="editorial-decision-details">
               <summary><span><b>决策底稿</b><small>AI 编辑会自动整理 · 仅在复核或手工修订时展开</small></span><span class="decision-detail-state">查看全部字段</span></summary>
               <div class="editorial-decision-body">
-            <div class="form-pair"><label>推荐角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
+            <div class="form-pair"><label>写作角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
             <label class="question-field">当前关键问题<input name="editor_question" placeholder="一次只问一个最能改变方向的问题"></label>
-            <div class="form-pair"><label>已确认公共事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>作者明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
-            <div class="form-pair"><label>已确认实践及证据<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界<textarea name="rejected_angles" rows="4"></textarea></label></div>
-            <div class="form-pair"><label>仍未解决问题<textarea name="open_questions" rows="3"></textarea></label><label>禁止写入<textarea name="forbidden_claims" rows="3"></textarea></label></div>
-            <div class="gate-strip"><label><input type="checkbox" name="experience_required"> 核心判断依赖亲身实践</label><label>下一动作<select name="next_action"><option value="DISCUSS">继续讨论</option><option value="WRITE_NOW">可以成稿</option><option value="TEST_FIRST">先做实践验证</option><option value="RESEARCH_FIRST">先补充事实</option><option value="DROP">暂不推进</option></select></label><span id="brief-state">讨论中</span></div>
+            <div class="form-pair"><label>已确认事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
+            <div class="form-pair"><label>已确认实践（选填）<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界（选填）<textarea name="rejected_angles" rows="4"></textarea></label></div>
+            <div class="form-pair"><label>待完善项（由系统按必填项推导）<textarea name="open_questions" rows="3" readonly></textarea></label><label>禁止写入<textarea name="forbidden_claims" rows="3"></textarea></label></div>
+            <div class="gate-strip"><span id="brief-state">讨论中</span></div>
             <div class="decision-save-row"><button type="submit" class="ghost-button">保存修订</button></div>
               </div>
             </details>
@@ -591,7 +591,7 @@
         <section class="phone-proof">
           <div class="phone-bar"><span>WECHAT PROOF</span><button class="text-button" id="refresh-preview">刷新产物</button></div>
           <div id="proof-empty" class="proof-empty">当前文章尚未生成 <code>article.ai.html</code><br><small>点击上方“生成 / 更新排版 HTML”</small></div>
-          <iframe id="proof-frame" title="公众号排版预览" hidden></iframe>
+          <iframe id="proof-frame" title="公众号排版预览" sandbox="allow-same-origin" referrerpolicy="no-referrer" hidden></iframe>
         </section>
         <aside class="delivery-panel"><span class="kicker">DELIVERY</span><h3>交付出口</h3><div id="delivery-links"></div><button class="ghost-button" id="preview-reindex">扫描排版产物</button></aside>
       </div>
@@ -658,13 +658,16 @@
       <header class="capability-studio-hero"><div><span class="kicker">CAPABILITY STUDIO / LOCAL FIRST</span><h2>能力编排台</h2><p>把创作规则、信息工具和采集插件组织成可检查、可替换的本机能力网络。</p></div><div class="capability-studio-seal"><span>LOCAL</span><b>能力<br>工作室</b></div></header>
       <div class="runtime-path-strip skill-registry-summary capability-studio-summary" id="skill-registry-summary"><span>正在扫描本机能力…</span></div>
       <nav class="capability-section-tabs" role="tablist" aria-label="技能与工具管理分区">
-        <button type="button" class="active" data-capability-tab="skills" role="tab" aria-selected="true"><span>01</span><b>创作技能</b><small>规则、契约与适用环节</small><i>SKILLS</i></button>
-        <button type="button" data-capability-tab="tools" role="tab" aria-selected="false"><span>02</span><b>能力配置</b><small>为业务环节选择实现工具</small><i>ROUTING</i></button>
-        <button type="button" data-capability-tab="collectors" role="tab" aria-selected="false"><span>03</span><b>工具运行</b><small>执行、配置、权限与诊断</small><i>RUNTIME</i></button>
-        <button type="button" data-capability-tab="extensions" role="tab" aria-selected="false"><span>04</span><b>扩展工作室</b><small>校验、安装与连接服务</small><i>EXTEND</i></button>
+        <button type="button" class="active" data-capability-tab="consumers" role="tab" aria-selected="true"><span>01</span><b>消费者</b><small>谁能用哪项能力、为什么</small><i>ACCESS</i></button>
+        <button type="button" data-capability-tab="tools" role="tab" aria-selected="false"><span>02</span><b>能力</b><small>状态、消费者与实现路由</small><i>CAPABILITIES</i></button>
+        <button type="button" data-capability-tab="collectors" role="tab" aria-selected="false"><span>03</span><b>工具</b><small>启用、优先级、健康与执行</small><i>RUNTIME</i></button>
+        <button type="button" data-capability-tab="skills" role="tab" aria-selected="false"><span>04</span><b>创作技能</b><small>规则、契约与适用环节</small><i>SKILLS</i></button>
+        <button type="button" data-capability-tab="extensions" role="tab" aria-selected="false"><span>05</span><b>扩展工作室</b><small>校验、安装与连接服务</small><i>EXTEND</i></button>
       </nav>
       <section class="panel collector-plugin-panel" data-capability-section="collectors" hidden><div class="panel-head"><div><span class="kicker">TOOL RUNTIME</span><h3>工具执行与配置</h3><small>统一管理信息工具的启用状态、优先级、依赖、配置与执行历史。</small></div></div>
         <div class="collector-management-note"><span>这里只处理工具运行；安装、卸载和首次授权统一放在扩展工作室。</span><button type="button" class="text-button" data-go-extension-studio>前往扩展工作室 →</button></div>
+        <div class="runtime-commandbar"><div><b>对话 Agent 运行概览</b><small>查看编辑室、自主写作和自定义图文的运行成功率、耗时及关联工具调用。</small></div><button type="button" class="outline-button" id="load-agent-run-history">查看运行历史</button></div>
+        <section class="tool-execution-panel" id="agent-run-history-panel" hidden><div class="skill-config-section-head"><div><b>对话 Agent 执行历史</b><small>同一次 Agent run 与工具调用按运行 ID 关联；不展示参数正文或凭据。</small></div><button type="button" class="text-button" id="agent-run-history-close">关闭</button></div><div class="runtime-path-strip" id="agent-run-summary"></div><div class="runtime-model-list" id="agent-run-history-list"></div></section>
         <div class="tool-runtime-section-head"><span>INFORMATION TOOLS</span><b>信息工具</b><small>启用、优先级、依赖检查、配置与执行历史</small></div>
         <div class="runtime-model-list" id="tool-capability-list"></div>
         <section class="tool-execution-panel" id="tool-execution-panel" hidden><div class="skill-config-section-head"><div><b id="tool-execution-title">执行历史</b><small>仅记录参数名，不保存输入正文或密钥</small></div><button type="button" class="text-button" id="tool-execution-close">关闭</button></div><div class="runtime-model-list" id="tool-execution-list"></div></section>
@@ -719,6 +722,11 @@
           <button class="outline-button" id="save-remote-credential">保存凭据</button>
           <button class="text-button" id="cancel-remote-credential">取消</button>
         </div>
+        <section class="extension-config-panel catalog-draft-panel" id="catalog-draft-panel" hidden>
+          <div class="skill-config-section-head"><div><b>能力目录条目草案</b><small>Manifest 声明了目录外能力；补全名称、描述与分类后确认入库。入库前这些能力的实现仅可调试，不得启用或设为路由首选。</small></div><button type="button" class="text-button" id="catalog-draft-close">关闭</button></div>
+          <div id="catalog-draft-list"></div>
+          <div class="runtime-actions"><button class="outline-button" type="button" id="catalog-draft-submit">确认入库</button></div>
+        </section>
       </section>
       <section class="runtime-commandbar tool-package-installer extension-card">
         <div><b>安装受信本地工具</b><small>仅限管理员审查过的本地 adapter；安装后默认停用，并需重启工作台加载。</small></div>
@@ -731,6 +739,20 @@
         <div class="information-slot-heading"><div><span class="kicker">CAPABILITY ROUTING</span><b>能力所需工具</b><small>这里只配置业务能力与工具实现的关系；工具本身的状态、参数和执行历史请到“工具运行”查看。</small></div><strong id="information-slot-summary">正在检查…</strong></div>
         <div class="capability-graph-toolbar"><label class="search-field"><span>⌕</span><input id="capability-graph-search" type="search" placeholder="搜索能力、技能、功能或工具"></label><select id="capability-graph-status"><option value="all">全部状态</option><option value="blocked">已阻断</option><option value="degraded">降级</option><option value="ready">就绪</option><option value="unused">未使用</option></select></div>
         <div class="information-slot-grid capability-graph-list" id="information-slot-list"><div class="kv-empty">正在读取统一能力图…</div></div>
+      </section>
+      <section class="information-slot-panel" data-capability-section="consumers" hidden>
+        <div class="information-slot-heading consumer-access-heading"><div><span class="kicker">CONSUMER ACCESS</span><b>谁在使用这些能力？</b><small>优先检查 Agent 的可用性、授权和工具链；技能与流水线关系可按需切换查看。</small></div><strong id="consumer-access-summary" aria-live="polite">正在检查…</strong></div>
+        <div class="consumer-access-toolbar" aria-label="消费者筛选">
+          <label class="consumer-search"><span aria-hidden="true">⌕</span><input id="consumer-access-search" type="search" aria-label="搜索消费者" placeholder="搜索 Agent、能力或 ID" autocomplete="off"></label>
+          <div class="consumer-type-filter" role="group" aria-label="消费者类型">
+            <button type="button" class="active" data-consumer-type="agent" aria-pressed="true">Agent <span id="consumer-agent-count">—</span></button>
+            <button type="button" data-consumer-type="skill" aria-pressed="false">技能 <span id="consumer-skill-count">—</span></button>
+            <button type="button" data-consumer-type="feature" aria-pressed="false">流水线 <span id="consumer-feature-count">—</span></button>
+            <button type="button" data-consumer-type="all" aria-pressed="false">全部</button>
+          </div>
+          <label class="consumer-status-filter"><span>状态</span><select id="consumer-access-status"><option value="all">全部状态</option><option value="attention">需要处理</option><option value="ready">全部可用</option></select></label>
+        </div>
+        <div class="consumer-access-list" id="consumer-access-list"><div class="kv-empty">正在读取消费者登记…</div></div>
       </section>
       <div class="skill-management-layout" data-capability-section="skills">
         <aside class="skill-browser" aria-label="创作技能列表">
@@ -1112,7 +1134,7 @@
     <div class="job-console" id="production-job-console">等待任务…</div>
     <p class="fine-print" id="production-job-note">可以关闭窗口，任务仍会在后台继续。</p>
   </dialog>
-  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><div class="preview-status" hidden>正在加载预览…</div><iframe title="产物预览"></iframe></dialog>
+  <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><div class="preview-status" hidden>正在加载预览…</div><iframe title="产物预览" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe></dialog>
   <dialog id="confirm-dialog" class="modal"><div class="confirm-body"><h2>确认操作</h2><p class="confirm-message"></p><div class="modal-actions"><button type="button" class="ghost-button" data-confirm-cancel>取消</button><button type="button" class="ink-button" data-confirm-ok>确认执行</button></div></div></dialog>
   <dialog id="revision-dialog" class="modal revision-dialog"><div class="modal-head"><div><span class="kicker">DOCUMENT HISTORY</span><h2>版本历史</h2></div><button class="close-button" data-close-revisions aria-label="关闭">×</button></div><div class="revision-layout"><div id="revision-list" class="revision-list"></div><div class="revision-preview"><div id="revision-summary" class="muted">选择一个版本查看差异</div><pre id="revision-diff" class="revision-diff"></pre><button class="ink-button" id="restore-revision" disabled>恢复此版本</button></div></div></dialog>
   <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>
