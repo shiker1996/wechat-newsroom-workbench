@@ -35,3 +35,10 @@ test('自主写作管线按模式选择心得经验或教程技能',()=>{
   assert.match(source,/wechat-mp-personal-writing/);
   assert.match(source,/wechat-mp-tutorial/);
 });
+
+test('教程质量门禁使用独立 JSON 提示并在格式错误时重试',()=>{
+  const source=fs.readFileSync(new URL('../lib/llm/tutorial-pipeline.mjs',import.meta.url),'utf8');
+  assert.match(source,/只评估，不修改、不续写、不复述文章/);
+  assert.match(source,/quality-gate-\$\{stage\}\$\{attempt\?'\-format-retry'/);
+  assert.doesNotMatch(source,/content:`\$\{reviewer\.prompt\}\\n\\n只执行\$\{label\}门禁/);
+});

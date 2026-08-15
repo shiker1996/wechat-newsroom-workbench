@@ -1,10 +1,18 @@
 # API 接口文档
 
+## 本地安全会话
+
+- `GET /api/security/session`：建立当前进程内的本地会话并返回随机 CSRF token。
+- `POST /api/security/confirmation`：在 CSRF 校验通过后签发 60 秒、一次性、绑定操作类型的敏感操作确认 token。
+
 > 当前版本：0.5.x。本文是本地 REST/NDJSON 接口的完整路由参考，并由 `test/api-docs-routes.test.mjs` 与代码双向校验。面向用户的操作流程见 [详细使用手册](./docs/user-guide.md)，扩展契约见 [插件开发指南](./docs/plugin-development.md)。
 
 ## 能力依赖图（只读）
 
-- `GET /api/system/capability-graph`：返回技能、编码功能、采集源、能力和实现组成的统一依赖图，以及各能力的 `ready / degraded / blocked / unused` 状态。
+- `GET /api/system/capability-graph`：返回技能、编码功能、采集源、能力和实现组成的统一依赖图，以及各能力的 `ready / degraded / blocked / unused` 状态；`consumerStates` 给出每条消费者—能力关系的可用性、原因码（`CONSUMER_NOT_DECLARED` / `ADAPTER_MISSING` / `ADAPTER_DEGRADED` / `SKILL_NOT_ALLOWED` / `NO_ENABLED_IMPLEMENTATION` / `IMPLEMENTATION_UNHEALTHY`）与候选实现。
+- `GET /api/system/capability-consumers`：返回全部消费者的清单及可用/降级/阻断关系统计（Agent / 技能 / 流水线功能三类；页面按类型分组，Agent 归属的运行时技能不单列）；feature 消费者携带 `purpose` 用途说明。
+- `GET /api/system/capability-consumers/:consumerId`：返回单个消费者的完整能力链路（声明、适配、技能授权、实现状态、不可用原因、已知缺口），只读且不含本地路径、allowedRoots 或凭据。技能消费者的 `runtimeSkillIds` 视为其自身，`skillAuthorizations` 返回自身的授权描述（editable/locked/whitelist/version）；feature 消费者的 `skillAuthorizations` 恒为空数组（无授权开关），详情顶层携带 `purpose` 用途说明，各行携带 `requirement`/`failurePolicy`/`triggerPolicy`/`resultPolicy`。
+- `GET /api/system/conversation-agent-runs?limit=100`：返回三类对话 Agent 的统一运行历史、关联工具调用，以及按入口和能力聚合的成功率、失败数和平均耗时；`estimatedCost` 在供应商未提供可审计费用时为 `null`。
 - `GET /api/system/tools/:id/status-impact`：模拟停用普通工具后的能力阻断、降级和剩余候选。
 - `GET /api/system/collectors/:id/status-impact`：模拟停用采集器后的采集源影响。
 
@@ -13,7 +21,8 @@
 停用或卸载工具时，客户端必须先读取对应 `status-impact`，确认 `canDisable=true` 后将返回的 `impactVersion` 放入状态修改请求。服务端会重新计算影响：版本过期返回 `409 requiresImpactConfirmation`；断开必需能力返回 `409 blocked`。停用仅影响新任务，历史记录继续保留。
 
 - `GET /api/system/tool-invocations/:resolutionId`：按尝试顺序返回一次能力调用的首选实现、失败原因、兜底来源和最终实现。
-- `PUT /api/system/capability-routes/:capability`：设置统一能力首选实现，正文为 `{ "preferredImplementationId": "plugin-id" }`；传空值表示恢复自动选择。
+- `PUT /api/system/capability-routes/:capability`：设置统一能力首选实现，正文为 `{ "preferredImplementationId": "plugin-id" }`；传空值表示恢复自动选择。能力未登记（`registered:false`）时拒绝设置首选，返回 `400 CAPABILITY_NOT_REGISTERED`。
+- `POST /api/system/capability-catalog`：能力目录草案确认入库（需管理员确认），正文为 `{ "entries": [{ "id", "name", "description", "category" }] }`；逐条校验 ID 格式与必填字段，已登记条目返回 `400`。目录外能力的实现允许存在（调试期宽容），但任何启用路径（内置/第三方/远程工具与采集器）都会被拒绝并返回 `400 CAPABILITY_NOT_REGISTERED`，必须先经本接口或手工补目录条目。
 
 ## 概览
 
@@ -271,7 +280,7 @@ tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-c
 → 热点全景（事件卡片 → 创建综合选题）
 
 ### POST /api/batches/:id/custom-social-chat/stream
-自定义图文对话式策划（NDJSON 流）{ provider, answer, draft, history }
+自定义图文对话式策划（NDJSON 流）{ provider, answer, draft, history }。固定使用显式只读 ToolCall，关闭 provider 隐式搜索，并返回 `assistant.delta`、`tool.requested`、`tool.running`、`tool.completed`、`tool.failed`、`agent.limit`；外部资料仅以带公开 URL 的【素材】写入表单，`done.data` 包含 `agentRunId` 与 `toolCalls`。
 无状态：创建前没有候选记录，草稿与对话历史由前端每轮全量传入；AI 返回 { assistantReply, formUpdates, ready }，前端据此回填创建表单
 → 图文编辑室（创建自定义图文面板 · AI 策划助手）
 
@@ -288,6 +297,8 @@ URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工�
 ### GET /api/creation-entry-points/:entryPoint/social-card-stage-skills
 查询图文故事板技能槽位。`entryPoint` 为 `social-tool`、`social-event` 或 `social-custom`；
 `contentType` 查询参数分别使用 `repository`、`event` 或 `tutorial|list|opinion`。
+命名说明：`social-custom` 是图文阶段管线的历史入口名，会话 Agent 层使用 `custom-social`，两者指同一自定义图文通道，
+`lib/skills/entry-routing.mjs` 的别名机制双向兼容；新增代码应使用 `custom-social`，`social-custom` 仅为兼容保留（阶段 6 起弃用，不删除）。
 返回默认实现、兼容候选、可用状态和不可用原因。
 
 ### POST /api/candidates/:id/ai/card-editorial
@@ -367,6 +378,7 @@ URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工�
 → 编辑室（废弃，保留兼容）
 
 ### POST /api/candidates/:id/ai/editorial/stream
+编辑会 NDJSON 对话流，返回 `assistant.delta`、`assistant.thinking`、`tool.requested`、`tool.running`、`tool.completed`、`tool.failed`、`agent.limit`、`done` 和 `error`。工具事件只公开能力名、原因、状态、摘要和公开来源，不返回完整参数、绝对路径或插件配置；`done.data` 附带 `agentRunId` 与 `toolCalls`。
 编辑会 AI 流式调用 { provider, answer } → ndjson
 → 编辑室
 
@@ -647,8 +659,8 @@ AI 规划配图占位
 
 读取可在 UI 中维护的应用 / RSSHub 环境变量和解析后的路径。敏感字段只返回 `configured`。
 
-### PUT /api/system/settings
-更新受支持的 `.env` 字段；空值不覆盖现有密钥，`clear: true` 才清除。
+### GET|PUT /api/system/settings
+GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段。空值不覆盖现有密钥，`clear: true` 才清除。
 
 ### POST /api/system/runtime/:service/:action
 控制 `rsshub|reddit` 的 `start|stop|restart`。仅适用于当前 Windows / PowerShell 本机运行方式。
@@ -660,7 +672,7 @@ AI 规划配图占位
 上传 ZIP 二进制并只做格式、清单、路径和哈希校验，不写入工作区。
 
 ### POST /api/system/backup/restore
-恢复已校验的 ZIP；要求请求头 `x-restore-confirm: RESTORE`。恢复前自动保存安全备份。
+恢复已校验且与当前应用版本兼容的 ZIP；要求会话绑定的一次性 `backup-restore` 操作确认令牌。恢复前自动保存安全备份。
 
 ### GET /api/system/skills
 返回只读技能注册表，包括技能包版本、角色、适用入口、内容类型、输入输出契约、必需/可选工具和清单校验状态；同时返回插件能力、启停状态、优先级、健康检查和最近执行结果。
@@ -761,7 +773,7 @@ AI 规划配图占位
 
 ## 自主写作
 
-- `POST /api/batches/:id/tutorial-chat/stream`：以 NDJSON 流式返回自主写作策划回复和表单更新；`articleMode` 支持 `experience`（心得经验）和 `tutorial`（使用教程）。教程请求可包含 `draft.localProjectPath`，或在本轮回答中提供绝对目录。
+- `POST /api/batches/:id/tutorial-chat/stream`：以 NDJSON 流式返回自主写作策划回复和表单更新；`articleMode` 支持 `experience`（心得经验）和 `tutorial`（使用教程）。教程请求可包含 `draft.localProjectPath`，或在本轮回答中提供绝对目录。路径只在服务端映射为临时项目资源，流中返回 `assistant.delta`、`tool.requested`、`tool.running`、`tool.completed`、`tool.failed` 与 `agent.limit`；`done.data` 包含 `agentRunId` 和 `toolCalls`。
 - `POST /api/tools/local-project/read`：预检用户明确指定的本地项目目录。只读受支持的文本文件，跳过依赖/构建目录、密钥文件、二进制和符号链接，并受文件数、单文件与总字符数限制。
 - `POST /api/batches/:id/custom-articles`：根据对话填好的事实表单创建自主写作项目并启动成稿；旧的 `/tutorials` 路径保留兼容。
 - `GET /api/batches/:id/custom-articles`：列出本批自主写作项目及草稿 / 任务状态；旧的 `/tutorials` 路径保留兼容。
@@ -781,8 +793,8 @@ AI 规划配图占位
 所有本地 adapter 变更都返回 `restartRequired: true`，重启工作台后加载，不在安装请求内执行插件代码。
 ## 远程 API / MCP 插件（P4）
 
-- `POST /api/system/remote-tool-plugins/validate`：校验声明式远程 Manifest。
-- `POST /api/system/remote-tool-plugins`：保存远程连接，默认停用。
+- `POST /api/system/remote-tool-plugins/validate`：校验声明式远程 Manifest。响应附带 `catalogDrafts`：Manifest 声明了目录外能力时生成目录条目草案（保守占位，`needsCompletion: true`），需人工确认后经 `POST /api/system/capability-catalog` 入库，不自动写入。
+- `POST /api/system/remote-tool-plugins`：保存远程连接，默认停用。响应同样附带 `catalogDrafts`。
 - `PATCH /api/system/remote-tool-plugins/:id/status`：即时启用或停用。
 - `POST /api/system/remote-tool-plugins/:id/first-run-confirm`：首次执行确认；确认前该插件的真实调用会被拒绝（`FIRST_RUN_CONFIRM_REQUIRED`），避免“安装即信任所有能力”。
 - `GET|PUT /api/system/remote-tool-plugins/:id/credentials`：查看配置状态或写入/清除隔离凭据；永不返回凭据原文。
@@ -794,6 +806,13 @@ AI 规划配图占位
 ### GET|PUT /api/system/skills/:id/configuration
 
 读取或保存技能/工具 Manifest 声明的动态配置。普通字段写入 `extension_settings`，秘密字段只写入隔离凭据 Profile；读取接口仅返回秘密字段是否已配置。工具使用对应路径 `GET|PUT /api/system/tool-plugins/:id/configuration`。
+
+当技能是 Agent 运行时技能时，GET 额外返回 `capabilityAuthorization`（可编辑能力 `editable`、锁定原因 `locked`、当前白名单 `whitelist`、配置 `version`/`configHash`/`integrity`）；PUT 携带 `capabilityAuthorization` 字段时走能力授权写入路径（写入 `writing-skills/<skillId>/active.json`，不影响动态配置）。无归属入口的技能（流水线阶段技能等）同样可写入：其可声明集合以自身 Manifest 的 required/optionalCapabilities 为准，适配状态恒为 ready：
+
+- 只允许启停"已声明、`declaration=optional`、`adapterStatus=ready`"的能力；必需、降级、未声明或目录外能力返回 `400 CAPABILITY_AUTHORIZATION_INVALID` 及逐条 `issues`；
+- `dryRun:true` 只返回影响预览（`impact`：哪些消费者的哪些能力会在 available/unavailable 间翻转），不落盘；
+- `expectedVersion` 必传，做乐观并发控制：缺失返回 `400 CAPABILITY_AUTHORIZATION_INVALID`，版本过期返回 `409 CONFIG_VERSION_CONFLICT`（含 `currentVersion`）；active.json 的 hash 链断裂返回 `409 CONFIG_INTEGRITY_BROKEN`；
+- 每次写入 `version` 单调递增并记录 `parentHash`；`capabilities:null` 清除白名单恢复全放行；`capabilities:[]` 为显式空白名单，表示全部禁止（图谱中输出 `SKILL_NOT_ALLOWED`）。
 
 ### POST /api/system/skills/:id/configuration/test
 

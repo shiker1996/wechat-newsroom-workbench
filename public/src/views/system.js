@@ -132,7 +132,7 @@ function bindBackupActions() {
     button.disabled = true;
     button.textContent = "正在恢复…";
     try {
-      const result = await request("/api/system/backup/restore", { method: "POST", headers: { "content-type": "application/zip", "x-restore-confirm": "RESTORE" }, body: validatedBackup });
+      const result = await request("/api/system/backup/restore", { method: "POST", confirmation: "backup-restore", headers: { "content-type": "application/zip" }, body: validatedBackup });
       toast(`恢复完成，已保留恢复前快照 ${result.safetyBackup}，即将刷新页面`);
       setTimeout(() => location.reload(), 800);
     } catch (error) {

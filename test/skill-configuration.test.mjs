@@ -129,7 +129,7 @@ test('历史重试复用快照中的 Prompt、模型和工具版本', async () =
   assert.equal(snapshots[0].snapshot.reusedFromSnapshotId,9);
 });
 
-test('历史快照中的空白名单视为未配置，不阻断重试', async () => {
+test('历史快照中的显式空白名单冻结为全部禁止', async () => {
   const snapshots=[];const original={
     id:11,batch_id:'batch-1',candidate_row_id:2,snapshot:{
       schemaVersion:1,purpose:'social-cards-repository',modelProvider:'default',model:'model-default',
@@ -142,9 +142,10 @@ test('历史快照中的空白名单视为未配置，不阻断重试', async ()
   const gateway={config:{defaultProvider:'default',providers:{default:{model:'model-default'}}}};
   const bundle={skillName:'xiaohongshu-article-generator',prompt:'当前 Prompt',hash:'current',files:[],fallback:false,config:null};
   const runtime=await prepareSkillRun({gateway,store,batchId:'batch-1',candidateId:2,purpose:'social-cards-repository',bundles:[bundle],snapshotId:11});
-  assert.equal(runtime.allowedCapabilities,null);
+  // 显式空数组 = 全部禁止；历史工具列表仍按快照冻结恢复
+  assert.deepEqual(runtime.allowedCapabilities,[]);
   assert.deepEqual(runtime.tools.map((item)=>item.capability),['content.url.fetch']);
-  assert.equal(snapshots[0].snapshot.skillConfig.allowedTools,null);
+  assert.deepEqual(snapshots[0].snapshot.skillConfig.allowedTools,[]);
 });
 
 test('模型调用通过绑定网关精确携带 generation snapshot', async () => {

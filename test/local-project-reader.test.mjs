@@ -27,3 +27,11 @@ test('可从对话中识别 Windows 本地目录', () => {
   assert.equal(extractLocalProjectPath('E:\\Documents\\write-assistant 这个我自己开发的工具想写一篇使用教程'), 'E:\\Documents\\write-assistant');
   assert.equal(extractLocalProjectPath('请读取 "E:\\My Projects\\demo app" 写教程'), 'E:\\My Projects\\demo app');
 });
+
+test('可识别单独一行中真实存在且包含空格的本地目录', (t) => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-path-'));
+  const root = path.join(parent, 'my project');
+  fs.mkdirSync(root);
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  assert.equal(extractLocalProjectPath(root), root);
+});

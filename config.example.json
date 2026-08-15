@@ -112,6 +112,14 @@
     "githubMinChars": 200
   },
   "aiJobs": { "maxConcurrent": 2 },
+  "conversationAgent": {
+    "maxModelSteps": 3,
+    "maxToolCalls": 5,
+    "maxParallelToolCalls": 3,
+    "maxToolResultChars": 8000,
+    "maxTotalToolResultChars": 24000,
+    "timeoutMs": 90000
+  },
   "articleLength": {
     "minVisibleChars": 1300,
     "maxVisibleChars": 2000,

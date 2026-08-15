@@ -153,5 +153,5 @@ test('server.mjs 的批次删除路由保留生命周期与确认头双重校验
   const source = fs.readFileSync(new URL('../lib/http/routes/batch-routes.mjs', import.meta.url), 'utf8');
   assert.match(source, /\/api\\\/batches\\\/\(\[\^\/\]\+\)\\\/delete-impact/);
   assert.match(source, /只有已归档批次可以彻底删除/);
-  assert.match(source, /x-admin-confirm'\] !== 'DELETE-BATCH'/);
+  assert.match(source, /localSecurity\?\.consume\(request, 'batch-delete'\)/);
 });

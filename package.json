@@ -23,6 +23,8 @@
         "config:baseline": "node scripts/snapshot-legacy-configuration.mjs",
         "config:migrate": "node --disable-warning=ExperimentalWarning scripts/migrate-legacy-configuration.mjs",
         "capability:baseline": "node scripts/snapshot-tool-call-baseline.mjs",
+        "capability:gates": "node --disable-warning=ExperimentalWarning scripts/check-consumer-capability-gates.mjs",
+        "capability:consumer-baseline": "node --disable-warning=ExperimentalWarning scripts/snapshot-consumer-capability-baseline.mjs",
         "capability:migrate-routes": "node scripts/migrate-capability-routes.mjs",
         "release": "node scripts/release.mjs"
     },

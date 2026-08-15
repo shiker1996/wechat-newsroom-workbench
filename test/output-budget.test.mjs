@@ -23,3 +23,10 @@ test('chunked tasks and explicitly fixed requests do not retry', () => {
     { initial: 16, retry: 16, adaptive: false, providerMax: 8192 },
   );
 });
+
+test('caller output cap overrides a larger purpose profile',()=>{
+  assert.deepEqual(
+    outputBudgetFor({purpose:'article-planning',providerMax:12000,requested:2400}),
+    {initial:2400,retry:2400,adaptive:false,providerMax:12000},
+  );
+});

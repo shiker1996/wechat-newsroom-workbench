@@ -33,6 +33,7 @@ async function binaryBody(request, maxBytes = 100_000_000) {
 async function startSystemRoutes(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'security-routes-'));
   const server = http.createServer(async (request, response) => {
+    request.localSecurity = { consume: (req, action) => action === 'plugin-admin' && req.headers['x-action-confirm'] === 'test-plugin-admin' };
     const url = new URL(request.url, 'http://127.0.0.1');
     try {
       const handled = await handleSystemRoutes({
@@ -49,7 +50,7 @@ async function startSystemRoutes(t) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-const ADMIN_HEADER = { 'x-admin-confirm': 'TRUSTED-LOCAL-PLUGIN' };
+const ADMIN_HEADER = { 'x-action-confirm': 'test-plugin-admin' };
 
 test('技能包变更类路由缺少受信确认头时一律拒绝', async (t) => {
   const base = await startSystemRoutes(t);
@@ -63,7 +64,7 @@ test('技能包变更类路由缺少受信确认头时一律拒绝', async (t) =
     const response = await fetch(`${base}${item.path}`, { method: item.method, headers: item.headers, body: item.payload });
     assert.equal(response.status, 400, `${item.method} ${item.path} 不应放行`);
     const result = await response.json();
-    assert.match(result.error, /受信安装确认/, `${item.method} ${item.path} 应提示缺少确认头`);
+    assert.match(result.error, /管理员操作确认/, `${item.method} ${item.path} 应提示缺少确认令牌`);
   }
 });
 
@@ -75,7 +76,7 @@ test('技能包路由带受信确认头后进入正常校验流程', async (t) =
   });
   assert.equal(response.status, 400);
   const result = await response.json();
-  assert.doesNotMatch(result.error, /受信安装确认/);
+  assert.doesNotMatch(result.error, /管理员操作确认/);
 });
 
 function tempFile(dir, name, content) {

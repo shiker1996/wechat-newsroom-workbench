@@ -39,8 +39,8 @@ const mmdcCandidates = [
 ];
 const mmdcCli = mmdcCandidates.find((candidate) => fs.existsSync(candidate)) || '';
 
-// mmdc 鑷甫鐨?puppeteer 鍙兘鎵句笉鍒板畠鏈熸湜鐨?Chrome 鐗堟湰锛?
-// 鍦?puppeteer 缂撳瓨閲屾寫涓€涓湡瀹炲瓨鍦ㄧ殑 chrome.exe锛岄€氳繃 -p 閰嶇疆鏂囦欢鍠傜粰瀹冦€?
+// mmdc 自带的 puppeteer 可能找不到它期望的 Chrome 版本。
+// 在 puppeteer 缓存中选择真实存在的 chrome.exe，通过 -p 配置文件传入。
 function findChromeExecutable() {
   const programFilesX86 = process.env['ProgramFiles(x86)'] || '';
   const explicitCandidates = [
@@ -67,7 +67,7 @@ const report = { converted: 0, failed: [], images: [] };
 let result = markdown;
 if (fences.length) {
   fs.mkdirSync(imageDir, { recursive: true });
-  if (!mmdcCli) fail(`鏈壘鍒?@mermaid-js/mermaid-cli锛堝凡妫€鏌ラ」鐩湰鍦颁緷璧栧拰 npm 鍏ㄥ眬鐩綍锛夈€傝杩愯 npm install -D @mermaid-js/mermaid-cli`);
+  if (!mmdcCli) fail('未找到 @mermaid-js/mermaid-cli（已检查项目本地依赖和 npm 全局目录）。请运行 npm install -D @mermaid-js/mermaid-cli');
   const chrome = findChromeExecutable();
   const pptrConfig = path.join(imageDir, '.mmdc-puppeteer-config.json');
   const mermaidConfig = path.join(imageDir, '.mmdc-theme-config.json');
@@ -81,8 +81,8 @@ if (fences.length) {
     const mmdcArgs = ['-i', mmdPath, '-o', pngPath, '-c', mermaidConfig, '-b', tokens.colors?.background || 'white', '-w', '1080', '-s', '2'];
     if (chrome) mmdcArgs.push('-p', pptrConfig);
     try {
-      // 鐩存帴浠?node 杩愯 mmdc 鍏ュ彛锛岀粫寮€ Windows 涓?spawn .cmd 鐨?EINVAL 闄愬埗銆?
-      // Chrome 鍚姩鍋跺彂宕╂簝锛堝挨鍏跺杩涚▼骞跺彂鏃讹級锛屽け璐ュ悗閲嶈瘯涓€娆°€?
+      // 直接以 node 运行 mmdc 入口，绕开 Windows 中 spawn .cmd 的 EINVAL 限制。
+      // Chrome 启动偶发崩溃（尤其多进程并发时），失败后重试一次。
       let lastError = null;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
@@ -101,7 +101,7 @@ if (fences.length) {
       report.images.push(relative);
       report.converted += 1;
     } catch (error) {
-      // 鍗曚釜鍥存爮澶辫触鏃朵繚鐣欏師鍥存爮锛屼笉寰楀垹闄ゅ唴瀹?
+      // 单个围栏失败时保留原围栏，不得删除内容。
       report.failed.push({ index: index + 1, error: String(error.stderr || error.message).trim().slice(0, 500) });
     }
   }
@@ -112,11 +112,10 @@ const temp = `${output}.tmp`;
 fs.writeFileSync(temp, result, 'utf8');
 fs.renameSync(temp, output);
 
-// 闂ㄧ锛氭浛鎹㈡暟閲忕瓑浜庢垚鍔熸覆鏌撴暟閲忥紝鏈鐞嗗洿鏍忓叏閮ㄧ暀鍦?failed 閲?
+// 门禁：替换数量等于成功渲染数量，未处理围栏全部留在 failed 中。
 const remaining = (result.match(FENCE_RE) || []).length;
 if (remaining !== report.failed.length) {
-  fail(`鍥存爮鏁伴噺鏍￠獙澶辫触锛氬墿浣?${remaining}锛屽け璐ヨ褰?${report.failed.length}`);
+  fail(`围栏数量校验失败：剩余 ${remaining}，失败记录 ${report.failed.length}`);
 }
 console.log(JSON.stringify(report));
 process.exit(report.failed.length ? 1 : 0);
-

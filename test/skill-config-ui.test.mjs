@@ -129,9 +129,9 @@ test('远程工具入口明确要求 Manifest 而不是单独 URL',()=>{
   assert.match(styles,/\.remote-manifest-notice/);
 });
 
-test('能力配置包含信息与采集能力，工具运行只保留信息工具运行操作',()=>{
-  assert.match(html,/data-capability-tab="tools"[\s\S]*?<b>能力配置<\/b>/);
-  assert.match(html,/data-capability-tab="collectors"[\s\S]*?<b>工具运行<\/b>/);
+test('能力页签包含信息与采集能力，工具页签只保留信息工具运行操作',()=>{
+  assert.match(html,/data-capability-tab="tools"[\s\S]*?<b>能力<\/b>/);
+  assert.match(html,/data-capability-tab="collectors"[\s\S]*?<b>工具<\/b>/);
   const runtime=html.slice(html.indexOf('data-capability-section="collectors"'),html.indexOf('data-capability-section="extensions"'));
   assert.match(runtime,/id="tool-capability-list"/);
   assert.match(runtime,/id="collector-runtime-list"/);
@@ -148,7 +148,8 @@ test('阶段 2 在能力配置和工具运行中可视化依赖链与影响范�
   assert.match(skills,/\/api\/system\/capability-graph/);
   assert.match(skills,/renderCapabilityGraph/);
   assert.match(skills,/openImplementationImpact/);
-  assert.match(skills,/placeRuntimeDetail\('capability-impact-panel',type==='collector'\?'collector-runtime-list':'tool-capability-list'\)/);
+  assert.match(skills,/placeRuntimeDetail\('capability-impact-panel',afterElementId\|\|\(type==='collector'\?'collector-runtime-list':'tool-capability-list'\)\)/);
+  assert.match(skills,/openImplementationImpact\(impact\.dataset\.consumerImpactType==="collector"\?"collector":"tool",impact\.dataset\.consumerImpact,"consumer-access-list"\)/);
   assert.match(styles,/\.collector-plugin-panel \.tool-execution-panel,\.collector-plugin-panel \.capability-impact-panel/);
   assert.match(skills,/data-tool-impact/);
   assert.match(skills,/data-collector-impact/);
@@ -160,6 +161,17 @@ test('阶段 2 在能力配置和工具运行中可视化依赖链与影响范�
   assert.match(skills,/tool-runtime-actions/);
   assert.match(styles,/\.capability-route-select select:focus-visible/);
   assert.match(styles,/\.tool-runtime-actions \.danger-action/);
+});
+
+test('消费者页默认聚焦 Agent，并提供搜索、类型与问题状态筛选',()=>{
+  assert.match(html,/id="consumer-access-search"[^>]*aria-label="搜索消费者"/);
+  assert.match(html,/data-consumer-type="agent"[^>]*aria-pressed="true"/);
+  assert.match(html,/id="consumer-access-status"/);
+  assert.match(skills,/let selectedConsumerType = "agent"/);
+  assert.match(skills,/selectedConsumerType==='all'\|\|group\.key===selectedConsumerType/);
+  assert.match(styles,/\.consumer-access-toolbar\{position:sticky/);
+  assert.match(styles,/\.consumer-access-group\{display:grid;grid-template-columns:1fr/);
+  assert.match(skills,/consumer\.type==='skill'\?'SKILL':'PIPELINE'/);
 });
 
 test('阶段 3 停用前展示影响并携带影响版本执行',()=>{

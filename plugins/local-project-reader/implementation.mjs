@@ -86,10 +86,20 @@ export function extractLocalProjectPath(value) {
   const text = String(value || '');
   const quotedWindows = text.match(/["']([A-Za-z]:\\[^"']+)["']/);
   if (quotedWindows) return quotedWindows[1].trim();
+  const wholeWindowsLine = text.trim().match(/^([A-Za-z]:\\[^\r\n"'<>|?*]+)[，。；、]?$/);
+  if (wholeWindowsLine) {
+    const candidate = wholeWindowsLine[1].trim().replace(/[，。；、]+$/, '');
+    if (fs.statSync(candidate, { throwIfNoEntry: false })?.isDirectory()) return candidate;
+  }
   const windows = text.match(/[A-Za-z]:\\[^\s"'<>|?*，。；、]+/);
   if (windows) return windows[0].trim().replace(/[，。；、]+$/, '');
   const quotedPosix = text.match(/["'](\/[^"']+)["']/);
   if (quotedPosix) return quotedPosix[1].trim();
+  const wholePosixLine = text.trim().match(/^(\/[^\r\n"']+)[，。；、]?$/);
+  if (wholePosixLine) {
+    const candidate = wholePosixLine[1].trim().replace(/[，。；、]+$/, '');
+    if (fs.statSync(candidate, { throwIfNoEntry: false })?.isDirectory()) return candidate;
+  }
   const posix = text.match(/(?:^|\s)(\/(?:[^/\s]+\/)*[^/\s，。；、]+)/);
   return posix?.[1]?.trim().replace(/[，。；、]+$/, '') || '';
 }

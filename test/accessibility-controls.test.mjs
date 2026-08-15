@@ -30,7 +30,7 @@ test("筛选和关系维度向辅助技术同步选中状态", () => {
   assert.match(html, /data-graph-lens="who" role="tab" aria-selected="true"/);
   assert.match(html, /data-batch-filter="all" role="tab" aria-selected="true"/);
   assert.match(html, /data-log-type="" role="tab" aria-selected="true"/);
-  assert.match(html, /data-capability-tab="skills" role="tab" aria-selected="true"/);
+  assert.match(html, /data-capability-tab="consumers" role="tab" aria-selected="true"/);
   assert.match(atlas, /setAttribute\("aria-selected", String\(button === lensButton\)\)/);
 });
 

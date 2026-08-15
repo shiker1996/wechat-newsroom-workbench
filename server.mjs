@@ -15,7 +15,6 @@ import { ensureStarted } from './plugins/rsshub/collector.mjs';
 import { ModelGateway } from './lib/llm/gateway.mjs';
 import { draftArticle } from './lib/llm/tasks.mjs';
 import { AiJobManager } from './lib/llm/ai-job-manager.mjs';
-import { runEditorialTurn, runEditorialTurnStream } from './lib/llm/editorial-room.mjs';
 import { fetchCandidateSource } from './lib/integrations/source-fetcher.mjs';
 import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
   planImagePlaceholders, imageManifestFile } from './lib/llm/image-workflow.mjs';
@@ -39,16 +38,20 @@ import { handleThemeRoutes } from './lib/http/routes/theme-routes.mjs';
 import { handleBatchRoutes } from './lib/http/routes/batch-routes.mjs';
 import { handleCandidateRoutes } from './lib/http/routes/candidate-routes.mjs';
 import { handleTaskRoutes } from './lib/http/routes/task-routes.mjs';
-import { createRouteHelpers, writeUtf8 as routeWriteUtf8 } from './lib/http/route-helpers.mjs';
+import { createRouteHelpers, writeUtf8 } from './lib/http/route-helpers.mjs';
 import { setToolConfigurationResolver } from './lib/tools/index.mjs';
 import { ExtensionConfigurationService } from './lib/extensions/configuration-service.mjs';
 import { modelProviderManifest } from './lib/extensions/model-provider-configuration.mjs';
 import { seedDemoData } from './lib/demo/seed.mjs';
+import { createLocalSecurity } from './lib/http/local-security.mjs';
+import { APP_VERSION } from './lib/version.mjs';
+import { acquireInstanceLock } from './lib/core/instance-lock.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const config = loadConfig(root);
 // --demo / WORKBENCH_DEMO=1：无模型服务商时也能预览各视图，使用独立演示库，不污染真实数据。
 const demo = process.argv.includes('--demo') || process.env.WORKBENCH_DEMO === '1';
+const instanceLock=acquireInstanceLock(root,{name:demo?'demo':'workbench'});
 const store = new Store(path.join(root, 'data', demo ? 'demo.db' : 'workbench.db'));
 const extensionConfigurationService=new ExtensionConfigurationService({root,repository:store.repositories.extensionSettings});
 setToolConfigurationResolver((manifest)=>{
@@ -68,6 +71,8 @@ const aiJobs = new AiJobManager(store, models, config);
 const artifactRoots = [config.workspaceRoot, ...config.contentRoots];
 const publicRoot = path.join(root, 'public');
 const execFileAsync = promisify(execFile);
+const localSecurity = createLocalSecurity();
+const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
 
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -83,19 +88,25 @@ function json(response, status, data) {
 
 async function body(request) {
   let text = '';
+  const decoder = new TextDecoder('utf-8', { fatal: true });
   for await (const chunk of request) {
-    text += chunk;
+    text += decoder.decode(chunk, { stream: true });
     if (text.length > 12_000_000) throw new Error('请求体过大');
   }
+  text += decoder.decode();
   return text ? JSON.parse(text) : {};
 }
 
 function serveStatic(response, pathname) {
   const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
   const filePath = path.resolve(publicRoot, relative);
-  if (!filePath.startsWith(publicRoot) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return false;
+  const relativeToPublic = path.relative(publicRoot, filePath);
+  if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return false;
   response.writeHead(200, { 'content-type': mime[path.extname(filePath)] ?? 'application/octet-stream', 'cache-control':'no-store' });
-  fs.createReadStream(filePath).pipe(response);
+  const source=fs.createReadStream(filePath);
+  source.once('error',(error)=>{console.error(error);if(!response.headersSent)response.writeHead(404);if(!response.writableEnded)response.end();});
+  response.once('close',()=>{if(!source.destroyed)source.destroy();});
+  source.pipe(response);
   return true;
 }
 
@@ -156,7 +167,7 @@ async function createWorkbenchBackup() {
         if(fs.existsSync(active))files.push({name:`writing-skills/${skill.name}/active.json`,path:active});
       }
     }
-    const manifest={schemaVersion:1,createdAt:new Date().toISOString(),appVersion:'0.1.0',
+    const manifest={schemaVersion:1,createdAt:new Date().toISOString(),appVersion:APP_VERSION,
       excludes:['.env','API tokens','node_modules','cache/log files','data/browser-profiles（登录 Cookie 与会话）'],
       files:files.map((file)=>({name:file.name,size:fs.statSync(file.path).size,
         sha256:crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex')}))};
@@ -198,15 +209,6 @@ function socialCardGate(candidate, contentType, facts, editorial, eventAnalysis)
   if(contentType==='event')return evaluateEventCardGate(candidate,eventAnalysis,editorial);
   if(contentType==='custom')return evaluateCustomCardGate(candidate,facts,editorial);
   return evaluateCardGate(candidate,facts,editorial);
-}
-
-function writeUtf8(filePath, content) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, content, 'utf8');
-  fs.renameSync(tempPath, filePath);
-  const stat = fs.statSync(filePath);
-  return { size: stat.size, modifiedAt: stat.mtime.toISOString() };
 }
 
 function lockedBrief(candidate, editorial) {
@@ -259,6 +261,14 @@ ${editorial.forbidden_claims.trim() || '不得把未核验线索写成事实，�
 
 async function api(request, response, url) {
   const { pathname, searchParams } = url;
+  if (request.method === 'GET' && pathname === '/api/security/session') {
+    return json(response, 200, { csrfToken: localSecurity.csrfToken });
+  }
+  if (request.method === 'POST' && pathname === '/api/security/confirmation') {
+    const input = await body(request);
+    try { return json(response, 201, { token: localSecurity.issue(input.action), expiresInMs: 60_000 }); }
+    catch { return json(response, 400, { code: 'CONFIRMATION_ACTION_INVALID', error: '敏感操作类型无效' }); }
+  }
   if (request.method === 'GET' && pathname === '/api/overview') {
     return json(response, 200, store.overview());
   }
@@ -269,7 +279,7 @@ async function api(request, response, url) {
     binaryBody, createWorkbenchBackup, models })) return;
   const mediaResult = await handleMediaRoutes({ request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity });
   if (mediaResult !== false) return mediaResult;
-  const articleResult = await handleArticleRoutes({ request, response, pathname, store, json, body, candidateEventGroups, fetchCandidateSource, config, root, runEditorialTurn, runEditorialTurnStream, writeUtf8, path, batchWorkdir, lockedBrief, draftArticle, models, aiJobs });
+  const articleResult = await handleArticleRoutes({ request, response, pathname, store, json, body, candidateEventGroups, fetchCandidateSource, config, root, writeUtf8, path, batchWorkdir, lockedBrief, draftArticle, models, aiJobs, localSecurity });
   if (articleResult !== false) return articleResult;
   const socialCardResult = await handleSocialCardRoutes({ request, response, pathname, searchParams, store, json, body, path, fs, root, config, mime, models, aiJobs, socialCardFiles, isInsideRoots, createZip, socialContentType, resolveEventAnalysisFor, socialCardGate, socialChannelMode, describeCardLayouts, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_COMPOSITION_MODES, normalizeCardComposition, loadSkillBundle, fetchCandidateSource, candidateEventGroups, candidateRepositoryUrl, inspectRepository, socialCardWorkdir, writeUtf8, repositoryFactMarkdown, evaluateCardGate });
    if (socialCardResult !== false) return socialCardResult;
@@ -277,8 +287,8 @@ async function api(request, response, url) {
    const batchResult = await handleBatchRoutes({ request, response, pathname, searchParams, root, store, jobs, body, json,
      batchWorkdir, decorateBatch: routeHelpers.decorateBatch, batchMaxAgeHours: routeHelpers.batchMaxAgeHours, config });
    if (batchResult !== false) return batchResult;
-   const candidateResult = await handleCandidateRoutes({ request, response, pathname, searchParams, root, config, store, body, json, models, aiJobs,
-     batchWorkdir, articleWorkdir, socialCardWorkdir, writeUtf8: routeWriteUtf8, candidateRepositoryUrl, candidateEventGroups: routeHelpers.candidateEventGroups,
+   const candidateResult = await handleCandidateRoutes({ request, response, pathname, searchParams, root, config, store, body, json, models, aiJobs, localSecurity,
+     batchWorkdir, articleWorkdir, socialCardWorkdir, writeUtf8, candidateRepositoryUrl, candidateEventGroups: routeHelpers.candidateEventGroups,
      attachEventConclusions: routeHelpers.attachEventConclusions, evaluateCustomCardGate });
    if (candidateResult !== false) return candidateResult;
    const taskResult = await handleTaskRoutes({ request, response, pathname, searchParams, store, body, json, aiJobs, jobs, models, root, config,
@@ -296,6 +306,12 @@ if (!demo) {
 
 const server = http.createServer(async (request, response) => {
   try {
+    response.setHeader('content-security-policy', CONTENT_SECURITY_POLICY);
+    response.setHeader('x-content-type-options', 'nosniff');
+    response.setHeader('referrer-policy', 'no-referrer');
+    const boundaryError = localSecurity.validateBoundary(request);
+    if (boundaryError) return json(response, boundaryError.status, boundaryError);
+    request.localSecurity = localSecurity;
     const url = new URL(request.url, `http://${request.headers.host ?? '127.0.0.1'}`);
     if (url.pathname.startsWith('/api/')) {
       const handled = await api(request, response, url);
@@ -308,7 +324,7 @@ const server = http.createServer(async (request, response) => {
     }
   } catch (error) {
     if(response.headersSent){if(!response.writableEnded)response.end();}
-    else json(response, 500, { error: error.message });
+    else { console.error(error); json(response, 500, { code: 'INTERNAL_ERROR', error: '服务器处理请求失败' }); }
   }
 });
 
@@ -335,3 +351,13 @@ server.listen(config.port, '127.0.0.1', () => {
   console.log(`公众号工作台已启动：http://127.0.0.1:${config.port}`);
   if (demo) console.log('演示模式：使用独立演示库 data/demo.db，无模型服务商也可浏览各视图。');
 });
+
+let shuttingDown=false;
+function shutdown(signal){
+  if(shuttingDown)return;shuttingDown=true;
+  console.log(`收到 ${signal}，正在安全关闭工作台`);
+  server.close(()=>{try{store.close();}finally{instanceLock.release();process.exit(0);}});
+  setTimeout(()=>process.exit(1),10_000).unref();
+}
+process.once('SIGINT',()=>shutdown('SIGINT'));
+process.once('SIGTERM',()=>shutdown('SIGTERM'));

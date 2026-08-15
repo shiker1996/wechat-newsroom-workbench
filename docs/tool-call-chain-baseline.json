@@ -181,16 +181,26 @@
       "name": "自定义图文故事板",
       "requiredCapabilities": [],
       "optionalCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
         "content.web.search",
         "content.news.search",
-        "content.document.search"
+        "content.document.search",
+        "content.repository.inspect",
+        "content.passage.retrieve"
       ]
     },
     {
       "id": "editorial-room",
       "name": "公众号编辑会",
       "requiredCapabilities": [],
-      "optionalCapabilities": []
+      "optionalCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.passage.retrieve",
+        "content.web.search",
+        "content.news.search"
+      ]
     },
     {
       "id": "event-card-generator",
@@ -395,7 +405,8 @@
         "content.url.fetch",
         "content.web.search",
         "content.news.search",
-        "content.document.search"
+        "content.document.search",
+        "content.passage.retrieve"
       ]
     },
     {
@@ -420,34 +431,53 @@
         {
           "capability": "content.url.fetch",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "source-content"
         },
         {
           "capability": "content.web.search",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
         },
         {
           "capability": "content.news.search",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
         },
         {
           "capability": "content.document.search",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
         },
         {
           "capability": "content.repository.inspect",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
         },
         {
           "capability": "filesystem.project.read",
           "requirement": "conditional",
-          "failurePolicy": "continue-with-warning"
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "project-summary"
         }
-      ]
+      ],
+      "purpose": "创建事实基座前补齐资料缺口：抓取来源正文、补搜公开/新闻/文档资料、分析仓库、读取本地项目摘要；对话阶段 Agent 已收集的内容会跳过不重复"
     },
     {
       "id": "feature.article-passage-retrieval",
@@ -460,9 +490,13 @@
         {
           "capability": "content.passage.retrieve",
           "requirement": "required",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "editorial-context"
         }
-      ]
+      ],
+      "purpose": "编辑会讨论前把超长来源正文做本地检索压缩，只把相关摘录注入模型上下文"
     },
     {
       "id": "feature.wechat-typeset",
@@ -476,19 +510,29 @@
         {
           "capability": "diagram.mermaid.render",
           "requirement": "conditional",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "article-asset"
         },
         {
           "capability": "diagram.echarts.render",
           "requirement": "conditional",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "article-asset"
         },
         {
           "capability": "image.cdn.upload",
           "requirement": "conditional",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "cdn-url-writeback"
         }
-      ]
+      ],
+      "purpose": "文章定稿后排版：把 Mermaid/ECharts 图表渲染成图片并上传图床，URL 写回文章"
     },
     {
       "id": "feature.diagram-preview",
@@ -501,14 +545,21 @@
         {
           "capability": "diagram.mermaid.render",
           "requirement": "conditional",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "preview-response"
         },
         {
           "capability": "diagram.echarts.render",
           "requirement": "conditional",
-          "failurePolicy": "block"
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "preview-response"
         }
-      ]
+      ],
+      "purpose": "写作过程中把 Mermaid/ECharts 代码即时渲染成预览图返回前端"
     }
   ],
   "codeCalls": [

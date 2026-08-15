@@ -6,6 +6,10 @@
 /lib/tools/remote-credentials.mjs @shiker1996
 /lib/artifacts/backup-archive.mjs @shiker1996
 /lib/http/routes/system-routes.mjs @shiker1996
-/collectors/rsshub.mjs @shiker1996
+/lib/http/local-security.mjs @shiker1996
+/lib/http/routes/system-restore-transactions.mjs @shiker1996
+/lib/agent/ @shiker1996
+/plugins/rsshub/ @shiker1996
 /plugins/url-fetch/ @shiker1996
-/scripts/cold-start-acceptance.sh @shiker1996
+/plugins/local-project-reader/ @shiker1996
+/scripts/release.mjs @shiker1996

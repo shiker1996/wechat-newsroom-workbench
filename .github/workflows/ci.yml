@@ -43,6 +43,9 @@ jobs:
         # 覆盖浏览器渲染层（布局审计、ECharts、浏览器内联化），Chromium 来自 postinstall 下载，
         # 不依赖真实 API Key、用户 Chrome Profile、RSSHub 常驻进程或外部 CDN 写入。
 
+      - name: 消费者—能力治理门禁
+        run: npm run capability:gates
+
       - name: 校验示例技能包与工具插件
         run: |
           node scripts/validate-skill-package.mjs docs/examples/skill-package

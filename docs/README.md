@@ -3,10 +3,10 @@
 本目录文档按三类维护，避免读者把**已上线的功能**误认为待办、或把**历史方案**误认为当前架构：
 
 - **现状**：描述当前系统真实行为的参考文档，随代码改动同步更新（CI 有校验的优先相信测试）。
-- **历史决策**：已实施或已拍板的设计评审、复盘记录，保留用于追溯「当时为什么这么做」，不代表当前实现细节。
+- **历史决策**：已实施或已拍板的设计评审、复盘记录，已归档至 [archive/](./archive/)，保留用于追溯「当时为什么这么做」，不代表当前实现细节。
 - **未来计划**：待办与待评审方案，其中描述的功能**尚未实现**。
 
-新增文档时在头部注明类别与状态（如 `> 状态：已实施` / `> 状态：待评审`），并登记到下表。
+新增文档时在头部注明类别与状态（如 `> 状态：已实施` / `> 状态：待评审`），并登记到下表；已闭环的阶段性文档移入 `archive/` 并更新本索引。
 
 ## 现状
 
@@ -23,41 +23,26 @@
 | [configuration-migration-and-system-center-redesign.md](./configuration-migration-and-system-center-redesign.md) | 旧配置迁移、统一配置资源模型与系统配置中心重构实施方案 |
 | [configuration-migration-inventory.json](./configuration-migration-inventory.json) | 阶段 0 旧配置字段、秘密属性、消费点和迁移目标机器清单 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
-| [ai-assisted-web-source-configuration-plan.md](./ai-assisted-web-source-configuration-plan.md) | 网页自动采集的静态优先、动态降级、AI 排序和字段复验方案（Phase 0–3 已实施） |
-| [collector-plugin-architecture-plan.md](./collector-plugin-architecture-plan.md) | 采集插件、统一来源服务和动态配置架构（核心阶段已实施） |
+| [ai-assisted-web-source-configuration-plan.md](./ai-assisted-web-source-configuration-plan.md) | 网页自动采集的静态优先、动态降级、AI 排序和字段复验方案（Phase 0–3 已实施，Phase 4 待实施） |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |
+| [r6-release-and-disk-hygiene.md](./r6-release-and-disk-hygiene.md) | R6 发布治理实施结果、磁盘清理精确路径盘点及人工确认条件 |
+| [consumer-capability-adaptation-design.md](./consumer-capability-adaptation-design.md) | 消费者—能力—工具实现统一治理方案（阶段 0–6 已实施，现行机制的权威描述） |
+| [consumer-capability-expansion-design.md](./consumer-capability-expansion-design.md) | 消费者能力扩展方案：三类消费者纳入、页面三分组与接入清单（阶段 A–D 已实施，§5.1/§10 有遗留裁定项） |
+| [capability-onboarding-configurability-plan.md](./capability-onboarding-configurability-plan.md) | 能力接入配置化与开发规范化：五种情形分级、能力生命周期状态机、Agent 登记驱动（阶段 1–4 已实施；页面添加入口 2026-08-15 已下线） |
+| [capability-expansion-guide.md](./capability-expansion-guide.md) | 能力拓展单一视图：消费者×能力类型成本矩阵、生命周期状态机、三类消费者 SOP 与遗留方向（2026-08-15 汇总，拓展先读） |
+| [agent-adapter-configurability-design.md](./agent-adapter-configurability-design.md) | Agent 能力适配层配置化设计：resourceKind 档案表 + Agent 双 map 声明，资源类能力接入免改代码（2026-08-15，待评审） |
 
 ## 历史决策
 
-| 文档 | 内容 |
-|---|---|
-| [2026-07-20-project-init.md](./2026-07-20-project-init.md) | 项目起点：技能封装为应用的可行性讨论 |
-| [project-development-journey.md](./project-development-journey.md) | 开发历程与阶段感悟 |
-| [project-development-record.md](./project-development-record.md) | 内部工程复盘 |
-| [custom-content-and-xiaohongshu-design.md](./custom-content-and-xiaohongshu-design.md) | 自定义图文 + 小红书渠道设计评审（已实施） |
-| [dual-content-pools-and-social-card-pipeline.md](./dual-content-pools-and-social-card-pipeline.md) | 文章 / 图文双选题池方案（已实施） |
-| [skill-and-tool-extension-plan.md](./skill-and-tool-extension-plan.md) | 技能与工具扩展能力方案（P0–P4 已完成） |
-| [tool-plugins-and-configurable-writing-skills.md](./tool-plugins-and-configurable-writing-skills.md) | 工具插件化与技能可配置化方案（已完成） |
-| [social-card-storyboard-skill-extension-plan.md](./social-card-storyboard-skill-extension-plan.md) | 图文故事板技能化改造方案 |
-| [2026-08-07-cover-image-and-ai-repo-discovery-plan.md](./2026-08-07-cover-image-and-ai-repo-discovery-plan.md) | 封面图、AI 兴趣仓库、事实基座链接入库的工作事项与实施方案（已实施，0.3.0） |
-| [2026-08-07-cover-image-design.md](./2026-08-07-cover-image-design.md) | 公众号封面图设计方案：组件契约、AI 排版决策、确定性渲染与封面主题体系（已实施，0.3.0） |
-| [2026-08-12-extension-architecture-refactor-summary.md](./2026-08-12-extension-architecture-refactor-summary.md) | 动态配置、能力图、工具与采集插件统一、流水线失败治理的阶段总结及遗留待办 |
+已实施完成或被取代的阶段性方案、实施记录与复盘，统一归档于 [archive/](./archive/)（37 篇，2026-08-14 整理）。要点提示：
+
+- R1–R6 整改系列的实施记录（`r3-*`/`r4-*`/`r5-*`）与 `review-remediation-roadmap.md` 已全部闭环归档；
+- 工具调用链与依赖重构（`tool-call-chain-and-dependency-refactor.md`）已由消费者能力治理系列承接；
+- 通用对话 ToolCall Agent 架构（`unified-conversation-toolcall-agent-design.md`，Phase 0–5 已完成）归档，当前行为以 [architecture.md](./architecture.md) 为准；
+- 主题体系、技能扩展、图文流水线等已实施方案（`article-and-social-theme-json-plan.md` 等）均在此。
 
 ## 未来计划
 
 | 文档 | 内容 |
 |---|---|
-| [plugin-boundary-convergence-plan.md](./plugin-boundary-convergence-plan.md) | 插件独立安装边界、跨插件依赖收敛、Plugin SDK 与分阶段实施方案（Phase 0–1 已完成） |
-| [tool-call-chain-and-dependency-refactor.md](./tool-call-chain-and-dependency-refactor.md) | 工具调用链、统一能力依赖图、停用影响门禁、执行兜底与可视化重构方案 |
-| [account-content-strategy-and-skill-alignment-plan.md](./account-content-strategy-and-skill-alignment-plan.md) | 账号推荐池 / 通知池双分发策略、账号配置校准、选题与成稿技能对齐及分阶段实施计划 |
-| [0730-todo-list.md](./0730-todo-list.md) | 后续工作事项与已知问题 |
-| [optional-feature-todos.md](./optional-feature-todos.md) | 可选功能扩展 TODO（各事项独立状态） |
-| [optional-feature-implementation-roadmap.md](./optional-feature-implementation-roadmap.md) | 可选功能实施路线图（部分批次已完成） |
-| [event-deep-fetch-and-fact-base-plan.md](./event-deep-fetch-and-fact-base-plan.md) | 事件精选深抓与事实基座升级计划 |
-| [typeset-pipeline-optimization-plan.md](./typeset-pipeline-optimization-plan.md) | 排版流水线优化方案（P2 待实施） |
-| [article-and-social-theme-json-plan.md](./article-and-social-theme-json-plan.md) | 文章排版与图文视觉主题 JSON 化、版本化及用户自定义主题实施方案 |
-| [theme-config-editor-expansion-plan.md](./theme-config-editor-expansion-plan.md) | 主题完整样式配置、生产级实时预览与发布门禁扩展方案 |
-| [theme-style-capability-inventory.md](./theme-style-capability-inventory.md) | 文章 / 图文 20 套主题视觉能力清单、配置消费矩阵与阶段 0 基线 |
-| [ai-theme-creation-extension-plan.md](./ai-theme-creation-extension-plan.md) | 主题中心 AI 创建主题、候选确认、受控生成与发布治理扩展方案 |
-| [theme-element-customization-expansion-plan.md](./theme-element-customization-expansion-plan.md) | 主题文字、颜色、边框等元素级可配置现状与受控组件属性扩展方案 |
 | [star-growth-roadmap.md](./star-growth-roadmap.md) | Star 增长路线图：发布临门一脚、首个公开 Release、可见性渠道与留存运营（待评审） |

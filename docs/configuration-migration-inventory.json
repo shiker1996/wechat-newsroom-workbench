@@ -84,6 +84,12 @@
     {"source":"config","path":"sourceFetch.rssFallbackMinChars","secret":false,"target":"tool:url-fetch.rssFallbackMinChars","consumer":{"file":"lib/integrations/source-fetcher-core.mjs","token":"rssFallbackMinChars"}},
     {"source":"config","path":"sourceFetch.githubMinChars","secret":false,"target":"tool:url-fetch.githubMinChars","consumer":{"file":"lib/integrations/source-fetcher-core.mjs","token":"githubMinChars"}},
     {"source":"config","path":"aiJobs.maxConcurrent","secret":false,"target":"system:jobs.maxConcurrent","consumer":{"file":"lib/llm/ai-job-manager.mjs","token":"maxConcurrent"}},
+    {"source":"config","path":"conversationAgent.maxModelSteps","secret":false,"target":"system:conversation-agent.maxModelSteps","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"maxModelSteps"}},
+    {"source":"config","path":"conversationAgent.maxToolCalls","secret":false,"target":"system:conversation-agent.maxToolCalls","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"maxToolCalls"}},
+    {"source":"config","path":"conversationAgent.maxParallelToolCalls","secret":false,"target":"system:conversation-agent.maxParallelToolCalls","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"maxParallelToolCalls"}},
+    {"source":"config","path":"conversationAgent.maxToolResultChars","secret":false,"target":"system:conversation-agent.maxToolResultChars","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"maxToolResultChars"}},
+    {"source":"config","path":"conversationAgent.maxTotalToolResultChars","secret":false,"target":"system:conversation-agent.maxTotalToolResultChars","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"maxTotalToolResultChars"}},
+    {"source":"config","path":"conversationAgent.timeoutMs","secret":false,"target":"system:conversation-agent.timeoutMs","consumer":{"file":"lib/agent/conversation-agent.mjs","token":"timeoutMs"}},
     {"source":"config","path":"articleLength.minVisibleChars","secret":false,"target":"system:content-length.minVisibleChars","consumer":{"file":"lib/core/config.mjs","token":"minVisibleChars"}},
     {"source":"config","path":"articleLength.maxVisibleChars","secret":false,"target":"system:content-length.maxVisibleChars","consumer":{"file":"lib/core/config.mjs","token":"maxVisibleChars"}},
     {"source":"config","path":"articleLength.pipelines.*","secret":false,"target":"system:content-length.pipelines.*","consumer":{"file":"lib/core/config.mjs","token":"pipelines"}},
@@ -91,4 +97,3 @@
     {"source":"rsshub-env","path":"*","secret":true,"target":"collector:rsshub-collector.environment","consumer":{"file":"lib/integrations/runtime-settings.mjs","token":"publicRsshubFields"}}
   ]
 }
-

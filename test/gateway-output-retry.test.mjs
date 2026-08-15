@@ -47,6 +47,8 @@ test('complete retries a truncated structured stage once with expanded budget', 
       initial: 6000, retry: 10000, adaptive: true, providerMax: 12000, used: 10000, attempts: 2,
     });
     assert.equal(records[0].completionTokens, 6020);
+    assert.equal(records[0].outputBudget.source,'purpose-profile');
+    assert.equal(records[0].outputBudget.thinkingReserve,0);
   } finally {
     delete process.env.TEST_RETRY_KEY;
   }

@@ -74,6 +74,7 @@ async function body(request) {
 
 async function startSystemRoutes(t, root) {
   const server = http.createServer(async (request, response) => {
+    request.localSecurity={consume:(_request,action)=>action==='plugin-admin'&&request.headers['x-action-confirm']==='test-plugin-admin'};
     const url = new URL(request.url, 'http://127.0.0.1');
     try {
       const handled = await handleSystemRoutes({
@@ -98,7 +99,7 @@ test('first-run-confirm 路由写入确认时间，未知插件返回 400', asyn
   const missing = await fetch(`${base}/api/system/remote-tool-plugins/nope/first-run-confirm`, { method: 'POST', body: '{}' });
   assert.equal(missing.status, 400);
 
-  const okResponse = await fetch(`${base}/api/system/remote-tool-plugins/demo-remote/first-run-confirm`, { method: 'POST', body: '{}' });
+  const okResponse = await fetch(`${base}/api/system/remote-tool-plugins/demo-remote/first-run-confirm`, { method: 'POST', headers:{'x-action-confirm':'test-plugin-admin'}, body: '{}' });
   assert.equal(okResponse.status, 200);
   const result = await okResponse.json();
   assert.ok(result.firstRunConfirmedAt);

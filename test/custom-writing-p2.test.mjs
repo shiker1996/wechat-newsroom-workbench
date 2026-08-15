@@ -22,6 +22,11 @@ test('自主写作项目列表提供加载播报、错误恢复、原项目重�
   assert.match(tutorial,/data-custom-writing-open/);
 });
 
+test('自主写作重试从文章轨道读取 output_mode 并以创建记录兜底识别',()=>{
+  assert.match(server,/candidate\.tracks\?\.find\(\(item\) => item\.track === 'article'\)\?\.output_mode/);
+  assert.match(server,/if \(!creation && !\['wechat-experience', 'wechat-tutorial'\]\.includes\(outputMode\)\)/);
+});
+
 test('热点事件创作由服务端过滤自主写作候选',()=>{
   assert.match(editorial,/candidates\?kind=hotspot/);
   assert.match(server,/kind === 'independent'/);

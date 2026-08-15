@@ -6,13 +6,13 @@
 
 - 工作台 HTTP 服务**硬编码绑定 `127.0.0.1`**（`server.mjs` 末尾 `listen` 字面量），没有任何配置项可以改成 `0.0.0.0`（`config.local.json` / `.env` 均无 host 项）。这是整个系统唯一真实的网络边界：所有 API 都假定调用方是本机用户本人。
 - 确认头（`x-admin-confirm: TRUSTED-LOCAL-PLUGIN`、`x-admin-confirm: DELETE-BATCH`、`x-restore-confirm: RESTORE`）是**防误触的 UI 语义**，不是鉴权。前端在对应操作前弹确认框，确认后才带头。
-- 密钥永不入库、永不回读：LLM Key 在 `~/.codex`（或用户本地配置），远程插件凭据按 profile 哈希存 `.env.remote-plugins`（服务端只写不读回页面）；审计日志只记参数名不记正文（`lib/tools/execution-log.mjs`）。
+- 密钥不进入业务数据库、不回显明文：模型与扩展凭据由统一配置服务和本地秘密文件管理；配置摘要包含秘密值哈希但不包含原值。Agent 工具调用审计只记录脱敏参数摘要，不保存正文或凭据。
 
 ## 1. 入口与防护清单
 
 ### 1.1 本地目录读取 / 路径穿越
 
-- 本地项目读取器：`lib/integrations/local-project-reader-core.mjs`——跳过密钥文件名（`SECRET_FILE` 正则）、跳过 symlink、跳过依赖目录、大小/字符上限。
+- 本地项目读取器：`plugins/local-project-reader/implementation.mjs`——限制授权根目录、跳过秘密文件名、symlink 与依赖目录，并执行文件数、大小和字符上限。
 - 策略层：`lib/tools/policy.mjs` `enforcePolicy` 校验 `allowedRoots`，`realpathSync` 防 symlink 绕过。
 - 产物资产：`lib/artifacts/artifact-indexer.mjs` `isInsideRoots` / `resolveArtifactRelativeAsset` 防 `../`；内容路由（preview/content/asset）全部过 `isInsideRoots`。
 - 测试：`test/local-project-reader.test.mjs`、`test/tool-registry.test.mjs`、`test/artifact-relative-assets.test.mjs`。
@@ -38,7 +38,7 @@
 
 ### 1.5 URL 抓取（RSS 订阅 / 热点原文）
 
-- RSS 直连：`collectors/rsshub.mjs` `assertPublicFeedUrl`——仅 HTTP(S)、禁内嵌凭据、禁 localhost、DNS 解析后逐地址过 `privateIp`（2026-07-31 起复用 remote-adapter 的全量实现，补上 100.64/10、198.18/15、0.0.0.0、192.0.0/24、240/4 等漏段），手动重定向 ≤4 次每跳重校验，12 MB 上限。
+- RSS 直连：`plugins/rsshub/collector.mjs` 及其网络安全模块——仅 HTTP(S)、禁内嵌凭据与本机/内网目标，重定向逐跳复核并限制响应体大小。
 - url-fetch 插件：`plugins/url-fetch/adapter.mjs` 增加 `publicTargetError`（2026-07-31）——禁 localhost、IP 字面量直接判定、域名先解析再逐地址过 `privateIp`；URL 规范化解析天然覆盖十进制/十六进制 IP 字面量（如 `2130706433` → `127.0.0.1`）。
 - Firecrawl MCP：`lib/integrations/firecrawl-mcp.mjs` `validatePublicUrl` 拒绝 localhost/.local/内网 IPv4/`::1`，10 MB 上限。
 - Python 抓取脚本 `scripts/fetch-hotspot-url.py` 自带本机/内网拒绝（第二道防线）。
@@ -57,6 +57,14 @@
 - 图片产物预览页：`lib/artifacts/artifact-preview.mjs` 对 URL 与 title 转义（2026-07-31 补上 title 的 `"` 转义，堵 `alt` 属性注入）。
 - HTML 产物预览原样输出（无 CSP/sandbox）——见 §2.2 已接受风险。
 - 测试：`test/editor-preview.test.mjs`、`test/artifact-preview.test.mjs`、`test/security-boundaries.test.mjs`（title 引号转义）。
+
+### 1.8 会话 Agent 资源授权（消费者—能力层）
+
+- 模型只见 resourceId，不见本地绝对路径/root/allowedRoots/凭据/插件名：三个 Adapter 的工具目录由 `lib/agent/resource-adaptation.mjs` 统一改写入参 Schema（`withResourceInputSchemas`），参数转换时按本次请求的资源目录逐项校验，越界即 `RESOURCE_NOT_ALLOWED`。
+- 授权范围按请求一次性确定：素材 URL、文档根目录、本地项目路径全部来自用户当次输入或既有授权配置，模型不能自行构造；一次性确认语义由入口既有流程保持。
+- 结果裁剪：本地项目读取结果只保留摘要字段（`trimProjectReadResult`），本地路径不扩散进模型上下文与审计明文；审计只记脱敏参数。
+- 消费者—能力登记：`config/capability-consumers.json` 为唯一权威源；治理门禁 `scripts/check-consumer-capability-gates.mjs`（CI 步骤）反向检查"配置声明但无适配"与"适配存在但未登记"，阻断隐式生产依赖。
+- 测试：`test/consumer-capability-gates.test.mjs`、`test/consumer-capability-consistency.test.mjs`、`test/skill-capability-authorization.test.mjs`。
 
 ## 2. 已接受风险（服务绑 127.0.0.1 前提下）
 
@@ -79,3 +87,4 @@
 ## 3. 变更记录
 
 - 2026-07-31：首次盘点并修复——①技能包 install/update/status/delete 四路由补 `x-admin-confirm` 校验（服务端 + 前端确认弹窗）；②图片预览页 title 补 `"` 转义；③rsshub 内网判定复用 remote-adapter 的 `privateIp` 全量实现；④url-fetch 插件增加内网/本机目标拒绝；⑤新增 `test/security-boundaries.test.mjs`（确认头、Zip Slip、保留段、url-fetch 拦截、响应超限、title 转义共 7 例）。
+- 2026-08-14：新增 §1.8 会话 Agent 资源授权（消费者—能力统一治理落地，见 `docs/consumer-capability-adaptation-design.md`）；新增治理门禁脚本 `scripts/check-consumer-capability-gates.mjs` 并接入 CI。

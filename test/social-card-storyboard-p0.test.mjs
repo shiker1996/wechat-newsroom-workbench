@@ -145,7 +145,7 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   }
   assert.deepEqual(repository.manifest.entryPoints,['social-tool']);
   assert.deepEqual(event.manifest.entryPoints,['social-event']);
-  assert.deepEqual(custom.manifest.entryPoints,['social-custom']);
+  assert.deepEqual(custom.manifest.entryPoints,['custom-social']);
   assert.equal(delivery.manifest.kind,'stage');
   assert.equal(delivery.manifest.inputContract,'social_card_storyboard');
   assert.equal(delivery.manifest.outputContract,'social_card_delivery');

@@ -15,7 +15,7 @@
    node scripts/release.mjs
    ```
 
-   产物在 `dist/`：`<name>-<version>.zip`（`git archive HEAD` 生成）与 `SHA256SUMS.txt`。脚本只打包已提交的 HEAD，工作区有未提交改动时会警告。
+   产物在 `dist/`：`<name>-<version>.zip`（`git archive HEAD` 生成）与 `SHA256SUMS.txt`。脚本会先精确清空项目根目录下的旧 `dist/` 内容，拒绝工作区与 HEAD 版本号不一致，并为本次目录中的全部发布物生成 SHA-256；工作区有其他未提交改动时仍会明确警告，因为归档只包含 HEAD。
 7. 在 GitHub 创建 Release：选择刚推送的 tag，把 zip 与 `SHA256SUMS.txt` 作为附件上传，正文粘贴 CHANGELOG 对应段落。
 8. 用户侧校验下载完整性：`certutil -hashfile <zip> SHA256`（Windows）或 `shasum -a 256 <zip>`，与 `SHA256SUMS.txt` 比对。
 

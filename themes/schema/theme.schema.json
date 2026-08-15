@@ -38,24 +38,25 @@
           "required": ["family", "headingFamily", "bodyPx", "h1Px", "h2Px", "captionPx", "lineHeight", "letterSpacingEm"],
           "properties": {
             "family": { "enum": ["sans", "serif", "mono"] }, "headingFamily": { "enum": ["sans", "serif", "mono"] },
-            "bodyPx": { "type": "number", "minimum": 9, "maximum": 18 }, "h1Px": { "type": "number", "minimum": 22, "maximum": 44 },
-            "h2Px": { "type": "number", "minimum": 11, "maximum": 28 }, "captionPx": { "type": "number", "minimum": 8, "maximum": 15 },
-            "lineHeight": { "type": "number", "minimum": 1.2, "maximum": 2.1 }, "letterSpacingEm": { "type": "number", "minimum": -0.08, "maximum": 0.2 }
+            "bodyPx": { "type": "number", "minimum": 9, "maximum": 18, "multipleOf": 1 }, "h1Px": { "type": "number", "minimum": 22, "maximum": 44, "multipleOf": 1 },
+            "h2Px": { "type": "number", "minimum": 11, "maximum": 28, "multipleOf": 1 }, "captionPx": { "type": "number", "minimum": 8, "maximum": 15, "multipleOf": 1 },
+            "codePx": { "type": "number", "minimum": 8, "maximum": 15, "multipleOf": 1 },
+            "lineHeight": { "type": "number", "minimum": 1.2, "maximum": 2.1, "multipleOf": 0.05 }, "letterSpacingEm": { "type": "number", "minimum": -0.08, "maximum": 0.2, "multipleOf": 0.005 }
           }
         },
         "spacing": {
           "type": "object", "additionalProperties": false,
           "required": ["articlePaddingPx", "sectionPx", "paragraphPx", "cardGapPx"],
           "properties": {
-            "articlePaddingPx": { "type": "number", "minimum": 0, "maximum": 40 }, "sectionPx": { "type": "number", "minimum": 12, "maximum": 48 },
-            "paragraphPx": { "type": "number", "minimum": 6, "maximum": 28 }, "cardGapPx": { "type": "number", "minimum": 0, "maximum": 28 }
+            "articlePaddingPx": { "type": "number", "minimum": 0, "maximum": 40, "multipleOf": 1 }, "sectionPx": { "type": "number", "minimum": 12, "maximum": 48, "multipleOf": 1 },
+            "paragraphPx": { "type": "number", "minimum": 6, "maximum": 28, "multipleOf": 1 }, "cardGapPx": { "type": "number", "minimum": 0, "maximum": 28, "multipleOf": 1 }
           }
         },
         "shape": {
           "type": "object", "additionalProperties": false,
           "required": ["radiusPx", "borderWidthPx", "shadow"],
           "properties": {
-            "radiusPx": { "type": "number", "minimum": 0, "maximum": 32 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 8 },
+            "radiusPx": { "type": "number", "minimum": 0, "maximum": 32, "multipleOf": 1 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 8, "multipleOf": 1 },
             "shadow": { "enum": ["none", "soft", "hard", "glow"] }
           }
         }

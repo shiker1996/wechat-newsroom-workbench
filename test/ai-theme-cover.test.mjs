@@ -272,7 +272,8 @@ test('主题管理 UI 提供封面 AI 生成入口与三目标文案', () => {
   const index = fs.readFileSync('public/index.html', 'utf8');
   assert.ok(index.includes('name="ai-theme-target" value="cover"'));
   const manager = fs.readFileSync('public/src/views/theme-manager.js', 'utf8');
-  assert.ok(manager.includes("cover:'封面'"));
+  const fields = fs.readFileSync('public/src/views/theme-manager-fields.js', 'utf8');
+  assert.ok(fields.includes("cover:'封面'"));
   assert.ok(manager.includes("loadThemeCatalog('cover')"));
   assert.ok(manager.includes("active.target==='cover'"));
 });

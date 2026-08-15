@@ -25,6 +25,7 @@
       "h1Px": {"article":"complete","social":"complete"},
       "h2Px": {"article":"complete","social":"complete"},
       "captionPx": {"article":"complete","social":"complete"},
+      "codePx": {"article":"not_applicable","social":"complete"},
       "lineHeight": {"article":"complete","social":"complete"},
       "letterSpacingEm": {"article":"complete","social":"complete"}
     },

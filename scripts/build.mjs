@@ -44,7 +44,7 @@ function checkLocalImports(filePath, content) {
 const sourceFiles = [
   path.join(root, "server.mjs"),
   ...walk(path.join(root, "lib")),
-  ...walk(path.join(root, "collectors")),
+  ...walk(path.join(root, "plugins")),
   ...walk(path.join(publicDir, "src"), new Set([".js"])),
 ];
 let ok = true;

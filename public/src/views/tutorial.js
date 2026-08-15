@@ -4,6 +4,8 @@ import { JOB_POLL_INTERVAL_MS } from "../core/constants.js";
 import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
+import { consumeAgentEvent } from "../core/agent-events.js";
+// Unified stream contract consumed here: tool.requested, assistant.delta.
 
 let bound = false;
 let candidateId = null;
@@ -191,10 +193,13 @@ async function sendChat() {
   const replyText = document.createElement("div");
   replyText.className = "reply-text";
   assistant.appendChild(replyText);
-  let thinkingBox = null, thinkingText = null;
+  const thinkingBox=document.createElement("details");thinkingBox.className="thinking-box";thinkingBox.hidden=true;thinkingBox.innerHTML='<summary>思考过程</summary><div class="thinking-text"></div>';const thinkingText=thinkingBox.querySelector(".thinking-text");assistant.insertBefore(thinkingBox,replyText);
+  const toolCards=document.createElement("div");toolCards.className="agent-tool-cards";assistant.insertBefore(toolCards,replyText);
+  const { securityHeaders } = await import("../core/http.js");
+  const projectReadRequested = /[A-Za-z]:\\|(?:^|\s)\//.test(answer) || Boolean(draft().localProjectPath);
   const response = await fetch(`/api/batches/${encodeURIComponent(batch.id)}/tutorial-chat/stream`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await securityHeaders({ confirmation: projectReadRequested ? "local-project-read" : "" })) },
     body: JSON.stringify({ provider: field("provider").value, draft: draft(), history, answer }),
   });
   if (!response.ok || !response.body) throw new Error(`教程策划请求失败（${response.status}）`);
@@ -209,24 +214,8 @@ async function sendChat() {
     for (const record of records) {
       if (!record.trim()) continue;
       const event = JSON.parse(record);
-      if (event.type === "thinking") {
-        if (!thinkingBox) {
-          thinkingBox = document.createElement("details");
-          thinkingBox.className = "thinking-box";
-          const summary = document.createElement("summary");
-          summary.textContent = "思考过程";
-          thinkingText = document.createElement("div");
-          thinkingText.className = "thinking-text";
-          thinkingBox.append(summary, thinkingText);
-          assistant.insertBefore(thinkingBox, replyText);
-        }
-        thinkingBox.open = true;
-        thinkingText.textContent += event.text;
-        thinkingText.scrollTop = thinkingText.scrollHeight;
-      }
-      if (event.type === "delta") replyText.textContent += event.text;
-      if (event.type === "error") throw new Error(event.error);
-      if (event.type === "done") { result = event.data; if (thinkingBox) thinkingBox.open = false; }
+      const completed=consumeAgentEvent(event,{toolCards,replyText,thinkingBox,thinkingText,errorLabel:'自主写作'});
+      if(completed)result=completed;
     }
     if (done) break;
   }
@@ -250,7 +239,7 @@ async function inspectProject() {
   if (!projectPath) { setProjectStatus("请先填写项目文件夹的绝对路径。", "error"); field("localProjectPath").focus(); return; }
   setProjectStatus("正在读取项目结构与支持的文本文件…", "loading");
   try {
-    const result = await request("/api/tools/local-project/read", { method: "POST", body: JSON.stringify({ path: projectPath }) });
+    const result = await request("/api/tools/local-project/read", { method: "POST", confirmation: "local-project-read", body: JSON.stringify({ path: projectPath }) });
     setProjectStatus(`${result.summary}${result.truncated ? "（内容较多，已截断）" : ""}`, "success");
     toast("项目素材已就绪，AI 将在后续对话中使用");
   } catch (error) {
@@ -295,7 +284,7 @@ async function submit() {
     const url=retrying
       ? `/api/candidates/${candidateId}/custom-article-runs`
       : `/api/batches/${encodeURIComponent(batch.id)}/custom-articles`;
-    const result = await request(url, { method: "POST", body: JSON.stringify(input) });
+    const result = await request(url, { method: "POST", confirmation: input.articleMode === "tutorial" && input.localProjectPath ? "local-project-read" : "", body: JSON.stringify(input) });
     candidateId = result.candidate?.id || candidateId;
     document.getElementById("tutorial-job-status").textContent = result.reused
       ? "已恢复当前自主写作任务，正在继续等待结果…"

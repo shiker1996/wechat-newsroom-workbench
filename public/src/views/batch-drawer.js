@@ -206,7 +206,7 @@ async function deleteBatchPermanently() {
   ];
   if(skippedDirs.length)lines.push(`另有 ${skippedDirs.length} 个与其他批次共享的遗留目录将保留`);
   if(!await confirmAction(`彻底删除批次「${batch.title}」？此操作不可恢复，建议先在「设置与数据」导出备份。\n${lines.join("\n")}`,{confirmText:"彻底删除"}))return;
-  await request(`/api/batches/${encodeURIComponent(batch.id)}`,{method:"DELETE",headers:{"x-admin-confirm":"DELETE-BATCH"}});
+  await request(`/api/batches/${encodeURIComponent(batch.id)}`,{method:"DELETE",confirmation:"batch-delete"});
   if(state.activeBatchId===batch.id)state.activeBatchId="";
   state.currentBatch=null;
   $("#batch-drawer").close();

@@ -16,7 +16,7 @@ if(!fs.existsSync(dbPath))throw new Error(`数据库不存在：${dbPath}`);
 const store=new Store(dbPath),resources=await buildConfigurationCatalog({root,config});
 const fallbackFor=(resource)=>resource.type==='tool'?legacyToolConfiguration(resource.manifest,config):resource.type==='collector'?legacyCollectorConfiguration(resource.manifest,config):resource.type==='model-provider'?legacyModelProviderConfiguration(config.llm?.providers?.[resource.id]||{}):{};
 const plan=planLegacyConfigurationMigration({resources,repository:store.repositories.extensionSettings,fallbackFor});
-const publicPlan=plan.map(({resource,action,configured,fields,secretFields,issues})=>({type:resource.type,id:resource.id,name:resource.name,action:force&&action==='skip'?'skip_existing_protected':action,configured,fields,secretFields,issues:issues.map(({field,message})=>({field,message}))}));
+const publicPlan=plan.map(({resource,action,configured,fields,secretFields,differences,issues})=>({type:resource.type,id:resource.id,name:resource.name,action:force&&action==='skip'?'skip_existing_protected':action,configured,fields,secretFields,differences,issues:issues.map(({field,message})=>({field,message}))}));
 if(dryRun){console.log(JSON.stringify({dryRun:true,total:plan.length,migrate:plan.filter((item)=>item.action==='migrate').length,skip:plan.filter((item)=>item.action==='skip').length,resources:publicPlan},null,2));store.close();process.exit(0);}
 const stamp=new Date().toISOString().replace(/[:.]/g,'-'),backupPath=path.join(root,'data',`configuration-migration-${stamp}.db`);
 await backupSqlite(store.db,backupPath);

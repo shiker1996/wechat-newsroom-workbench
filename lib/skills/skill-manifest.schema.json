@@ -21,7 +21,7 @@
       "type": "array",
       "uniqueItems": true,
       "items": {
-        "enum": ["hotspot-article", "independent-writing", "batch-daily", "social-tool", "social-custom", "social-event", "wechat-typeset"]
+        "enum": ["hotspot-article", "independent-writing", "batch-daily", "social-tool", "social-custom", "social-event", "wechat-typeset", "custom-social"]
       }
     },
     "contentTypes": {

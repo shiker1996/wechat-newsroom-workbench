@@ -58,7 +58,7 @@ if (fences.length) {
   fs.mkdirSync(imageDir, { recursive: true });
   const puppeteer = await loadPuppeteer();
   const echartsSource = loadEchartsSource();
-  // Chrome 鍚姩鍋跺彂宕╂簝锛堝挨鍏跺杩涚▼骞跺彂鏃讹級锛屽け璐ュ悗閲嶈瘯涓€娆?
+  // Chrome 启动偶发崩溃（尤其多进程并发时），失败后重试一次。
   let browser = null;
   for (let attempt = 0; attempt < 2 && !browser; attempt += 1) {
     try {
@@ -74,7 +74,7 @@ if (fences.length) {
       try {
         const raw = fence[1].trim();
         if (raw.length > MAX_OPTION_CHARS) throw new Error(`閰嶇疆瓒呰繃 ${MAX_OPTION_CHARS} 瀛楃涓婇檺`);
-        // 鍙帴鍙?JSON 閰嶇疆锛屼笉鎵ц鏉ユ簮涓嶆槑鐨勪换鎰?JavaScript
+        // 只接收 JSON 配置，不执行来源不明的任意 JavaScript。
         const option = JSON.parse(raw);
         if (!option || typeof option !== 'object' || Array.isArray(option)) throw new Error('閰嶇疆蹇呴』鏄?JSON 瀵硅薄');
         const themedOption = echartsOptionWithTheme(option, tokens);
@@ -101,7 +101,7 @@ if (fences.length) {
         report.images.push(relative);
         report.converted += 1;
       } catch (error) {
-        // 鍗曚釜鍥存爮澶辫触鏃朵繚鐣欏師鍥存爮鍜岄敊璇俊鎭紝涓嶅緱鐢ㄧ┖鐧藉浘鐗囨浛鎹?
+        // 单个围栏失败时保留原围栏和错误信息，不得用空白图片替换。
         report.failed.push({ index: index + 1, error: String(error.message).trim().slice(0, 500) });
       }
     }
@@ -117,8 +117,7 @@ fs.renameSync(temp, output);
 
 const remaining = (result.match(FENCE_RE) || []).length;
 if (remaining !== report.failed.length) {
-  fail(`鍥存爮鏁伴噺鏍￠獙澶辫触锛氬墿浣?${remaining}锛屽け璐ヨ褰?${report.failed.length}`);
+  fail(`围栏数量校验失败：剩余 ${remaining}，失败记录 ${report.failed.length}`);
 }
 console.log(JSON.stringify(report));
 process.exit(report.failed.length ? 1 : 0);
-

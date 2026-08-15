@@ -35,7 +35,7 @@ def validate_url(value: str) -> str:
     try:
         addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
     except socket.gaierror as error:
-        raise ValueError(f"鍩熷悕瑙ｆ瀽澶辫触锛歿error}") from error
+        raise ValueError(f"域名解析失败：{error}") from error
     for address in addresses:
         ip = ipaddress.ip_address(address[4][0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
@@ -162,7 +162,7 @@ def fetch(url: str, timeout: float, max_chars: int) -> dict:
     with opener.open(request, timeout=timeout) as response:
         final_url = validate_url(response.geturl())
         content_type = response.headers.get("Content-Type", "")
-        if "html" not in content_type.lower(): raise ValueError(f"涓嶆敮鎸佺殑鍐呭绫诲瀷锛歿content_type or '鏈煡'}")
+        if "html" not in content_type.lower(): raise ValueError(f"不支持的内容类型：{content_type or '未知'}")
         payload = response.read(MAX_BYTES + 1)
         if len(payload) > MAX_BYTES: raise ValueError(f"椤甸潰瓒呰繃 {MAX_BYTES} 瀛楄妭闄愬埗")
     parser = ArticleParser(); parser.feed(decode_body(payload, content_type)); result = parser.result()
@@ -187,5 +187,4 @@ def main() -> None:
 
 
 if __name__ == "__main__": main()
-
 

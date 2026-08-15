@@ -1,25 +1,452 @@
 {
   "schemaVersion": 1,
   "consumers": [
-    {"id":"feature.information-research","name":"资料检索与事实补充","type":"feature","sourceFiles":["lib/integrations/information-search.mjs","lib/integrations/local-project-reader.mjs","lib/integrations/repository-inspector.mjs","lib/integrations/source-fetcher.mjs"],"dependencies":[
-      {"capability":"content.url.fetch","requirement":"conditional","failurePolicy":"continue-with-warning"},
-      {"capability":"content.web.search","requirement":"conditional","failurePolicy":"continue-with-warning"},
-      {"capability":"content.news.search","requirement":"conditional","failurePolicy":"continue-with-warning"},
-      {"capability":"content.document.search","requirement":"conditional","failurePolicy":"continue-with-warning"},
-      {"capability":"content.repository.inspect","requirement":"conditional","failurePolicy":"continue-with-warning"},
-      {"capability":"filesystem.project.read","requirement":"conditional","failurePolicy":"continue-with-warning"}
-    ]},
-    {"id":"feature.article-passage-retrieval","name":"文章段落检索","type":"feature","sourceFiles":["lib/http/routes/article-routes.mjs"],"dependencies":[
-      {"capability":"content.passage.retrieve","requirement":"required","failurePolicy":"block"}
-    ]},
-    {"id":"feature.wechat-typeset","name":"公众号文章排版","type":"feature","sourceFiles":["lib/llm/typeset-pipeline.mjs","lib/llm/image-workflow.mjs"],"dependencies":[
-      {"capability":"diagram.mermaid.render","requirement":"conditional","failurePolicy":"block"},
-      {"capability":"diagram.echarts.render","requirement":"conditional","failurePolicy":"block"},
-      {"capability":"image.cdn.upload","requirement":"conditional","failurePolicy":"block"}
-    ]},
-    {"id":"feature.diagram-preview","name":"图表预览","type":"feature","sourceFiles":["lib/http/routes/media-routes.mjs"],"dependencies":[
-      {"capability":"diagram.mermaid.render","requirement":"conditional","failurePolicy":"block"},
-      {"capability":"diagram.echarts.render","requirement":"conditional","failurePolicy":"block"}
-    ]}
+    {
+      "id": "feature.information-research",
+      "name": "资料检索与事实补充",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/integrations/information-search.mjs",
+        "lib/integrations/local-project-reader.mjs",
+        "lib/integrations/repository-inspector.mjs",
+        "lib/integrations/source-fetcher.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "content.url.fetch",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "source-content"
+        },
+        {
+          "capability": "content.web.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "content.news.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "content.document.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "content.repository.inspect",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "filesystem.project.read",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "project-summary"
+        }
+      ],
+      "purpose": "创建事实基座前补齐资料缺口：抓取来源正文、补搜公开/新闻/文档资料、分析仓库、读取本地项目摘要；对话阶段 Agent 已收集的内容会跳过不重复"
+    },
+    {
+      "id": "feature.article-passage-retrieval",
+      "name": "文章段落检索",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/http/routes/article-routes.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "content.passage.retrieve",
+          "requirement": "required",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "editorial-context"
+        }
+      ],
+      "purpose": "编辑会讨论前把超长来源正文做本地检索压缩，只把相关摘录注入模型上下文"
+    },
+    {
+      "id": "feature.wechat-typeset",
+      "name": "公众号文章排版",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/llm/typeset-pipeline.mjs",
+        "lib/llm/image-workflow.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "diagram.mermaid.render",
+          "requirement": "conditional",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "article-asset"
+        },
+        {
+          "capability": "diagram.echarts.render",
+          "requirement": "conditional",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "article-asset"
+        },
+        {
+          "capability": "image.cdn.upload",
+          "requirement": "conditional",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "cdn-url-writeback"
+        }
+      ],
+      "purpose": "文章定稿后排版：把 Mermaid/ECharts 图表渲染成图片并上传图床，URL 写回文章"
+    },
+    {
+      "id": "feature.diagram-preview",
+      "name": "图表预览",
+      "type": "feature",
+      "sourceFiles": [
+        "lib/http/routes/media-routes.mjs"
+      ],
+      "dependencies": [
+        {
+          "capability": "diagram.mermaid.render",
+          "requirement": "conditional",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "preview-response"
+        },
+        {
+          "capability": "diagram.echarts.render",
+          "requirement": "conditional",
+          "failurePolicy": "block",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "preview-response"
+        }
+      ],
+      "purpose": "写作过程中把 Mermaid/ECharts 代码即时渲染成预览图返回前端"
+    },
+    {
+      "id": "agent.editorial",
+      "name": "编辑室 Agent",
+      "type": "agent",
+      "entryPoint": "editorial",
+      "adapterModule": "lib/agent/editorial-adapter.mjs",
+      "capabilityConstant": "EDITORIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "editorial-room"
+      ],
+      "adaptation": {
+        "resourceSources": [
+          {"source": "hotspotSources"},
+          {"source": "candidateUrls"},
+          {"source": "project"}
+        ],
+        "defaultResultHandler": "sanitize-only"
+      },
+      "dependencies": [
+        {
+          "capability": "filesystem.project.read",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "deterministic-first-step",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.url.fetch",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "event-source",
+            "supplied-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "source-content"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.web.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.news.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        }
+      ]
+    },
+    {
+      "id": "agent.independent-writing",
+      "name": "自主写作 Agent",
+      "type": "agent",
+      "entryPoint": "independent-writing",
+      "adapterModule": "lib/agent/tutorial-adapter.mjs",
+      "capabilityConstant": "TUTORIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "wechat-mp-tutorial",
+        "wechat-mp-personal-writing"
+      ],
+      "adaptation": {
+        "resourceSources": [
+          {"source": "materials", "limit": 5},
+          {"source": "documentRoots"},
+          {"source": "project"}
+        ],
+        "resultHandlers": {"filesystem.project.read": "project-fact-attachment"},
+        "defaultResultHandler": "fact-attachment"
+      },
+      "dependencies": [
+        {
+          "capability": "filesystem.project.read",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "deterministic-first-step",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary+fact-attachment",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.url.fetch",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "material-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.web.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.news.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.document.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "document-root"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "document-root-read",
+          "resultPolicy": "fact-attachment",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment",
+          "source": "builtin"
+        }
+      ]
+    },
+    {
+      "id": "agent.custom-social",
+      "name": "自定义图文 Agent",
+      "type": "agent",
+      "entryPoint": "custom-social",
+      "adapterModule": "lib/agent/custom-social-adapter.mjs",
+      "capabilityConstant": "CUSTOM_SOCIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "custom-card-storyboard"
+      ],
+      "adaptation": {
+        "resourceSources": [
+          {"source": "materials", "limit": 8},
+          {"source": "documentRoots"},
+          {"source": "project"}
+        ],
+        "defaultResultHandler": "fact-attachment",
+        "handlerOptions": {"entryPoint": "custom-social", "collectSources": true}
+      },
+      "dependencies": [
+        {
+          "capability": "filesystem.project.read",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.url.fetch",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "material-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.web.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.news.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.document.search",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "document-root"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "document-root-read",
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.repository.inspect",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "github-repository-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "source": "builtin"
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "requirement": "optional",
+          "failurePolicy": "continue-with-warning",
+          "declaration": "optional",
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "source": "builtin"
+        }
+      ]
+    }
   ]
 }
