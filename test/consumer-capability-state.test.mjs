@@ -135,7 +135,10 @@ test('只读接口返回消费者清单与详情，且不泄漏本地路径与�
   const list=await callApi(null,'/api/system/capability-consumers');
   assert.equal(list.status,200);
   const editorial=list.data.consumers.find((item)=>item.consumerId==='agent.editorial');
-  assert.equal(editorial.type,'agent');assert.ok(editorial.summary.available>=5);
+  assert.equal(editorial.type,'agent');assert.equal(editorial.summary.total,5);
+  // content.web.search / content.news.search 依赖 tavily-search 的 apiKey 配置，
+  // 未配置的环境（如 CI）这两项为 blocked，故只断言其余 3 项不依赖凭据的能力可用
+  assert.ok(editorial.summary.available>=3);
   const detail=await callApi(null,'/api/system/capability-consumers/agent.custom-social');
   assert.equal(detail.status,200);
   assert.equal(detail.data.runtimeSkillIds[0],'custom-card-storyboard');

@@ -1,0 +1,724 @@
+{
+  "schemaVersion": 1,
+  "source": "docs/design/consumer-capability-adaptation-design.md 阶段 0：冻结基线",
+  "generatedBy": "scripts/snapshot-consumer-capability-baseline.mjs",
+  "routes": {},
+  "consumers": [
+    {
+      "consumerId": "agent.editorial",
+      "name": "编辑室 Agent",
+      "type": "agent",
+      "entryPoint": "editorial",
+      "entryPointRegistered": true,
+      "adapterModule": "lib/agent/editorial-adapter.mjs",
+      "capabilityConstant": "EDITORIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "editorial-room-chat"
+      ],
+      "skillAuthorization": {
+        "editorial-room-chat": null
+      },
+      "declaredCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.passage.retrieve",
+        "content.web.search",
+        "content.news.search"
+      ],
+      "capabilities": [
+        {
+          "capability": "filesystem.project.read",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "deterministic-first-step",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary",
+          "adaptationNote": "用户提供 projectPath 时 step 0 确定性发起；结果裁剪为 summary/files 摘要；projectPath 缺失时报错拦截",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-project-reader",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.url.fetch",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "event-source",
+            "supplied-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "passthrough",
+          "adaptationNote": "resourceId 必须命中当前事件来源或用户提供的 URL，否则 RESOURCE_NOT_ALLOWED",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "url-fetch",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-composite",
+            "wechat-mp-daily",
+            "wechat-mp-deep-dive",
+            "wechat-mp-gossip-chill",
+            "wechat-mp-tech-deep",
+            "wechat-mp-tech-hotspot",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "source-content"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "passthrough",
+          "adaptationNote": "resourceIds 必须命中已抓取来源正文；query 清洗截断、k 限制在 1-8",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-passage-retrieval",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.article-passage-retrieval",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.web.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.news.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "consumerId": "agent.independent-writing",
+      "name": "自主写作 Agent",
+      "type": "agent",
+      "entryPoint": "independent-writing",
+      "entryPointRegistered": true,
+      "adapterModule": "lib/agent/tutorial-adapter.mjs",
+      "capabilityConstant": "TUTORIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "wechat-mp-tutorial",
+        "wechat-mp-personal-writing"
+      ],
+      "skillAuthorization": {
+        "wechat-mp-tutorial": null,
+        "wechat-mp-personal-writing": null
+      },
+      "declaredCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.web.search",
+        "content.news.search",
+        "content.document.search",
+        "content.passage.retrieve"
+      ],
+      "capabilities": [
+        {
+          "capability": "filesystem.project.read",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "deterministic-first-step",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary+fact-attachment",
+          "adaptationNote": "step 0 确定性发起；结果按 pathKey 存入事实附件缓存，二次会话直接复用",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-project-reader",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.url.fetch",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "material-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment",
+          "adaptationNote": "resourceId 必须命中素材 URL 目录（草稿 materialUrls 或回答中的 URL，上限 5 条）",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "url-fetch",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-composite",
+            "wechat-mp-daily",
+            "wechat-mp-deep-dive",
+            "wechat-mp-gossip-chill",
+            "wechat-mp-tech-deep",
+            "wechat-mp-tech-hotspot",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.web.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.news.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.document.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "document-root"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "document-root-read",
+          "resultPolicy": "fact-attachment",
+          "adaptationNote": "resourceId 必须命中已授权 documentRoots；query 截断 300、maxResults 固定 5",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "document-folder-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment",
+          "adaptationNote": "阶段 5 起由通用层适配：resourceIds 非空时严格映射资源目录（缺正文则 RESOURCE_NOT_ALLOWED），否则按插件原生 documents 入参透传",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-passage-retrieval",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.article-passage-retrieval",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "consumerId": "agent.custom-social",
+      "name": "自定义图文 Agent",
+      "type": "agent",
+      "entryPoint": "custom-social",
+      "entryPointRegistered": true,
+      "adapterModule": "lib/agent/custom-social-adapter.mjs",
+      "capabilityConstant": "CUSTOM_SOCIAL_AGENT_CAPABILITIES",
+      "runtimeSkillIds": [
+        "custom-card-storyboard"
+      ],
+      "skillAuthorization": {
+        "custom-card-storyboard": null
+      },
+      "declaredCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.web.search",
+        "content.news.search",
+        "content.document.search",
+        "content.repository.inspect",
+        "content.passage.retrieve"
+      ],
+      "capabilities": [
+        {
+          "capability": "filesystem.project.read",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "local-project"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "local-project-read",
+          "resultPolicy": "sanitized-project-summary+fact-attachment",
+          "adaptationNote": "扩展方案阶段 A 接入：用户提供 projectPath 才注册资源（无确定性首步）；结果裁剪为摘要并计入 externalSources 之外的事实附件",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-project-reader",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.url.fetch",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "material-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "adaptationNote": "resourceId 必须命中素材 URL 目录（上限 8 条）；结果中的公开 URL 回收进 externalSources",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "url-fetch",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-composite",
+            "wechat-mp-daily",
+            "wechat-mp-deep-dive",
+            "wechat-mp-gossip-chill",
+            "wechat-mp-tech-deep",
+            "wechat-mp-tech-hotspot",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.web.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.news.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "query-clamped-passthrough",
+          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "tavily-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.document.search",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "document-root"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": "document-root-read",
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "adaptationNote": "resourceId 必须命中已授权 documentRoots；query 截断 300、maxResults 固定 5",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "document-folder-search",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "feature.information-research",
+            "tutorial-chat",
+            "wechat-mp-personal-writing",
+            "wechat-mp-tutorial"
+          ]
+        },
+        {
+          "capability": "content.repository.inspect",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [
+            "github-repository-url"
+          ],
+          "triggerPolicy": "explicit-resource",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "adaptationNote": "resourceId 必须是已授权素材中的 github.com URL，否则 RESOURCE_NOT_ALLOWED",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "repository-inspector",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "network-read"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "feature.information-research"
+          ]
+        },
+        {
+          "capability": "content.passage.retrieve",
+          "registered": true,
+          "declared": true,
+          "adapterStatus": "ready",
+          "resourceKinds": [],
+          "triggerPolicy": "model-request",
+          "authorizationAction": null,
+          "resultPolicy": "fact-attachment+source-url-tracking",
+          "adaptationNote": "阶段 5 起由通用层适配：resourceIds 非空时严格映射资源目录（缺正文则 RESOURCE_NOT_ALLOWED），否则按插件原生 documents 入参透传",
+          "preferredImplementationId": "",
+          "implementations": [
+            {
+              "plugin": "local-passage-retrieval",
+              "version": "1.0.0",
+              "enabled": true,
+              "priority": 0,
+              "riskLevel": "read-only"
+            }
+          ],
+          "graphStatus": "degraded",
+          "graphConsumers": [
+            "agent.custom-social",
+            "agent.editorial",
+            "agent.independent-writing",
+            "custom-card-storyboard",
+            "custom-social-chat",
+            "editorial-room-chat",
+            "feature.article-passage-retrieval",
+            "tutorial-chat",
+            "wechat-mp-tutorial"
+          ]
+        }
+      ],
+      "gaps": []
+    }
+  ],
+  "graphComparison": {
+    "agentConsumersRegistered": true,
+    "note": "capability-graph 的消费者维度聚合技能、功能消费者、采集来源与 agent 消费者（阶段 1 起，来自 config/capability-consumers.json 的 type:'agent' 登记）；graphConsumers 为引用同一能力的全部消费者。"
+  }
+}

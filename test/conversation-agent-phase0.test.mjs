@@ -48,7 +48,7 @@ test('Phase 0 三份 JSON Schema 禁止未知字段并区分工具请求、成�
 });
 
 test('Phase 0 基线冻结三入口当前触发方式、能力矩阵、门禁和已知审计缺口',()=>{
-  const baseline=readJson('../docs/conversation-agent-phase0-baseline.json');
+  const baseline=readJson('./fixtures/conversation-agent-phase0-baseline.json');
   assert.equal(baseline.schemaVersion,1);
   assert.equal(baseline.productionAgentEnabled,true);
   assert.deepEqual(baseline.entries.map((entry)=>entry.id),CONVERSATION_AGENT_ENTRY_POINTS);
@@ -68,7 +68,7 @@ test('Phase 0 基线冻结三入口当前触发方式、能力矩阵、门禁和
 test('Phase 5 三个生产入口保留可扫描调用点并统一启用 Agent runtime',()=>{
   const article=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8');
   const candidate=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
-  const baseline=readJson('../docs/conversation-agent-phase0-baseline.json');
+  const baseline=readJson('./fixtures/conversation-agent-phase0-baseline.json');
   assert.match(article,new RegExp(baseline.callsiteMarkers.editorial));
   assert.match(candidate,new RegExp(baseline.callsiteMarkers['independent-writing']));
   assert.match(candidate,new RegExp(baseline.callsiteMarkers['custom-social']));

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { APP_FIELDS } from '../lib/integrations/runtime-settings.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
-const inventory=JSON.parse(fs.readFileSync(path.join(root,'docs','configuration-migration-inventory.json'),'utf8'));
+const inventory=JSON.parse(fs.readFileSync(path.join(root,'test','fixtures','configuration-migration-inventory.json'),'utf8'));
 const entries=inventory.entries;
 const leaves=(value,prefix='',into=[])=>{if(value&&typeof value==='object'&&!Array.isArray(value)){for(const [key,item] of Object.entries(value))leaves(item,prefix?`${prefix}.${key}`:key,into);}else into.push(prefix);return into;};
 const matches=(pattern,key)=>new RegExp(`^${pattern.split('.').map((part)=>part==='*'?'[^.]+':part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\.')}$`).test(key);

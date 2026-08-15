@@ -101,6 +101,6 @@ test('capability-graph 对三个 Agent 能力的现状快照',async ()=>{
 
 test('消费者—能力—实现基线与仓库现状保持同步',async ()=>{
   const expected=await buildConsumerCapabilityBaseline(root);
-  const saved=JSON.parse(fs.readFileSync(path.join(root,'data','capability-consumer-baseline.json'),'utf8'));
+  const saved=JSON.parse(fs.readFileSync(path.join(root,'test','fixtures','capability-consumer-baseline.json'),'utf8'));
   assert.deepEqual(saved,expected,'基线已过期，请运行 npm run capability:consumer-baseline 或 node scripts/snapshot-consumer-capability-baseline.mjs');
 });

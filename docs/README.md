@@ -4,7 +4,7 @@
 
 - 设计方案统一收在 [design/](./design/)；
 - 已闭环的历史方案、复盘与审计记录归档在 [archive/](./archive/)；
-- 基线 JSON（`*-baseline.json`、`configuration-migration-inventory.json`）由 `scripts/` 与测试读写，属开发工件，勿手工编辑。
+- 回归基线 JSON（`*-baseline.json`、`configuration-migration-inventory.json`）在 `test/fixtures/`，由 `scripts/snapshot-*` 生成、测试逐字比对，勿手工编辑。
 
 新增文档时在头部注明类别与状态（如 `> 状态：已实施` / `> 状态：待评审`），并登记到下表；已闭环的阶段性文档移入 `archive/` 并更新本索引。
 

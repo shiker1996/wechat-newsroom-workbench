@@ -15,5 +15,5 @@ function governance(item){
 }
 const violations=scanPluginBoundaries(root).map((item)=>({...item,...governance(item)}));
 const output={schemaVersion:1,generatedFrom:'plugins source boundary scan',policy:'baseline may only shrink; new violations fail CI',violations};
-fs.writeFileSync(path.join(root,'docs','plugin-boundary-baseline.json'),`${JSON.stringify(output,null,2)}\n`,'utf8');
+fs.writeFileSync(path.join(root,'test','fixtures','plugin-boundary-baseline.json'),`${JSON.stringify(output,null,2)}\n`,'utf8');
 console.log(`插件边界基线已写入：${violations.length} 项`);

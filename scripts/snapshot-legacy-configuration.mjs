@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { parseEnv } from '../lib/core/env.mjs';
 
 const root=process.cwd();
-const inventory=JSON.parse(fs.readFileSync(path.join(root,'docs','configuration-migration-inventory.json'),'utf8'));
+const inventory=JSON.parse(fs.readFileSync(path.join(root,'test','fixtures','configuration-migration-inventory.json'),'utf8'));
 const readJson=(file)=>fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{};
 const readEnv=(file)=>fs.existsSync(file)?parseEnv(fs.readFileSync(file,'utf8')):{};
 const get=(value,key)=>key.split('.').reduce((current,part)=>current?.[part],value);

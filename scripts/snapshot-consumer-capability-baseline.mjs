@@ -211,7 +211,7 @@ export async function buildConsumerCapabilityBaseline(root) {
 if (import.meta.main) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const baseline = await buildConsumerCapabilityBaseline(root);
-  const output = path.join(root, 'data', 'capability-consumer-baseline.json');
+  const output = path.join(root, 'test', 'fixtures', 'capability-consumer-baseline.json');
   fs.writeFileSync(output, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
   console.log(`已写入 ${path.relative(root, output)}：${baseline.consumers.length} 个 Agent 消费者、`
     + `${baseline.consumers.reduce((sum, item) => sum + item.capabilities.length, 0)} 条消费者—能力关系`);
