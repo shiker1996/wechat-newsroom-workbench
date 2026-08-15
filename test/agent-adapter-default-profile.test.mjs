@@ -9,7 +9,7 @@ import { applyCatalogSchemas, buildAdaptation, resolveCatalogResourceProfiles, R
 import { addCapabilityCatalogEntries, readCapabilityCatalog } from '../lib/tools/capability-catalog.mjs';
 import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
 
-// 阶段 3（agent-adapter-configurability-design.md §4）：新资源类能力走默认档案路径——
+// 阶段 3（docs/design/agent-adapter-configurability-design.md §4）：新资源类能力走默认档案路径——
 // 目录条目声明 resourceKind + 消费者登记即接入，全程不改任何 .mjs（不进 Adapter 常量）。
 
 const projectRoot=path.resolve(import.meta.dirname,'..');
@@ -19,8 +19,8 @@ function makeRoot(t,{resourceKind='url-fetch'}={}){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-default-profile-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   fs.mkdirSync(path.join(dir,'config'),{recursive:true});
-  fs.mkdirSync(path.join(dir,'skills','editorial-room'),{recursive:true});
-  fs.copyFileSync(path.join(projectRoot,'skills','editorial-room','skill.json'),path.join(dir,'skills','editorial-room','skill.json'));
+  fs.mkdirSync(path.join(dir,'skills','editorial-room-chat'),{recursive:true});
+  fs.copyFileSync(path.join(projectRoot,'skills','editorial-room-chat','skill.json'),path.join(dir,'skills','editorial-room-chat','skill.json'));
   const catalog=JSON.parse(fs.readFileSync(path.join(projectRoot,'config','capabilities.json'),'utf8'));
   catalog.capabilities['vendor.clouddoc.read']={name:'云文档读取',description:'读取指定云文档的正文内容。',category:'信息获取',...(resourceKind?{resourceKind}:{})};
   fs.writeFileSync(path.join(dir,'config','capabilities.json'),JSON.stringify(catalog));

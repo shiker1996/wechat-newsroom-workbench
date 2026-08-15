@@ -70,8 +70,8 @@ test('Agent 阻止相同调用重复执行并在模型步骤、工具数和时�
 test('Agent 运行与工具调用持久化关联，且不保存原始参数值',async(t)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'agent-core-')),store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
   const tools=registry(),catalog=buildConversationToolCatalog({registry:tools,entryCapabilities:['content.demo.read']});let calls=0;
-  const result=await runConversationAgent({entryPoint:'editorial',registry:tools,catalog,store,toolContext:{skillId:'editorial-room',provider:'mock'},modelStep:async()=>++calls===1?{type:'tool_requests',assistant_note:'read',requests:[{requestId:'tr_db',capability:'content.demo.read',arguments:{query:'secret-value'},reason:'read'}]}:{type:'final',assistantReply:'ok',output:{}}});
+  const result=await runConversationAgent({entryPoint:'editorial',registry:tools,catalog,store,toolContext:{skillId:'editorial-room-chat',provider:'mock'},modelStep:async()=>++calls===1?{type:'tool_requests',assistant_note:'read',requests:[{requestId:'tr_db',capability:'content.demo.read',arguments:{query:'secret-value'},reason:'read'}]}:{type:'final',assistantReply:'ok',output:{}}});
   const run=store.getAgentRun(result.agentRunId),toolCalls=store.listAgentToolCalls(result.agentRunId);
   assert.equal(run.status,'completed');assert.equal(run.model_steps,2);assert.equal(toolCalls.length,1);assert.equal(toolCalls[0].status,'ok');assert.deepEqual(toolCalls[0].input_summary,{keys:['query']});assert.doesNotMatch(JSON.stringify(toolCalls),/secret-value/);
-  const executions=store.listToolExecutions({capability:'content.demo.read'});assert.equal(executions.length,1);assert.equal(executions[0].skill_id,'editorial-room');
+  const executions=store.listToolExecutions({capability:'content.demo.read'});assert.equal(executions.length,1);assert.equal(executions[0].skill_id,'editorial-room-chat');
 });

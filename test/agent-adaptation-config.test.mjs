@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildAdaptation, loadAgentAdaptation } from '../lib/agent/resource-adaptation.mjs';
 
-// 阶段 4（agent-adapter-configurability-design.md）：Agent 适配声明挪到 capability-consumers.json 的
+// 阶段 4（docs/design/agent-adapter-configurability-design.md）：Agent 适配声明挪到 capability-consumers.json 的
 // adaptation 字段，config 为权威来源；config 缺失/无字段时 Adapter 回退内联声明，行为一致。
 
 const projectRoot=path.resolve(import.meta.dirname,'..');

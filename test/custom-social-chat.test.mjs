@@ -44,10 +44,12 @@ test('requestMessages 按有无回答生成指令并携带草稿与历史', () =
   const opening = requestMessages({ draft: { topic: '' }, history: [], answer: '' });
   assert.equal(opening[0].role, 'system');
   const openingBody = JSON.parse(opening[1].content.match(/<untrusted-data[^>]*>\n([\s\S]*)\n<\/untrusted-data>/)[1]);
-  assert.match(openingBody.instruction, /对话刚开始/);
+  assert.equal(openingBody.draft.topic, '');
+  assert.match(opening.at(-1).content, /对话刚开始/);
   const answering = requestMessages({ draft: { topic: '笔记同步' }, history: [{ role: 'user', content: 'hi' }], answer: '  我想做教程  ' });
   const answeringBody = JSON.parse(answering[1].content.match(/<untrusted-data[^>]*>\n([\s\S]*)\n<\/untrusted-data>/)[1]);
-  assert.match(answeringBody.instruction, /处理用户刚才的回答/);
   assert.equal(answeringBody.draft.topic, '笔记同步');
-  assert.deepEqual(answeringBody.conversation, [{ role: 'user', content: 'hi' }, { role: 'user', content: '我想做教程' }]);
+  // 历史与本轮回答展开为真实 user/assistant 回合，指令作为最后一条 user 消息
+  assert.deepEqual(answering.slice(2, -1), [{ role: 'user', content: 'hi' }, { role: 'user', content: '我想做教程' }]);
+  assert.match(answering.at(-1).content, /处理用户刚才的回答/);
 });

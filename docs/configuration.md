@@ -101,7 +101,7 @@
 - `allowedTools`：工具白名单（信息工具槽位能力 ID）。
 - `gates`：质量门禁——`length.minVisibleChars` / `maxVisibleChars`（默认跟随 `config.local.json` 的 `articleLength`，内置兜底 1300–2000；覆盖层配置后优先级最高；字数违规只记 warning，不阻断流程）、`facts`（未核验事实/缺来源/模型建议冒充体验，默认 error）、`voice`（第一人称与亲测声明策略）、`repair`（自动返工开关与上限，默认 1 轮）。
 
-选题阶段 5 个技能（`hotspot-tagging`、`event-card-generator`、`hotspot-brainstorm`、`hotspot-synthesis`、`editorial-room`）同样走覆盖层机制；它们在代码里留有内联 fallback，技能目录缺失时行为不变。
+选题阶段 5 个技能（`hotspot-tagging`、`event-card-generator`、`hotspot-brainstorm`、`hotspot-synthesis`、`editorial-room-chat`）同样走覆盖层机制；它们在代码里留有内联 fallback，技能目录缺失时行为不变。
 
 ## 5. 技能与工具的编写、校验、安装
 

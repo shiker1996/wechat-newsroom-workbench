@@ -191,7 +191,21 @@
       ]
     },
     {
-      "id": "editorial-room",
+      "id": "custom-social-chat",
+      "name": "图文策划对话",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.web.search",
+        "content.news.search",
+        "content.document.search",
+        "content.repository.inspect",
+        "content.passage.retrieve"
+      ]
+    },
+    {
+      "id": "editorial-room-chat",
       "name": "公众号编辑会",
       "requiredCapabilities": [],
       "optionalCapabilities": [
@@ -281,6 +295,19 @@
       "name": "标题生成与筛选",
       "requiredCapabilities": [],
       "optionalCapabilities": []
+    },
+    {
+      "id": "tutorial-chat",
+      "name": "自主写作策划对话",
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "filesystem.project.read",
+        "content.url.fetch",
+        "content.web.search",
+        "content.news.search",
+        "content.document.search",
+        "content.passage.retrieve"
+      ]
     },
     {
       "id": "upyun-upload-image",

@@ -10,7 +10,7 @@ import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const outDir = path.resolve(process.argv[2] || path.join(root, 'docs/audits/theme-ux/review'));
+const outDir = path.resolve(process.argv[2] || path.join(root, 'docs/archive/audits/theme-ux/review'));
 fs.mkdirSync(outDir, { recursive: true });
 
 async function loadPuppeteer() {

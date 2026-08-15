@@ -87,4 +87,4 @@
 ## 3. 变更记录
 
 - 2026-07-31：首次盘点并修复——①技能包 install/update/status/delete 四路由补 `x-admin-confirm` 校验（服务端 + 前端确认弹窗）；②图片预览页 title 补 `"` 转义；③rsshub 内网判定复用 remote-adapter 的 `privateIp` 全量实现；④url-fetch 插件增加内网/本机目标拒绝；⑤新增 `test/security-boundaries.test.mjs`（确认头、Zip Slip、保留段、url-fetch 拦截、响应超限、title 转义共 7 例）。
-- 2026-08-14：新增 §1.8 会话 Agent 资源授权（消费者—能力统一治理落地，见 `docs/consumer-capability-adaptation-design.md`）；新增治理门禁脚本 `scripts/check-consumer-capability-gates.mjs` 并接入 CI。
+- 2026-08-14：新增 §1.8 会话 Agent 资源授权（消费者—能力统一治理落地，见 `docs/design/consumer-capability-adaptation-design.md`）；新增治理门禁脚本 `scripts/check-consumer-capability-gates.mjs` 并接入 CI。

@@ -153,7 +153,7 @@
       "adapterModule": "lib/agent/editorial-adapter.mjs",
       "capabilityConstant": "EDITORIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
-        "editorial-room"
+        "editorial-room-chat"
       ],
       "adaptation": {
         "resourceSources": [

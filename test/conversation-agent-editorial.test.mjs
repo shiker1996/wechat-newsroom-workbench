@@ -74,11 +74,11 @@ test('旧嵌套 final（output 层包裹 briefUpdates）仍被兼容展开',asyn
 });
 
 test('编辑室业务 Prompt 定义打平的 final 信封（业务字段平铺顶层）',()=>{
-  for(const file of ['../lib/llm/editorial-room.mjs','../skills/editorial-room/SKILL.md']){
-    const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
-    assert.match(source,/平铺在 final 信封顶层/);assert.match(source,/不要再套 output 层/);
-    assert.doesNotMatch(source,/读取当前决策和对话后返回严格JSON/);
-  }
+  const skillSource=fs.readFileSync(new URL('../skills/editorial-room-chat/SKILL.md',import.meta.url),'utf8');
+  assert.match(skillSource,/平铺在 final 信封顶层/);assert.match(skillSource,/不要再套 output 层/);
+  assert.doesNotMatch(skillSource,/读取当前决策和对话后返回严格JSON/);
+  const codeSource=fs.readFileSync(new URL('../lib/llm/editorial-room.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(codeSource,/你是公众号编辑会主持人/,'编辑室 prompt 应只从技能加载，代码不再内联');
 });
 
 test('用户明确陈述亲身实践时，确定性沉淀进 confirmed_experiences（本地路径脱敏）',()=>{
@@ -98,52 +98,20 @@ test('无亲身实践陈述时不改动体验字段',()=>{
   assert.equal(result.briefUpdates.author_opinions,'作者倾向批判');
 });
 
-test('用户作答后决策字段冻结：强制一次决策补写并落库',async(t)=>{
-  const {root,store,candidate}=fixture(t);
-  const frozen={type:'final',assistantReply:'收到，你最想主攻哪一条主线？',briefUpdates:{}};
-  let calls=0,sawAnswer=false;
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
-    if(calls===1)return {callId:'frozen',content:JSON.stringify(frozen),usage:{},model:'mock'};
-    assert.equal(input.purpose,'editorial-room-decision-repair');
-    sawAnswer=input.messages.some((item)=>typeof item.content==='string'&&item.content.includes('主打涨价对选型的影响'));
-    return {callId:'patch',content:JSON.stringify({briefUpdates:{angle:'涨价与峰谷定价对选型的影响',author_opinions:'作者主攻涨价对选型的影响'}}),usage:{},model:'mock'};}};
-  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'主打涨价对选型的影响',events:[],workspaceRoot:root});
-  assert.equal(calls,2);assert.equal(sawAnswer,true);
-  assert.equal(result.candidate.angle,'涨价与峰谷定价对选型的影响');
-  assert.match(result.editorial.author_opinions,/主攻涨价/);
-});
-
-test('占位符式搪塞（待定/未定逐轮抖动措辞）视为字段冻结，触发决策补写',async(t)=>{
-  const {root,store,candidate}=fixture(t);
-  store.updateCandidate(candidate.id,{angle:'待定：工具接入实践 vs 模型定价与选型影响'});
-  const wobble={type:'final',assistantReply:'主线未定，主线选哪头？',briefUpdates:{angle:'待定：工具接入实践 vs 模型定价与选型影响（需作者明确）',thesis:'未定（待主线确认）',reader_stake:'待确认',author_opinions:'暂无（尚未征询作者意见）'}};
-  let calls=0;
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
-    if(calls===1)return {callId:'wobble',content:JSON.stringify(wobble),usage:{},model:'mock'};
-    assert.equal(input.purpose,'editorial-room-decision-repair');
-    return {callId:'patch',content:JSON.stringify({briefUpdates:{angle:'V4 Pro 涨价与峰谷定价对开发者成本/选型的影响',distribution_lane:'通知池',author_opinions:'作者主张以涨价为主线服务选型决策者'}}),usage:{},model:'mock'};}};
-  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'走定价与选型主线',events:[],workspaceRoot:root});
-  assert.equal(calls,2,'占位符抖动应触发决策补写');
-  assert.equal(result.candidate.angle,'V4 Pro 涨价与峰谷定价对开发者成本/选型的影响');
-  assert.match(result.editorial.author_opinions,/涨价为主线/);
-});
-
-test('占位符值不写入候选也不覆盖已有实质观点',async(t)=>{
+test('占位符值不写入候选也不覆盖已有实质观点（无补写器兜底，过滤发生在落库前）',async(t)=>{
   const {root,store,candidate}=fixture(t);
   store.updateCandidate(candidate.id,{angle:'已有实质角度'});
   store.saveEditorial(candidate.id,{author_opinions:'已有实质观点'});
   const placeholder={type:'final',assistantReply:'待定，主线？',briefUpdates:{angle:'待定：需作者明确',thesis:'未定',author_opinions:'暂无（尚未征询）'}};
   let calls=0;
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(input){calls+=1;
-    if(calls===1)return {callId:'p1',content:JSON.stringify(placeholder),usage:{},model:'mock'};
-    return {callId:'p2',content:JSON.stringify({briefUpdates:{angle:'待定',author_opinions:'待定'}}),usage:{},model:'mock'};}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'p1',content:JSON.stringify(placeholder),usage:{},model:'mock'};}};
   const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'再想想',events:[],workspaceRoot:root});
-  assert.equal(calls,2);
+  assert.equal(calls,1,'不再有决策补写等额外调用');
   assert.equal(result.candidate.angle,'已有实质角度','占位符不得覆盖已有角度');
-  assert.equal(result.editorial.author_opinions,'已有实质观点','占位符补丁不得覆盖已有观点');
+  assert.equal(result.editorial.author_opinions,'已有实质观点','占位符不得覆盖已有观点');
 });
 
-test('用户作答且决策字段有更新：不触发决策补写',async(t)=>{
+test('用户作答且决策字段有更新：单次调用完成本轮',async(t)=>{
   const {root,store,candidate}=fixture(t);let calls=0;
   const normal={type:'final',assistantReply:'已记录，读者利益怎么落？',briefUpdates:{angle:'实测角度',author_opinions:'作者主张实测'}};
   const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(normal),usage:{},model:'mock'};}};
@@ -151,7 +119,7 @@ test('用户作答且决策字段有更新：不触发决策补写',async(t)=>{
   assert.equal(calls,1);assert.equal(result.candidate.angle,'实测角度');
 });
 
-test('无用户作答（开场）时即使字段未更新也不触发决策补写',async(t)=>{
+test('无用户作答（开场）时单次调用完成本轮',async(t)=>{
   const {root,store,candidate}=fixture(t);let calls=0;
   const opening={type:'final',assistantReply:'开场，你的立场是什么？',briefUpdates:{}};
   const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){calls+=1;return {callId:'m1',content:JSON.stringify(opening),usage:{},model:'mock'};}};
@@ -198,9 +166,34 @@ test('底稿字段不齐时保持 DISCUSS，缺失项由代码推导写入 open_
 test('已有对话时留空作答不再触发开场分支，而是继续推进',async(t)=>{
   const {buildEditorialMessages}=await import('../lib/llm/editorial-room.mjs');
   const fresh=await buildEditorialMessages({editorial:{},messages:[]},'',[],null,'');
-  assert.match(fresh[1].content,/编辑会刚开始/);
+  assert.match(fresh.at(-1).content,/编辑会刚开始/);
   const ongoing=await buildEditorialMessages({editorial:{},messages:[{role:'user',content:'上轮回答'}]},'',[],null,'');
-  assert.match(ongoing[1].content,/未输入新内容/);assert.doesNotMatch(ongoing[1].content,/编辑会刚开始/);
+  assert.match(ongoing.at(-1).content,/未输入新内容/);assert.doesNotMatch(ongoing.at(-1).content,/编辑会刚开始/);
+  // 历史对话展开为真实 user/assistant 回合，不再埋在不可信数据块里
+  assert.equal(ongoing[2].role,'user');assert.equal(ongoing[2].content,'上轮回答');
+});
+
+test('作者收窄事件范围只落表单字段（excluded_events 机制已回滚）',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  const output={type:'final',assistantReply:'已记录：聚焦 AI 收编主线，放弃支付与游戏事件。',briefUpdates:{author_opinions:'聚焦巨头收编 AI 资产主线',rejected_angles:'放弃阿里灵犀与 PayPal 事件',confirmed_facts:'仅保留 SpaceX-Cursor 与 Anthropic-Decart 事实'}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'m1',content:JSON.stringify(output),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',answer:'放弃阿里灵犀与 PayPal，只保留 SpaceX-Cursor + Anthropic-Decart 主线',events:[],workspaceRoot:root});
+  assert.equal(result.editorial.rejected_angles,'放弃阿里灵犀与 PayPal 事件');
+  assert.equal(result.editorial.author_opinions,'聚焦巨头收编 AI 资产主线');
+  assert.equal(result.editorial.confirmed_facts,'仅保留 SpaceX-Cursor 与 Anthropic-Decart 事实');
+  assert.equal(result.editorial.excluded_events,'[]','不再写入结构化舍弃字段');
 });
 
 test('编辑室生产路由只使用统一 Agent 与共享工具事件渲染器',()=>{const source=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/core/stream-chat.js',import.meta.url),'utf8'),events=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');assert.match(source,/runEditorialAgentTurn/);assert.doesNotMatch(source,/runEditorialTurnStream/);assert.match(source,/onEvent:send/);assert.match(client,/consumeAgentEvent/);assert.match(events,/tool\.requested/);assert.match(events,/assistant\.delta/);});
+
+test('就绪判定：长文本中的事实状态描述（尚未完成）不被误判为占位符',async()=>{
+  const {evaluateEditorialReadiness,substantiveDecision}=await import('../lib/domain/editorial-readiness.mjs');
+  assert.equal(substantiveDecision('待定'),false,'纯占位符仍判不合格');
+  assert.equal(substantiveDecision('暂无（尚未征询）'),false,'短搪塞值仍判不合格');
+  assert.equal(substantiveDecision('【Anthropic拟收购Decart】据虎嗅报道：Anthropic 拟以 60 亿美元收购 Decart（尚未完成）。'),true,'长文本中的"尚未完成"是事实状态，不是占位符');
+  const readiness=evaluateEditorialReadiness({
+    candidate:{angle:'从开发者视角看工具演进',thesis:'大厂收编加速工具演进'},
+    editorial:{confirmed_facts:'据事件研判：SpaceX 于 8 月 14 日完成对 Cursor 的收购；据虎嗅报道：Anthropic 拟收购 Decart（尚未完成）。',author_opinions:'作者判断是机会',forbidden_claims:'未证实内容不得写入'},
+  });
+  assert.equal(readiness.ready,true,'必填项齐备即可成稿');
+});
