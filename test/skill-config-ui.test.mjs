@@ -171,7 +171,10 @@ test('消费者页默认聚焦 Agent，并提供搜索、类型与问题状态�
   assert.match(skills,/selectedConsumerType==='all'\|\|group\.key===selectedConsumerType/);
   assert.match(styles,/\.consumer-access-toolbar\{position:sticky/);
   assert.match(styles,/\.consumer-access-group\{display:grid;grid-template-columns:1fr/);
-  assert.match(skills,/consumer\.type==='skill'\?'SKILL':'PIPELINE'/);
+  assert.match(skills,/consumer\.type==='skill'\?'SKILL':consumer\.type==='collection-source'\?'SOURCE':'PIPELINE'/);
+  // 采集源消费者分组与 tab（数量标签与列表同口径）
+  assert.match(skills,/key:'source',label:'采集源消费者'/);
+  assert.match(html,/data-consumer-type="source"[^>]*aria-pressed="false">采集源/);
 });
 
 test('阶段 3 停用前展示影响并携带影响版本执行',()=>{

@@ -17,6 +17,8 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-15
+
 ### Added
 
 - 通用对话 ToolCall Agent：编辑室、自主写作和自定义图文共享协议、能力授权、执行预算、事件流与审计关联。
@@ -26,10 +28,18 @@
 - 新增失败对象单条重试：采集源只重跑原订阅源，打标只补目标热点，事件卡只补目标事件；成功后自动归档失败记录，批次抽屉可直接触发。
 - 新增失败对象跳过与恢复：采集跳过仅作用于当前批次，打标热点和事件卡事件会从后续范围安全排除；批次级研判错误禁止跳过，所有决策均保留历史并可恢复。
 - 研判任务失败现在按前置条件、确定性门禁、模型输出门禁和服务商异常分类持久化，可从失败清单整体重试；成功后自动解决，阶段级错误始终不提供跳过。
+- 技能与工具页新增「采集源」消费者 tab：37 个按启用采集源自动生成的采集源消费者单独成组展示，此前只计入总数不可见。
 
 ### Changed
 
 - 内置能力现由 35 个写作技能与 15 个 Manifest 插件组成；项目已采用 MIT 许可证开放源码，第三方扩展仍需按 Manifest 权限与信任门禁审阅。
+- 文档目录重组：顶层只保留使用与开发接入文档，设计方案统一收进 `docs/design/`，历史方案与审计记录归档 `docs/archive/`；回归基线 JSON 移入 `test/fixtures/`。
+
+### Fixed
+
+- 技能与工具页统计口径：tab 数量、顶部消费者/能力/工具实现计数均与列表过滤规则一致（技能 tab 12、能力 17 含采集能力、工具实现分子计入采集器）。
+- 消费者—能力基线文件从被忽略的 `data/` 移入 `test/fixtures/` 并纳入提交，修复 CI 干净环境 ENOENT；消费者状态测试去除对本地 Tavily 凭据的隐式依赖。
+- 移除一次性复现脚本 `scripts/render-card-repro.mjs`。
 
 ## [0.5.1] - 2026-08-10
 
@@ -220,7 +230,8 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.6.3...HEAD
+[0.6.3]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.1...0.6.3
 [0.5.1]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/v0.4.3...0.5.0
 [0.4.2]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.4.1...0.4.2
