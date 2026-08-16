@@ -21,7 +21,7 @@ function bindEditorial() {
   if (bound) return;
   bound = true;
   const form = document.getElementById("editorial-form");
-  form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message)));
+  form.addEventListener("submit", (event) => saveEditorial(event).catch((error) => toast(error.message, "error")));
   form.addEventListener("input", () => { editorialDirty = true; renderEditorialReadiness(); });
   // 与 editor.js 一致：决策底稿有未保存修改时拦截关闭/刷新（bindEditorial 仅执行一次，无监听泄漏）
   window.addEventListener("beforeunload", (event) => { if (!editorialDirty) return; event.preventDefault(); event.returnValue = ""; });
@@ -36,16 +36,16 @@ function bindEditorial() {
   document.getElementById("close-editorial-skills")?.addEventListener("click",()=>{
     document.querySelector(".creation-skill-settings")?.removeAttribute("open");
   });
-  document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message)));
+  document.getElementById("send-editorial-answer").addEventListener("click", () => sendEditorialAnswer().catch((error) => toast(error.message, "error")));
   document.getElementById("run-editorial-prepare")?.addEventListener("click", () => prepareEditorialSources().catch((error) => {
-    toast(error.message);
+    toast(error.message, "error");
     if (state.editorialCandidate) updateEditorialPrepareGate(state.editorialCandidate);
   }));
   document.getElementById("skip-editorial-prepare")?.addEventListener("click", () => {
     editorialPrepareState.skipped = true;
     if (state.editorialCandidate) updateEditorialPrepareGate(state.editorialCandidate);
   });
-  document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message))));
+  document.getElementById("start-editorial-production").addEventListener("click", (event) => withLoading(event.currentTarget, "正在发布任务…", () => startEditorialProduction().catch((error) => toast(error.message, "error"))));
   document.addEventListener("click", async (event) => {
     const editCandidate = event.target.closest("[data-edit-candidate]");
     if (editCandidate) {
@@ -53,7 +53,7 @@ function bindEditorial() {
       const currentId = Number(document.getElementById("editorial-form")?.elements.candidateId?.value);
       // 切换候选前保护未保存的决策底稿手改内容
       if (editorialDirty && nextId !== currentId && !await confirmAction("当前候选的决策底稿有未保存的修改，切换后将丢失。仍要切换吗？", { confirmText: "放弃修改并切换" })) return;
-      openEditorial(nextId).catch((error) => toast(error.message));
+      openEditorial(nextId).catch((error) => toast(error.message, "error"));
     }
   });
 }

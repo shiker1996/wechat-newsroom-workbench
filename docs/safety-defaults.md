@@ -14,7 +14,7 @@
 | 打标并发 | `taggingChunkSize` / `taggingConcurrency`：deepseek、kimi 8/6，minimax 2/4 | `config.local.json` 或设置页 |
 | 事件卡并发 | 每批 3 个事件、并发 4（`eventCardChunkSize` / `eventCardConcurrency`） | `config.local.json` |
 | 联网搜索降级 | 服务商无原生 webSearch 且 `tavily.enabled` 时注入 Tavily 结果（`maxResults: 5`） | `config.local.json` |
-| 调用审计 | 每次调用（含失败与压缩）写 `model_calls` 表（provider、purpose、tokens、耗时） | 不可关闭 |
+| 调用审计 | 每次调用（含失败与压缩）写 `model_calls` 表（provider、purpose、tokens、耗时、输出留档，仅保留最近 2000 条） | 不可关闭 |
 
 未配置任何 API Key 时界面与 AI 功能明确降级，不会静默失败或隐式试用未授权服务商。
 

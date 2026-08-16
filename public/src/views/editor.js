@@ -1,6 +1,6 @@
 import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
-import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions } from "../core/ui.js";
+import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions, debounce } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { AUTOSAVE_DELAY_MS } from "../core/constants.js";
 import { lineDiff as documentLineDiff, markdownHeadings as documentMarkdownHeadings, qualityIssues as documentQualityIssues, visibleChars as documentVisibleChars, writingStatistics as documentWritingStatistics } from "./editor-document-model.js";
@@ -255,6 +255,10 @@ function renderMarkdown() {
   renderQualitySummary(editor.value);
 }
 
+// 连续输入时预览渲染防抖；撤销/替换等离散操作仍走同步 renderMarkdown。
+// 渲染后预览区滚动由 renderMarkdown 内已有的 syncScroll(editor, preview) 按比例恢复
+const renderMarkdownDebounced = debounce(renderMarkdown, 160);
+
 function qualityIssues(markdown) { return documentQualityIssues(markdown); }
 
 function renderQualitySummary(markdown) {
@@ -303,12 +307,12 @@ function handlePreflightAction(action) {
   const dialog=document.getElementById("preflight-dialog");
   if(action==="close"){dialog.close();return;}
   dialog.close();
-  if(action==="save"){saveDocument().catch((error)=>toast(error.message));return;}
+  if(action==="save"){saveDocument().catch((error)=>toast(error.message, "error"));return;}
   if(action==="goal"){openWritingGoal();return;}
   if(action==="quality"){openQualityCheck();return;}
   if(action==="final"){
     const finalRadio=document.querySelector('input[name="doc-kind"][value="final"]');
-    if(finalRadio&&selectedDocKind()!=="final"){finalRadio.checked=true;loadSelectedDocument().catch((error)=>toast(error.message));}
+    if(finalRadio&&selectedDocKind()!=="final"){finalRadio.checked=true;loadSelectedDocument().catch((error)=>toast(error.message, "error"));}
     else document.getElementById("article-title")?.focus();
   }
 }
@@ -515,7 +519,7 @@ async function loadSelectedDocument() {
   try {
     docResult = await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/documents?candidateId=${daily?"daily":candidateId}&kind=${daily?`daily-${kind}`:kind}`);
   } catch (error) {
-    toast(`文稿加载失败，已保留当前内容：${error.message}`);
+    toast(`文稿加载失败，已保留当前内容：${error.message}`, "error");
     return;
   }
   currentDocument = docResult?.id ? docResult : null;
@@ -688,7 +692,7 @@ async function saveDocument({automatic=false}={}) {
   } catch(error) {
     if(sequence===saveSequence){editorDirty=true;setSaveState("error","保存失败 · 点击重试");}
     if(!automatic)throw error;
-    toast(`自动保存失败：${error.message}`);
+    toast(`自动保存失败：${error.message}`, "error");
     throw error;
   }
 }
@@ -713,7 +717,7 @@ async function aiDraft() {
     const ctx = document.getElementById("draft-context");
     if (ctx) ctx.textContent = `${result.provider} · ${result.model} · 输入约 ${result.context.afterTokens} tokens${result.context.compressed ? " · 已压缩历史上下文" : " · 未触发压缩"} · 尚未保存`;
     toast("模型结果已放入编辑器，请审阅后保存");
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "error"); }
   finally { if (button) { button.disabled = false; button.textContent = "AI 起草"; } }
 }
 
@@ -736,7 +740,7 @@ async function pollJob(id) {
         document.dispatchEvent(new CustomEvent("typeset:completed", { detail: { job } }));
       }
     }
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "error"); }
 }
 
 async function runTypeset() {
@@ -754,7 +758,7 @@ async function runTypeset() {
     // 排版任务数分钟：打开进度弹窗，避免页面上无任何可见反馈
     document.getElementById("production-job-dialog")?.showModal();
     if (result?.id) pollJob(result.id);
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "error"); }
 }
 
 // batch-drawer 的成稿完成跳转依赖该桥接
@@ -778,7 +782,7 @@ function bindEditor() {
   bound = true;
   document.getElementById("writing-candidate").addEventListener("change", async (event) => {
     if (!await confirmDiscardEdits()) { event.target.value = lastCandidateValue; return; }
-    loadSelectedDocument().catch((error) => toast(error.message));
+    loadSelectedDocument().catch((error) => toast(error.message, "error"));
   });
   $$("input[name=doc-kind]").forEach((item) => item.addEventListener("change", async () => {
     if (!await confirmDiscardEdits()) {
@@ -786,13 +790,13 @@ function bindEditor() {
       if (previous) previous.checked = true;
       return;
     }
-    loadSelectedDocument().catch((error) => toast(error.message));
+    loadSelectedDocument().catch((error) => toast(error.message, "error"));
   }));
   document.getElementById("markdown-editor").addEventListener("input", () => {
     const now=Date.now();
     if(now-lastSnapshotAt>HISTORY_SNAPSHOT_MS){pushHistory(lastEditorValue);lastSnapshotAt=now;}
     lastEditorValue=document.getElementById("markdown-editor").value;
-    markDocumentDirty(); renderMarkdown();
+    markDocumentDirty(); renderMarkdownDebounced();
   });
   document.getElementById("article-title").addEventListener("input", () => {
     markDocumentDirty();
@@ -807,14 +811,14 @@ function bindEditor() {
       }
     }
     lastTitleValue = title;
-    renderMarkdown();
+    renderMarkdownDebounced();
   });
-  document.getElementById("save-document").addEventListener("click", () => saveDocument().catch((error) => toast(error.message)));
+  document.getElementById("save-document").addEventListener("click", () => saveDocument().catch((error) => toast(error.message, "error")));
   document.getElementById("document-save-state").addEventListener("click", (event) => {
     if (!event.currentTarget.classList.contains("error")) return;
-    saveDocument().catch((error) => toast(error.message));
+    saveDocument().catch((error) => toast(error.message, "error"));
   });
-  document.getElementById("document-history").addEventListener("click",()=>openDocumentHistory().catch((error)=>toast(error.message)));
+  document.getElementById("document-history").addEventListener("click",()=>openDocumentHistory().catch((error)=>toast(error.message, "error")));
   document.getElementById("document-find").addEventListener("click",openFindDialog);
   document.querySelector("[data-close-find]").addEventListener("click",()=>document.getElementById("find-dialog").close());
   document.getElementById("find-next").addEventListener("click",findNext);
@@ -835,19 +839,19 @@ function bindEditor() {
   document.getElementById("writing-goal-form").addEventListener("submit",saveWritingGoal);
   document.querySelectorAll("[data-close-writing-goal]").forEach((button)=>button.addEventListener("click",()=>document.getElementById("writing-goal-dialog").close()));
   document.getElementById("find-text").addEventListener("keydown",(event)=>{if(event.key==="Enter"){event.preventDefault();findNext();}});
-  document.getElementById("revision-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-revision-id]");if(button)selectRevision(button.dataset.revisionId).catch((error)=>toast(error.message));});
-  document.getElementById("restore-revision").addEventListener("click",()=>restoreRevision().catch((error)=>toast(error.message)));
+  document.getElementById("revision-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-revision-id]");if(button)selectRevision(button.dataset.revisionId).catch((error)=>toast(error.message, "error"));});
+  document.getElementById("restore-revision").addEventListener("click",()=>restoreRevision().catch((error)=>toast(error.message, "error")));
   document.querySelector("[data-close-revisions]").addEventListener("click",()=>document.getElementById("revision-dialog").close());
-  document.getElementById("ai-draft").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => aiDraft().catch((error) => toast(error.message))));
-  document.getElementById("plan-article-visuals").addEventListener("click",(event)=>withLoading(event.currentTarget,"正在分析…",()=>planVisuals().catch((error)=>toast(error.message))));
+  document.getElementById("ai-draft").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => aiDraft().catch((error) => toast(error.message, "error"))));
+  document.getElementById("plan-article-visuals").addEventListener("click",(event)=>withLoading(event.currentTarget,"正在分析…",()=>planVisuals().catch((error)=>toast(error.message, "error"))));
   document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-insert-visual]");if(button)insertVisual(button.dataset.insertVisual);});
-  document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-preview-visual]");if(button)withLoading(button,"生成中…",()=>previewVisual(button.dataset.previewVisual).catch((error)=>toast(error.message)));});
+  document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-preview-visual]");if(button)withLoading(button,"生成中…",()=>previewVisual(button.dataset.previewVisual).catch((error)=>toast(error.message, "error")));});
   document.getElementById("visual-plan-list").addEventListener("click",(event)=>{const button=event.target.closest("[data-ignore-visual]");if(button)ignoreVisual(button.dataset.ignoreVisual);});
   window.addEventListener("beforeunload",(event)=>{if(!editorDirty)return;event.preventDefault();event.returnValue="";});
   window.addEventListener("keydown",(event)=>{
     if(event.key==="Escape"&&document.body.classList.contains("editor-focus")&&!document.querySelector("dialog[open]")){setFocusMode(false);return;}
     if(!(event.ctrlKey||event.metaKey)||!document.getElementById("view-editor").classList.contains("active"))return;
-    if(event.key.toLowerCase()==="s"){event.preventDefault();saveDocument().catch((error)=>toast(error.message));}
+    if(event.key.toLowerCase()==="s"){event.preventDefault();saveDocument().catch((error)=>toast(error.message, "error"));}
     if(event.key.toLowerCase()==="f"&&(document.activeElement===document.getElementById("markdown-editor")||document.getElementById("find-dialog").open)){event.preventDefault();openFindDialog();}
     if(event.key.toLowerCase()==="b"&&document.activeElement===document.getElementById("markdown-editor")){event.preventDefault();applyMarkdownCommand("bold");}
     if(event.key.toLowerCase()==="k"&&document.activeElement===document.getElementById("markdown-editor")){event.preventDefault();applyMarkdownCommand("link");}

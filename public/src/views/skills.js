@@ -29,7 +29,7 @@ function bindSkills() {
   bound = true;
   document.getElementById("skill-registry-list")?.addEventListener("click", (event) => {
     const item = event.target.closest("[data-skill-edit]");
-    if (item) openSkillConfig(item.dataset.skillEdit).catch((error) => toast(error.message));
+    if (item) openSkillConfig(item.dataset.skillEdit).catch((error) => toast(error.message, "error"));
   });
   document.getElementById("tool-capability-list")?.addEventListener("click", (event) => {
     const testButton = event.target.closest("[data-tool-test]");
@@ -42,22 +42,22 @@ function bindSkills() {
     const impactButton = event.target.closest("[data-tool-impact]");
     const gotoCapability = event.target.closest("[data-goto-capability]");
     if (gotoCapability) { jumpToCapability(gotoCapability.dataset.gotoCapability); return; }
-    if (testButton) testToolPlugin(testButton.dataset.toolTest, testButton).catch((error) => toast(error.message));
-    if (historyButton) loadToolHistory(historyButton.dataset.toolHistory).catch((error) => toast(error.message));
-    if (versionsButton) manageToolPluginVersions(versionsButton.dataset.toolVersions).catch((error) => toast(error.message));
-    if (uninstallButton) uninstallManagedToolPlugin(uninstallButton.dataset.toolUninstall).catch((error) => toast(error.message));
+    if (testButton) testToolPlugin(testButton.dataset.toolTest, testButton).catch((error) => toast(error.message, "error"));
+    if (historyButton) loadToolHistory(historyButton.dataset.toolHistory).catch((error) => toast(error.message, "error"));
+    if (versionsButton) manageToolPluginVersions(versionsButton.dataset.toolVersions).catch((error) => toast(error.message, "error"));
+    if (uninstallButton) uninstallManagedToolPlugin(uninstallButton.dataset.toolUninstall).catch((error) => toast(error.message, "error"));
     if (credentialButton) openRemoteCredential(credentialButton.dataset.toolCredential);
-    if (firstRunButton) confirmRemoteFirstRun(firstRunButton.dataset.toolFirstRun).catch((error) => toast(error.message));
+    if (firstRunButton) confirmRemoteFirstRun(firstRunButton.dataset.toolFirstRun).catch((error) => toast(error.message, "error"));
     if (configButton) openUnifiedExtensionConfiguration("tool", configButton.dataset.toolConfig);
-    if (impactButton) openImplementationImpact("tool", impactButton.dataset.toolImpact).catch((error)=>toast(error.message));
+    if (impactButton) openImplementationImpact("tool", impactButton.dataset.toolImpact).catch((error)=>toast(error.message, "error"));
   });
   document.getElementById("tool-capability-list")?.addEventListener("change", (event) => {
     const toggle = event.target.closest("[data-tool-enabled]");
     const priority = event.target.closest("[data-tool-priority]");
     if (toggle) updateToolPlugin(toggle.dataset.toolEnabled, { enabled: toggle.checked }, toggle)
-      .catch((error) => { toggle.checked = !toggle.checked; toast(error.message); });
+      .catch((error) => { toggle.checked = !toggle.checked; toast(error.message, "error"); });
     if (priority) updateToolPlugin(priority.dataset.toolPriority, { priority: Number(priority.value) }, priority)
-      .catch((error) => toast(error.message));
+      .catch((error) => toast(error.message, "error"));
   });
   document.getElementById("information-slot-list")?.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-goto-consumer]");
@@ -65,17 +65,17 @@ function bindSkills() {
   });
   document.getElementById("information-slot-list")?.addEventListener("change", (event) => {
     const select = event.target.closest("[data-capability-route]");
-    if (select) updateCapabilityRoute(select.dataset.capabilityRoute, select.value, select).catch((error) => toast(error.message));
+    if (select) updateCapabilityRoute(select.dataset.capabilityRoute, select.value, select).catch((error) => toast(error.message, "error"));
   });
   document.getElementById("tool-execution-close")?.addEventListener("click", () => {
     document.getElementById("tool-execution-panel").hidden = true;
   });
-  document.getElementById("load-agent-run-history")?.addEventListener("click",()=>loadAgentRunHistory().catch((error)=>toast(error.message)));
+  document.getElementById("load-agent-run-history")?.addEventListener("click",()=>loadAgentRunHistory().catch((error)=>toast(error.message, "error")));
   document.getElementById("agent-run-history-close")?.addEventListener("click",()=>{document.getElementById("agent-run-history-panel").hidden=true;});
   document.getElementById("capability-impact-close")?.addEventListener("click",()=>{document.getElementById("capability-impact-panel").hidden=true;});
   document.getElementById("consumer-access-list")?.addEventListener("click",(event)=>{
     const impact=event.target.closest("[data-consumer-impact]");
-    if(impact){event.preventDefault();openImplementationImpact(impact.dataset.consumerImpactType==="collector"?"collector":"tool",impact.dataset.consumerImpact,"consumer-access-list").catch((error)=>toast(error.message));return;}
+    if(impact){event.preventDefault();openImplementationImpact(impact.dataset.consumerImpactType==="collector"?"collector":"tool",impact.dataset.consumerImpact,"consumer-access-list").catch((error)=>toast(error.message, "error"));return;}
     const capabilityLink=event.target.closest("[data-consumer-capability]");
     if(capabilityLink){
       event.preventDefault();
@@ -85,7 +85,7 @@ function bindSkills() {
   });
   document.getElementById("consumer-access-list")?.addEventListener("change",(event)=>{
     const toggle=event.target.closest("[data-consumer-auth]");
-    if(toggle)toggleConsumerAuthorization(toggle.dataset.consumerAuth,toggle.dataset.consumerAuthCapability,toggle).catch((error)=>{toggle.checked=!toggle.checked;toast(error.message);});
+    if(toggle)toggleConsumerAuthorization(toggle.dataset.consumerAuth,toggle.dataset.consumerAuthCapability,toggle).catch((error)=>{toggle.checked=!toggle.checked;toast(error.message, "error");});
   });
   document.getElementById("consumer-access-search")?.addEventListener("input",debounce(renderConsumerAccess));
   document.getElementById("consumer-access-status")?.addEventListener("change",renderConsumerAccess);
@@ -104,31 +104,31 @@ function bindSkills() {
   if (skillStatusFilter && !skillStatusFilter.querySelector('[value="installed"]')) {
     skillStatusFilter.insertAdjacentHTML("beforeend", '<option value="installed">已安装</option>');
   }
-  document.getElementById("validate-skill-package")?.addEventListener("click", () => submitSkillDirectory(false).catch((error) => toast(error.message)));
-  document.getElementById("install-skill-package")?.addEventListener("click", () => submitSkillDirectory(true).catch((error) => toast(error.message)));
-  document.getElementById("skill-package-zip")?.addEventListener("change", (event) => submitSkillZip(event.target.files?.[0], event.target).catch((error) => toast(error.message)));
+  document.getElementById("validate-skill-package")?.addEventListener("click", () => submitSkillDirectory(false).catch((error) => toast(error.message, "error")));
+  document.getElementById("install-skill-package")?.addEventListener("click", () => submitSkillDirectory(true).catch((error) => toast(error.message, "error")));
+  document.getElementById("skill-package-zip")?.addEventListener("change", (event) => submitSkillZip(event.target.files?.[0], event.target).catch((error) => toast(error.message, "error")));
   document.getElementById("skill-package-actions")?.addEventListener("click", (event) => {
     const defaultButton = event.target.closest("[data-skill-default-entry]");
     if (defaultButton) {
-      setSkillDefault(defaultButton).catch((error) => toast(error.message));
+      setSkillDefault(defaultButton).catch((error) => toast(error.message, "error"));
       return;
     }
     const button = event.target.closest("[data-skill-package-action]");
-    if (button) manageSkillPackage(button).catch((error) => toast(error.message));
+    if (button) manageSkillPackage(button).catch((error) => toast(error.message, "error"));
   });
-  document.getElementById("validate-tool-package")?.addEventListener("click", () => submitToolPackage(false).catch((error) => toast(error.message)));
-  document.getElementById("install-tool-package")?.addEventListener("click", () => submitToolPackage(true).catch((error) => toast(error.message)));
-  document.getElementById("validate-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(false).catch((error) => toast(error.message)));
-  document.getElementById("install-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(true).catch((error) => toast(error.message)));
+  document.getElementById("validate-tool-package")?.addEventListener("click", () => submitToolPackage(false).catch((error) => toast(error.message, "error")));
+  document.getElementById("install-tool-package")?.addEventListener("click", () => submitToolPackage(true).catch((error) => toast(error.message, "error")));
+  document.getElementById("validate-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(false).catch((error) => toast(error.message, "error")));
+  document.getElementById("install-collector-plugin")?.addEventListener("click", () => submitCollectorPackage(true).catch((error) => toast(error.message, "error")));
   document.querySelector("[data-go-extension-studio]")?.addEventListener("click", () => selectCapabilityTab("extensions"));
-  document.getElementById("collector-runtime-list")?.addEventListener("click",(event)=>{const jump=event.target.closest("[data-goto-capability]");if(jump){jumpToCapability(jump.dataset.gotoCapability);return;}const check=event.target.closest("[data-collector-check]");if(check)testCollectorTool(check.dataset.collectorCheck,check).catch((error)=>toast(error.message));const configure=event.target.closest("[data-collector-config]");if(configure)openCollectorConfiguration(configure.dataset.collectorConfig);const history=event.target.closest("[data-collector-history]");if(history)loadCollectorHistory(history.dataset.collectorHistory).catch((error)=>toast(error.message));const impact=event.target.closest("[data-collector-impact]");if(impact)openImplementationImpact("collector",impact.dataset.collectorImpact).catch((error)=>toast(error.message));});
-  document.getElementById("collector-runtime-list")?.addEventListener("change",(event)=>{const enabled=event.target.closest("[data-collector-enabled]");if(enabled)updateCollectorTool(enabled.dataset.collectorEnabled,{enabled:enabled.checked}).catch((error)=>toast(error.message));const priority=event.target.closest("[data-collector-priority]");if(priority)updateCollectorTool(priority.dataset.collectorPriority,{priority:Number(priority.value)}).catch((error)=>toast(error.message));});
-  document.getElementById("validate-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(false).catch((error) => toast(error.message)));
-  document.getElementById("install-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(true).catch((error) => toast(error.message)));
-  document.getElementById("save-remote-credential")?.addEventListener("click", () => saveRemoteCredential().catch((error) => toast(error.message)));
+  document.getElementById("collector-runtime-list")?.addEventListener("click",(event)=>{const jump=event.target.closest("[data-goto-capability]");if(jump){jumpToCapability(jump.dataset.gotoCapability);return;}const check=event.target.closest("[data-collector-check]");if(check)testCollectorTool(check.dataset.collectorCheck,check).catch((error)=>toast(error.message, "error"));const configure=event.target.closest("[data-collector-config]");if(configure)openCollectorConfiguration(configure.dataset.collectorConfig);const history=event.target.closest("[data-collector-history]");if(history)loadCollectorHistory(history.dataset.collectorHistory).catch((error)=>toast(error.message, "error"));const impact=event.target.closest("[data-collector-impact]");if(impact)openImplementationImpact("collector",impact.dataset.collectorImpact).catch((error)=>toast(error.message, "error"));});
+  document.getElementById("collector-runtime-list")?.addEventListener("change",(event)=>{const enabled=event.target.closest("[data-collector-enabled]");if(enabled)updateCollectorTool(enabled.dataset.collectorEnabled,{enabled:enabled.checked}).catch((error)=>toast(error.message, "error"));const priority=event.target.closest("[data-collector-priority]");if(priority)updateCollectorTool(priority.dataset.collectorPriority,{priority:Number(priority.value)}).catch((error)=>toast(error.message, "error"));});
+  document.getElementById("validate-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(false).catch((error) => toast(error.message, "error")));
+  document.getElementById("install-remote-plugin")?.addEventListener("click", () => submitRemotePlugin(true).catch((error) => toast(error.message, "error")));
+  document.getElementById("save-remote-credential")?.addEventListener("click", () => saveRemoteCredential().catch((error) => toast(error.message, "error")));
   document.getElementById("cancel-remote-credential")?.addEventListener("click", () => closeRemoteCredential());
   document.getElementById("catalog-draft-close")?.addEventListener("click", () => { document.getElementById("catalog-draft-panel").hidden = true; });
-  document.getElementById("catalog-draft-submit")?.addEventListener("click", () => submitCatalogDrafts().catch((error) => toast(error.message)));
+  document.getElementById("catalog-draft-submit")?.addEventListener("click", () => submitCatalogDrafts().catch((error) => toast(error.message, "error")));
   document.querySelector(".capability-section-tabs")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-capability-tab]");
     if (button) selectCapabilityTab(button.dataset.capabilityTab);

@@ -14,33 +14,33 @@ function bindPreview() {
   document.getElementById("typeset-candidate").addEventListener("change", (event) => {
     const id = event.target.value;
     renderProductionCandidate(id);
-    loadImageWorkspace(id).catch((error) => toast(error.message));
+    loadImageWorkspace(id).catch((error) => toast(error.message, "error"));
   });
   // 「生成文章封面图」引导：带着当前选中的文章跳转到封面页（state.coverCandidateId 由封面页消费）
   document.getElementById("goto-cover").addEventListener("click", () => {
     state.coverCandidateId = document.getElementById("typeset-candidate")?.value || null;
     window.go("cover");
   });
-  document.getElementById("refresh-preview").addEventListener("click", () => loadProductionPreview().catch((error) => toast(error.message)));
+  document.getElementById("refresh-preview").addEventListener("click", () => loadProductionPreview().catch((error) => toast(error.message, "error")));
   document.addEventListener("typeset:completed", () => {
-    loadProductionPreview().catch((error) => toast(error.message));
+    loadProductionPreview().catch((error) => toast(error.message, "error"));
   });
   document.getElementById("preview-reindex").addEventListener("click", async (event) => {
-    await withLoading(event.currentTarget, "正在扫描…", () => reindex().catch((error) => toast(error.message)));
-    await loadProductionPreview().catch((error) => toast(error.message));
+    await withLoading(event.currentTarget, "正在扫描…", () => reindex().catch((error) => toast(error.message, "error")));
+    await loadProductionPreview().catch((error) => toast(error.message, "error"));
   });
-  document.getElementById("plan-article-images").addEventListener("click", (event) => withLoading(event.currentTarget, "正在分析…", () => planArticleImages().catch((error) => toast(error.message))));
+  document.getElementById("plan-article-images").addEventListener("click", (event) => withLoading(event.currentTarget, "正在分析…", () => planArticleImages().catch((error) => toast(error.message, "error"))));
   document.getElementById("run-local-typeset").addEventListener("click", (event) => {
     const blocked = typesetBlockReason();
     if (blocked) { toast(blocked); return; }
-    withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message)));
+    withLoading(event.currentTarget, "正在排版…", () => runTypeset("local").catch((error) => toast(error.message, "error")));
   });
-  document.getElementById("copy-typeset-html").addEventListener("click", (event) => withLoading(event.currentTarget, "正在复制…", () => copyTypesetHtml().catch((error) => toast(error.message))));
+  document.getElementById("copy-typeset-html").addEventListener("click", (event) => withLoading(event.currentTarget, "正在复制…", () => copyTypesetHtml().catch((error) => toast(error.message, "error"))));
   document.addEventListener("click", (event) => {
     // 显式「上传 CDN」按钮：本地图片已就位时点击才产生外部写入
     const uploadCdnButton = event.target.closest("[data-upload-cdn]");
     if (uploadCdnButton) {
-      withLoading(uploadCdnButton, "正在上传…", () => uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message)));
+      withLoading(uploadCdnButton, "正在上传…", () => uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message, "error")));
       return;
     }
     // 「生成图片」：可生成占位调用确定性生成链，仅产出本地 PNG，不自动上传
@@ -50,7 +50,7 @@ function bindPreview() {
       card?.classList.add("generating");
       withLoading(generateButton, "正在生成…", () => generateImageAsset(generateButton.dataset.generateImage).catch((error) => {
         card?.classList.remove("generating");
-        toast(error.message);
+        toast(error.message, "error");
       }));
       return;
     }
@@ -70,7 +70,7 @@ function bindPreview() {
       card?.classList.add("generating");
       generateImageAsset(generateTrigger.dataset.generateTrigger).catch((error) => {
         card?.classList.remove("generating");
-        toast(error.message);
+        toast(error.message, "error");
       });
       return;
     }
@@ -86,12 +86,21 @@ function bindPreview() {
       card?.querySelector("[data-image-file]")?.click();
     }
   });
+  // .generate-empty 是 role="button" 的占位区：支持 Enter/Space 触发，与点击同逻辑
+  //（仅当焦点就在占位区本身时触发，避免吞掉内部「手动供图」等交互的按键）
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const trigger = event.target instanceof Element && event.target.matches('.generate-empty[data-generate-trigger]') ? event.target : null;
+    if (!trigger) return;
+    event.preventDefault();
+    trigger.click();
+  });
   // 图片文件选择后仅保存到本地，不自动上传 CDN（与页面文案承诺一致）
   document.addEventListener("change", (event) => {
     if (!event.target.matches("[data-image-file]")) return;
     const card = event.target.closest("[data-image-id]");
     if (!card) return;
-    saveLocalImageAsset(card.dataset.imageId).catch((error) => toast(error.message));
+    saveLocalImageAsset(card.dataset.imageId).catch((error) => toast(error.message, "error"));
   });
   document.addEventListener("dragover", (event) => {
     const dropZone = event.target.closest("[data-upload-image]");
@@ -112,7 +121,7 @@ function bindPreview() {
     const card = dropZone.closest("[data-image-id]");
     const file = event.dataTransfer?.files?.[0];
     if (!card || !file) return;
-    saveLocalImageAsset(card.dataset.imageId, file).catch((error) => toast(error.message));
+    saveLocalImageAsset(card.dataset.imageId, file).catch((error) => toast(error.message, "error"));
   });
 }
 
@@ -361,7 +370,7 @@ async function planArticleImages() {
     const result = await request(`/api/candidates/${candidateId}/images/plan`, { method: "POST", body: JSON.stringify({ provider }) });
     toast("配图占位已生成");
     await loadImageWorkspace(candidateId);
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "error"); }
 }
 
 // 选中图片后仅保存到本地，不产生外部写入；上传 CDN 由「上传 CDN」按钮显式触发
@@ -383,7 +392,7 @@ async function saveLocalImageAsset(id, droppedFile = null) {
     toast(`${id} 已保存到本地，点击「上传 CDN」才会同步到图床`);
   } catch (error) {
     if (status?.isConnected) status.textContent = "本地待上传";
-    toast(error.message);
+    toast(error.message, "error");
   }
 }
 
@@ -399,7 +408,7 @@ async function uploadImageAsset(id) {
     toast(`${id} 已上传 CDN`);
   } catch (error) {
     if (status?.isConnected) status.textContent = "本地待上传";
-    toast(error.message);
+    toast(error.message, "error");
   }
 }
 
@@ -441,7 +450,7 @@ async function copyTypesetHtml() {
       return;
     }
     toast("公众号富文本已复制，直接粘贴到公众号编辑器即可");
-  } catch (error) { toast(`复制失败：${error.message}`); }
+  } catch (error) { toast(`复制失败：${error.message}`, "error"); }
 }
 
 async function openProductionJob(id) {

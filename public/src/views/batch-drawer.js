@@ -41,7 +41,7 @@ export async function createBreakingBatch(event) {
     await loadOverview();
     openBatch(batch.id);
   } catch (error) {
-    toast(error.message);
+    toast(error.message, "error");
   } finally {
     submit.disabled = false; submit.textContent = "建立突发专题";
   }
@@ -63,7 +63,7 @@ export async function createBatch(event) {
     await loadOverview();
     openBatch(batch.id);
   } catch (error) {
-    toast(error.message);
+    toast(error.message, "error");
   } finally {
     submit.disabled = false; submit.textContent = "建立批次";
   }
@@ -339,7 +339,7 @@ export async function pollJob(id) {
         $("#job-console").textContent = "自动流程已入队…";
         await loadOverview();
         return pollJob(autoJob.id);
-      } catch (error) { toast(`采集完成，但自动流程启动失败：${error.message}`); }
+      } catch (error) { toast(`采集完成，但自动流程启动失败：${error.message}`, "error"); }
     }
     const successText = job.type === "breaking-analysis" ? "突发事实基座和双评分已生成，请确认分流" : job.type === "research" || job.type === "auto" ? "事件研判完成，已进入选题池" : job.type === "collect" ? "采集完成" : job.type === "event-cards" ? "事件卡已生成" : job.type === "article" ? "完整成稿链已完成" : job.type === "typeset" ? "公众号排版 HTML 已完成" : "AI 打标完成";
     toast(job.status === "completed" ? successText : `任务失败：${job.error || "未取得有效结果"}`);
@@ -364,7 +364,7 @@ export async function pollJob(id) {
     } else {
       await openBatch(job.batchId || job.batch_id);
     }
-  } catch (error) { toast(error.message); }
+  } catch (error) { toast(error.message, "error"); }
 }
 
 async function retryPipelineFailure(button) {
@@ -413,28 +413,28 @@ export function bindBatchDrawer() {
       const mode = document.querySelector(".nav-item.active")?.dataset.view === "batches" ? "archive" : "full";
       openBatch(batch.dataset.batch, mode);
     }
-    if (event.target.closest("[data-collect]")) startCollection().catch((error) => toast(error.message));
+    if (event.target.closest("[data-collect]")) startCollection().catch((error) => toast(error.message, "error"));
     const failureRetryButton=event.target.closest("[data-retry-pipeline-failure]");
     if(failureRetryButton)retryPipelineFailure(failureRetryButton);
     const failureSkipButton=event.target.closest("[data-skip-pipeline-failure]");
     if(failureSkipButton)decidePipelineFailure(failureSkipButton,"skip");
     const failureReopenButton=event.target.closest("[data-reopen-pipeline-failure]");
     if(failureReopenButton)decidePipelineFailure(failureReopenButton,"reopen");
-    if (event.target.closest("[data-ai-tag]")) startBatchAi("tag").catch((error) => toast(error.message));
-    if (event.target.closest("[data-ai-retag]")) startBatchAi("retag").catch((error) => toast(error.message));
-    if (event.target.closest("[data-ai-event-cards-force]")) startBatchAi("event-cards-force").catch((error) => toast(error.message));
-    if (event.target.closest("[data-ai-event-cards]")) startBatchAi("event-cards").catch((error) => toast(error.message));
-    if (event.target.closest("[data-ai-research]")) startBatchAi("research").catch((error) => toast(error.message));
+    if (event.target.closest("[data-ai-tag]")) startBatchAi("tag").catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-ai-retag]")) startBatchAi("retag").catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-ai-event-cards-force]")) startBatchAi("event-cards-force").catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-ai-event-cards]")) startBatchAi("event-cards").catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-ai-research]")) startBatchAi("research").catch((error) => toast(error.message, "error"));
     if (event.target.closest("[data-view-research]")) {
       $("#batch-drawer").close();
       window.go("topics");
     }
-    if (event.target.closest("[data-breaking-analyze]")) startBreakingAnalysis().catch((error) => toast(error.message));
-    if (event.target.closest("[data-breaking-route]")) confirmBreakingRoute().catch((error) => toast(error.message));
-    if (event.target.closest("[data-breaking-add-material]")) addBreakingMaterials().catch((error) => toast(error.message));
+    if (event.target.closest("[data-breaking-analyze]")) startBreakingAnalysis().catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-breaking-route]")) confirmBreakingRoute().catch((error) => toast(error.message, "error"));
+    if (event.target.closest("[data-breaking-add-material]")) addBreakingMaterials().catch((error) => toast(error.message, "error"));
     const lifecycleButton=event.target.closest("[data-batch-lifecycle]");
-    if(lifecycleButton)updateBatchLifecycle(lifecycleButton.dataset.batchLifecycle).catch((error)=>toast(error.message));
-    if (event.target.closest("[data-batch-delete]")) deleteBatchPermanently().catch((error) => toast(error.message));
+    if(lifecycleButton)updateBatchLifecycle(lifecycleButton.dataset.batchLifecycle).catch((error)=>toast(error.message, "error"));
+    if (event.target.closest("[data-batch-delete]")) deleteBatchPermanently().catch((error) => toast(error.message, "error"));
   });
   $("#new-batch-button").addEventListener("click", openNewBatch);
   // 整卡 role="button" 的批次卡片（如工作台最新批次）支持 Enter/Space 打开；

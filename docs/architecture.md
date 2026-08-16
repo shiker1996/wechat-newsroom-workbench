@@ -76,7 +76,7 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 ## LLM 网关（lib/llm/）
 
-- `gateway.mjs`：OpenAI 兼容客户端，统一 `complete` / `streamComplete`。多服务商在 `config.llm.providers`（含 baseUrl / model / apiKeyEnv / contextWindow / 输出上限 / jsonMode / webSearch 配置），`defaultProvider` 选择，`resolve()` 校验启用状态与 Key。降级：jsonMode 不支持自动去 `response_format` 重试；无原生 webSearch 且配置 Tavily 时注入搜索结果；`finishReason=length` 且 adaptive 时自动扩容重试一次。每次调用（含失败）写 `model_calls` 审计。
+- `gateway.mjs`：OpenAI 兼容客户端，统一 `complete` / `streamComplete`。多服务商在 `config.llm.providers`（含 baseUrl / model / apiKeyEnv / contextWindow / 输出上限 / jsonMode / webSearch 配置），`defaultProvider` 选择，`resolve()` 校验启用状态与 Key。降级：jsonMode 不支持自动去 `response_format` 重试；无原生 webSearch 且配置 Tavily 时注入搜索结果；`finishReason=length` 且 adaptive 时自动扩容重试一次。每次调用（含失败）写 `model_calls` 审计（含原始输出与推理文本，仅保留最近 2000 条，超出自动清理）。
 - `context-manager.mjs`：CJK 加权 token 估算与上下文预算；超预算时先 LLM 摘要老消息（不新增事实），仍超则丢弃最老非保护消息，不静默截断。
 - `output-budget.mjs`：按用途（typeset-html、editorial-room 等 16 组画像）定输出预算，截断时带重试提示词重试。
 

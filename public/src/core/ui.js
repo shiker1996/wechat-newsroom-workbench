@@ -57,8 +57,52 @@ export async function withLoading(button, label, fn) {
   const original = button.textContent;
   button.disabled = true;
   button.textContent = label;
+  button.setAttribute("aria-busy", "true");
   try { return await fn(); }
-  finally { button.disabled = false; button.textContent = original; }
+  finally { button.disabled = false; button.textContent = original; button.removeAttribute("aria-busy"); }
+}
+
+// tablist 键盘导航（roving tabindex）：ArrowLeft/Right 循环移动焦点并激活，
+// Home/End 跳首尾。全局委托；激活复用各视图已有的 click 处理（由它们同步 aria-selected）
+export function bindTablistKeyboardNavigation() {
+  const syncTabStops = (list) => {
+    list.querySelectorAll('[role="tab"]').forEach((tab) => {
+      tab.tabIndex = tab.getAttribute("aria-selected") === "true" ? 0 : -1;
+    });
+  };
+  document.querySelectorAll('[role="tablist"]').forEach(syncTabStops);
+  document.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const tab = event.target instanceof Element ? event.target.closest('[role="tab"]') : null;
+    const list = tab?.closest('[role="tablist"]');
+    if (!list) return;
+    const tabs = [...list.querySelectorAll('[role="tab"]')];
+    const current = tabs.indexOf(tab);
+    if (tabs.length < 2 || current < 0) return;
+    let next;
+    if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    tabs[next].focus();
+    tabs[next].click();
+    syncTabStops(list);
+  });
+}
+
+// 弹层式 details（候选卡“更多”菜单、创作配置弹层）支持 Esc / 外部点击关闭；
+// .nav-group 导航分组与其余内联折叠面板是常驻内容，不受影响
+const popupDetailsSelector = 'details:is(.candidate-more, .creation-skill-settings)[open]';
+export function bindDismissableDetails() {
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    document.querySelectorAll(popupDetailsSelector).forEach((node) => { node.open = false; });
+  });
+  document.addEventListener("click", (event) => {
+    document.querySelectorAll(popupDetailsSelector).forEach((node) => {
+      if (!node.contains(event.target)) node.open = false;
+    });
+  });
 }
 
 // 产物/日历共用的 iframe 预览：打开时显示加载态（load 后隐藏），关闭时清空 src，
@@ -97,6 +141,8 @@ export function openArtifactPreview(url, { originalUrl } = {}) {
   status.hidden = false;
   iframe.src = url;
   dialog.showModal();
+  // 初始焦点落在关闭按钮，键盘用户无需穿越 iframe
+  dialog.querySelector(".preview-close")?.focus();
 }
 
 // 统一确认对话框：覆盖、删除等危险操作都走这里，返回 Promise<boolean>

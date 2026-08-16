@@ -296,7 +296,7 @@ if(!window.__socialPageLayoutBound){window.__socialPageLayoutBound=true;
     try{
       const data=await request(`/api/candidates/${selectedId}/card-pages/${page}/layout`,{method:'PUT',body:JSON.stringify({layout_style:select.value})});
       renderCardPlan(data.cardPlan,data.layoutDecisions);
-    }catch(error){toast(error.message);renderCardPlan(currentCardPlan,currentLayoutDecisions);}
+    }catch(error){toast(error.message, "error");renderCardPlan(currentCardPlan,currentLayoutDecisions);}
   });
 }
 if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
@@ -329,7 +329,7 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
         else block.content=field?.value.trim()||'';
         contentBlocks.push(block);
       });
-    }catch(error){toast(error instanceof SyntaxError?'结构化内容必须是有效 JSON':`内容块读取失败：${error.message}`);return;}
+    }catch(error){toast(error instanceof SyntaxError?'结构化内容必须是有效 JSON':`内容块读取失败：${error.message}`,'error');return;}
     const originalText=button.textContent;button.disabled=true;button.textContent='保存中…';
     try{
       const data=await request(`/api/candidates/${selectedId}/card-pages/${pageNumber}`,{method:'PUT',body:JSON.stringify({
@@ -339,7 +339,7 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
       })});
       renderCardPlan(data.cardPlan,data.layoutDecisions);renderGate(data.gate);
       toast('本页故事板已保存；生成图文时会整组重新渲染');
-    }catch(error){toast(error.message);button.disabled=false;button.textContent=originalText;}
+    }catch(error){toast(error.message, "error");button.disabled=false;button.textContent=originalText;}
   });
   // 切换内容块类型：重渲染该块编辑器，保留标题；结构化/正文内容按新类型转换
   document.addEventListener('change',(event)=>{
@@ -375,7 +375,7 @@ if(!window.__socialThemeBound){
     if(!selectedId)return;
     try{
       await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});
-    }catch(error){toast(error.message);}
+    }catch(error){toast(error.message, "error");}
   });
 }
 if(!window.__socialCompositionBound){
@@ -393,7 +393,7 @@ if(!window.__socialCompositionBound){
       selectedCompositionMode=previous;
       event.target.value=previous;
       syncCompositionControls();
-      toast(error.message);
+      toast(error.message, "error");
     }
   });
 }
@@ -406,7 +406,7 @@ if(!window.__socialLayoutBound){
       const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({layout_style:event.target.value})});
       currentGroupLayout=event.target.value;
       renderCardPlan(data.cardPlan,data.layoutDecisions);
-    }catch(error){event.target.value=currentGroupLayout;toast(error.message);}
+    }catch(error){event.target.value=currentGroupLayout;toast(error.message, "error");}
   });
 }
 if(!window.__socialChannelBound){
@@ -420,7 +420,7 @@ if(!window.__socialChannelBound){
       selectedChannelMode=data.channelMode;
       renderCardPlan(currentCardPlan,data.layoutDecisions);
       if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;
-    }catch(error){event.target.value=selectedChannelMode;toast(error.message);}
+    }catch(error){event.target.value=selectedChannelMode;toast(error.message, "error");}
   });
 }
 if(!window.__socialSkillSelectionBound){window.__socialSkillSelectionBound=true;
@@ -442,7 +442,7 @@ inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");
-generateButton?.addEventListener("click", async () => { if (!selectedId) return; const candidateId = Number(selectedId); if (delivery?.ready && !await confirmAction("重新生成图文将覆盖当前已生成的整组交付物（HTML 与逐页 PNG），是否继续？", { confirmText: "重新生成" })) return; socialJobs.set(candidateId, { status: 'running', progress: '正在启动…' }); syncGenerateButton(); try { const job = await request(`/api/candidates/${candidateId}/ai/social-card`, { method: 'POST', body: '{}' }); socialJobs.set(candidateId, { status: 'running', progress: '图文任务执行中…' }); syncGenerateButton(); toast("图文生成任务已启动，可在任务日志查看进度"); watchSocialJob(job.id, candidateId).catch((error) => { socialJobs.set(candidateId, { status: 'failed', error: error.message }); syncGenerateButton(); toast(error.message); }); } catch (error) { socialJobs.delete(candidateId); syncGenerateButton(); renderGate(lastGate); toast(error.message); } });
+generateButton?.addEventListener("click", async () => { if (!selectedId) return; const candidateId = Number(selectedId); if (delivery?.ready && !await confirmAction("重新生成图文将覆盖当前已生成的整组交付物（HTML 与逐页 PNG），是否继续？", { confirmText: "重新生成" })) return; socialJobs.set(candidateId, { status: 'running', progress: '正在启动…' }); syncGenerateButton(); try { const job = await request(`/api/candidates/${candidateId}/ai/social-card`, { method: 'POST', body: '{}' }); socialJobs.set(candidateId, { status: 'running', progress: '图文任务执行中…' }); syncGenerateButton(); toast("图文生成任务已启动，可在任务日志查看进度"); watchSocialJob(job.id, candidateId).catch((error) => { socialJobs.set(candidateId, { status: 'failed', error: error.message }); syncGenerateButton(); toast(error.message, "error"); }); } catch (error) { socialJobs.delete(candidateId); syncGenerateButton(); renderGate(lastGate); toast(error.message, "error"); } });
 
 window.openSocialEditor=openSocialEditor;
 
@@ -543,7 +543,7 @@ function bindCustomSocialForm(){
       panel.hidden=true;resetCustomPanel();toast('自定义图文已创建');
       await loadSocialEditor();
       if(data.candidate?.id)await openSocialEditor(data.candidate.id);
-    }catch(error){toast(error.message);}
+    }catch(error){toast(error.message, "error");}
     finally{submit.disabled=false;submit.textContent='创建并进入图文编辑室';}
   });
 }
@@ -608,7 +608,7 @@ function bindRepositorySocialForm(){
       if(data.candidate?.id)await openSocialEditor(data.candidate.id);
     }catch(error){
       hint.textContent=error.message;hint.className='repository-quickadd-hint error';
-      toast(error.message);
+      toast(error.message, "error");
     }
     finally{submit.disabled=!parseRepo(input.value.trim());submit.textContent='添加';}
   });

@@ -88,17 +88,17 @@ function bindAtlas() {
     if (eventPool && state.atlas && state.activeBatchId) {
       const eventId = eventPool.dataset.eventPool;
       const tracks = String(eventPool.dataset.eventTracks || "article").split(",").filter(Boolean);
-      withLoading(eventPool, "合成中…", () => createCompositeFromEvent(state.activeBatchId, eventId, "", tracks)).catch((error) => toast(error.message));
+      withLoading(eventPool, "合成中…", () => createCompositeFromEvent(state.activeBatchId, eventId, "", tracks)).catch((error) => toast(error.message, "error"));
     }
     const dimensionPool = event.target.closest("[data-dimension-pool]");
     if (dimensionPool && state.activeBatchId) {
       const nodeId = dimensionPool.dataset.dimensionPool;
       const tracks = String(dimensionPool.dataset.dimensionTracks || "article").split(",").filter(Boolean);
-      withLoading(dimensionPool, "合成中…", () => createCompositeFromDimension(state.activeBatchId, nodeId, tracks)).catch((error) => toast(error.message));
+      withLoading(dimensionPool, "合成中…", () => createCompositeFromDimension(state.activeBatchId, nodeId, tracks)).catch((error) => toast(error.message, "error"));
     }
     const collectButton=event.target.closest("[data-atlas-collect]");
     if(collectButton&&state.activeBatchId){
-      import("./batch-drawer.js").then(({openBatch})=>openBatch(state.activeBatchId)).catch((error)=>toast(error.message));
+      import("./batch-drawer.js").then(({openBatch})=>openBatch(state.activeBatchId)).catch((error)=>toast(error.message, "error"));
     }
   });
   const graph = document.getElementById("event-graph");

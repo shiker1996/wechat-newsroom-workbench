@@ -275,7 +275,7 @@ export default async function loadThemeManager(){
       const result=await request(`/api/themes/${encodeURIComponent(sourceId)}/clone`,{method:'POST',body:JSON.stringify({id,label})});
       toast('已创建用户主题草稿');
       await open(result.theme.id);
-    }catch(error){toast(error.message);}
+    }catch(error){toast(error.message, "error");}
   });
   document.getElementById('open-ai-theme-creator').addEventListener('click',openAiThemeCreator);
   document.getElementById('close-ai-theme-creator').addEventListener('click',closeAiThemeCreator);
@@ -321,11 +321,11 @@ export default async function loadThemeManager(){
       const result=await request('/api/themes/import',{method:'POST',body:JSON.stringify({definition})});
       toast(result.warnings?.length?`导入成功：${result.warnings.map((item)=>item.message).join('；')}`:'主题已导入为草稿');
       await open(result.theme.id);
-    }catch(error){toast(`导入失败：${error.message}`);}finally{event.target.value='';}
+    }catch(error){toast(`导入失败：${error.message}`, "error");}finally{event.target.value='';}
   });
   document.getElementById('user-theme-list').addEventListener('click',(event)=>{
     const row=event.target.closest('[data-user-theme]');
-    if(row)open(row.dataset.userTheme).catch((error)=>toast(error.message));
+    if(row)open(row.dataset.userTheme).catch((error)=>toast(error.message, "error"));
   });
   document.getElementById('user-theme-form').addEventListener('input',(event)=>{
     const pair=event.target?.dataset?.tokenPair;
@@ -369,7 +369,7 @@ export default async function loadThemeManager(){
       await list();
     }catch(error){
       showGateIssues(error.issues);
-      toast(`校验失败：${error.message}`);
+      toast(`校验失败：${error.message}`, "error");
     }
   });
   document.getElementById('publish-user-theme').addEventListener('click',async()=>{
@@ -381,7 +381,7 @@ export default async function loadThemeManager(){
       await open(active.id);
     }catch(error){
       showGateIssues(error.issues);
-      toast(error.message);
+      toast(error.message, "error");
     }
   });
   document.getElementById('export-user-theme').addEventListener('click',async()=>{

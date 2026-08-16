@@ -116,7 +116,7 @@ function syncMode() {
       loadStageSkillControls(document.getElementById("tutorial-stage-skills"),
         "/api/creation-entry-points/independent-writing/stage-skills"),
     ])
-      .catch((error)=>toast(error.message));
+      .catch((error)=>toast(error.message, "error"));
   }
   const title = document.getElementById("tutorial-empty-title");
   const copy = document.getElementById("tutorial-empty-copy");
@@ -338,16 +338,16 @@ function bind() {
     try {
       await withLoading(button, writingFailed ? "重新执行中…" : "生成中…", () => submit());
     } catch(error) {
-      toast(error.message);
+      toast(error.message, "error");
     } finally {
       if(writingFailed)button.textContent="重新执行";
     }
   });
-  document.getElementById("tutorial-chat-send").addEventListener("click", () => withLoading(document.getElementById("tutorial-chat-send"), "思考中…", () => sendChat().catch((error) => { toast(error.message); throw error; })));
+  document.getElementById("tutorial-chat-send").addEventListener("click", () => withLoading(document.getElementById("tutorial-chat-send"), "思考中…", () => sendChat().catch((error) => { toast(error.message, "error"); throw error; })));
   document.getElementById("tutorial-chat-input").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.getElementById("tutorial-chat-send").click(); }
   });
-  document.getElementById("tutorial-read-project").addEventListener("click", () => withLoading(document.getElementById("tutorial-read-project"), "读取中…", () => inspectProject().catch((error) => { toast(error.message); throw error; })));
+  document.getElementById("tutorial-read-project").addEventListener("click", () => withLoading(document.getElementById("tutorial-read-project"), "读取中…", () => inspectProject().catch((error) => { toast(error.message, "error"); throw error; })));
   document.getElementById("tutorial-local-project").addEventListener("input", (event) => { if (!event.currentTarget.value.trim()) setProjectStatus("尚未读取，不影响继续对话或填写表单。", "idle"); });
   document.querySelectorAll("[data-writing-mode]").forEach((button) => button.addEventListener("click", () => {
     field("articleMode").value = button.dataset.writingMode;
@@ -369,10 +369,10 @@ function bind() {
   document.getElementById("close-tutorial-skills").addEventListener("click",()=>{
     document.getElementById("tutorial-creation-skill-settings")?.removeAttribute("open");
   });
-  document.getElementById("open-tutorial-editor").addEventListener("click", () => openEditor().catch((error) => toast(error.message)));
+  document.getElementById("open-tutorial-editor").addEventListener("click", () => openEditor().catch((error) => toast(error.message, "error")));
   document.getElementById("custom-writing-project-list").addEventListener("click",(event)=>{
     const open=event.target.closest("[data-custom-writing-open]");
-    if(open)return openEditor(Number(open.dataset.customWritingOpen)).catch((error)=>toast(error.message));
+    if(open)return openEditor(Number(open.dataset.customWritingOpen)).catch((error)=>toast(error.message, "error"));
     const resume=event.target.closest("[data-custom-writing-resume]");
     if(resume){
       candidateId=Number(resume.dataset.candidateId);
@@ -383,7 +383,7 @@ function bind() {
     }
     const retry=event.target.closest("[data-custom-writing-retry]");
     if(retry)return withLoading(retry,"重新执行中…",()=>retryProject(Number(retry.dataset.customWritingRetry)))
-      .catch((error)=>toast(error.message));
+      .catch((error)=>toast(error.message, "error"));
     if(event.target.closest("[data-reload-custom-writing]"))loadProjects();
   });
 }

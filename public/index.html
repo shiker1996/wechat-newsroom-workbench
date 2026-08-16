@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/styles.css?v=20260805-block-edit">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">跳到主内容</a>
   <div class="paper-noise"></div>
   <aside class="rail">
     <div class="brand">
@@ -81,7 +82,7 @@
     </div>
   </aside>
 
-  <main class="shell">
+  <main class="shell" id="main-content" tabindex="-1">
     <header class="topbar">
       <div><span class="eyebrow">编辑工作台</span><h1 id="page-title">工作台总览</h1></div>
       <div class="top-actions">
@@ -395,7 +396,7 @@
                   </label>
                   <label class="social-theme-picker">
                     <span>视觉主题</span>
-                    <select id="social-visual-style"><option value="ice-blue">正在加载主题…</option></select>
+                    <select id="social-visual-style" class="visually-hidden"><option value="ice-blue">正在加载主题…</option></select>
                     <button type="button" class="theme-picker-trigger" id="social-theme-trigger" data-theme-picker="social"><span>视觉主题</span><b>正在加载…</b></button>
                     <div id="social-theme-preview" class="theme-catalog-preview" hidden></div>
                     <small id="social-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small>
@@ -570,7 +571,7 @@
       <div class="typeset-toolbar">
         <select id="typeset-candidate" aria-label="待排版文章"></select>
         <select id="typeset-provider" aria-label="排版设计模型"></select>
-        <select id="typeset-theme" aria-label="排版主题">
+        <select id="typeset-theme" class="visually-hidden" aria-label="排版主题">
           <option value="auto">自动（按文章类型）</option>
         </select>
         <button type="button" class="theme-picker-trigger" id="typeset-theme-trigger" data-theme-picker="article"><span>排版主题</span><b>自动匹配</b></button>
@@ -601,7 +602,7 @@
       <div class="section-intro"><div><span class="kicker">COVER IMAGE</span><h2>文章封面图</h2></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
       <div class="typeset-toolbar">
         <select id="cover-candidate" aria-label="封面文章"></select>
-        <select id="cover-theme" aria-label="封面主题"></select>
+        <select id="cover-theme" class="visually-hidden" aria-label="封面主题"></select>
         <button type="button" class="theme-picker-trigger" id="cover-theme-trigger" data-theme-picker="cover"><span>封面主题</span><b>自动匹配</b></button>
         <select id="cover-provider" aria-label="封面设计模型"></select>
         <button class="primary-button" id="generate-cover">生成封面图</button>

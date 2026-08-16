@@ -15,15 +15,15 @@ function bindCalendar() {
   document.addEventListener("click", (event) => {
     if (event.target.closest("[data-cal-month-prev]")) {
       let y = state.calYear, m = state.calMonth;
-      if (y) { if (m <= 1) { y--; m = 12; } else { m--; } loadCalendar(y, m).catch((e) => toast(e.message)); }
+      if (y) { if (m <= 1) { y--; m = 12; } else { m--; } loadCalendar(y, m).catch((e) => toast(e.message, "error")); }
     }
     if (event.target.closest("[data-cal-month-next]")) {
       let y = state.calYear, m = state.calMonth;
-      if (y) { if (m >= 12) { y++; m = 1; } else { m++; } loadCalendar(y, m).catch((e) => toast(e.message)); }
+      if (y) { if (m >= 12) { y++; m = 1; } else { m++; } loadCalendar(y, m).catch((e) => toast(e.message, "error")); }
     }
     if (event.target.closest("#cal-today-btn")) {
       const n = new Date();
-      loadCalendar(n.getFullYear(), n.getMonth() + 1).catch((e) => toast(e.message));
+      loadCalendar(n.getFullYear(), n.getMonth() + 1).catch((e) => toast(e.message, "error"));
     }
     const calArticle = event.target.closest("[data-cal-article]");
     if (calArticle) {

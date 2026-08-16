@@ -15,7 +15,7 @@ function bindArtifacts() {
   if (bound) return;
   bound = true;
   document.getElementById("reindex-button").addEventListener("click", () => {
-    reindex().catch((error) => toast(error.message));
+    reindex().catch((error) => toast(error.message, "error"));
   });
   document.addEventListener("click", (event) => {
     const artifact = event.target.closest("[data-artifact]");

@@ -8,7 +8,7 @@ function bindHotspots() {
   bound = true;
   document.getElementById("hotspot-filter").addEventListener("submit", (event) => {
     event.preventDefault();
-    loadHotspots(new URLSearchParams(new FormData(event.currentTarget))).catch((error) => toast(error.message));
+    loadHotspots(new URLSearchParams(new FormData(event.currentTarget))).catch((error) => toast(error.message, "error"));
   });
 }
 

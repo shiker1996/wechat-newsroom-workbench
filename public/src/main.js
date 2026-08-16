@@ -1,7 +1,7 @@
 import { state } from "./core/state.js";
 import { $$ } from "./core/dom.js";
 import { request } from "./core/http.js";
-import { toast } from "./core/ui.js";
+import { toast, bindTablistKeyboardNavigation, bindDismissableDetails } from "./core/ui.js";
 import { bindBatchDrawer } from "./views/batch-drawer.js";
 import loadOverview from "./views/dashboard.js";
 import { hydrateThemePickers } from "./core/theme-catalog.js";
@@ -109,8 +109,16 @@ function tick() {
   document.getElementById("today-label").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(now);
 }
 
+// 对齐到下一分钟边界再刷新，避免固定间隔轮询让分钟显示滞后/漂移
+function startClock() {
+  tick();
+  setTimeout(startClock, 60000 - (Date.now() % 60000) + 20);
+}
+
 // 全局骨架绑定（原 app-bind.js 中与具体视图无关的部分）
 function bindGlobal() {
+  bindTablistKeyboardNavigation();
+  bindDismissableDetails();
   document.getElementById("nav").addEventListener("click", (event) => {
     const item = event.target.closest("[data-view]"); if (item) go(item.dataset.view);
   });
@@ -147,10 +155,7 @@ function bindGlobal() {
   window.addEventListener("hashchange", () => {
     const route = location.hash.slice(1);
     const view = route.split("/")[0];
-    if (view in titles && !document.querySelector(".nav-item.active,.nav-utility.active")?.matches(`[data-view="${view}"]`)) {
-      navigatingFromHistory = true;
-      go(route).finally(() => { navigatingFromHistory = false; });
-    } else if(view in titles){
+    if (view in titles) {
       navigatingFromHistory = true;
       go(route).finally(() => { navigatingFromHistory = false; });
     }
@@ -201,8 +206,7 @@ async function onReady() {
   await init();
   bindGlobal();
   bindBatchDrawer();
-  tick();
-  setInterval(tick, 30000);
+  startClock();
   pollJobNotifications();
   // 首屏视图激活：切导航/视图样式、设置标题、加载 ESM 视图（go 内部已处理 batch-switcher 显隐）
   const route = location.hash.slice(1);

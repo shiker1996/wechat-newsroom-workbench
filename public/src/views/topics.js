@@ -98,6 +98,24 @@ function renderCandidates(candidates, track = activeTrack()) {
     : `<div class="empty-state">${track === "article" ? (hiddenItems.length ? "当前没有高于成稿线的选题。" : "暂无文章候选。在热点全景创建选题后会进入这里。") : "暂无图文候选。完成事件研判后，Social Fit 前十会自动进入这里。"}</div>`);
 }
 
+// 文章/图文预选排行榜共用的展开收起：状态用 class 表达，按钮同步 aria-expanded
+function bindRankingToggle(toggle, list, items, render) {
+  if (!toggle || !list) return;
+  // 文案从 class 状态推导，避免重载后脱节
+  const sync = () => {
+    const expanded = list.classList.contains("expanded");
+    toggle.textContent = expanded ? "收起" : `展开(${items.length}条)`;
+    toggle.setAttribute("aria-expanded", String(expanded));
+  };
+  if (list.classList.contains("expanded")) render(items, list);
+  sync();
+  toggle.onclick = () => {
+    const expanded = list.classList.toggle("expanded");
+    sync();
+    if (expanded) render(items, list);
+  };
+}
+
 async function loadRanking() {
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
@@ -107,19 +125,7 @@ async function loadRanking() {
     const panel = document.getElementById("ranking-panel");
     if (!panel) return;
     panel.hidden = false;
-    const toggle = document.getElementById("toggle-ranking");
-    const list = document.getElementById("ranking-list");
-    if (!toggle || !list) return;
-    // 文案从实际 display 状态推导，避免重载后脱节
-    const syncToggleText = () => { toggle.textContent = list.style.display === "block" ? "收起" : `展开(${items.length}条)`; };
-    if (list.style.display === "block") renderRankingList(items, list);
-    syncToggleText();
-    toggle.onclick = function () {
-      const expanded = list.style.display !== "block";
-      list.style.display = expanded ? "block" : "none";
-      syncToggleText();
-      if (expanded) renderRankingList(items, list);
-    };
+    bindRankingToggle(document.getElementById("toggle-ranking"), document.getElementById("ranking-list"), items, renderRankingList);
     state.rankingItems = items;
   } catch (error) { toast("排行榜加载失败：" + error.message, "error"); }
 }
@@ -144,16 +150,7 @@ async function loadSocialRanking() {
     const panel=document.getElementById('social-ranking-panel');
     if(!panel||!items.length){if(panel)panel.hidden=true;return;}
     panel.hidden=false;
-    const toggle=document.getElementById('toggle-social-ranking'),list=document.getElementById('social-ranking-list');
-    const syncToggleText=()=>{toggle.textContent=list.style.display==='block'?'收起':`展开(${items.length}条)`;};
-    if(list.style.display==='block')renderSocialRankingList(items,list);
-    syncToggleText();
-    toggle.onclick=()=>{
-      const expanded=list.style.display!=='block';
-      list.style.display=expanded?'block':'none';
-      syncToggleText();
-      if(expanded)renderSocialRankingList(items,list);
-    };
+    bindRankingToggle(document.getElementById('toggle-social-ranking'),document.getElementById('social-ranking-list'),items,renderSocialRankingList);
     state.socialRankingItems=items;
   }catch(error){toast('图文排行榜加载失败：'+error.message,'error');}
 }
@@ -214,7 +211,7 @@ if (!window.__candidateTrackActionsBound) {
         await request(`/api/candidates/${Number(remove.dataset.candidateId)}/tracks/${encodeURIComponent(remove.dataset.removeTrack)}`, { method: "DELETE" });
         toast(`已移出${label}`);
         await loadTopicPool();
-      } catch (error) { toast(error.message); }
+      } catch (error) { toast(error.message, "error"); }
     }
     const editor = event.target.closest("[data-social-editor-id]");
     if (editor) {
@@ -224,7 +221,7 @@ if (!window.__candidateTrackActionsBound) {
     const socialAdd=event.target.closest('[data-social-ranking-add]');
     if(socialAdd){
       if(!await confirmAction("将该热点写入图文池？",{confirmText:"加入图文池"}))return;
-      const hotspotId=Number(socialAdd.dataset.socialRankingAdd),ranked=(state.socialRankingItems||[]).find((item)=>Number(item.hotspotId)===hotspotId);try{await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`,{method:'POST',body:JSON.stringify({hotspotIds:[hotspotId],tracks:['social_cards'],track:'social_cards',socialScoreDetails:ranked?.socialScoreDetails})});toast('已加入图文池');await loadTopicPool();}catch(error){toast(error.message);}
+      const hotspotId=Number(socialAdd.dataset.socialRankingAdd),ranked=(state.socialRankingItems||[]).find((item)=>Number(item.hotspotId)===hotspotId);try{await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`,{method:'POST',body:JSON.stringify({hotspotIds:[hotspotId],tracks:['social_cards'],track:'social_cards',socialScoreDetails:ranked?.socialScoreDetails})});toast('已加入图文池');await loadTopicPool();}catch(error){toast(error.message, "error");}
     }
     const rankingAdd = event.target.closest("[data-ranking-add]");
     if (rankingAdd) {
@@ -235,7 +232,7 @@ if (!window.__candidateTrackActionsBound) {
           await request(`/api/batches/${encodeURIComponent(state.activeBatchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds: [hid] }) });
           toast("已加入候选池");
           await loadTopicPool();
-        } catch (error) { toast(error.message); }
+        } catch (error) { toast(error.message, "error"); }
       }
     }
     const removeCandidate = event.target.closest("[data-remove-candidate]");
@@ -247,7 +244,7 @@ if (!window.__candidateTrackActionsBound) {
         toast("已移除");
         await loadTopicPool();
         await window.loadEditorialRoom?.();
-      } catch (error) { toast(error.message); }
+      } catch (error) { toast(error.message, "error"); }
     }
   });
 }

@@ -6,7 +6,7 @@ let bound = false;
 function bindModels() {
   if (bound) return;
   bound = true;
-  document.getElementById("test-model").addEventListener("click", () => testModel().catch((error) => toast(error.message)));
+  document.getElementById("test-model").addEventListener("click", () => testModel().catch((error) => toast(error.message, "error")));
 }
 
 async function loadModels() {
@@ -51,7 +51,7 @@ async function testModel() {
     const result = await request("/api/models/test", { method: "POST", body: JSON.stringify({ provider }) });
     toast(`${result.provider} · ${result.model} · 连接成功 (${result.latencyTokens?.completion_tokens || 0} tokens)`);
   } catch (err) {
-    toast(`测试失败：${err.message}`);
+    toast(`测试失败：${err.message}`, "error");
   } finally { if (btn) { btn.disabled = false; btn.textContent = "测试连接"; } }
 }
 

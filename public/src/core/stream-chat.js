@@ -63,7 +63,7 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
       throw error;
     }
     if (st && !st.textContent) st.textContent = `调用失败：${error.message}`;
-    else toast(error.message);
+    else toast(error.message, "error");
     return null;
   } finally {
     button.disabled = false;

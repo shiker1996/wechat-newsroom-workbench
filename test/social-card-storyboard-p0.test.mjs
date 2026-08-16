@@ -127,7 +127,7 @@ test('图文创作页以事实、故事板和交付三阶段组织主路径',()=
   assert.match(html,/class="card-gate-panel social-production-bar"/);
   assert.match(styles,/\.social-project-hero\{/);
   assert.match(styles,/\.social-production-bar\{position:sticky/);
-  assert.match(styles,/\.social-editor-form\{width:100%;max-width:none;margin-inline:0\}/);
+  assert.match(styles,/\.social-editor-form \{ min-width:0;width:100%;max-width:none;margin-inline:0; \}/);
   assert.match(styles,/@media\(min-width:1600px\).*?\.social-control-deck\{grid-template-columns:minmax\(280px,.62fr\) minmax\(720px,1.75fr\)/s);
   assert.match(styles,/\.social-foundation-grid:has\(\.social-score-panel\[hidden\]\)\{grid-template-columns:minmax\(0,1fr\)\}/);
   assert.match(styles,/@media\(max-width:760px\).*?\.social-picker-group\{grid-template-columns:1fr 1fr\}/s);
