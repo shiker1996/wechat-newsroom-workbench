@@ -37,7 +37,6 @@
           "triggerPolicy": "deterministic-first-step",
           "authorizationAction": "local-project-read",
           "resultPolicy": "sanitized-project-summary",
-          "adaptationNote": "用户提供 projectPath 时 step 0 确定性发起；结果裁剪为 summary/files 摘要；projectPath 缺失时报错拦截",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -73,7 +72,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": null,
           "resultPolicy": "passthrough",
-          "adaptationNote": "resourceId 必须命中当前事件来源或用户提供的 URL，否则 RESOURCE_NOT_ALLOWED",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -114,7 +112,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": null,
           "resultPolicy": "passthrough",
-          "adaptationNote": "resourceIds 必须命中已抓取来源正文；query 清洗截断、k 限制在 1-8",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -147,7 +144,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -181,7 +177,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -245,7 +240,6 @@
           "triggerPolicy": "deterministic-first-step",
           "authorizationAction": "local-project-read",
           "resultPolicy": "sanitized-project-summary+fact-attachment",
-          "adaptationNote": "step 0 确定性发起；结果按 pathKey 存入事实附件缓存，二次会话直接复用",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -280,7 +274,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": null,
           "resultPolicy": "fact-attachment",
-          "adaptationNote": "resourceId 必须命中素材 URL 目录（草稿 materialUrls 或回答中的 URL，上限 5 条）",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -319,7 +312,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -353,7 +345,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -389,7 +380,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": "document-root-read",
           "resultPolicy": "fact-attachment",
-          "adaptationNote": "resourceId 必须命中已授权 documentRoots；query 截断 300、maxResults 固定 5",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -421,7 +411,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "fact-attachment",
-          "adaptationNote": "阶段 5 起由通用层适配：resourceIds 非空时严格映射资源目录（缺正文则 RESOURCE_NOT_ALLOWED），否则按插件原生 documents 入参透传",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -482,8 +471,7 @@
           ],
           "triggerPolicy": "explicit-resource",
           "authorizationAction": "local-project-read",
-          "resultPolicy": "sanitized-project-summary+fact-attachment",
-          "adaptationNote": "扩展方案阶段 A 接入：用户提供 projectPath 才注册资源（无确定性首步）；结果裁剪为摘要并计入 externalSources 之外的事实附件",
+          "resultPolicy": "sanitized-project-summary",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -518,7 +506,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": null,
           "resultPolicy": "fact-attachment+source-url-tracking",
-          "adaptationNote": "resourceId 必须命中素材 URL 目录（上限 8 条）；结果中的公开 URL 回收进 externalSources",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -557,7 +544,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -591,7 +577,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "query-clamped-passthrough",
-          "adaptationNote": "resolveArguments 仅做 query 清洗与长度截断",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -627,7 +612,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": "document-root-read",
           "resultPolicy": "fact-attachment+source-url-tracking",
-          "adaptationNote": "resourceId 必须命中已授权 documentRoots；query 截断 300、maxResults 固定 5",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -661,7 +645,6 @@
           "triggerPolicy": "explicit-resource",
           "authorizationAction": null,
           "resultPolicy": "fact-attachment+source-url-tracking",
-          "adaptationNote": "resourceId 必须是已授权素材中的 github.com URL，否则 RESOURCE_NOT_ALLOWED",
           "preferredImplementationId": "",
           "implementations": [
             {
@@ -689,7 +672,6 @@
           "triggerPolicy": "model-request",
           "authorizationAction": null,
           "resultPolicy": "fact-attachment+source-url-tracking",
-          "adaptationNote": "阶段 5 起由通用层适配：resourceIds 非空时严格映射资源目录（缺正文则 RESOURCE_NOT_ALLOWED），否则按插件原生 documents 入参透传",
           "preferredImplementationId": "",
           "implementations": [
             {

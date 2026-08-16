@@ -1,6 +1,6 @@
 # 能力拓展现状与操作手册
 
-日期：2026-08-15
+日期：2026-08-15（2026-08-16 更新遗留清单）
 定位：能力拓展的单一视图。汇总分散在三份方案文档中的机制、SOP 与遗留，后续拓展先读本篇；权威设计细节仍回源文档。
 
 源文档：
@@ -40,7 +40,7 @@ consumable（可消费，按消费者逐个计算）
 
 - **R1 消费者门禁**：消费者登记/技能 Manifest 引用非 registered 能力 → 审计报错或警告。
 - **R2 实现侧收口**：`registered:false` 的实现允许存在（调试期宽容），但不得启用、不得设为路由首选；图谱与页面标注"未登记 · 仅调试"。六条启用/路由写路径统一 `CAPABILITY_NOT_REGISTERED` 拦截。
-- **R3 目录草案辅助**：远程工具 Manifest 导入时若声明目录外能力，校验通过后生成目录条目草案，人工确认经 `POST /api/system/capability-catalog` 入库。第三方本地工具暂不产出草案（遗留）。
+- **R3 目录草案辅助**：远程与第三方本地工具 Manifest 导入时若声明目录外能力，校验通过后均生成目录条目草案，人工确认经 `POST /api/system/capability-catalog` 入库（本地工具草案 2026-08-16 补齐）。
 - **R4 门禁 warning**：图谱存在 `registered:false` 能力 → `npm run capability:gates` 输出 warning（不阻断，CI 可见）。
 
 ## 3. 各消费者 SOP
@@ -69,6 +69,7 @@ consumable（可消费，按消费者逐个计算）
 
 六件清单经 custom-social 接入 `filesystem.project.read` 实战验证（阶段 A）。
 2026-08-15 起（agent-adapter-configurability 阶段 3）：新能力命中存量 resourceKind 时在 `config/capabilities.json` 条目声明 `resourceKind` 即走默认档案路径，前三件 Adapter 清单免除，纯配置接入、不改 `.mjs`。
+2026-08-16 起：授权拒绝文案外置 `config/agent-adaptation-messages.json`（`messages.<consumerId>.<capability>` 二维），Adapter 不再传 messages；缺省回退档案内联兜底文案。
 
 ### 3.3 Pipeline / feature 接入已有能力（两件）
 
@@ -89,7 +90,7 @@ feature 的能力调用是业务流程里确定性的一环，"改代码"即功�
 
 图谱可用性计算与原因码、页面展示、停用影响预览、CI 门禁。
 
-注意：`scripts/snapshot-consumer-capability-baseline.mjs` 内含手工维护的 adaptation 静态表与 gaps，登记变更后需同步修改该表再重跑脚本（遗留：可改为从登记推导）。
+注意：`scripts/snapshot-consumer-capability-baseline.mjs` 的 adaptation 信息自 2026-08-16 起从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 刷新基线即可。
 
 ## 4. 明确边界
 
@@ -102,7 +103,7 @@ feature 的能力调用是业务流程里确定性的一环，"改代码"即功�
 ## 5. 遗留与演进方向
 
 1. ~~S3 默认适配档案~~ 已实施（2026-08-15，[agent-adapter-configurability-design.md](./agent-adapter-configurability-design.md) 阶段 1–4）：resourceKind 档案表 + 目录条目 resourceKind 声明 + Agent 适配声明（`capability-consumers.json` 的 `adaptation` 字段），资源类能力接入从 L2 降为纯配置。
-2. 第三方本地工具 Manifest 声明目录外能力时不产出目录草案（仅远程场景覆盖，R3 缺口）。
-3. 基线脚本 adaptation 静态表手工维护，可从登记推导（3.5 注记）。
-4. tutorial/custom-social 的 passage content 回填未实施。
+2. ~~第三方本地工具 Manifest 声明目录外能力时不产出目录草案~~ 已实施（2026-08-16）：本地工具包 validate/install 路由与远程一样返回 `catalogDrafts`，R3 缺口闭合。
+3. ~~基线脚本 adaptation 静态表手工维护~~ 已实施（2026-08-16）：`snapshot-consumer-capability-baseline.mjs` 改为从 `config/capability-consumers.json` 登记推导（3.5 注记）。
+4. ~~tutorial/custom-social 的 passage content 回填~~ 已实施（2026-08-16）：url.fetch 成功结果回填资源目录条目正文，`content.passage.retrieve` 的 resourceIds 严格分支在这两个入口可用。
 5. Agent 纯参数能力的声明路径当前是"手改 JSON"；如需更低成本，可考虑只读登记 + 草案辅助的轻量入口（原页面入口的教训：候选范围太窄时不值得做完整写入链路）。

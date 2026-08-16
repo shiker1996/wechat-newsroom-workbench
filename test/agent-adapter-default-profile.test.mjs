@@ -55,7 +55,8 @@ test('能力图谱：新能力实现健康且授权放行时链路 available',(t
 
 test('buildAdaptation：新能力按 url-fetch 档案改写参数，越界 resourceId 抛 RESOURCE_NOT_ALLOWED',(t)=>{
   const root=makeRoot(t);
-  const adaptation=buildAdaptation({adaptation:{resourceSources:[{source:'materials'}]},inputs:{materialUrls:['https://docs.example.com/a'],answer:''},workspaceRoot:root,messages:{urlFetch:'素材 URL 未授权'}});
+  fs.writeFileSync(path.join(root,'config','agent-adaptation-messages.json'),JSON.stringify({schemaVersion:1,messages:{'agent.custom-social':{'vendor.clouddoc.read':'素材 URL 未授权'}}}));
+  const adaptation=buildAdaptation({adaptation:{resourceSources:[{source:'materials'}]},inputs:{materialUrls:['https://docs.example.com/a'],answer:''},workspaceRoot:root,consumerId:'agent.custom-social'});
   const resolved=adaptation.resolveArguments({resourceId:'material:1'},{capability:'vendor.clouddoc.read',arguments:{resourceId:'material:1'}});
   assert.deepEqual(resolved,{targetUrl:'https://docs.example.com/a',root});
   const denied=adaptation.resolveArguments.bind(null,{resourceId:'material:9'},{capability:'vendor.clouddoc.read'});

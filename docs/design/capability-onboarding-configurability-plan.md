@@ -156,7 +156,7 @@ consumable（可消费，按消费者逐个计算）
 
 遗留（沿用 §9 + 新增）：
 
-1. S3 默认适配档案未做；
-2. 前端添加能力 409 仅 toast 提示重试，未自动重放；
-3. 第三方本地工具 Manifest 声明目录外能力时不产出目录草案（仅远程场景覆盖）；
-4. 上游两份文档的遗留项：空白名单语义与真实健康检查均已落地（见 consumer-capability-expansion-design.md 5.1 与遗留清单）；基线静态表、passage content 回填不变。
+1. ~~S3 默认适配档案未做~~ 已实施（2026-08-15，agent-adapter-configurability-design.md 阶段 1–4）；
+2. ~~前端添加能力 409 仅 toast 提示重试，未自动重放~~ 随页面添加入口 2026-08-15 下线而消解，不再适用；
+3. ~~第三方本地工具 Manifest 声明目录外能力时不产出目录草案（仅远程场景覆盖）~~ 已实施（2026-08-16，本地工具包 validate/install 同样返回 catalogDrafts）；
+4. 上游两份文档的遗留项：空白名单语义与真实健康检查均已落地（见 consumer-capability-expansion-design.md 5.1 与遗留清单）；~~基线静态表、passage content 回填~~ 均已于 2026-08-16 实施。

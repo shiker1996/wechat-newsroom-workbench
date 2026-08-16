@@ -63,3 +63,34 @@ test('提供项目路径但能力未启用时报错引导去技能配置开启',
     runCustomSocialAgentTurn({gateway,store,registry:registryWithProject([]),batchId:batch.id,draft:{},workspaceRoot:root,projectPath:path.join(root,'demo-proj'),allowedCapabilities:['content.web.search']}),
     (error)=>error.message.includes('自定义图文当前未启用本地项目读取能力')&&error.message.includes('filesystem.project.read'));
 });
+
+// passage content 回填（设计文档 §13）：url.fetch 成功后正文写回素材资源，passage.retrieve 走严格分支
+function registryWithFetchAndPassage(passageInputs){const value=registry();
+  value.register({manifest:{id:'url-fetch',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',inputSchema:{type:'object',required:['targetUrl'],properties:{targetUrl:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,final_url:input.targetUrl,title:'素材页',content:'抓取到的正文内容'},artifacts:[],warnings:[],provenance:{}};}}});
+  value.register({manifest:{id:'passage',name:'段落检索',version:'1.0.0',capabilities:['content.passage.retrieve'],riskLevel:'read-only',inputSchema:{type:'object',properties:{documents:{type:'array'},query:{type:'string'},k:{type:'integer'}}},outputSchema:{type:'object'}},adapter:{async execute(input){passageInputs.push(input);return {status:'ok',data:{passages:[]},artifacts:[],warnings:[],provenance:{}};}}});
+  return value;}
+
+test('url.fetch 后 passage.retrieve 命中回填正文走严格分支（不透传）',async(t)=>{
+  const {root,store,batch}=fixture(t);const passageInputs=[];const tools=registryWithFetchAndPassage(passageInputs);let step=0;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
+    if(step===1)return {callId:'f1',content:JSON.stringify({type:'tool_requests',assistant_note:'抓取素材',requests:[{requestId:'tr_fetch',capability:'content.url.fetch',arguments:{resourceId:'material:1'},reason:'读取素材正文'}]}),model:'mock',usage:{}};
+    if(step===2)return {callId:'f2',content:JSON.stringify({type:'tool_requests',assistant_note:'检索段落',requests:[{requestId:'tr_passage',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文要点',k:4},reason:'定位可引用段落'}]}),model:'mock',usage:{}};
+    return finalWith(['【素材】素材页给出关键事实 https://example.com/material']);}};
+  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{materialUrls:['https://example.com/material']},workspaceRoot:root});
+  assert.equal(result.toolCalls,2);
+  assert.equal(passageInputs.length,1,'passage.retrieve 应以 documents 形式执行');
+  assert.deepEqual(passageInputs[0].documents,[{id:'material:1',content:'抓取到的正文内容'}]);
+  assert.equal(passageInputs[0].query,'正文要点');assert.equal(passageInputs[0].k,4);
+});
+
+test('passage.retrieve 的 resourceIds 未抓取或未知时拒绝 RESOURCE_NOT_ALLOWED',async(t)=>{
+  const {root,store,batch}=fixture(t);const passageInputs=[];const tools=registryWithFetchAndPassage(passageInputs);let step=0;
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
+    if(step===1)return {callId:'d1',content:JSON.stringify({type:'tool_requests',assistant_note:'未抓取直接检索',requests:[{requestId:'tr_unfetched',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
+    if(step===2)return {callId:'d2',content:JSON.stringify({type:'tool_requests',assistant_note:'未知资源检索',requests:[{requestId:'tr_unknown',capability:'content.passage.retrieve',arguments:{resourceIds:['material:9'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
+    return finalWith([]);}};
+  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{materialUrls:['https://example.com/material']},workspaceRoot:root});
+  assert.equal(passageInputs.length,0,'未授权检索不得执行插件');
+  const calls=store.listAgentToolCalls(result.agentRunId);
+  assert.equal(calls.length,2);assert.ok(calls.every((call)=>call.error_code==='RESOURCE_NOT_ALLOWED'));
+});

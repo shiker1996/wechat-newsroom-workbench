@@ -17,6 +17,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- 第三方本地工具插件 Manifest 声明目录外能力时，包校验与安装接口同样返回目录条目草案（R3 草案辅助补齐本地场景），人工确认后经 `POST /api/system/capability-catalog` 入库。
+
+### Changed
+
+- 消费者—能力基线脚本的适配信息改为从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 即可。
+- 自主写作与自定义图文 Agent 的 url.fetch 成功结果回填资源目录正文，段落检索（`content.passage.retrieve`）在这两个入口可对已抓取素材走严格资源分支。
+- 资源适配层的授权拒绝文案外置到 `config/agent-adaptation-messages.json`，按"Agent + capability"二维维护（`messages.<consumerId>.<capability>`），各 Agent 措辞直接改配置；文件或条目缺失时回退档案内联兜底。
+
 ## [0.6.3] - 2026-08-15
 
 ### Added

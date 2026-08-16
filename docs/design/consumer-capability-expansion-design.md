@@ -189,7 +189,7 @@ Schema 校验扩展：feature 依赖带新字段时校验枚举合法；门禁�
 遗留：
 
 1. ~~空白名单等同全放行的边角~~ 已裁定并收紧：显式空数组 = 全部禁止，`null`/无字段 = 全放行（见 5.1）；
-2. 基线脚本 adaptation 静态表手工维护，可考虑改为从登记推导（9.4 注记）；
+2. ~~基线脚本 adaptation 静态表手工维护，可考虑改为从登记推导（9.4 注记）~~ 已实施（2026-08-16）：`snapshot-consumer-capability-baseline.mjs` 从 `config/capability-consumers.json` 登记推导，gaps 改为声明未登记的派生判定；
 3. ~~`implementationHealthy` 仍为配置就绪代理~~ 已接真实 `registry.health()`：`lib/tools/health-check.mjs` 构建前并发预取健康表（进程内 TTL 45s 缓存，写操作后失效），检查异常回退代理并在 warnings 标注 `HEALTH_CHECK_UNAVAILABLE`；
-4. tutorial/custom-social 的 passage content 回填未实施（上一批遗留）；
+4. ~~tutorial/custom-social 的 passage content 回填未实施（上一批遗留）~~ 已实施（2026-08-16）：url.fetch 结果回填资源目录正文，passage.retrieve 严格分支在这两个入口可用；
 5. feature 详情接口的 `skillAuthorizations` 恒为空数组属预期；feature 行无授权开关是设计决策而非缺口。

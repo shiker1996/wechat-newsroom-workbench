@@ -449,7 +449,7 @@ Adapter 最终只保留：
 
 阶段 0-6 已于 2026-08-14 全部实施完成。已知遗留（记录在案，不在本期实施）：
 
-- tutorial/custom-social 的资源目录不含已抓取正文（无 `content` 字段），passage.retrieve 的 resourceIds 严格分支在这两个入口会拒绝，实际走插件原生 documents 透传；如需启用需在 url.fetch 结果回填资源正文。
+- ~~tutorial/custom-social 的资源目录不含已抓取正文（无 `content` 字段），passage.retrieve 的 resourceIds 严格分支在这两个入口会拒绝，实际走插件原生 documents 透传~~ 已实施回填（2026-08-16）：`fact-attachment` 结果处理器把 url.fetch 正文写回资源目录条目，严格分支随之可用；无 resourceIds 时的透传回退保留；
 - `social-custom` 历史入口名仅保留读取兼容（`lib/skills/entry-routing.mjs` 别名 + API.md 弃用标注），不删除。
 - `expectedVersion` 已改为强制必传（阶段 6，`saveSkillAuthorization` 服务端校验，缺失返回 400）；前端与既有调用方均已总传，无兼容面。
 

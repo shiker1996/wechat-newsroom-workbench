@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildAdaptation, loadAgentAdaptation } from '../lib/agent/resource-adaptation.mjs';
+import { buildAdaptation, loadAdaptationMessages, loadAgentAdaptation } from '../lib/agent/resource-adaptation.mjs';
 
 // 阶段 4（docs/design/agent-adapter-configurability-design.md）：Agent 适配声明挪到 capability-consumers.json 的
 // adaptation 字段，config 为权威来源；config 缺失/无字段时 Adapter 回退内联声明，行为一致。
@@ -66,4 +66,69 @@ test('materials 的 limit 来自声明条目（去重 + 截断语义同 mergeMat
   const inputs={materialUrls:['https://a.example.com/1','https://a.example.com/1','https://b.example.com/2'],answer:'见 https://c.example.com/3 与 https://d.example.com/4'};
   const limited=buildAdaptation({adaptation:{resourceSources:[{source:'materials',limit:3}]},inputs});
   assert.deepEqual([...limited.resources.keys()],['material:1','material:2','material:3']);
+});
+
+// 阶段 5：授权拒绝文案外置到 config/agent-adaptation-messages.json，按 consumerId + capability 二维维护。
+function makeMessagesRoot(t,messages){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-adaptation-messages-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  fs.mkdirSync(path.join(dir,'config'),{recursive:true});
+  fs.writeFileSync(path.join(dir,'config','agent-adaptation-messages.json'),JSON.stringify({schemaVersion:1,messages}));
+  return dir;
+}
+
+test('文案按 consumerId + capability 命中配置（二维结构）',(t)=>{
+  const dir=makeMessagesRoot(t,{'agent.editorial':{'filesystem.project.read':'配置里的项目文案'}});
+  assert.deepEqual(loadAdaptationMessages(dir,'agent.editorial'),{'filesystem.project.read':'配置里的项目文案'});
+  const adaptation=buildAdaptation({workspaceRoot:dir,consumerId:'agent.editorial'});
+  const denied=adaptation.resolveArguments.bind(null,{resourceId:'project:current'},{capability:'filesystem.project.read'});
+  assert.throws(denied,(error)=>error.code==='RESOURCE_NOT_ALLOWED'&&error.message==='配置里的项目文案');
+});
+
+test('不同 agent 同一 capability 文案不同',(t)=>{
+  const dir=makeMessagesRoot(t,{
+    'agent.editorial':{'content.url.fetch':'资源不属于当前候选'},
+    'agent.custom-social':{'content.url.fetch':'素材 URL 未授权'},
+  });
+  const editorial=buildAdaptation({workspaceRoot:dir,consumerId:'agent.editorial'});
+  const social=buildAdaptation({workspaceRoot:dir,consumerId:'agent.custom-social'});
+  const request={capability:'content.url.fetch'};
+  assert.throws(editorial.resolveArguments.bind(null,{resourceId:'material:9'},request),(error)=>error.message==='资源不属于当前候选');
+  assert.throws(social.resolveArguments.bind(null,{resourceId:'material:9'},request),(error)=>error.message==='素材 URL 未授权');
+});
+
+test('agent 条目内未覆盖的 capability 回退档案内联兜底文案',(t)=>{
+  const dir=makeMessagesRoot(t,{'agent.custom-social':{'content.url.fetch':'素材 URL 未授权'}});
+  const adaptation=buildAdaptation({workspaceRoot:dir,consumerId:'agent.custom-social'});
+  const denied=adaptation.resolveArguments.bind(null,{resourceId:'document-root:9'},{capability:'content.document.search'});
+  assert.throws(denied,(error)=>error.code==='RESOURCE_NOT_ALLOWED'&&error.message==='文档目录未授权');
+});
+
+test('JSON 缺失或无该 agent 条目时回退档案内联兜底文案（嵌入式/测试工作区）',(t)=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-adaptation-messages-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  assert.deepEqual(loadAdaptationMessages(dir,'agent.editorial'),{},'文件缺失回退 {}');
+  const empty=makeMessagesRoot(t,{'agent.editorial':{'content.url.fetch':'资源不属于当前候选'}});
+  assert.deepEqual(loadAdaptationMessages(empty,'agent.custom-social'),{},'无该 agent 条目回退 {}');
+  const adaptation=buildAdaptation({workspaceRoot:dir,consumerId:'agent.editorial'});
+  const denied=adaptation.resolveArguments.bind(null,{resourceId:'project:current'},{capability:'filesystem.project.read'});
+  assert.throws(denied,(error)=>error.code==='RESOURCE_NOT_ALLOWED'&&error.message==='项目资源不属于当前请求');
+});
+
+test('真实 config 三个 agent 条目的文案与迁移前各 Adapter 内联文案一致',()=>{
+  assert.deepEqual(loadAdaptationMessages(projectRoot,'agent.editorial'),{
+    'filesystem.project.read':'项目资源不属于当前请求',
+    'content.url.fetch':'资源不属于当前候选',
+    'content.passage.retrieve':'段落资源不存在、未抓取或不属于当前候选',
+  });
+  assert.deepEqual(loadAdaptationMessages(projectRoot,'agent.independent-writing'),{
+    'filesystem.project.read':'项目资源不属于当前请求',
+    'content.url.fetch':'URL 资源不属于当前请求',
+    'content.document.search':'文档目录未授权',
+  });
+  assert.deepEqual(loadAdaptationMessages(projectRoot,'agent.custom-social'),{
+    'content.url.fetch':'素材 URL 未授权',
+    'content.repository.inspect':'仓库不属于用户授权的 GitHub 素材',
+    'content.document.search':'文档目录未授权',
+  });
 });

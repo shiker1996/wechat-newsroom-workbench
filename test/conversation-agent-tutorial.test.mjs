@@ -20,3 +20,20 @@ test('项目材料不会让心得模式绕过【体验】门禁，缓存项目�
 test('自主写作生产路由只使用 Agent、复用事实附件与统一事件消费器',()=>{const route=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8'),search=fs.readFileSync(new URL('../lib/integrations/information-search.mjs',import.meta.url),'utf8');assert.match(route,/runTutorialAgentTurn/);assert.doesNotMatch(route,/runTutorialChatStream/);assert.match(route,/listConversationFactAttachments/);assert.match(search,/if \(fact\[field\]\)/);assert.match(client,/consumeAgentEvent/);});
 
 test('创建事实表可直接复用对话阶段 URL 附件而不重复抓取',async()=>{let fetched=0;const url='https://example.com/material',fact=await buildCustomFactSheet({input:{content_type:'tutorial',topic:'示例',points:['【素材】A','【素材】B','【建议】C'],materialUrls:[url]},root:process.cwd(),materialCache:new Map([[url,{title:'缓存材料',content:'已读取正文'}]]),fetchImpl:async()=>{fetched+=1;throw new Error('不应调用');}});assert.equal(fetched,0);assert.equal(fact.materials[0].title,'缓存材料');assert.equal(fact.materials[0].status,'ok');});
+
+// passage content 回填（设计文档 §13）：url.fetch 成功后正文写回素材资源，passage.retrieve 走严格分支
+test('url.fetch 后 passage.retrieve 命中回填正文；未抓取/未知 resourceId 拒绝',async(t)=>{
+  const {root,store,batch}=fixture(t),passageInputs=[],registry=projectRegistry();
+  registry.register({manifest:{id:'url-fetch',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',inputSchema:{type:'object',required:['targetUrl'],properties:{targetUrl:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,final_url:input.targetUrl,title:'素材页',content:'抓取到的教程正文'},artifacts:[],warnings:[],provenance:{}};}}});
+  registry.register({manifest:{id:'passage',name:'段落检索',version:'1.0.0',capabilities:['content.passage.retrieve'],riskLevel:'read-only',inputSchema:{type:'object',properties:{documents:{type:'array'},query:{type:'string'},k:{type:'integer'}}},outputSchema:{type:'object'}},adapter:{async execute(input){passageInputs.push(input);return {status:'ok',data:{passages:[]},artifacts:[],warnings:[],provenance:{}};}}});
+  let step=0;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
+    if(step===1)return {callId:'t1',content:JSON.stringify({type:'tool_requests',assistant_note:'未抓取先试探',requests:[{requestId:'tr_early',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1','material:9'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
+    if(step===2)return {callId:'t2',content:JSON.stringify({type:'tool_requests',assistant_note:'抓取素材',requests:[{requestId:'tr_fetch',capability:'content.url.fetch',arguments:{resourceId:'material:1'},reason:'读取素材正文'}]}),model:'mock',usage:{}};
+    if(step===3)return {callId:'t3',content:JSON.stringify({type:'tool_requests',assistant_note:'检索段落',requests:[{requestId:'tr_passage',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文要点'},reason:'定位可引用段落'}]}),model:'mock',usage:{}};
+    return {callId:'t4',content:JSON.stringify({type:'final',assistantReply:'已读取素材',briefUpdates:{articleMode:'tutorial',topic:'示例',audience:'开发者'}}),model:'mock',usage:{}};}};
+  const result=await runTutorialAgentTurn({gateway,store,registry,provider:'mock',batchId:batch.id,draft:{articleMode:'tutorial',materialUrls:['https://example.com/material']},workspaceRoot:root});
+  assert.equal(passageInputs.length,1,'仅回填后的检索可执行');
+  assert.deepEqual(passageInputs[0].documents,[{id:'material:1',content:'抓取到的教程正文'}]);
+  const denied=store.listAgentToolCalls(result.agentRunId).find((call)=>call.request_id==='tr_early');
+  assert.equal(denied.error_code,'RESOURCE_NOT_ALLOWED');
+});

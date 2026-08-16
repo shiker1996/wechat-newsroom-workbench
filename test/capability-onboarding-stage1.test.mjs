@@ -51,6 +51,22 @@ test('R3：远程 Manifest 声明目录外能力时生成保守占位草案',(t)
   assert.match(drafts[0].description,/Remote Demo/);
 });
 
+test('R3：本地插件 Manifest 声明目录外能力时同样生成草案，目录内能力不生成',(t)=>{
+  const root=makeRoot(t);
+  const manifest={id:'local-demo',name:'Local Demo',capabilities:['content.web.search','local.demo']};
+  const drafts=catalogDraftsForManifest(root,manifest);
+  assert.equal(drafts.length,1);
+  assert.equal(drafts[0].id,'local.demo');
+  assert.equal(drafts[0].needsCompletion,true);
+  assert.match(drafts[0].description,/Local Demo/);
+  assert.deepEqual(catalogDraftsForManifest(root,{id:'local-demo',name:'Local Demo',capabilities:['content.web.search']}),[]);
+});
+
+test('R3：本地插件 validate/install 路由与远程路由一样附 catalogDrafts',()=>{
+  const routes=fs.readFileSync(path.join(projectRoot,'lib','http','routes','system-routes.mjs'),'utf8');
+  assert.match(routes,/tool-plugin-packages\/validate[\s\S]*?catalogDrafts:catalogDraftsForManifest\(root,result\.manifest\)/);
+});
+
 test('R3：草案确认入库后转为已登记（门禁转绿路径），重复/非法条目被拒',(t)=>{
   const root=makeRoot(t);
   assert.deepEqual(findUnregisteredCapabilities(root,['remote.demo']),['remote.demo']);

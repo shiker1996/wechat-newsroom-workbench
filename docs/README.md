@@ -22,7 +22,7 @@
 | 文档 | 内容 |
 |---|---|
 | [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线 |
-| [plugin-development.md](./plugin-development.md) | 技能包、工具插件和采集器插件的 Manifest、Adapter、安全与发布指南 |
+| [plugin-development.md](./plugin-development.md) | 插件开发指南：新增能力（目录定义与消费者接入）与新增插件（Manifest、Adapter、安全与发布）两个环节 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |
 | [threat-model.md](./threat-model.md) | 威胁建模：安全边界假设、入口防护、已接受风险 |
@@ -38,7 +38,7 @@
 | [consumer-capability-expansion-design.md](./design/consumer-capability-expansion-design.md) | 消费者能力扩展方案：三类消费者纳入、页面三分组与接入清单（阶段 A–D 已实施，§5.1/§10 有遗留裁定项） |
 | [capability-onboarding-configurability-plan.md](./design/capability-onboarding-configurability-plan.md) | 能力接入配置化与开发规范化：五种情形分级、能力生命周期状态机、Agent 登记驱动（阶段 1–4 已实施；页面添加入口 2026-08-15 已下线） |
 | [capability-expansion-guide.md](./design/capability-expansion-guide.md) | 能力拓展单一视图：消费者×能力类型成本矩阵、生命周期状态机、三类消费者 SOP 与遗留方向（2026-08-15 汇总，拓展先读） |
-| [agent-adapter-configurability-design.md](./design/agent-adapter-configurability-design.md) | Agent 能力适配层配置化设计：resourceKind 档案表 + Agent 双 map 声明，资源类能力接入免改代码（2026-08-15，待评审） |
+| [agent-adapter-configurability-design.md](./design/agent-adapter-configurability-design.md) | Agent 能力适配层配置化设计：resourceKind 档案表 + Agent 双 map 声明，资源类能力接入免改代码（2026-08-15，阶段 1–4 已实施） |
 | [conversation-agent-form-unification-design.md](./design/conversation-agent-form-unification-design.md) | 对话 Agent 表单统一设计（`lib/domain/editorial-readiness.mjs` 的设计依据） |
 | [star-growth-roadmap.md](./design/star-growth-roadmap.md) | Star 增长路线图：发布临门一脚、首个公开 Release、可见性渠道与留存运营（待评审） |
 

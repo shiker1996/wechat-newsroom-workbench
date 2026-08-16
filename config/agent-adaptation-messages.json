@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "messages": {
+    "agent.editorial": {
+      "filesystem.project.read": "项目资源不属于当前请求",
+      "content.url.fetch": "资源不属于当前候选",
+      "content.passage.retrieve": "段落资源不存在、未抓取或不属于当前候选"
+    },
+    "agent.independent-writing": {
+      "filesystem.project.read": "项目资源不属于当前请求",
+      "content.url.fetch": "URL 资源不属于当前请求",
+      "content.document.search": "文档目录未授权"
+    },
+    "agent.custom-social": {
+      "content.url.fetch": "素材 URL 未授权",
+      "content.repository.inspect": "仓库不属于用户授权的 GitHub 素材",
+      "content.document.search": "文档目录未授权"
+    }
+  }
+}
