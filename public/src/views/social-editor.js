@@ -58,14 +58,12 @@ async function loadSocialSkillControls(data){
 // 工具图文 / 自定义图文 / 事件图文三个导航入口共用本模块，以 currentMode 区分
 let currentMode='tools';
 const MODE_LAYOUT={
-  tools:{heading:'工具图文',intro:'AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。',empty:'当前批次没有工具图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
-  custom:{heading:'自定义图文',intro:'从主题、要点和素材直接立项，AI 按来源等级规划卡片故事板。',empty:'当前批次没有自定义图文，请点击上方「创建自定义图文」添加。'},
-  event:{heading:'事件图文',intro:'AI 根据事件卡与来源快照整理事实基座，规划事件卡片故事板。',empty:'当前批次没有事件图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
+  tools:{empty:'当前批次没有工具图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
+  custom:{empty:'当前批次没有自定义图文，请点击上方「创建自定义图文」添加。'},
+  event:{empty:'当前批次没有事件图文候选。<a href="#overview">前往热点全景，将合适事件加入图文池</a>'},
 };
 function applyModeLayout(){
   const layout=MODE_LAYOUT[currentMode]||MODE_LAYOUT.tools;
-  document.getElementById('social-editor-heading').textContent=layout.heading;
-  document.getElementById('social-editor-intro').textContent=layout.intro;
   document.getElementById('create-custom-social').hidden=currentMode!=='custom';
   document.getElementById('create-repository-social').hidden=currentMode!=='tools';
   if(currentMode!=='tools')document.getElementById('repository-social-panel').hidden=true;

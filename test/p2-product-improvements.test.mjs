@@ -26,9 +26,9 @@ test("采集控制显示最后检查时间并支持 Reddit、RSSHub、GitHub 单
   assert.match(systemRoutes,/target === 'all' \|\| target === 'reddit'/);
 });
 
-test("说明文字提高可读性并自动收起与顶栏重复的页面标题",()=>{
-  assert.match(main,/section-intro-title-redundant/);
-  assert.match(main,/introTitle\?\.textContent\.trim\(\)===titles\[view\]/);
-  assert.match(css,/\.section-intro-title-redundant h2\{display:none\}/);
+test("页面标题只保留在顶栏，section-intro 不再重复标题",()=>{
+  assert.doesNotMatch(main,/section-intro-title-redundant/);
+  assert.doesNotMatch(css,/section-intro-title-redundant/);
+  for(const block of html.match(/<div class="section-intro[\s\S]*?<\/div>/g)||[])assert.doesNotMatch(block,/<h2/);
   assert.match(css,/\.subscription-test-result,\.source-health,\.source-cost-note\{font-size:11px\}/);
 });

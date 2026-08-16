@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260805-block-edit">
+  <link rel="stylesheet" href="/styles.css?v=20260816-extension-grid">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -134,7 +134,7 @@
     </section>
 
     <section class="view" id="view-overview">
-      <div class="section-intro"><div><span class="kicker">HOTSPOT ATLAS · SEMANTIC EDITION</span><h2>热点全景</h2></div><p>用打标后的事件语义观察媒体覆盖结构、国内关联和议题集中度；来源数与报道数分开计算，不把跨平台热度相加。</p></div>
+      <div class="section-intro"><div><span class="kicker">HOTSPOT ATLAS · SEMANTIC EDITION</span></div><p>用打标后的事件语义观察媒体覆盖结构、国内关联和议题集中度；来源数与报道数分开计算，不把跨平台热度相加。</p></div>
       <section class="atlas-stage-empty" id="atlas-stage-empty" hidden>
         <span class="kicker">NO EVENT DATA</span>
         <h3>当前批次还没有可分析的事件</h3>
@@ -155,7 +155,7 @@
     </section>
 
     <section class="view" id="view-topics">
-      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span><h2>文章选题池</h2></div><p>比较候选的历史表现、成稿潜力、账号匹配与同题竞争，选择值得进入编辑会的文章方向。</p></div>
+      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>比较候选的历史表现、成稿潜力、账号匹配与同题竞争，选择值得进入编辑会的文章方向。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
@@ -172,7 +172,7 @@
     </section>
 
     <section class="view" id="view-daily">
-      <div class="section-intro"><div><span class="kicker">BATCH MORNING BRIEF</span><h2>批次早报</h2></div><p>从事件关系中选择主体、动作或场合，AI 汇总该关系下的关联事件，形成有明确阅读侧重的信息流。</p></div>
+      <div class="section-intro"><div><span class="kicker">BATCH MORNING BRIEF</span></div><p>从事件关系中选择主体、动作或场合，AI 汇总该关系下的关联事件，形成有明确阅读侧重的信息流。</p></div>
       <div class="creation-steps" id="daily-creation-steps" aria-label="批次早报生成步骤"><span class="active" data-step="1"><b>01</b>选择阅读视角</span><span data-step="2"><b>02</b>确认并生成</span><span data-step="3"><b>03</b>查看文章草稿</span></div>
       <div id="daily-job-history" class="daily-job-history" aria-live="polite"></div>
       <div class="daily-layout">
@@ -207,7 +207,7 @@
     </section>
 
     <section class="view" id="view-tutorial">
-      <div class="section-intro"><div><span class="kicker">INDEPENDENT WRITING</span><h2>自主写作</h2></div><p>通过 AI 对话完成心得经验或使用教程；保留主观表达与事实边界，成稿后统一进入文章编辑器和公众号排版。</p></div>
+      <div class="section-intro"><div><span class="kicker">INDEPENDENT WRITING</span></div><p>通过 AI 对话完成心得经验或使用教程；保留主观表达与事实边界，成稿后统一进入文章编辑器和公众号排版。</p></div>
       <section class="panel custom-writing-projects">
         <div class="workspace-head"><div><span class="kicker">CURRENT BATCH</span><h3>当前批次自主文章</h3><small>继续查看、重试或编辑已经创建的文章，不必重复新建。</small></div><span id="custom-writing-project-count">0 篇</span></div>
         <div id="custom-writing-project-list" class="custom-writing-project-list" aria-live="polite" aria-busy="true"><div class="empty-state">正在读取当前批次自主文章…</div></div>
@@ -266,7 +266,7 @@
     </section>
 
     <section class="view" id="view-social-topics">
-      <div class="section-intro"><div><span class="kicker">SOCIAL CARD PITCH DESK</span><h2>图文选题池</h2></div><p>承接适合工具卡和社交图文的候选。P0 先完成独立入池与状态管理，事实门禁和图文生成将在后续阶段接入。</p></div>
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD PITCH DESK</span></div><p>承接适合工具卡和社交图文的候选。P0 先完成独立入池与状态管理，事实门禁和图文生成将在后续阶段接入。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">SOCIAL SHORTLIST</span><h3>图文候选</h3></div><span id="social-candidate-count">0 条</span></div>
@@ -281,7 +281,7 @@
     </section>
 
     <section class="view" id="view-social-editor">
-      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span><h2 id="social-editor-heading">工具图文</h2></div><p id="social-editor-intro">AI 根据仓库事实直接规划卡片故事板，确认故事线后即可生成整组图文。</p><div class="section-intro-actions"><button type="button" class="outline-button" id="create-repository-social" hidden>添加仓库图文</button><button type="button" class="outline-button" id="create-custom-social" hidden>创建自定义图文</button></div></div>
+      <div class="section-intro"><div><span class="kicker">SOCIAL CARD STUDIO</span></div><div class="section-intro-actions"><button type="button" class="outline-button" id="create-repository-social" hidden>添加仓库图文</button><button type="button" class="outline-button" id="create-custom-social" hidden>创建自定义图文</button></div></div>
       <div id="repository-social-panel" class="repository-quickadd" hidden>
         <span class="kicker">REPOSITORY</span>
         <div class="repository-quickadd-row">
@@ -445,7 +445,7 @@
     </section>
 
     <section class="view" id="view-editorial">
-      <div class="section-intro"><div><span class="kicker">HOTSPOT EDITORIAL ROOM</span><h2>热点事件创作</h2></div><p>只处理热点事件候选：逐项确认事实、观点与实践边界，通过门禁后启动成稿链。</p></div>
+      <div class="section-intro"><div><span class="kicker">HOTSPOT EDITORIAL ROOM</span></div><p>只处理热点事件候选：逐项确认事实、观点与实践边界，通过门禁后启动成稿链。</p></div>
       <div class="editorial-layout">
         <div class="candidate-tab-strip">
           <button type="button" class="candidate-tab-arrow previous" id="candidate-tabs-previous" aria-label="向左查看更多候选题">‹</button>
@@ -514,7 +514,7 @@
     </section>
 
     <section class="view" id="view-editor">
-      <div class="section-intro"><div><span class="kicker">WRITING DESK</span><h2>文章编辑器</h2></div><p>编辑器只接受已锁定候选。草稿与终稿分别保存为 04-draft.md 和 09-FINAL.md，并实时计算可见字符。</p></div>
+      <div class="section-intro"><div><span class="kicker">WRITING DESK</span></div><p>编辑器只接受已锁定候选。草稿与终稿分别保存为 04-draft.md 和 09-FINAL.md，并实时计算可见字符。</p></div>
       <div class="writing-toolbar">
         <div class="document-identity"><select id="writing-candidate" aria-label="文章候选"></select><input id="article-title" placeholder="文章标题"></div>
         <div class="document-state"><div class="document-kind" role="radiogroup" aria-label="文稿阶段"><label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked><span>草稿</span></label><label class="kind-toggle"><input type="radio" name="doc-kind" value="final"><span>终稿</span></label></div><span id="char-count">0 / 1,500</span><span id="document-save-state" class="document-save-state saved" role="status" aria-live="polite">已保存</span></div>
@@ -567,7 +567,7 @@
     </section>
 
     <section class="view" id="view-preview">
-      <div class="section-intro"><div><span class="kicker">PROOF & TYPESET</span><h2>公众号排版</h2></div><p>只把真正生成的 article.ai.html 当作公众号排版结果；编辑器即时预览不会冒充门禁通过的正式 HTML。</p></div>
+      <div class="section-intro"><div><span class="kicker">PROOF & TYPESET</span></div><p>只把真正生成的 article.ai.html 当作公众号排版结果；编辑器即时预览不会冒充门禁通过的正式 HTML。</p></div>
       <div class="typeset-toolbar">
         <select id="typeset-candidate" aria-label="待排版文章"></select>
         <select id="typeset-provider" aria-label="排版设计模型"></select>
@@ -599,7 +599,7 @@
     </section>
 
     <section class="view" id="view-cover">
-      <div class="section-intro"><div><span class="kicker">COVER IMAGE</span><h2>文章封面图</h2></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
+      <div class="section-intro"><div><span class="kicker">COVER IMAGE</span></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
       <div class="typeset-toolbar">
         <select id="cover-candidate" aria-label="封面文章"></select>
         <select id="cover-theme" class="visually-hidden" aria-label="封面主题"></select>
@@ -619,7 +619,7 @@
     </section>
 
     <section class="view" id="view-batches">
-      <div class="section-intro"><div><span class="kicker">BATCH ARCHIVE</span><h2>批次管理</h2></div><p>查看所有历史批次的概览、来源记录和产物。</p></div>
+      <div class="section-intro"><div><span class="kicker">BATCH ARCHIVE</span></div><p>查看所有历史批次的概览、来源记录和产物。</p></div>
       <div class="batch-ledger-controls">
         <label class="search-field"><span>⌕</span><input id="batch-search" type="search" placeholder="搜索批次标题或值班备注"></label>
         <div class="scope-tabs" id="batch-lifecycle-filter" role="tablist" aria-label="批次状态筛选">
@@ -634,7 +634,7 @@
     </section>
 
     <section class="view" id="view-hotspots">
-      <div class="section-intro"><div><span class="kicker">THE MORGUE</span><h2>热点档案</h2></div><p>不是一次性热榜。按日期、来源和关键词，找回当时发生了什么。</p></div>
+      <div class="section-intro"><div><span class="kicker">THE MORGUE</span></div><p>不是一次性热榜。按日期、来源和关键词，找回当时发生了什么。</p></div>
       <form class="filter-bar" id="hotspot-filter">
         <label class="search-field"><span>⌕</span><input name="q" placeholder="搜索公司、产品、人物或事件"></label>
         <select name="source"><option value="">全部来源</option><option value="reddit">Reddit</option><option value="rsshub">RSSHub</option><option value="github">GitHub</option></select>
@@ -646,9 +646,8 @@
     </section>
 
     <section class="view" id="view-artifacts">
-      <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span><h2>产物中心</h2></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
+      <div class="section-intro"><div><span class="kicker">PRODUCTION CABINET</span></div><p>热点原始数据、编辑决策、锁定简报、终稿和排版 HTML 集中管理。</p></div>
       <div class="cabinet-tools">
-        <div class="artifact-legend"><span>MD</span><span>JSON</span><span>HTML</span><span>URL</span></div>
         <div class="article-stats" id="article-stats"></div>
         <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
       </div>
@@ -678,18 +677,30 @@
         <section class="capability-impact-panel" id="capability-impact-panel" hidden><div class="skill-config-section-head"><div><b id="capability-impact-title">影响范围</b><small>只读分析，不会修改工具状态</small></div><button type="button" class="text-button" id="capability-impact-close">关闭</button></div><div id="capability-impact-content"></div></section>
       </section>
       <div class="extension-management-grid" data-capability-section="extensions" hidden>
-      <section class="runtime-commandbar collector-package-installer extension-card">
-        <div><b>安装采集插件</b><small>校验采集器 Manifest、来源 Schema 与网络权限；安装后在“采集插件”区启用和管理。</small></div>
-        <input id="collector-plugin-directory" type="text" placeholder="本地采集插件目录">
-        <button class="ghost-button" type="button" id="validate-collector-plugin">校验与权限摘要</button>
-        <button class="outline-button" type="button" id="install-collector-plugin">管理员安装</button>
-      </section>
       <section class="runtime-commandbar skill-package-installer extension-card">
         <div><b>安装第三方技能包</b><small>可先校验本地目录，或直接选择 ZIP；安装前不会执行包内代码。</small></div>
         <input id="skill-package-directory" type="text" placeholder="本地技能包目录">
-        <button class="ghost-button" id="validate-skill-package">校验目录</button>
-        <button class="outline-button" id="install-skill-package">安装目录</button>
-        <label class="ghost-button">选择 ZIP<input id="skill-package-zip" type="file" accept=".zip,application/zip" hidden></label>
+        <div class="extension-card-actions">
+          <button class="ghost-button" id="validate-skill-package">校验目录</button>
+          <button class="outline-button" id="install-skill-package">安装目录</button>
+          <label class="ghost-button">选择 ZIP<input id="skill-package-zip" type="file" accept=".zip,application/zip" hidden></label>
+        </div>
+      </section>
+      <section class="runtime-commandbar tool-package-installer extension-card">
+        <div><b>安装受信本地工具</b><small>仅限管理员审查过的本地 adapter；安装后默认停用，并需重启工作台加载。</small></div>
+        <input id="tool-package-directory" type="text" placeholder="本地工具包目录">
+        <div class="extension-card-actions">
+          <button class="ghost-button" id="validate-tool-package">校验与权限摘要</button>
+          <button class="outline-button" id="install-tool-package">管理员安装</button>
+        </div>
+      </section>
+      <section class="runtime-commandbar collector-package-installer extension-card">
+        <div><b>安装采集插件</b><small>校验采集器 Manifest、来源 Schema 与网络权限；安装后在“采集插件”区启用和管理。</small></div>
+        <input id="collector-plugin-directory" type="text" placeholder="本地采集插件目录">
+        <div class="extension-card-actions">
+          <button class="ghost-button" type="button" id="validate-collector-plugin">校验与权限摘要</button>
+          <button class="outline-button" type="button" id="install-collector-plugin">管理员安装</button>
+        </div>
       </section>
       <section class="model-config-panel remote-plugin-installer extension-card">
         <div class="panel-head"><div><span class="kicker">REMOTE TOOL MANIFEST</span><h3>导入远程工具连接声明</h3><small>面向开发者：用 Manifest 将一个兼容的 HTTPS API 或 MCP 工具映射为工作台能力。</small></div></div>
@@ -728,12 +739,6 @@
           <div id="catalog-draft-list"></div>
           <div class="runtime-actions"><button class="outline-button" type="button" id="catalog-draft-submit">确认入库</button></div>
         </section>
-      </section>
-      <section class="runtime-commandbar tool-package-installer extension-card">
-        <div><b>安装受信本地工具</b><small>仅限管理员审查过的本地 adapter；安装后默认停用，并需重启工作台加载。</small></div>
-        <input id="tool-package-directory" type="text" placeholder="本地工具包目录">
-        <button class="ghost-button" id="validate-tool-package">校验与权限摘要</button>
-        <button class="outline-button" id="install-tool-package">管理员安装</button>
       </section>
       </div>
       <section class="information-slot-panel" data-capability-section="tools" hidden>
@@ -799,7 +804,7 @@
     </section>
 
     <section class="view" id="view-system">
-      <div class="section-intro system-intro"><div><span class="kicker">LOCAL OPERATIONS</span><h2>运行与配置中心</h2></div><p>先确认采集依赖是否在线，再处理凭据和本机参数。敏感值只在服务端保存，页面不会读取密钥原文。<small class="system-last-checked" id="system-last-checked">尚未检查</small></p></div>
+      <div class="section-intro system-intro"><div><span class="kicker">LOCAL OPERATIONS</span></div><p>先确认采集依赖是否在线，再处理凭据和本机参数。敏感值只在服务端保存，页面不会读取密钥原文。<small class="system-last-checked" id="system-last-checked">尚未检查</small></p></div>
       <div class="runtime-commandbar"><div><span class="pulse-dot"></span><b>本机运行台</b><small>服务状态、配置和备份都留在当前设备</small></div><button class="ink-button" id="system-health">检查全部服务</button></div>
       <div class="control-grid">
         <article class="control-card reddit-card">
@@ -882,7 +887,7 @@
     </section>
 
     <section class="view theme-center-view" id="view-themes">
-      <div class="section-intro"><div><span class="kicker">THEME LIBRARY</span><h2>主题中心</h2></div><p>先从视觉卡片中找到方向，再复制为自己的主题。内置主题保持稳定，我的主题按版本发布。</p></div>
+      <div class="section-intro"><div><span class="kicker">THEME LIBRARY</span></div><p>先从视觉卡片中找到方向，再复制为自己的主题。内置主题保持稳定，我的主题按版本发布。</p></div>
       <div class="theme-library-launch"><button type="button" data-theme-browser="article"><span>ARTICLE THEMES</span><b>浏览文章排版</b><small>6 套主题 · 支持自动匹配</small></button><button type="button" data-theme-browser="social"><span>SOCIAL THEMES</span><b>浏览图文视觉</b><small>14 套主题 · 版式与配色独立</small></button><button type="button" data-theme-browser="cover"><span>COVER THEMES</span><b>浏览封面主题</b><small>10 套主题 · AI 按调性自动匹配</small></button></div>
       <section class="theme-manager-panel">
         <div class="theme-manager-head"><div><span class="kicker">THEME STUDIO</span><h3>我的主题</h3><p>用一句视觉描述生成完整主题，确认后再进入编辑与发布流程。</p></div><button type="button" class="primary-button ai-theme-launch" id="open-ai-theme-creator" aria-expanded="false" aria-controls="ai-theme-creator"><span>AI CREATE</span><b>AI 创建主题</b><small>从视觉意图生成安全草稿</small></button><details class="theme-existing-tools"><summary>从已有主题复制或导入</summary><div class="theme-clone-bar"><select id="theme-clone-source" aria-label="复制来源主题"></select><input id="theme-clone-id" placeholder="主题 ID，如 my-editorial"><input id="theme-clone-label" placeholder="主题名称"><button class="ink-button" id="clone-theme">复制并编辑</button><label class="theme-import-button">导入 JSON<input id="import-theme-file" type="file" accept="application/json,.json"></label></div></details></div>
@@ -1004,7 +1009,7 @@
     </section>
 
     <section class="view" id="view-sources">
-      <div class="section-intro"><div><span class="kicker">SOURCE REGISTER · LIVE CONFIG</span><h2>采集源</h2></div><p>把 RSSHub 路由、X 账号和直连 RSS/Atom 放在同一张编辑台账里。变更会立即写入本地配置，下一次采集直接生效，无需手改 JSON。</p></div>
+      <div class="section-intro"><div><span class="kicker">SOURCE REGISTER · LIVE CONFIG</span></div><p>把 RSSHub 路由、X 账号和直连 RSS/Atom 放在同一张编辑台账里。变更会立即写入本地配置，下一次采集直接生效，无需手改 JSON。</p></div>
       <div class="source-register-summary" id="subscription-summary"></div>
       <div class="source-health-dots" id="subscription-health"></div>
       <div class="source-register-layout">
@@ -1058,7 +1063,7 @@
     </section>
 
     <section class="view" id="view-models">
-      <div class="section-intro"><div><span class="kicker">MODEL OPERATIONS</span><h2>模型运行</h2></div><p>查看当前可用模型、执行最小连接诊断并追踪调用记录。新增或修改服务请前往“运行与配置 → 模型接入”。 <button type="button" class="text-button" data-go="system">前往模型接入管理 →</button></p></div>
+      <div class="section-intro"><div><span class="kicker">MODEL OPERATIONS</span></div><p>查看当前可用模型、执行最小连接诊断并追踪调用记录。新增或修改服务请前往“运行与配置 → 模型接入”。 <button type="button" class="text-button" data-go="system">前往模型接入管理 →</button></p></div>
       <div class="model-layout">
         <section>
           <div class="model-grid" id="model-cards"></div>
@@ -1079,7 +1084,7 @@
     </section>
 
     <section class="view" id="view-calendar">
-      <div class="section-intro"><div><span class="kicker">CONTENT CALENDAR</span><h2>内容日历</h2></div>
+      <div class="section-intro"><div><span class="kicker">CONTENT CALENDAR</span></div>
         <p>按周浏览已完结文章。左键单击展开详情，日历同时还为编辑室提供跨批次历史覆盖提示。</p>
       </div>
       <div class="calendar-controls">
@@ -1092,7 +1097,7 @@
       <div class="calendar-scroll"><div class="calendar-grid" id="cal-grid"></div></div>
     </section>
     <section class="view" id="view-logs">
-      <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span><h2>任务日志</h2></div>
+      <div class="section-intro"><div><span class="kicker">ACTIVITY LOG</span></div>
         <p>批次所有任务的执行记录。AI 任务按每次运行记录一条，模型调用累积到 2048 条后滚动清理。</p>
       </div>
       <div class="log-controls">

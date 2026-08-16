@@ -24,7 +24,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260808-poll-http";
+const moduleVersion = "20260816-intro-merge";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
@@ -60,10 +60,6 @@ async function go(route) {
   const sectionId = viewSectionAliases[view] ? viewSectionAliases[view] : `view-${view}`;
   $$(".view").forEach((item) => item.classList.toggle("active", item.id === sectionId));
   document.getElementById("page-title").textContent = titles[view];
-  const activeSection=document.getElementById(sectionId);
-  const intro=activeSection?.querySelector(":scope > .section-intro");
-  const introTitle=intro?.querySelector("h2");
-  if(intro)intro.classList.toggle("section-intro-title-redundant",introTitle?.textContent.trim()===titles[view]);
   // 主视图共享同一个文档滚动容器。进入新视图时必须从页面顶部开始，
   // 但批次切换等“刷新当前视图”的操作仍保留用户正在查看的位置。
   if (isViewChange) {
