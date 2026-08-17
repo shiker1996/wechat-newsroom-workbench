@@ -16,7 +16,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "puppeteer": "^21.0.0"
+    "puppeteer": "^25.7.0"
   },
   "peerDependencies": {
     "html-pages-to-images": "file:../html-pages-to-images"
