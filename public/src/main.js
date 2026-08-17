@@ -35,6 +35,8 @@ const titles = {
 };
 
 async function go(route) {
+  // 切换视图时退出任何沉浸式对话，避免全屏层残留并清除 body.chat-immersive
+  exitImmersiveChats();
   const view = String(route || "").split("/")[0];
   if (!(view in titles)) return;
   if(view!=="editor")document.body.classList.remove("editor-focus");
@@ -111,6 +113,20 @@ function startClock() {
   setTimeout(startClock, 60000 - (Date.now() % 60000) + 20);
 }
 
+// 沉浸式对话全局态：与 body.editor-focus 同一模式，由 body.chat-immersive 统一隐藏固定侧栏与顶栏，
+// 避免 fixed 全屏层受祖先动画/层叠上下文影响时左侧侧边栏仍然可见。任何沉浸式状态变化后都要同步。
+function syncImmersiveMode() {
+  document.body.classList.toggle("chat-immersive", Boolean(document.querySelector(".editorial-chat.immersive")));
+}
+function exitImmersiveChats() {
+  document.querySelectorAll(".editorial-chat.immersive").forEach((chat) => {
+    chat.classList.remove("immersive");
+    const btn = chat.querySelector("[data-immersive-chat]");
+    if (btn) { btn.title = "沉浸式对话"; btn.setAttribute("aria-pressed", "false"); }
+  });
+  syncImmersiveMode();
+}
+
 // 全局骨架绑定（原 app-bind.js 中与具体视图无关的部分）
 function bindGlobal() {
   bindTablistKeyboardNavigation();
@@ -128,6 +144,7 @@ function bindGlobal() {
         const active = chat.classList.toggle("immersive");
         immersiveButton.title = active ? "退出沉浸式" : "沉浸式对话";
         immersiveButton.setAttribute("aria-pressed", String(active));
+        syncImmersiveMode();
       }
     }
     if (event.target.closest("[data-close-batch-dialog]")) document.getElementById("batch-dialog").close();
@@ -158,11 +175,7 @@ function bindGlobal() {
   });
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    document.querySelectorAll(".editorial-chat.immersive").forEach((chat) => {
-      chat.classList.remove("immersive");
-      const btn = chat.querySelector("[data-immersive-chat]");
-      if (btn) { btn.title = "沉浸式对话"; btn.setAttribute("aria-pressed", "false"); }
-    });
+    exitImmersiveChats();
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;

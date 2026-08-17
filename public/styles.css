@@ -1041,7 +1041,7 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 @media(max-width:760px){.theme-recipe-grid{grid-template-columns:1fr}.theme-recipe-field{grid-template-columns:90px minmax(0,1fr)}.theme-behavior-grid{display:grid;grid-template-columns:1fr}}
 .theme-compat-report{margin-bottom:12px;border:1px solid var(--line);background:var(--cream)}.theme-compat-report>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)}.theme-compat-report>header span{color:var(--red);font:800 11px/1 Consolas,monospace;letter-spacing:.14em}.theme-compat-report>header b{font:600 13px var(--display)}.theme-gate-checks{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:0;padding:0;list-style:none}.theme-gate-checks li{display:flex;align-items:center;gap:6px;padding:9px;border-right:1px solid var(--line);font-size: 11px}.theme-gate-checks li:last-child{border-right:0}.theme-gate-checks li b{width:16px;height:16px;display:grid;place-items:center;border:1px solid currentColor}.theme-gate-checks .pass{color:#267257}.theme-gate-checks .fail{color:var(--red)}.theme-gate-issues{display:grid;gap:6px;margin:0;padding:10px 13px;border-top:1px solid var(--line);list-style:none}.theme-gate-issues li{display:grid;grid-template-columns:minmax(110px,.35fr) 1fr;gap:10px;font-size: 11px}.theme-gate-issues code{color:var(--red);overflow-wrap:anywhere}.theme-issue-suggestion{grid-column:2;color:#267257;font-size:11px;line-height:1.5}.theme-compat-report>p{margin:0;padding:10px 13px;border-top:1px solid var(--line);color:var(--muted);font-size: 11px}.theme-compat-report.legacy{border:2px solid var(--red);background:#fff5ef}.user-theme-live-preview>.theme-compat-report{margin:16px}
 @media(max-width:760px){.theme-gate-checks{grid-template-columns:repeat(2,1fr)}.theme-gate-checks li{border-bottom:1px solid var(--line)}.theme-gate-issues li{grid-template-columns:1fr}.theme-issue-suggestion{grid-column:1}}
-.editorial-chat.immersive { position: fixed; inset: 0; z-index: var(--z-modal); width: 100%; max-width: 100%; margin: 0; border: none; border-radius: 0; box-shadow: none; padding: 22px 30px 28px; background: var(--ink); display: flex; flex-direction: column; }
+.editorial-chat.immersive { position: fixed; inset: 0; z-index: var(--z-modal); width: 100vw; height: 100vh; max-width: none; margin: 0; border: none; border-radius: 0; box-shadow: none; padding: 22px 30px 28px; background: var(--ink); display: flex; flex-direction: column; }
 .editorial-chat.immersive .editorial-messages { flex: 1 1 auto; min-height: 0; max-height: none; height: auto; padding: 16px 6px; }
 .editorial-chat.immersive .editorial-reply { flex: none; margin-top: 14px; }
 .editorial-chat.immersive .editorial-chat-head h3, .editorial-chat.immersive .editorial-chat-head h4 { font-size: 20px; }
@@ -1053,6 +1053,16 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 .editorial-chat.immersive .chat-immersive-toggle { border-color:var(--yellow);background:var(--yellow);color:var(--ink);box-shadow:3px 3px 0 rgba(0,0,0,.28); }
 .editorial-chat.immersive .chat-immersive-toggle::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2317201e' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M6 6V1H1M10 6V1h5M6 10v5H1M10 10v5h5'/%3E%3C/svg%3E"); }
 .editorial-chat.immersive .chat-immersive-toggle:hover { box-shadow:4px 4px 0 rgba(0,0,0,.32);transform:translate(-1px,-1px); }
+/* 沉浸式对话全局态：进入任意沉浸式对话时，main.js 会在 <body> 上添加 .chat-immersive。
+   与 body.editor-focus 同一模式：隐藏固定侧栏与顶栏、解除 .shell 左侧偏移并锁定滚动，
+   并停用祖先进入动画（opacity/transform 会在动画期间建立层叠上下文/包含块，
+   把 position:fixed 全屏层困在侧栏 z-index 之下）。这样左侧侧边栏在任何情况下都不会残留。 */
+body.chat-immersive { overflow: hidden; }
+body.chat-immersive .rail,
+body.chat-immersive .topbar { display: none; }
+body.chat-immersive .shell { margin-left: 0; padding: 0; }
+body.chat-immersive .view { animation: none; }
+body.chat-immersive .tutorial-writing-workspace { animation: none; transform: none; }
 .editorial-chat-tools { flex-wrap:nowrap; min-width:max-content; }
 .decision-save-row { display:flex; justify-content:flex-end; margin-top:14px; }
 /* Unified collection source extensions */
