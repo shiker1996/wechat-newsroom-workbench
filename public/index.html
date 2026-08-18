@@ -839,30 +839,6 @@
             <div class="config-panel-heading"><div><span class="kicker">RSSHUB/.ENV</span><h4>RSSHub 环境</h4></div><p>已有值不会回显，修改后重启 RSSHub 生效。</p></div>
             <div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" id="add-rsshub-env">＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div>
           </div>
-          <div class="config-panel legacy-config-panel" id="config-panel-models" role="tabpanel" hidden>
-            <div class="config-panel-heading"><div><span class="kicker">OPENAI-COMPATIBLE</span><h4>模型接入配置</h4></div><p>保存后即时进入模型网关；密钥只写入服务端环境文件。</p></div>
-            <div class="runtime-model-list" id="runtime-model-list"></div>
-            <section class="model-config-panel">
-              <div class="panel-head"><div><span class="kicker">PROVIDER SETTINGS</span><h3 id="model-config-title">新增模型配置</h3></div><button class="outline-button" type="button" id="new-model-config">＋ 新增</button></div>
-              <form id="model-config-form">
-                <input id="model-existing-id" type="hidden">
-                <div class="model-config-grid">
-                  <label>配置名称<input id="model-label" required placeholder="例如：主力模型"></label>
-                  <label>配置 ID<input id="model-id" placeholder="留空自动生成"></label>
-                  <label class="wide">Base URL<input id="model-base-url" required placeholder="https://api.example.com/v1"></label>
-                  <label>模型名称<input id="model-name" required placeholder="gpt-4.1"></label>
-                  <label>API Key<input id="model-api-key" type="password" autocomplete="off" placeholder="留空保持现值"></label>
-                  <label>上下文窗口<input id="model-context-window" type="number" min="4096" value="128000"></label>
-                  <label>最大输出 Token<input id="model-max-output" type="number" min="256" placeholder="16384"><small>可选，留空默认 16384。填该模型 API 的真实输出上限即可，不是每次调用量：系统按阶段分配预算（开启推理的阶段自动追加推理余量），截断时自动扩容重试一次。</small></label>
-                  <label>Token 参数<select id="model-max-token-field"><option value="max_tokens">max_tokens</option><option value="max_completion_tokens">max_completion_tokens</option></select></label>
-                  <label>打标分组<input id="model-tagging-chunk" type="number" min="1" max="20" value="6"></label>
-                  <label>打标并发<input id="model-tagging-concurrency" type="number" min="1" max="20" value="4"></label>
-                </div>
-                <div class="model-config-checks"><label><input id="model-json-mode" type="checkbox" checked> 支持 JSON Mode</label><label><input id="model-enabled" type="checkbox" checked> 启用</label><label><input id="model-default" type="checkbox"> 设为默认模型</label></div>
-                <div class="model-config-actions"><button class="primary-button" type="submit">保存配置</button><button class="ghost-button" type="button" id="delete-model-config" hidden>删除配置</button></div>
-              </form>
-            </section>
-          </div>
           <div class="configuration-legend configuration-inline-legend"><span><i class="ready"></i>已就绪</span><span><i class="attention"></i>需要配置</span><span><i class="secret"></i>凭据隔离</span></div>
           <div class="config-panel active" id="config-panel-extensions">
             <div class="config-panel-heading"><div><span class="kicker">CONFIGURATION CATALOG</span><h4>统一配置资源</h4></div><p>字段由 Manifest 自动生成；模型、技能、工具和采集器使用相同的保存与测试流程。</p><button type="button" class="outline-button" id="add-model-provider">＋ 添加模型</button></div>

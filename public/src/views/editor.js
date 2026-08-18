@@ -455,7 +455,7 @@ async function loadWritingDesk() {
   setupSynchronizedScrolling();
   await ensureModelOptions();
   const draftProv = document.getElementById("draft-provider");
-  if (draftProv && state.models) draftProv.innerHTML = providerOptions(state.models.providers.find((p) => p.configured)?.name || state.models.defaultProvider);
+  if (draftProv && state.models) draftProv.innerHTML = providerOptions(state.models.defaultProvider || state.models.providers.find((p) => p.configured)?.name);
   const batch = state.batches.find((b) => b.id === state.activeBatchId);
   if (!batch) return;
   const [candidates, documents] = await Promise.all([
