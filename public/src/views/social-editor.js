@@ -515,7 +515,7 @@ function bindCustomSocialForm(){
     panel.hidden=!panel.hidden;syncTypeFields();
     if(!panel.hidden){
       const prov=document.getElementById('custom-chat-provider');
-      if(prov)prov.innerHTML=providerOptions(state.models?.providers?.find((p)=>p.configured)?.name||state.models?.defaultProvider||'');
+      if(prov)prov.innerHTML=providerOptions(state.models?.defaultProvider||state.models?.providers?.find((p)=>p.configured)?.name||'');
       chat.history=[];
       const messages=document.getElementById('custom-chat-messages');
       if(messages)messages.innerHTML='<div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div>';

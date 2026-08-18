@@ -856,6 +856,10 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 
 校验指定统一配置资源的当前有效配置是否完整。阶段 1 只执行通用 Schema 完整性检查，具体工具和服务的连接测试由后续迁移阶段接入。
 
+### POST /api/system/configuration/model-provider
+
+注册新的模型 Provider（添加模型）。入参为创建所需的非敏感字段（`id`、`label`、`baseUrl`、`model`、`contextWindow`、`maxOutputTokens`），写入 `config.local.json` 的 `llm.providers`；密钥等后续字段由统一配置资源的保存流程写入隔离凭据 Profile，不写 `.env`。返回新建 Provider 的统一配置资源条目。
+
 ### GET|PUT /api/system/collector-plugins/:id/configuration
 
 读取或保存采集插件的全局动态配置。普通字段进入 `extension_settings`，秘密字段进入隔离凭据 Profile。
