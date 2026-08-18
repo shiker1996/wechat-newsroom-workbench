@@ -14,7 +14,7 @@ async function loadModels() {
   state.models = data;
   window.__models = data;
   const providerSelect = document.getElementById("model-provider");
-  if (providerSelect) providerSelect.innerHTML = providerOptions(data.providers?.find((p) => p.configured)?.name || data.defaultProvider);
+  if (providerSelect) providerSelect.innerHTML = providerOptions(data.defaultProvider || data.providers?.find((p) => p.configured)?.name);
   const available=(data.providers||[]).filter((provider)=>provider.enabled!==false&&provider.configured);
   if (!available.length) {
     document.getElementById("model-cards").innerHTML = '<div class="empty-state">暂无可用模型。请前往“运行与配置 → 模型接入”完成配置。</div>';

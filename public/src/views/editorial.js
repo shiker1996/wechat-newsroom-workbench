@@ -217,7 +217,7 @@ async function openEditorial(id) {
   if (briefState) briefState.textContent = statusLabel(editorial.brief_status);
   const provEl = document.getElementById("editorial-provider");
   if (provEl) {
-    const preferred = state.models?.providers?.find((p) => p.configured)?.name || state.models?.defaultProvider || "";
+    const preferred = state.models?.defaultProvider || state.models?.providers?.find((p) => p.configured)?.name || "";
     provEl.innerHTML = providerOptions(preferred);
   }
   // 事件卡与原文：选题与事件一对多，原文绑定在事件下，逐事件渲染

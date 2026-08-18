@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { deleteModelProvider, normalizeProviderInput, saveModelProvider } from '../lib/integrations/model-provider-settings.mjs';
+import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider } from '../lib/integrations/model-provider-settings.mjs';
 
 test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   const result=normalizeProviderInput({label:'自定义',baseUrl:'https://api.example.com/v1/',model:'model-a'});
@@ -36,20 +36,40 @@ test('网关接受 Base URL 或完整 chat completions 地址',()=>{
   assert.ok(source.includes('/\\/chat\\/completions$/i.test(value)'));
 });
 
-test('模型接入承载增删改，模型运行只负责诊断与观测',()=>{
+test('创建模型仅注册 config.local.json，不写环境文件',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'model-create-'));
+  fs.writeFileSync(path.join(root,'config.local.json'),'{}','utf8');
+  fs.writeFileSync(path.join(root,'.env'),'EXISTING=value\n','utf8');
+  const config={llm:{providers:{}}};
+  const id=createModelProvider(root,config,{id:'openai-main',label:'主力',baseUrl:'https://api.openai.com/v1/',model:'gpt-4.1',contextWindow:128000,maxOutputTokens:8192});
+  assert.equal(id,'openai-main');
+  assert.equal(config.llm.providers['openai-main'].model,'gpt-4.1');
+  const local=JSON.parse(fs.readFileSync(path.join(root,'config.local.json'),'utf8'));
+  assert.equal(local.llm.providers['openai-main'].baseUrl,'https://api.openai.com/v1');
+  assert.equal(local.llm.providers['openai-main'].maxOutputTokens,8192);
+  assert.equal(fs.readFileSync(path.join(root,'.env'),'utf8'),'EXISTING=value\n');
+  assert.throws(()=>createModelProvider(root,config,{id:'openai-main',label:'重复',baseUrl:'https://x/v1',model:'m'}),/已存在/);
+});
+
+test('模型统一接入统一配置资源，模型运行只负责诊断与观测',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
   const modelsView=fs.readFileSync(new URL('../public/src/views/models.js',import.meta.url),'utf8');
   const systemView=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
   const modelRoutes=fs.readFileSync(new URL('../lib/http/routes/model-routes.mjs',import.meta.url),'utf8');
-  for(const id of ['model-base-url','model-name','model-api-key','model-max-token-field','model-json-mode'])assert.match(html,new RegExp(`id="${id}"`));
+  const systemRoutes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+  const settingsModule=fs.readFileSync(new URL('../lib/integrations/model-provider-settings.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/id="model-base-url"|id="model-config-form"/);
+  assert.match(html,/id="add-model-provider"/);
   assert.doesNotMatch(html,/data-config-tab="models"/);
   assert.match(html,/id="system-extension-list"/);
-  assert.match(html,/模型接入配置/);
+  assert.doesNotMatch(html,/模型接入配置/);
   assert.match(systemView,/model-provider/);
   assert.match(html,/data-view="models">[\s\S]*?<b>模型运行<\/b>/);
-  assert.match(systemView,/method: "POST"[\s\S]*modelFormPayload/);
-  assert.match(systemView,/method: "DELETE"/);
+  assert.match(systemView,/\/api\/system\/configuration\/model-provider/);
+  assert.match(systemView,/method: ?"DELETE"/);
+  assert.match(systemRoutes,/\/api\/system\/configuration\/model-provider/);
+  assert.match(settingsModule,/createModelProvider/);
   assert.doesNotMatch(modelsView,/modelFormPayload|saveModelConfig|deleteModelConfig/);
   assert.doesNotMatch(html,/id="ai-tag-batch"|id="tag-limit"/);
   assert.doesNotMatch(modelsView,/aiTagBatch|\/ai\/tag/);
