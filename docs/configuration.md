@@ -62,9 +62,9 @@
 复制 `config.example.json` 为 `config.local.json` 后修改，未写的键用默认值。结构（括注默认值）：
 
 - `port`（4317）、`workspaceRoot`、`contentRoots`：服务端口与内容扫描根目录。
-- `reddit`：Reddit 采集。`cdpUrl`、`subreddits`、`limitPerSubreddit`（15）、`navigationTimeoutMs`。
-- `rsshub`：RSSHub 采集。`baseUrl`、`routes`（默认 12 条路由）、`disabledRoutes`、`directFeeds`、`maxAgeHours`（168，旧闻窗口）、`concurrency`（5）、`keepAlive`、`startupTimeoutMs`。
-- `githubDiscovery`：GitHub 新项目发现。`enabled`、`createdWithinDays`（30）、`minStars`（1000）、`limit`、`cacheTtlMs`。
+- `reddit`：Reddit 采集连接参数。`cdpUrl`、`navigationTimeoutMs`。具体分区来源在「采集源」页面维护（存入 `collection_sources` 表），不再由配置文件声明。
+- `rsshub`：RSSHub 采集连接参数。`baseUrl`、`maxAgeHours`（168，旧闻窗口）、`concurrency`（5）、`keepAlive`、`startupTimeoutMs`。具体路由 / 直连 Feed 来源在「采集源」页面维护（存入 `collection_sources` 表）。
+- `githubDiscovery`：GitHub 新项目发现采集器参数。`createdWithinDays`（30）、`minStars`（1000）、`limit`、`cacheTtlMs`。`github:search` 采集源实例在「采集源」页面维护（存入 `collection_sources` 表）。
   - `aiQueries`：AI 兴趣仓库发现。`enabled`、`refreshDays`（7，查询组缓存天数，缓存文件 `data/repo-discovery-queries.json`，可手工编辑）、`maxQueries`（6）、`perQueryLimit`（15）、`relevanceFilter`、`minInterestScore`（6，兴趣分阈值）。LLM 按 `account-context.json` 内容支柱生成 Search 查询组并做相关性打分过滤；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）。
 - `llm`：模型网关。
   - `defaultProvider`、`requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。

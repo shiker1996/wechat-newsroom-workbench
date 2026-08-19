@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { sanitizeQueries, loadCachedQueries, planRepoDiscoveryQueries, filterRepositoriesByInterest } from '../lib/llm/repo-discovery.mjs';
-import { discoverGitHubRepositories } from '../plugins/github-discovery/collector.mjs';
+import { discoverGitHubRepositories, expandAiQueryKeywords } from '../plugins/github-discovery/collector.mjs';
 
 function tmpRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'repo-discovery-'));
@@ -33,12 +33,22 @@ test('sanitizeQueries 校验字段并夹紧范围', () => {
       { label: '', query: '无标签应丢弃' },
       { label: '超长查询', query: `x`.repeat(500), createdWithinDays: 60, minStars: 50 },
       { label: '无查询应丢弃' },
+      { label: '纯逻辑运算符应丢弃', query: 'AND OR NOT' },
     ],
   }, { maxQueries: 6 });
   assert.equal(queries.length, 2);
   assert.equal(queries[0].createdWithinDays, 7);
   assert.equal(queries[0].minStars, 5000);
   assert.equal(queries[1].query.length, 200);
+});
+
+test('expandAiQueryKeywords 拆分纯限定符 OR 查询，保留含文本词条的原样查询', () => {
+  assert.deepEqual(expandAiQueryKeywords('topic:developer-tools OR topic:cli'), ['topic:developer-tools', 'topic:cli']);
+  assert.deepEqual(expandAiQueryKeywords('topic:a AND topic:b'), ['topic:a topic:b']);
+  assert.deepEqual(expandAiQueryKeywords('topic:a NOT topic:b'), ['topic:a']);
+  assert.deepEqual(expandAiQueryKeywords('agent framework'), ['agent framework']);
+  assert.deepEqual(expandAiQueryKeywords('OR'), []);
+  assert.deepEqual(expandAiQueryKeywords('  '), []);
 });
 
 test('planRepoDiscoveryQueries 生成查询组并落缓存，缓存期内不再调模型', async () => {
@@ -82,6 +92,28 @@ test('filterRepositoriesByInterest 按阈值过滤并附分数理由，失败放
   const failing = { async complete() { throw new Error('超时'); } };
   const all = await filterRepositoriesByInterest({ gateway: failing, accountContext, repos, threshold: 6 });
   assert.equal(all.length, 2, '模型故障应放行全量');
+});
+
+test('filterRepositoriesByInterest 仓库多时分片并发打分，单片失败只放行该片', async () => {
+  const repos = Array.from({ length: 60 }, (_, i) => ({ repository: `r${i}/repo${i}`, description: `仓库 ${i}`, topics: [], language: 'TypeScript', stars: 10 }));
+  const gateway = {
+    calls: [],
+    async complete(input) {
+      this.calls.push(input);
+      const names = [...String(input.messages[1].content).matchAll(/(\d+)\.\s+([^\s|｜]+)/g)].map((m) => m[2]);
+      return { content: JSON.stringify({ results: names.map((name, idx) => ({ repository: name, score: idx % 5 === 0 ? 3 : 8, reason: 'r' })) }) };
+    },
+  };
+  const kept = await filterRepositoriesByInterest({ gateway, accountContext, repos, threshold: 6, chunkSize: 25, concurrency: 4 });
+  assert.equal(gateway.calls.length, 3, '60 个仓库按 25/片应拆成 3 次调用');
+  assert.equal(kept.length, 48, '每 5 个里 1 个低分被过滤：3+2 个低分仓库被剔除');
+  assert.ok(kept.some((item) => item.interestScore === 8));
+
+  const flaky = {
+    async complete() { throw new Error('该片超时'); },
+  };
+  const failOpen = await filterRepositoriesByInterest({ gateway: flaky, accountContext, repos, threshold: 6, chunkSize: 25, concurrency: 4 });
+  assert.equal(failOpen.length, 60, '所有分片失败时应放行全量');
 });
 
 test('discoverGitHubRepositories 执行 AI 查询组并按优先级归并通道', async () => {
@@ -131,4 +163,31 @@ test('discoverGitHubRepositories 执行 AI 查询组并按优先级归并通道'
   const repo = merged.find((i) => i.repository === 'x/mcp-server');
   assert.equal(repo.primaryDiscovery, 'trending');
   assert.ok(repo.discoveryChannels.includes('ai-search') === false || repo.sourceType === 'trending');
+});
+
+test('discoverGitHubRepositories 纯限定符 OR 查询按分支拆分请求而非 422 整体失败', async () => {
+  const requests = [];
+  const fetchImpl = async (url) => {
+    const decoded = decodeURIComponent(url);
+    requests.push(decoded);
+    const repo = decoded.includes('topic:cli')
+      ? { full_name: 'x/cli-tool', html_url: 'https://github.com/x/cli-tool', description: 'CLI 工具', language: 'Go', stargazers_count: 900, topics: ['cli'], created_at: '2026-08-01', updated_at: '2026-08-06' }
+      : { full_name: 'y/devtools', html_url: 'https://github.com/y/devtools', description: '开发者工具', language: 'Rust', stargazers_count: 1200, topics: ['developer-tools'], created_at: '2026-08-01', updated_at: '2026-08-06' };
+    return {
+      ok: true, status: 200, headers: new Map(),
+      async json() { return { items: [repo] }; },
+    };
+  };
+  const sourceResults = [];
+  const items = await discoverGitHubRepositories([], {
+    enabled: true, searchEnabled: false, minStars: 1000, createdWithinDays: 30, limit: 5,
+    aiQueries: [{ label: '开发者工具', query: 'topic:developer-tools OR topic:cli', createdWithinDays: 60, minStars: 500, limit: 10 }],
+    fetchImpl,
+  }, () => {}, (r) => sourceResults.push(r));
+
+  assert.equal(requests.length, 2, 'OR 查询应拆分为两个独立请求');
+  assert.ok(requests.some((q) => q.includes('topic:developer-tools') && !/topic:[^ ]+\s+OR/.test(q)), '请求不应再含裸 OR');
+  assert.ok(requests.every((q) => !/(^|\s)OR(\s|$)/.test(q)), '没有任何请求包含孤立 OR');
+  assert.equal(items.filter((i) => i.sourceType === 'ai-search').length, 2);
+  assert.ok(sourceResults.some((r) => r.sourceType === 'ai-search' && r.status === 'success' && r.itemCount === 2));
 });

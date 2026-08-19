@@ -146,8 +146,8 @@ function renderSubscriptions() {
   }).join("") : `<div class="empty-state source-empty"><b>${all.length ? "没有匹配的订阅源" : "还没有订阅源"}</b><span>${all.length ? "换个关键词，或清除当前筛选条件。" : "从左侧选择一种来源并完成首次添加。"}</span>${filtered ? '<button type="button" class="text-button" data-clear-source-filters>清除筛选</button>' : ""}</div>`;
 }
 async function loadSubscriptions() {
-  const [subscriptions, plugins, sources] = await Promise.all([request("/api/subscriptions"), request("/api/collector-plugins"), request("/api/collection-sources")]);
-  state.subscriptions = subscriptions; state.collectorPlugins = plugins.items || []; state.collectionSources = sources.items || [];
+  const [plugins, sources] = await Promise.all([request("/api/collector-plugins"), request("/api/collection-sources")]);
+  state.collectorPlugins = plugins.items || []; state.collectionSources = sources.items || [];
   const creatable = state.collectorPlugins.filter((item) => item.available && (item.builtin ? CREATABLE_PLUGINS.has(item.id) : true));
   const ordinary = creatable.filter((item) => !WEB_PLUGINS.has(item.id));
   const advancedWeb = creatable.filter((item) => WEB_PLUGINS.has(item.id));
@@ -165,18 +165,18 @@ async function testSource(payload, button, id = null) {
 async function addSource(event) {
   event.preventDefault(); const form = event.currentTarget; const payload = formPayload();
   if (payload.pluginId) await request("/api/collection-sources", { method: "POST", body: JSON.stringify(payload) });
-  else { if (!payload.value) throw new Error("订阅内容不能为空"); state.subscriptions = await request("/api/subscriptions", { method: "POST", body: JSON.stringify(payload) }); }
+  else { if (!payload.value) throw new Error("订阅内容不能为空"); await request("/api/subscriptions", { method: "POST", body: JSON.stringify(payload) }); }
   form.reset(); $("#source-search").value = ""; $("#source-type-filter").value = "all"; $("#source-status-filter").value = "all";
   await reloadSources(); updateComposer(); toast("采集源已添加");
 }
 async function toggleSource(input) {
   input.disabled = true;
-  try { if (input.dataset.sourceId) await request(`/api/collection-sources/${input.dataset.sourceId}`, { method: "PATCH", body: JSON.stringify({ enabled: input.checked }) }); else state.subscriptions = await request("/api/subscriptions", { method: "PATCH", body: JSON.stringify({ kind: input.dataset.kind, value: input.dataset.value, enabled: input.checked }) }); await reloadSources(); }
+  try { if (input.dataset.sourceId) await request(`/api/collection-sources/${input.dataset.sourceId}`, { method: "PATCH", body: JSON.stringify({ enabled: input.checked }) }); else await request("/api/subscriptions", { method: "PATCH", body: JSON.stringify({ kind: input.dataset.kind, value: input.dataset.value, enabled: input.checked }) }); await reloadSources(); }
   finally { input.disabled = false; }
 }
 async function removeSource(button) {
   if (!await confirmAction("确定删除这个采集源吗？", { confirmText: "删除" })) return;
-  if (button.dataset.sourceId) await request(`/api/collection-sources/${button.dataset.sourceId}`, { method: "DELETE" }); else state.subscriptions = await request("/api/subscriptions", { method: "DELETE", body: JSON.stringify({ kind: button.dataset.kind, value: button.dataset.value }) });
+  if (button.dataset.sourceId) await request(`/api/collection-sources/${button.dataset.sourceId}`, { method: "DELETE" }); else await request("/api/subscriptions", { method: "DELETE", body: JSON.stringify({ kind: button.dataset.kind, value: button.dataset.value }) });
   await reloadSources(); toast("采集源已删除");
 }
 

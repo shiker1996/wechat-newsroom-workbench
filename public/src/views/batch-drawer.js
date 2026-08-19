@@ -79,7 +79,7 @@ export async function openBatch(id, mode) {
   const lifecycle=batch.lifecycle_status||"active";
   const statusLabel = { active:"进行中", completed:"已完成", archived:"已归档" }[lifecycle];
   const ai = batch.ai_status || { tagged: 0, total: batch.hotspots.length, latestResearch: null };
-  const preferred = state.models.providers.find((item) => item.configured)?.name || state.models.defaultProvider;
+  const preferred = state.models.defaultProvider || state.models.providers.find((item) => item.configured)?.name;
   const researchDone = ai.latestResearch?.status === "completed";
   const cards = batch.event_cards || { count: 0, total: 0 };
   const cardsReady = cards.total > 0 && cards.count >= cards.total;

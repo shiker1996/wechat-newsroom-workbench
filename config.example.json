@@ -4,8 +4,6 @@
   "contentRoots": [],
   "reddit": {
     "cdpUrl": "http://localhost:9333",
-    "subreddits": ["technology", "programming", "artificial", "sysadmin"],
-    "limitPerSubreddit": 15,
     "navigationTimeoutMs": 30000
   },
   "rsshub": {
@@ -18,23 +16,7 @@
     "keepAlive": true,
     "maxAgeHours": 168,
     "allowUndated": true,
-    "concurrency": 5,
-    "disabledRoutes": [],
-    "directFeeds": [],
-    "routes": [
-      "/latepost?limit=30",
-      "/techcrunch/news?limit=30",
-      "/huxiu/article?limit=30",
-      "/solidot?limit=30",
-      "/readhub?limit=30",
-      "/jiemian/lists/65?limit=30",
-      "/anthropic/engineering?limit=30",
-      "/anthropic/news?limit=30",
-      "/36kr/hot-list?limit=30",
-      "/github/trending/daily/any?limit=30",
-      "/github/trending/weekly/any?limit=30",
-      "/github/trending/monthly/any?limit=30"
-    ]
+    "concurrency": 5
   },
   "githubDiscovery": {
     "enabled": true,

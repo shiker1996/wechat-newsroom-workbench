@@ -5,7 +5,6 @@ import { Store } from '../lib/core/store.mjs';
 import { CollectorRegistry } from '../lib/collectors/registry.mjs';
 import { CollectionRunner } from '../lib/collectors/runner.mjs';
 import { normalizeCollectorResult, validateCollectorManifest } from '../lib/collectors/contracts.mjs';
-import { syncLegacyCollectionSources } from '../lib/collectors/legacy-source-adapter.mjs';
 import { createBuiltinCollectorRegistry } from '../lib/collectors/builtin-registry.mjs';
 import { createStoreCollectionRunner } from '../lib/collectors/store-runner.mjs';
 import { CollectionSourceService } from '../lib/collectors/source-service.mjs';
@@ -63,12 +62,33 @@ test('未加载插件和无效来源配置都形成来源级失败',async t=>{
   assert.equal(result.status,'error');assert.equal(failures[0].sourceKey,'demo:missing');assert.equal(failures[0].error.code,'DEPENDENCY_MISSING');
 });
 
-test('旧订阅配置幂等同步到 collection_sources 且不改变旧响应身份',t=>{
-  const {store}=workspace(t);const config={rsshub:{routes:['/twitter/user/OpenAI?limit=30','/readhub/daily?limit=30','/github/trending/daily/any?limit=30'],disabledRoutes:['/readhub/daily?limit=30'],directFeeds:[{url:'https://example.com/feed.xml',label:'Example',enabled:true}]},githubDiscovery:{enabled:true,createdWithinDays:30}};
-  const first=syncLegacyCollectionSources(config,store.repositories.collectionSources);const second=syncLegacyCollectionSources(config,store.repositories.collectionSources);
-  assert.equal(first.length,5);assert.equal(second.length,5);assert.equal(store.listCollectionSources().length,5);
-  assert.equal(store.repositories.collectionSources.getByKey('rsshub:/readhub/daily').enabled,false);
-  assert.equal(store.repositories.collectionSources.getByKey('github:search').managed,true);
+test('用户暂停采集源后 upsert 不会重新启用',t=>{
+  const {store}=workspace(t);const repository=store.repositories.collectionSources;
+  repository.upsert({pluginId:'rsshub-collector',pluginVersion:'builtin',sourceType:'rsshub',sourceKey:'rsshub:/readhub/daily',label:'每日读',config:{route:'/readhub/daily?limit=30'},enabled:true,origin:'unified-api'});
+  const source=repository.getByKey('rsshub:/readhub/daily');
+  repository.setEnabled(source.id,false);
+  repository.upsert({pluginId:'rsshub-collector',pluginVersion:'builtin',sourceType:'rsshub',sourceKey:'rsshub:/readhub/daily',label:'每日读',config:{route:'/readhub/daily?limit=30'},enabled:true,origin:'unified-api'});
+  assert.equal(repository.getByKey('rsshub:/readhub/daily').enabled,false,'upsert 应保留用户手动暂停状态');
+});
+
+test('删除采集源后不再出现在列表中',t=>{
+  const {store}=workspace(t);const repository=store.repositories.collectionSources;
+  repository.upsert({pluginId:'rsshub-collector',pluginVersion:'builtin',sourceType:'rsshub',sourceKey:'rsshub:/readhub/daily',label:'每日读',config:{route:'/readhub/daily?limit=30'},enabled:true,origin:'unified-api'});
+  const source=repository.getByKey('rsshub:/readhub/daily');
+  assert.equal(repository.remove(source.id),true);
+  assert.equal(store.listCollectionSources().length,0,'删除后列表不再出现该来源');
+  assert.equal(repository.getByKey('rsshub:/readhub/daily'),null);
+});
+
+test('用户通过统一 API 重新添加已删除来源时恢复为可用状态',t=>{
+  const {store}=workspace(t);const repository=store.repositories.collectionSources;
+  repository.upsert({pluginId:'rsshub-collector',pluginVersion:'builtin',sourceType:'rsshub',sourceKey:'rsshub:/readhub/daily',label:'每日读',config:{route:'/readhub/daily?limit=30'},enabled:true,origin:'unified-api'});
+  const source=repository.getByKey('rsshub:/readhub/daily');
+  repository.remove(source.id);
+  const revived=repository.upsert({pluginId:'rsshub-collector',pluginVersion:'builtin',sourceType:'rsshub',sourceKey:'rsshub:/readhub/daily',label:'手动重加',config:{route:'/readhub/daily?limit=30'},enabled:true,origin:'unified-api'});
+  assert.ok(revived,'重新 upsert 应返回可用来源');
+  assert.equal(revived.dismissed,false);
+  assert.equal(store.listCollectionSources().length,1);
 });
 
 test('collection_sources 数据库迁移幂等并保留稳定 source_key',t=>{

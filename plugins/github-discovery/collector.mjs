@@ -1,5 +1,26 @@
 export function repositoryFromUrl(value){try{const url=new URL(String(value||''));if(url.hostname.toLowerCase()!=='github.com')return null;const [owner,repo]=url.pathname.split('/').filter(Boolean);if(!owner||!repo||['topics','trending','search','marketplace'].includes(owner.toLowerCase()))return null;return {repository:`${owner}/${repo.replace(/\.git$/i,'')}`,url:`https://github.com/${owner}/${repo.replace(/\.git$/i,'')}`};}catch{return null;}}
 function mergeRepository(map,item,channel){const parsed=repositoryFromUrl(item.url)||item.repository&&{repository:item.repository,url:`https://github.com/${item.repository}`};if(!parsed)return;const key=parsed.repository.toLowerCase();const current=map.get(key);const channels=[...new Set([...(current?.discoveryChannels||[]),channel,...(item.discoveryChannels||[])])];const priority={trending:4,'ai-search':3,search:2,mentioned:1};const preferred=!current||priority[channel]>priority[current.primaryDiscovery||'mentioned']?item:current;map.set(key,{...current,...preferred,id:`github:${key}`,title:parsed.repository,url:parsed.url,repository:parsed.repository,sourceGroup:'github',discoveryChannels:channels,primaryDiscovery:channels.sort((a,b)=>priority[b]-priority[a])[0]});}
+const LOGICAL_OPERATOR=/^(and|or|not)$/i;
+// 把 AI 查询拆成可执行的子查询：只要存在普通文本词条就原样返回（GitHub 允许 OR/AND/NOT 作用于文本）；
+// 仅由限定符 + 逻辑运算符组成的查询（如 `topic:a OR topic:b`）会被 GitHub 以
+// "search contains only logical operators" 拒绝（422），这里按 OR 拆分为多组独立限定符查询，
+// 并丢弃裸 AND/NOT（限定符并集等价于 AND，NOT 无法作用于限定符）。
+export function expandAiQueryKeywords(keywords){
+  const tokens=String(keywords||'').trim().split(/\s+/).filter(Boolean);
+  if(!tokens.length)return [];
+  const hasTextTerm=tokens.some((token)=>!LOGICAL_OPERATOR.test(token)&&!token.includes(':'));
+  if(hasTextTerm)return [tokens.join(' ')];
+  const groups=[];let current=[];
+  for(let i=0;i<tokens.length;i++){
+    const token=tokens[i];
+    if(/^or$/i.test(token)){if(current.length)groups.push(current.join(' '));current=[];}
+    else if(/^and$/i.test(token)){continue;}
+    else if(/^not$/i.test(token)){i++;continue;}
+    else current.push(token);
+  }
+  if(current.length)groups.push(current.join(' '));
+  return groups.filter(Boolean);
+}
 
 export async function discoverGitHubRepositories(items,config={},onProgress=()=>{},onSourceResult=()=>{}){
   const requestGitHubJson=config.requestGitHubJson||config.githubRequest||(config.fetchImpl?async(apiPath,options={})=>{const response=await config.fetchImpl(`https://api.github.com${apiPath}`,options);if(!response.ok)throw new Error(`GitHub API ${response.status}`);return response.json();}:null);if(config.enabled!==false&&typeof requestGitHubJson!=='function')throw new Error('GitHub 宿主服务未注入');
@@ -14,21 +35,32 @@ export async function discoverGitHubRepositories(items,config={},onProgress=()=>
   // 注意：search/ai-search 的 publishedAt 一律用发现时间而非 repo.created_at——
   // 下游 isFreshForBatch 按批次窗口过滤 published_at，用仓库创建时间会导致整批发现结果被新鲜度过滤吞掉。
   for(const spec of Array.isArray(config.aiQueries)?config.aiQueries:[]){
-    const label=String(spec?.label||'兴趣发现').slice(0,40);const keywords=String(spec?.query||'').trim();if(!keywords)continue;
+    const label=String(spec?.label||'兴趣发现').slice(0,40);const subQueries=expandAiQueryKeywords(spec?.query);if(!subQueries.length)continue;
     const days=Math.max(7,Number(spec.createdWithinDays||60));const stars=Math.max(10,Number(spec.minStars||50));const perQuery=Math.max(1,Math.min(50,Number(spec.limit||15)));
     const after=new Date(Date.now()-days*86400000).toISOString().slice(0,10);
     const language=String(spec.language||'').trim();
-    const query=`${keywords} stars:>=${stars} created:>=${after} fork:false archived:false${language?` language:${language}`:''}`;
+    const suffix=` stars:>=${stars} created:>=${after} fork:false archived:false${language?` language:${language}`:''}`;
     const sourceKey=`github:ai-search:${label}`;const queryStarted=Date.now();const queryStartedAt=new Date().toISOString();
-    try{
-      onProgress(`正在按兴趣方向「${label}」搜索 GitHub 项目`);
-      const result=await requestGitHubJson(`/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perQuery}`,{cacheDir:config.cacheDir,ttlMs:Number(config.cacheTtlMs||30*60*1000),fetchImpl:config.fetchImpl||fetch,token:config.token??process.env.GITHUB_ACCESS_TOKEN});
-      const found=(result.items||[]).slice(0,perQuery);
-      for(const repo of found)mergeRepository(map,{url:repo.html_url,repository:repo.full_name,sourceType:'ai-search',sourceKey,sourceName:`AI 兴趣发现 · ${label}`,publishedAt:queryStartedAt,description:repo.description||'',language:repo.language||'',stars:repo.stargazers_count,topics:repo.topics||[],createdAt:repo.created_at,updatedAt:repo.updated_at,searchQuery:query},'ai-search');
+    const found=[];const failures=[];
+    for(const keywords of subQueries){
+      const query=`${keywords}${suffix}`;
+      try{
+        onProgress(`正在按兴趣方向「${label}」搜索 GitHub 项目${subQueries.length>1?`（${keywords}）`:''}`);
+        const result=await requestGitHubJson(`/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perQuery}`,{cacheDir:config.cacheDir,ttlMs:Number(config.cacheTtlMs||30*60*1000),fetchImpl:config.fetchImpl||fetch,token:config.token??process.env.GITHUB_ACCESS_TOKEN});
+        for(const repo of (result.items||[]).slice(0,perQuery)){
+          if(found.some((item)=>item.repository===repo.full_name))continue;
+          found.push({url:repo.html_url,repository:repo.full_name,sourceType:'ai-search',sourceKey,sourceName:`AI 兴趣发现 · ${label}`,publishedAt:queryStartedAt,description:repo.description||'',language:repo.language||'',stars:repo.stargazers_count,topics:repo.topics||[],createdAt:repo.created_at,updatedAt:repo.updated_at,searchQuery:query});
+        }
+      }catch(error){
+        failures.push(`${keywords}：${error.message}`);
+      }
+    }
+    if(found.length){
+      for(const repo of found)mergeRepository(map,repo,'ai-search');
       onSourceResult({sourceGroup:'github',sourceType:'ai-search',sourceKey,sourceName:`AI 兴趣发现 · ${label}`,status:'success',itemCount:found.length,durationMs:Date.now()-queryStarted,startedAt:queryStartedAt,endedAt:new Date().toISOString()});
-    }catch(error){
-      onProgress(`兴趣方向「${label}」搜索失败，已跳过：${error.message}`);
-      onSourceResult({sourceGroup:'github',sourceType:'ai-search',sourceKey,sourceName:`AI 兴趣发现 · ${label}`,status:'failed',itemCount:0,durationMs:Date.now()-queryStarted,error:error.message,startedAt:queryStartedAt,endedAt:new Date().toISOString()});
+    }else if(failures.length){
+      onProgress(`兴趣方向「${label}」搜索失败，已跳过：${failures[0]}`);
+      onSourceResult({sourceGroup:'github',sourceType:'ai-search',sourceKey,sourceName:`AI 兴趣发现 · ${label}`,status:'failed',itemCount:0,durationMs:Date.now()-queryStarted,error:failures[0],startedAt:queryStartedAt,endedAt:new Date().toISOString()});
     }
   }
   return [...others,...map.values()].map((item)=>item.sourceGroup==='github'?{...item,sourceType:item.primaryDiscovery,sourceKey:`github:${item.primaryDiscovery}`,sourceName:item.primaryDiscovery==='trending'||item.primaryDiscovery==='ai-search'?item.sourceName:item.primaryDiscovery==='search'?'GitHub 新项目增长发现':'其他热点提及的 GitHub 项目'}:item);
