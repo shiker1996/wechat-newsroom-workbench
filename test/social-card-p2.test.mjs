@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, acceptSoftDensityOnlyLayoutReport, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
@@ -696,4 +696,20 @@ test('补充仍不足时内容框按内容高度收缩并垂直居中',()=>{
   assert.match(html,/class="page fit-content-stack page-content/);
   assert.match(html,/\.page\.fit-content-stack \.page-body\{align-items:center\}/);
   assert.match(html,/\.page\.fit-content-stack \.page-content-stack\{min-height:0!important;height:max-content;align-self:center\}/);
+});
+
+test('只有 underfilled 的页面启用内容自适应后按软门禁通过',()=>{
+  const report={valid:false,pages:[
+    {page:1,kind:'cover',valid:true,issues:[]},
+    {page:2,kind:'content',valid:false,utilization:42.7,issues:['underfilled']},
+    {page:3,kind:'content',valid:true,issues:[]},
+  ]};
+  assert.equal(acceptSoftDensityOnlyLayoutReport(report,[]),null);
+  const accepted=acceptSoftDensityOnlyLayoutReport(report,[1]);
+  assert.equal(accepted.valid,true);
+  assert.deepEqual(accepted.acceptedSoftDensityPages,[2]);
+  assert.equal(accepted.pages[1].valid,true);
+  assert.deepEqual(accepted.pages[1].issues,[]);
+  assert.deepEqual(accepted.pages[1].acceptedIssues,['underfilled']);
+  assert.equal(acceptSoftDensityOnlyLayoutReport({...report,pages:[{...report.pages[1],issues:['underfilled','vertical_imbalance']},...report.pages.slice(0,1),...report.pages.slice(2)]},[1]),null);
 });
