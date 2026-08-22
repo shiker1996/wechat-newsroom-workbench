@@ -42,6 +42,15 @@ test('事实候选按角色槽位匹配并可编译为带来源的补充块', ()
   assert.equal(block.fact_ids.length, selected.length);
 });
 
+test('完整 fenced code 在事实索引中保留换行', () => {
+  const index = buildSocialCardFactIndex({
+    sourceUrl: 'https://example.com/readme',
+    readme: { sections: [{ title: 'Install', content: '```bash\ncurl -fsSl https://example.com/install | bash\n```' }] },
+  });
+  const candidate = index.candidates.find((item) => item.path.endsWith('sections[0]'));
+  assert.equal(candidate.text, '```bash\ncurl -fsSl https://example.com/install | bash\n```');
+});
+
 test('事实候选提示只暴露候选 id、文本、标签和来源', () => {
   const index = buildSocialCardFactIndex({ sourceUrl: 'https://example.com', description: '工具简介' });
   const prompt = JSON.parse(buildSocialCardFactCandidatePrompt(index));

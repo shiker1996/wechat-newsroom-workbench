@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "phase": 0,
+  "capturedAt": "2026-08-22",
+  "candidateId": 833,
+  "artifact": "social-cards/2026-08-22-402ada3dba-c004",
+  "template": "brutalist-v1",
+  "pageCounts": {
+    "original": 6,
+    "reflow": 7,
+    "final": 7
+  },
+  "componentCounts": {
+    "total": 44,
+    "coreAtoms": 25,
+    "supplementCandidates": 19,
+    "insertedSupplements": 0,
+    "provided": 44,
+    "legacyFallback": 0,
+    "missing": 0
+  },
+  "browserAudit": {
+    "valid": true,
+    "utilization": {
+      "1": 74.3,
+      "2": 78.2,
+      "3": 76.8,
+      "4": 61.8,
+      "5": 61.1,
+      "6": 61.3,
+      "7": 72.0
+    }
+  },
+  "pageCandidates": {
+    "1": { "role": "cover", "core": 2, "supplements": 0 },
+    "2": { "role": "concept", "core": 5, "supplements": 0 },
+    "3": { "role": "feature", "core": 6, "supplements": 0 },
+    "4": { "role": "feature", "core": 4, "supplements": 0 },
+    "5": { "role": "steps", "core": 1, "supplements": 0 },
+    "6": { "role": "steps", "core": 2, "supplements": 0 },
+    "7": { "role": "risk", "core": 5, "supplements": 0 }
+  },
+  "estimatorMismatch": {
+    "page2": {
+      "estimatedHeightPx": 414,
+      "bodyHeightPx": 398,
+      "overCapacity": true,
+      "browserValid": true
+    },
+    "steps": {
+      "p5EstimatedHeightPx": 303,
+      "p6EstimatedHeightPx": 384,
+      "bodyHeightPx": 386,
+      "safeFitRatio": 0.92
+    }
+  },
+  "noProgressGuard": {
+    "detected": true,
+    "firstAttempt": 2,
+    "repeatedAtAttempt": 3
+  },
+  "contracts": {
+    "plannerOperation": "add_component",
+    "plannerSlotId": "program-resolved; model must not provide slot_id",
+    "browserAuditAuthority": true
+  },
+  "stage0Conclusion": [
+    "补充候选已生成但没有实际装入页面",
+    "容量预估与浏览器审计存在偏差",
+    "拆页与补充装箱尚未联合规划",
+    "下一步先统一容量估算和拆页决策"
+  ]
+}

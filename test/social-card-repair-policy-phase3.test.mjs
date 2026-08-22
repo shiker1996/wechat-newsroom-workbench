@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, classifySocialCardLayoutIssue, structuralLayoutPages, validateSocialCardRestructureOperations } from '../lib/rendering/social-card-repair-policy.mjs';
+import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, classifySocialCardLayoutIssue, socialCardRepairStateSignature, structuralLayoutPages, validateSocialCardRestructureOperations } from '../lib/rendering/social-card-repair-policy.mjs';
 
 const plan = [{ kind: 'cover', title: '封面', content_blocks: [] }, {
   kind: 'content', role: 'feature', title: '能力清单', content_blocks: [{ type: 'list', title: '要点', items: ['事实一', '事实二', '事实三', '事实四'] }],
@@ -48,4 +48,31 @@ test('模型未返回结构修复操作时，程序可为可拆分列表生成�
   assert.equal(applied.changed,true);
   assert.deepEqual(applied.pages.slice(1,-1).flatMap((page)=>page.content_blocks[0].items),['事实一','事实二','事实三','事实四']);
   assert.deepEqual(buildDeterministicSocialCardRestructureOperations([{kind:'cover',content_blocks:[{type:'list',items:['a','b']}]}],[{page:1,issues:['overflow']}]),[]);
+});
+
+test('布局修复状态指纹在计划、问题和确定性变体不变时保持一致', () => {
+  const input = {
+    cardPlan: plan,
+    report: { pages: [{ page: 2, valid: false, utilization: 42.34, issues: ['underfilled', 'text_too_small'] }] },
+    densityCalibration: { pages: [{ page: 2, utilization: 42.34, target: 58 }] },
+    safeCompositionPages: [1],
+    relaxedDensityPages: [1],
+    expandedDensityPages: [],
+  };
+  assert.equal(socialCardRepairStateSignature(input), socialCardRepairStateSignature({ ...input, report: { pages: [{ page: 2, valid: false, utilization: 42.33, issues: ['text_too_small', 'underfilled'] }] } }));
+});
+
+test('布局修复状态指纹在计划或已启用变体变化时变化', () => {
+  const input = {
+    cardPlan: plan,
+    report: { pages: [{ page: 2, valid: false, utilization: 42, issues: ['underfilled'] }] },
+    densityCalibration: { pages: [{ page: 2, utilization: 42, target: 58 }] },
+    safeCompositionPages: [], relaxedDensityPages: [], expandedDensityPages: [],
+  };
+  const planChanged = socialCardRepairStateSignature({ ...input, cardPlan: [...plan, { kind: 'content', role: 'feature', content_blocks: [] }] });
+  const variantChanged = socialCardRepairStateSignature({ ...input, safeCompositionPages: [1] });
+  const fitContentChanged = socialCardRepairStateSignature({ ...input, fitContentPages: [1] });
+  assert.notEqual(planChanged, socialCardRepairStateSignature(input));
+  assert.notEqual(variantChanged, socialCardRepairStateSignature(input));
+  assert.notEqual(fitContentChanged, socialCardRepairStateSignature(input));
 });

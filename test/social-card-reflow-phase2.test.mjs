@@ -55,6 +55,22 @@ test('未超容量页面保持原计划和页数', () => {
   assert.equal(estimateSocialCardPageLoad(page, profile().roles.feature).overCapacity, false);
 });
 
+test('拆页不可用时，程序化压缩以省略号作为最后兜底且不触碰命令', () => {
+  const p = structuredClone(profile('clean-v1'));
+  p.roles.feature.split = { allowed: false, blockTypes: [] };
+  const original = '这是一段非常长的说明，用来模拟 AI 改写后仍然无法放入固定卡片的情况。'.repeat(18);
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [{ kind: 'content', role: 'feature', title: '能力说明', content_blocks: [{ type: 'note', title: '说明', content: original, source_refs: ['README:test'], fact_ids: ['fact-test'] }] }],
+    capacityProfile: p,
+    maxPages: 7,
+  });
+  const block = result.pages[0].content_blocks[0];
+  assert.ok(block.content.length < original.length);
+  assert.match(block.content, /…$/u);
+  assert.deepEqual(block.source_refs, ['README:test']);
+  assert.ok(result.operations.some((item) => item.op === 'compact_text_fallback'));
+});
+
 test('同组过短续页会在硬上限内重新装箱', () => {
   const p = resolveSocialCardCapacityProfile({
     templatePack: getSocialCardTemplatePack('clean-v1'),
@@ -75,6 +91,120 @@ test('同组过短续页会在硬上限内重新装箱', () => {
   assert.ok(result.operations.some((item) => item.op === 'merge_pages'));
   assert.equal(result.pages[0].content_blocks.length, 2);
   assert.equal(result.pages[0].continuation_index, 1);
+});
+
+test('同一故事线的重复代码和说明块会在模板重排前去重并移除空续页', () => {
+  const group = 'storyboard-page-steps-duplicates';
+  const duplicateCode = (title, content) => ({ type: 'code', title, content, source_refs: ['README:quickstart'] });
+  const duplicateNote = { type: 'note', title: '快捷键冲突处理', content: '若终端快捷键与编辑器冲突，运行向导自动调整映射。', source_refs: ['README:quickstart'] };
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [
+      { kind: 'quickstart', role: 'steps', title: '快速上手', page_group_id: group, continuation_index: 1, content_blocks: [duplicateCode('启动命令', '# 打开当前目录\ntode .\n# 打开指定文件并跳转到第 10 行第 5 列\ntode main.py -g 10:5'), duplicateNote] },
+      { kind: 'quickstart', role: 'steps', title: '快速上手（续）', page_group_id: group, continuation_index: 2, content_blocks: [duplicateCode('启动命令（续）', '# 打开当前目录\ntode .\n# 打开指定文件并跳转到第10行第5列\ntode main.py -g 10:5'), duplicateNote] },
+    ],
+    capacityProfile: profile('clean-v1'),
+    maxPages: 7,
+  });
+  assert.equal(result.finalPageCount, 1);
+  assert.equal(result.pages.flatMap((page) => page.content_blocks).length, 2);
+  assert.ok(result.operations.some((item) => item.op === 'dedupe_duplicate_block'));
+  assert.ok(result.warnings.some((item) => item.includes('去重')));
+});
+
+test('相关代码块会先合并再装箱，避免安装页只剩单个代码块', () => {
+  const page = {
+    kind: 'quickstart', role: 'steps', title: '一分钟快速上手', page_group_id: 'steps-code-pack',
+    content_blocks: [
+      { type: 'code', title: '安装', content: 'curl -fsSL https://example.test/install | bash', source_refs: ['README:install'] },
+      { type: 'code', title: '启动', content: '# 打开当前目录\ntool .\n# 远程连接\ntool --ssh user@host', source_refs: ['README:run'] },
+      { type: 'note', title: '注意', content: '需要支持图形协议的终端。', source_refs: ['README:prerequisite'] },
+    ],
+  };
+  const result = compileTemplateAwareCardPlan({ cardPlan: [page], capacityProfile: profile('clean-v1'), maxPages: 7 });
+  assert.equal(result.finalPageCount, 1);
+  assert.equal(result.pages[0].content_blocks.filter((block) => block.type === 'code').length, 1);
+  assert.ok(result.operations.some((item) => item.op === 'coalesce_code_blocks'));
+});
+
+test('相邻代码块合并后处于近似容量区间时不提前拆页', () => {
+  const capacityProfile = {
+    roles: {
+      steps: {
+        structural: { maxBlocks: 4, maxItems: 9 },
+        visual: { bodyHeightPx: 386, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['code', 'note', 'text'] },
+      },
+    },
+  };
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [{
+      kind: 'quickstart',
+      role: 'steps',
+      title: '三步上手',
+      content_blocks: [
+        { type: 'code', title: '安装命令', content: 'curl -fsSl https://tode.sh/install | bash' },
+        { type: 'code', title: '启动编辑器', content: '# 打开当前目录\ntode .\n\n# 打开指定文件并跳转至第 10 行\ntode main.py -g 10' },
+        { type: 'note', title: '快捷键冲突处理', content: '若遇到按键无响应，运行 tode --shortcut-setup 进入向导。' },
+      ],
+    }],
+    capacityProfile,
+    maxPages: 7,
+  });
+  assert.equal(result.finalPageCount, 1);
+  assert.equal(result.pages[0].content_blocks.filter((block) => block.type === 'code').length, 1);
+  assert.equal(result.pages[0].content_blocks.length, 2);
+  assert.ok(result.operations.some((item) => item.op === 'coalesce_code_blocks'));
+  assert.equal(result.preflight[0].nearFit, true);
+});
+
+test('长代码块按完整命令组拆分并保持命令顺序', () => {
+  const capacityProfile = {
+    roles: {
+      steps: {
+        structural: { maxBlocks: 4, maxItems: 99 },
+        visual: { bodyHeightPx: 260, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['code', 'note', 'text'] },
+      },
+    },
+  };
+  const code = [
+    '# 安装工具\ncurl -fsSL https://example.test/install | bash',
+    '# 初始化项目\ntool init --workspace demo',
+    '# 启动服务\ntool run --port 4317',
+  ].join('\n\n');
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [{ kind: 'quickstart', role: 'steps', title: '快速开始', content_blocks: [{ type: 'code', title: '命令', content: code, source_refs: ['README:commands'] }] }],
+    capacityProfile,
+    maxPages: 7,
+  });
+  assert.ok(result.pages.length > 1);
+  assert.ok(result.operations.some((item) => item.op === 'split_block' && item.blockType === 'code' && item.boundary === 'semantic'));
+  assert.equal(result.pages.flatMap((page) => page.content_blocks).filter((block) => block.type === 'code').map((block) => block.content).join('\n\n'), code);
+});
+
+test('长说明按段落拆分并保持原文顺序', () => {
+  const capacityProfile = {
+    roles: {
+      feature: {
+        structural: { maxBlocks: 4, maxItems: 99 },
+        visual: { bodyHeightPx: 170, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['code', 'note', 'text'] },
+      },
+    },
+  };
+  const content = [
+    '第一段说明工具的工作方式，并保留来源事实。',
+    '第二段说明需要的环境条件和权限边界。',
+    '第三段说明失败时如何检查日志和恢复。',
+  ].join('\n\n');
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [{ kind: 'capability', role: 'feature', title: '能力说明', content_blocks: [{ type: 'note', title: '使用说明', content, source_refs: ['README:usage'] }] }],
+    capacityProfile,
+    maxPages: 7,
+  });
+  assert.ok(result.pages.length > 1);
+  assert.ok(result.operations.some((item) => item.op === 'split_block' && item.blockType === 'note' && item.boundary === 'semantic'));
+  assert.equal(result.pages.flatMap((page) => page.content_blocks).filter((block) => block.type === 'note').map((block) => block.content).join('\n\n'), content);
 });
 
 test('同组续页在不能合并时会移动完整内容块以改善装箱', () => {
@@ -133,6 +263,32 @@ test('续页偏空时会从前页移动末尾内容块并保持顺序', () => {
   assert.equal(result.pages[1].content_blocks.map((block) => block.title).join(','), '边界,结论');
 });
 
+test('代码语义单元可在续页之间平衡，不会留下空页或半条命令', () => {
+  const capacityProfile = {
+    roles: {
+      steps: {
+        structural: { maxBlocks: 4, maxItems: 99 },
+        visual: { bodyHeightPx: 400, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['code', 'note', 'text'] },
+      },
+    },
+  };
+  const group = 'storyboard-page-balance-code';
+  const result = compileTemplateAwareCardPlan({
+    cardPlan: [
+      { kind: 'quickstart', role: 'steps', title: '快速开始', page_group_id: group, continuation_index: 1, content_blocks: [{ type: 'text', title: '概览', content: '一句话概览。' }] },
+      { kind: 'quickstart', role: 'steps', title: '快速开始（续）', page_group_id: group, continuation_index: 2, content_blocks: [{ type: 'code', title: '命令', content: '# 安装\ncurl install\n\n# 启动\ntool run' }] },
+    ],
+    capacityProfile,
+    maxPages: 7,
+    mergeSlack: 1,
+  });
+  assert.equal(result.finalPageCount, 2);
+  assert.ok(result.operations.some((item) => item.op === 'move_block' && item.boundary === 'semantic' && item.blockType === 'code'));
+  assert.deepEqual(result.pages.flatMap((page) => page.content_blocks.filter((block) => block.type === 'code').map((block) => block.content)), ['# 安装\ncurl install', '# 启动\ntool run']);
+  assert.ok(result.pages.every((page) => page.content_blocks.length > 0));
+});
+
 test('列表拆分会优先均衡续页，保留顺序和续页元数据', () => {
   const items = Array.from({ length: 7 }, (_, index) => `条目${index + 1}：保持完整的事实描述`);
   const result = compileTemplateAwareCardPlan({
@@ -160,5 +316,23 @@ test('续页超过上限时只记录警告，不删除内容', () => {
   const items = Array.from({ length: 30 }, (_, index) => `事实${index + 1}：长内容`);
   const result = compileTemplateAwareCardPlan({ cardPlan: [listPage(items)], capacityProfile: profile(), maxPages: 2 });
   assert.ok(result.warnings.length > 0);
+  assert.equal(result.pages.flatMap((page) => page.content_blocks[0]?.items || []).length, items.length);
+});
+
+test('推荐页数只是软预算，超过后仍保留全部续页和事实', () => {
+  const items = Array.from({ length: 30 }, (_, index) => `事实${index + 1}：需要完整保留的长内容说明`);
+  const result = compileTemplateAwareCardPlan({ cardPlan: [listPage(items)], capacityProfile: profile(), maxPages: 2, absoluteMaxPages: 20 });
+  assert.ok(result.finalPageCount > 2);
+  assert.equal(result.pageBudget.recommendedExceeded, true);
+  assert.equal(result.pageBudget.absoluteExceeded, false);
+  assert.ok(result.warnings.some((item) => item.includes('超过推荐页数')));
+  assert.equal(result.pages.flatMap((page) => page.content_blocks[0]?.items || []).length, items.length);
+});
+
+test('超过绝对页数只产生阻断标记，不执行静默截断', () => {
+  const items = Array.from({ length: 30 }, (_, index) => `事实${index + 1}：需要完整保留的长内容说明`);
+  const result = compileTemplateAwareCardPlan({ cardPlan: [listPage(items)], capacityProfile: profile(), maxPages: 2, absoluteMaxPages: 3 });
+  assert.equal(result.pageBudget.absoluteExceeded, true);
+  assert.ok(result.warnings.some((item) => item.includes('绝对安全上限')));
   assert.equal(result.pages.flatMap((page) => page.content_blocks[0]?.items || []).length, items.length);
 });

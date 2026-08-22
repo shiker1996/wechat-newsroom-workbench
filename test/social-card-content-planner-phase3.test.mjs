@@ -4,6 +4,7 @@ import {
   applySocialCardContentPlannerOperations,
   applySocialCardContentPlannerOperationsPartial,
   buildSocialCardContentPlannerPrompt,
+  buildSocialCardPlannerComponentPool,
   normalizeSocialCardContentPlannerResult,
   validateSocialCardContentPlannerSchema,
   validateSocialCardContentPlannerOperations,
@@ -31,6 +32,28 @@ test('内容计划调整器 Prompt 只允许受控操作，不暴露 HTML/CSS �
   assert.match(prompt, /fact_ids/);
   assert.match(prompt, /allowedSupplementSlots/);
   assert.match(prompt, /不要使用 target_page、merge_with/);
+});
+
+test('计划超出模板页数上限时，提示优先合并续页而不是继续补充内容', () => {
+  const prompt = buildSocialCardContentPlannerPrompt({
+    cardPlan: Array.from({ length: 8 }, (_, index) => ({ kind: 'content', role: 'steps', title: `步骤 ${index + 1}`, page_group_id: 'steps', content_blocks: [] })),
+    maxPages: 7,
+    layoutReport: { pages: [{ page: 4, issues: ['underfilled'] }] },
+  });
+  assert.match(prompt, /超过模板允许的 7 页/);
+  assert.match(prompt, /优先使用 merge_pages/);
+  assert.match(prompt, /仅 add_component 不能解决超页问题/);
+});
+
+test('内容计划提示只暴露目标页候选，不暴露跨角色全局事实组件', () => {
+  const globalOnly = { id: 'component-global-source-only', componentId: 'component-global-source-only', sourceStatus: 'provided', factIds: ['fact-source'], sourceRefs, semanticTags: ['source'], renderCandidates: ['note'], content: { title: '来源', text: '其他页面专属事实' } };
+  const scoped = { id: 'component-fact-export@p1-capability-note', componentId: 'component-fact-export@p1-capability-note', page: 1, role: 'feature', slotId: 'capability', sourceStatus: 'provided', factIds: ['fact-export'], sourceRefs, semanticTags: ['capability'], renderCandidates: ['note'], content: { title: '具体能力', text: '支持导出 PNG。' } };
+  const contentComponents = { supplements: [globalOnly, scoped], pageCandidates: { '1': { page: 1, role: 'feature', supplements: [scoped] } } };
+  const pool = buildSocialCardPlannerComponentPool(contentComponents, { pages: [{ page: 1 }] });
+  assert.deepEqual(pool.pageCandidates['1'].supplements.map((item) => item.id), [scoped.id]);
+  const prompt = buildSocialCardContentPlannerPrompt({ cardPlan: plan, contentComponents, layoutReport: { pages: [{ page: 1 }] } });
+  assert.doesNotMatch(prompt, /component-global-source-only/);
+  assert.match(prompt, /component-fact-export@p1-capability-note/);
 });
 
 test('内容计划调整器支持同组完整块移动并守恒来源引用', () => {
@@ -62,11 +85,11 @@ test('补充组件必须引用已知事实来源，跨故事线合并被拒绝',
 
 test('第一步槽位契约：目录完整且槽位类型、页角色不越界', () => {
   assert.equal(validateSocialCardSupplementSlotCatalog().valid, true);
-  const wrongComponent = { id: 'component-fact-install', componentId: 'component-fact-install', page: 1, role: 'feature', factIds: ['fact-install'], sourceRefs: [sourceRefs[0]], sourceStatus: 'provided', semanticTags: ['install'], preferredRender: 'note', renderCandidates: ['note'], content: { title: '安装', text: '错误角色槽位' } };
-  const wrongSlot = { operations: [{ op: 'add_component', page: 1, component_id: wrongComponent.id, source_refs: [sourceRefs[0]], fact_ids: ['fact-install'] }] };
-  const result = validateSocialCardContentPlannerOperations(plan, wrongSlot, { knownSourceRefs: sourceRefs, contentComponents: { supplements: [wrongComponent], pageCandidates: { '1': { supplements: [wrongComponent] } } }, factIndex: { candidates: [{ id: 'fact-install', path: 'facts.installation[0]', tags: ['install'], source_refs: [sourceRefs[0]], source_status: 'provided' }] } });
+  const wrongComponent = { id: 'component-fact-source', componentId: 'component-fact-source', page: 1, role: 'feature', factIds: ['fact-source'], sourceRefs: [sourceRefs[0]], sourceStatus: 'provided', semanticTags: ['source'], preferredRender: 'note', renderCandidates: ['note'], content: { title: '来源', text: '错误角色槽位' } };
+  const wrongSlot = { operations: [{ op: 'add_component', page: 1, component_id: wrongComponent.id, source_refs: [sourceRefs[0]], fact_ids: ['fact-source'] }] };
+  const result = validateSocialCardContentPlannerOperations(plan, wrongSlot, { knownSourceRefs: sourceRefs, contentComponents: { supplements: [wrongComponent], pageCandidates: { '1': { supplements: [wrongComponent] } } }, factIndex: { candidates: [{ id: 'fact-source', path: 'facts.readme.sections[0]', tags: ['source'], source_refs: [sourceRefs[0]], source_status: 'provided' }] } });
   assert.equal(result.valid, false);
-  assert.match(result.issues.join('；'), /必须指定 slot_id/);
+  assert.match(result.issues.join('；'), /无法从页面语义解析有效槽位/);
 });
 
 test('调整器结果兼容数组和 operations 包装', () => {

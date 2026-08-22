@@ -71,6 +71,23 @@ test('阶段 3 程序根据页面组件语义解析槽位并应用组件操作',
   assert.equal(applied.pages[0].content_blocks.at(-1).content, '支持导出 PNG。');
 });
 
+test('阶段 3 组件内容为 fenced code 时不接受 AI 的 list 渲染覆盖', () => {
+  const codeComponent = {
+    id: 'component-fact-install@p1-install-list', componentId: 'component-fact-install@p1-install-list',
+    page: 1, role: 'feature', slotId: 'capability', factIds: ['fact-install'], sourceRefs,
+    semanticTags: ['capability'], preferredRender: 'list', renderCandidates: ['list', 'code'],
+    content: { title: '安装命令', text: '```bash\ncurl -fsSl https://example.com/install | bash\n```' },
+  };
+  const normalized = normalizeSocialCardContentPlannerResult({ operations: [{
+    op: 'add_component', page: 1, component_id: codeComponent.id, render_type: 'list',
+    fact_ids: ['fact-install'], source_refs: sourceRefs,
+    block: { type: 'list', title: '安装命令', content: '```bash\ncurl -fsSl https://example.com/install | bash\n```' },
+  }] }, { cardPlan: plan, contentComponents: { pageCandidates: { '1': { supplements: [codeComponent] } } } });
+  assert.equal(normalized.operations[0].op, 'add_fact_block');
+  assert.equal(normalized.operations[0].block.type, 'code');
+  assert.equal(normalized.operations[0].block.content, 'curl -fsSl https://example.com/install | bash');
+});
+
 test('阶段 3 旧 add_fact_block 不再作为内容计划输入接受', () => {
   const legacy = { operations: [{ op: 'add_fact_block', page: 1, slot_id: 'capability', source_refs: sourceRefs, block: { type: 'note' } }] };
   assert.equal(validateSocialCardContentPlannerSchema(legacy).valid, false);
@@ -83,5 +100,5 @@ test('阶段 3 无法解析页面组件时不静默补槽位', () => {
   const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-unknown', source_refs: sourceRefs, render_type: 'note' }] };
   const result = validateSocialCardContentPlannerOperations(plan, raw, { factIndex, contentComponents, knownSourceRefs: sourceRefs });
   assert.equal(result.valid, false);
-  assert.match(result.issues.join('；'), /必须指定 slot_id|不存在|补充内容块缺少 block/);
+  assert.match(result.issues.join('；'), /不属于当前页面候选池/);
 });

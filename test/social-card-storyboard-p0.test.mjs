@@ -25,6 +25,21 @@ test('技术命令和 URL 以安全可换行片段渲染，续页显示连续标
   assert.match(continuationBadge({continuation_index:2}),/CONTINUED · 02/);
 });
 
+test('完整 fenced code 不受内容块类型影响，统一渲染为代码块',()=>{
+  const html=renderStoryboardBlock({type:'list',title:'安装命令',content:'```bash\ncurl -fsSl https://example.com/install | bash\n```'});
+  assert.match(html,/class="content-block code-block"/);
+  assert.match(html,/<pre><code[^>]*>curl -fsSl https:\/\/example\.com\/install \| bash<\/code><\/pre>/);
+  assert.doesNotMatch(html,/```bash/);
+});
+
+test('阶段 2 字体放大变体通过内联样式覆盖主题 CSS',()=>{
+  const html=renderStoryboardBlock({
+    type:'note',title:'补充说明',content:'这是一段用于验证字体放大变体的说明。',font_scale:1.12,
+  });
+  assert.match(html,/font-size:12\.32px/);
+  assert.match(html,/line-height:/);
+});
+
 test('P0 固化图文故事板三项 JSON Schema 契约',()=>{
   assert.deepEqual(SOCIAL_CARD_STORYBOARD_CONTRACTS,{
     factBase:'social_card_fact_base',
@@ -70,12 +85,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'0bb9505c29499d19941e8484c199e9c41201fa0718f163e85ceec4adb716d0c8',
-    'repository/xiaohongshu':'493ca9619b1c61e62251624bc62032f3558a802d4d99c262e262bc03fcb55902',
-    'event/wechat':'9d95a99b8f07c1fc5c26e2c94fba08b01163a38ae47cb5c25e1047084099e9e7',
-    'event/xiaohongshu':'222c409414e68f712ab43060421b51ca29091a08a32c5d9f2804862fd6f5c616',
-    'custom/wechat':'a84b1f7e6bb24bb1ba7792055bfcc9fd397d94fdf67d0cd4d41292844bfdfca7',
-    'custom/xiaohongshu':'581275f2cdeba82c1b0eb43690b9b3ec6997872a367c2ceab3973291a3c6e32e',
+    'repository/wechat':'7a598602aa715955c4cde6d338d4f57cdcd7c795ec3a94e51bcdc14ce1efb89a',
+    'repository/xiaohongshu':'a1f0a47871dd8d22807481bdb7a584ffcde7663386590330844743ee2d0e8cc1',
+    'event/wechat':'fafdd660f17a3fc741474b083802d1cb3580aae67e1fbf08c75f61fb55df32f0',
+    'event/xiaohongshu':'b186411f608a5c345b44d4a943256a49821decfb4b173b82500c9a6678f6ee9b',
+    'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
+    'custom/xiaohongshu':'3493bf0e112e398aee9d3bf295b5d99758fb74630f86c45e82f89689bc29c253',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
@@ -161,7 +176,7 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.equal(delivery.manifest.outputContract,'social_card_delivery');
   assert.match(repository.prompt,/核心能力怎样工作/);
   assert.match(repository.prompt,/Star、Trending 和项目知名度只作为证据/);
-  assert.match(repository.prompt,/运行时继续允许 4～7 页/);
+  assert.match(repository.prompt,/推荐用 4～7 页/);
   assert.match(repository.prompt,/awesome\/list\/catalog/);
   assert.match(repository.prompt,/禁止所有仓库机械套用/);
   assert.match(repository.prompt,/不单设信息贫乏的“适用场景”页/);

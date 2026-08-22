@@ -688,3 +688,12 @@ test('underfilled density adjustment uses bounded relaxed and expanded tiers',()
   assert.match(html,/data-density-adjustment="none"/);
   assert.match(html,/\.page\.density-relaxed \.content-block\{padding-block:3px\}/);
 });
+
+test('补充仍不足时内容框按内容高度收缩并垂直居中',()=>{
+  const html=renderStoryboardHtml({topic:'内容自适应',fitContentPages:new Set([0]),pages:[{
+    kind:'content',role:'feature',title:'稀疏页',content_blocks:[{type:'text',title:'说明',content:'一段短说明'}],
+  }]});
+  assert.match(html,/class="page fit-content-stack page-content/);
+  assert.match(html,/\.page\.fit-content-stack \.page-body\{align-items:center\}/);
+  assert.match(html,/\.page\.fit-content-stack \.page-content-stack\{min-height:0!important;height:max-content;align-self:center\}/);
+});

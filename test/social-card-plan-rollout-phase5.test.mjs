@@ -48,3 +48,12 @@ test('Phase 5 原子损失会阻止灰度推广', () => {
   assert.equal(comparison.gates.sourceAtomLossZero, false);
 });
 
+test('阶段 5 审计偏差变差时阻止灰度推广', () => {
+  const rows = [
+    ...Array.from({ length: 3 }, () => ({ operation: 'generation', success: true, layoutPass: true, pageCount: 1, requested_template_id: 'clean-v1', rolloutProfile: { mode: 'gray' }, joint_packing_audit_attempts: 1, joint_packing_mismatch_count: 1 })),
+    ...Array.from({ length: 3 }, () => ({ operation: 'generation', success: true, layoutPass: true, pageCount: 1, requested_template_id: 'clean-v1', rolloutProfile: { mode: 'legacy' }, joint_packing_audit_attempts: 1, joint_packing_mismatch_count: 0 })),
+  ];
+  const comparison = buildSocialCardPlanRolloutReport(rows, { minSamples: 3 }).comparisons.find((item) => item.templatePackId === 'clean-v1');
+  assert.equal(comparison.gates.auditAlignmentNotWorse, false);
+  assert.equal(comparison.readyForPromotion, false);
+});

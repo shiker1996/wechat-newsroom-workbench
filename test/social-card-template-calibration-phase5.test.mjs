@@ -40,3 +40,18 @@ test('Phase 5 指标落库并可按主题查询维度报告', (t) => {
   assert.equal(stats.averageUtilization, 0.74);
   assert.equal(stats.rollout.variants[0].mode, 'gray');
 });
+
+test('阶段 5 联合装箱审计指标进入模板运行统计', () => {
+  const row = summarizeSocialTemplateRun({
+    requestedTemplate: { id: 'clean-v1' },
+    report: { valid: true, pages: [{ valid: true, utilization: 0.74, issues: [] }] },
+    jointPackingAudit: [{ mismatchCount: 1, browserOnlyOverflowPages: [1], staticOnlyOverflowPages: [], meanAbsoluteUtilizationDelta: 0.08 }],
+  });
+  assert.equal(row.jointPackingAuditAttempts, 1);
+  assert.equal(row.jointPackingMismatchCount, 1);
+  assert.equal(row.jointPackingBrowserOnlyOverflowPages, 1);
+  assert.equal(row.jointPackingMeanAbsoluteUtilizationDelta, 0.08);
+  const dimensions = aggregateSocialTemplateMetricsByDimension([row]);
+  assert.equal(dimensions[0].jointPackingMismatchRate, 1);
+  assert.equal(buildSocialTemplateCalibrationReport([row], { minSamples: 1 }).dimensions[0].jointPackingCalibrationNeeded, true);
+});

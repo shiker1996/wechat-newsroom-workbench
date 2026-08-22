@@ -1,5 +1,7 @@
 # Social 图文模板严格渲染与新主题模板匹配方案
 
+> 当前实现说明：模板选择、容量、内容计划和修复顺序的统一现状见 [Social 图文生成现状与运行链路](./social-card-generation-current-flow.md)。本文重点记录模板严格渲染和主题匹配的改造过程。
+
 状态：Phase 1、Phase 2、Phase 3 已完成，Phase 4 已完成本地确定性验证，待有模型凭据后做候选端到端重生成
 
 范围：仅 Social 图文主题、Social 故事板和 Social 图文渲染。文章主题、封面主题及其交互不在本方案内。

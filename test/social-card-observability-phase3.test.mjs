@@ -13,6 +13,10 @@ test('第三步持久化事实候选索引并通过图文接口暴露', () => {
   assert.match(route, /factIndex:parse\('social-card-fact-index\.json'/);
   assert.match(route, /social-card-fact-index\.json/);
   assert.match(route, /reason:'storyboard-regenerated'/);
+  assert.match(route, /invalidateSocialCardArtifacts/);
+  assert.match(route, /reason:'theme-changed'/);
+  assert.match(route, /reason:'channel-changed'/);
+  assert.match(route, /layout-report\.json/);
 });
 
 test('故事板编辑器展示补充槽位与事实来源，并保留回写字段', () => {

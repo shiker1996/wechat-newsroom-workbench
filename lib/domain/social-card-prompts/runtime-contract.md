@@ -1,5 +1,7 @@
 ## 固定运行契约：事实基座到图文故事板
 
+完整的生成阶段、修复顺序和产物说明见 [Social 图文生成现状与运行链路](../../../docs/design/social-card-generation-current-flow.md)。本文只冻结模型输入输出契约。
+
 只依据运行时事实信封规划故事板，不得增加事实、体验、数字、效果、收益、引语或来源。
 
 返回严格 JSON：
@@ -39,4 +41,4 @@
 
 ## 内容计划调整器
 
-布局失败后的内容计划调整使用 `social-card-content-planner` 用途。模型只能返回 `split_page`、`move_block`、`merge_pages`、`add_fact_block` 四类受控操作；不得返回 HTML、CSS、完整 `card_plan` 或任意新事实。`add_fact_block` 必须声明目标页面角色允许的 `slot_id`，可携带事实候选 `fact_ids`，并携带已登记 `source_refs`；程序会校验页面角色、故事线、槽位与内容块类型、候选事实、操作数量、来源引用和原子守恒，校验通过后才应用，并重新编译和审计。
+布局失败后的内容计划调整使用 `social-card-content-planner` 用途。模型只能返回 `split_page`、`move_block`、`merge_pages`、`add_component` 四类受控操作；不得返回 HTML、CSS、完整 `card_plan` 或任意新事实。`add_component` 必须引用目标页 `pageCandidates` 中列出的页面专属组件，并携带已登记的 `source_refs`，可携带事实候选 `fact_ids` 和渲染类型；模型不填写 `slot_id`，程序根据组件的页面绑定和统一槽位语义表解析槽位，再校验页面角色、故事线、槽位与内容块类型、候选事实、操作数量、来源引用和原子守恒，校验通过后才应用，并重新编译和审计。
