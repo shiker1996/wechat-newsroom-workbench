@@ -7,6 +7,7 @@ import { evaluateEventCardGate } from '../lib/domain/social-card-gate.mjs';
 import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
 import { Store } from '../lib/core/store.mjs';
 import { routeBreakingAnalysis } from '../lib/llm/breaking-analysis-pipeline.mjs';
+import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 
 test('事件图文门禁要求事实边界、来源审计和故事板',()=>{
   const analysis={eventSummary:'事件摘要',sources:[{status:'ok'}],factBase:{confirmedFacts:[{claim:'事实'}],claims:[]},sourceAudit:{issues:[]}};
@@ -16,7 +17,8 @@ test('事件图文门禁要求事实边界、来源审计和故事板',()=>{
 });
 
 test('事件故事板 HTML 使用事件标签和事实边界页脚',()=>{
-  const html=renderStoryboardHtml({topic:'突发事件',contentType:'event',sourceLabel:'突发专题',pages:[
+  const legacyTheme=structuredClone(socialThemeDefinition('peach')); delete legacyTheme.social.templatePack; delete legacyTheme.hash; delete legacyTheme.file;
+  const html=renderStoryboardHtml({topic:'突发事件',contentType:'event',sourceLabel:'突发专题',visualStyle:'peach',themeDefinition:legacyTheme,pages:[
     {kind:'cover',title:'发生了什么',goal:'核心事件',content_blocks:[{type:'text',content:'确认事实'}]},
     {kind:'evidence',title:'证据核验',content_blocks:[{type:'note',content:'该主张尚未获独立证实'}]},
     {kind:'risk',title:'事实边界',content_blocks:[{type:'list',content:'来源单一\n等待回应'}]},

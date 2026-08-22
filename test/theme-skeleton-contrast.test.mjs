@@ -12,6 +12,24 @@ function socialPreview(id){
   return compileThemePreview({target:'social',definition}).html;
 }
 
+function legacyBoneWhite(){
+  const definition=structuredClone(socialThemeDefinition('bone-white'));
+  delete definition.social.templatePack;
+  delete definition.hash;delete definition.file;
+  return definition;
+}
+
+function legacyPeach(){
+  const definition=structuredClone(socialThemeDefinition('peach'));
+  delete definition.social.templatePack;
+  delete definition.hash;delete definition.file;
+  return definition;
+}
+
+function legacySocialPreview(){
+  return compileThemePreview({target:'social',definition:legacyBoneWhite()}).html;
+}
+
 function articleHtml(id){
   const definition=structuredClone(articleThemeDefinition(id));
   delete definition.hash;delete definition.file;
@@ -19,7 +37,7 @@ function articleHtml(id){
 }
 
 test('图文骨架类名作用于封面、内容页和结尾页',()=>{
-  const html=socialPreview('bone-white');
+  const html=legacySocialPreview();
   assert.equal((html.match(/class="page page-[a-z]+ skeleton-editorial-split/g)||[]).length,5);
   const terminal=socialPreview('neon');
   assert.equal((terminal.match(/class="page page-[a-z]+ skeleton-terminal-rail/g)||[]).length,5);
@@ -32,7 +50,7 @@ test('editorial-split 双栏构图只作用于非封面页，封面保持底部�
 });
 
 test('editorial-split 骨架服从管线单列决策：3 块与 comp-cols-single 页面不启用双栏',()=>{
-  const html=renderStoryboardHtml({topic:'测试主题',repository:'example/repo',visualStyle:'solarized',contentType:'repository',channelMode:'xiaohongshu',compositionMode:'smart',pages:[
+  const html=renderStoryboardHtml({topic:'测试主题',repository:'example/repo',visualStyle:'bone-white',themeDefinition:legacyBoneWhite(),contentType:'repository',channelMode:'xiaohongshu',compositionMode:'smart',pages:[
     {kind:'content',title:'三块页面',content_blocks:[{type:'steps',title:'步骤',items:[{title:'一',content:'x'}]},{type:'list',title:'清单',items:['a','b']},{type:'note',title:'提示',content:'z'}]},
     {kind:'content',title:'两块页面',content_blocks:[{type:'list',title:'清单一',items:['a','b']},{type:'list',title:'清单二',items:['c','d']}]},
   ]});
@@ -60,6 +78,25 @@ test('表面配方的页面底色消费 page token，图文页背景可调',()=>
   assert.ok(gridCss.includes('.page{background-color:var(--page);background-image:linear-gradient'),'grid 纹理不能把 .page 背景冲成透明');
 });
 
+test('冰川冷调为三项功能页提供受控的信息分层',()=>{
+  const ice=compileSocialTheme(socialThemeDefinition('ice-blue'));
+  assert.match(ice.css,/\.composition-smart\.role-feature\.blocks-3 \.content-block\{padding:10px 11px/);
+  assert.match(ice.css,/\.composition-smart\.role-feature\.blocks-2 \.content-block\{padding-bottom:10px/);
+  assert.equal(ice.definition.social.components.contentTitle.sizeScale,'compact');
+  assert.equal(ice.definition.social.components.note.borderColorRole,'accentSecondary');
+});
+
+test('内置主题的轨道与柔焦装饰会实际编译为可见的视觉层',()=>{
+  const orbit=compileSocialTheme(socialThemeDefinition('mocha'));
+  assert.match(orbit.css,/\.page:after\{border-radius:50%;box-shadow:0 0 0 9px/);
+  for(const id of ['lavender','peach']){
+    const soft=compileSocialTheme(socialThemeDefinition(id));
+    assert.match(soft.css,/\.page:after\{width:218px;height:218px;border:0;border-radius:50%/);
+    assert.match(soft.css,/background:radial-gradient\(circle/);
+    assert.equal(soft.definition.social.components.contentTitle.sizeScale,'compact');
+  }
+});
+
 test('浅色代码面板的文章主题代码文字回退为正文色',()=>{
   const html=articleHtml('research-report');
   assert.match(html,/<code style="[^"]*background:#F2F4F6;color:#1A1A1A/i);
@@ -79,7 +116,7 @@ test('代码面板对比度正常时仍使用 inverseText',()=>{
 });
 
 test('封面已有内容块时不再叠加封面承载物，超长承载文本被截断',()=>{
-  const base={topic:'测试主题',repository:'example/repo',visualStyle:'lavender',contentType:'repository',channelMode:'xiaohongshu'};
+  const base={topic:'测试主题',repository:'example/repo',visualStyle:'peach',themeDefinition:legacyPeach(),contentType:'repository',channelMode:'xiaohongshu'};
   const withBlocks=renderStoryboardHtml({...base,pages:[
     {kind:'cover',title:'封面标题',summary:'这段导语不应该出现在封面上',content_blocks:[{type:'text',title:'要点',content:'已有内容块'}]},
     {kind:'ending',title:'结束'},

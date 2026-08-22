@@ -28,7 +28,7 @@ test('P1 组件目录只开放受控字体、字重、字号档位和语义颜�
 test('P1 编译器将组件属性严格作用于封面标题、眉题和封面导语',()=>{
   const value=userTheme();value.social.components={coverTitle:{fontFamily:'mono',fontWeight:500,sizeScale:'display',colorRole:'accentSecondary',borderColorRole:'line'},eyebrow:{fontFamily:'serif',fontWeight:600,colorRole:'text'},lead:{sizeScale:'compact',colorRole:'accent'}};
   const compiled=compileSocialTheme(value);
-  assert.match(compiled.css,/\.page-cover h1\{font-family:ui-monospace[^}]*font-weight:500[^}]*font-size:38px[^}]*color:var\(--accent2\)[^}]*border-color:var\(--line\)/);
+  assert.match(compiled.css,/\.page-cover h1\{font-family:ui-monospace[^}]*font-weight:500[^}]*font-size:36px[^}]*color:var\(--accent2\)[^}]*border-color:var\(--line\)/);
   assert.match(compiled.css,/\.eyebrow\{font-family:Georgia[^}]*font-weight:600[^}]*color:var\(--ink\)/);
   assert.match(compiled.css,/\.page-cover \.lead\{font-size:11px;color:var\(--accent\)/);
   for(const path of ['social.components.coverTitle.fontFamily','social.components.coverTitle.fontWeight','social.components.coverTitle.sizeScale','social.components.coverTitle.colorRole','social.components.coverTitle.borderColorRole','social.components.eyebrow.fontFamily','social.components.eyebrow.fontWeight','social.components.eyebrow.colorRole','social.components.lead.sizeScale','social.components.lead.colorRole'])assert.ok(compiled.usageMap[path]?.length,path);
@@ -70,8 +70,8 @@ test('P2 固定样稿包含全部新增组件并支持字段高亮',()=>{
 test('P3 内容页与结尾页标题可独立设置字体、字号和颜色',()=>{
   const value=userTheme();value.social.components.contentTitle={fontFamily:'serif',sizeScale:'compact',colorRole:'accentSecondary'};value.social.components.endingTitle={fontFamily:'mono',sizeScale:'display',colorRole:'inverseText'};
   const compiled=compileSocialTheme(value);
-  assert.match(compiled.css,/\.page:not\(\.page-cover\):not\(\.page-ending\) h1\{font-family:Georgia[^}]*font-size:31px;color:var\(--accent2\)/);
-  assert.match(compiled.css,/\.page-ending h1\{font-family:ui-monospace[^}]*font-size:38px;color:var\(--inverse\)/);
+  assert.match(compiled.css,/\.page:not\(\.page-cover\):not\(\.page-ending\) h1\{font-family:Georgia[^}]*font-size:29px;color:var\(--accent2\)/);
+  assert.match(compiled.css,/\.page-ending h1\{font-family:ui-monospace[^}]*font-size:36px;color:var\(--inverse\)/);
   for(const component of ['contentTitle','endingTitle'])for(const key of ['fontFamily','sizeScale','colorRole'])assert.ok(compiled.usageMap[`social.components.${component}.${key}`]?.length,`${component}.${key}`);
   assert.match(compileThemePreview({target:'social',definition:value,highlightField:'social.components.contentTitle.fontFamily'}).html,/\.page:not\(\.page-cover\):not\(\.page-ending\) h1\{outline:3px solid/);
   assert.match(compileThemePreview({target:'social',definition:value,highlightField:'social.components.endingTitle.colorRole'}).html,/\.page-ending h1\{outline:3px solid/);

@@ -13,10 +13,25 @@ let selectedCompositionMode='smart';
 let currentGroupLayout='auto';
 let currentCardPlan=[];
 let currentLayoutDecisions=[];
+let currentLayoutReportPages=[];
 let socialSkillSlots=null;
+let storyboardThemeState=null;
+let storyboardReflowPreview=null;
+let storyboardRenderState=null;
+let currentContentPlanAdjustments=null;
+let currentFactIndex=null;
 // 故事板 <details> 编辑器存在未保存修改时置位；任何 renderCardPlan 重建都会丢失这些修改，
 // 触发重建的操作（整组/逐页版式、构图模式、渠道）需先 confirmAction 警告
 let storyboardDirty=false;
+
+const STORYBOARD_AI_TIMEOUT_MS=180000;
+async function requestStoryboardAi(url, options={}){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),STORYBOARD_AI_TIMEOUT_MS);
+  try{return await request(url,{...options,signal:controller.signal});}
+  catch(error){if(error?.name==='AbortError')throw new Error('单页 AI 修复超过 180 秒，未修改故事板；请稍后重试。');throw error;}
+  finally{clearTimeout(timer);}
+}
 
 const CARD_LAYOUT_LABELS={auto:'自动推荐',poster:'海报大字',editorial:'杂志分栏',data:'数据报告',checklist:'卡片清单',steps:'教程步骤',minimal:'极简留白'};
 const CARD_LAYOUT_STATUS={recommended:'自动推荐',storyboard:'故事板指定',manual:'手动指定',group:'整组指定',fallback:'自动降级'};
@@ -24,6 +39,36 @@ const CARD_ROLE_LABELS={cover:'封面',concept:'概念',feature:'功能',steps:'
 const CARD_COMPOSITION_LABELS={'hero-stack':'主视觉堆叠','hero-frame':'主视觉框景','concept-split':'概念分栏','concept-offset':'概念错位','feature-ledger':'功能账本','feature-stack':'功能纵列','sequence-rail':'步骤轨道','sequence-offset':'步骤错列','metric-board':'数据面板','metric-split':'数据分栏','comparison-board':'对比面板','comparison-split':'对比分栏','evidence-ledger':'证据账本','evidence-frame':'证据框景','timeline-rail':'时间轨道','timeline-offset':'时间错列','risk-sidebar':'风险侧栏','risk-frame':'风险框景','closing-focus':'收束聚焦','closing-note':'收束便笺'};
 const CARD_DECORATION_LABELS={none:'无装饰',orbit:'轨道圆环','index-line':'索引线',stamp:'编辑戳记'};
 const CARD_OVERLAP_LABELS={none:'标准层级','title-card':'标题叠卡','accent-edge':'边缘错位'};
+const CARD_AUDIT_ISSUE_LABELS={underfilled:'内容偏少',overfilled:'内容过满',overflow:'内容溢出',clipped:'内容被裁切',horizontal_overflow:'横向溢出'};
+
+function renderStoryboardThemeState(state) {
+  storyboardThemeState=state||null;
+  const status=document.getElementById('social-storyboard-theme-status');
+  if(!status)return;
+  if(!state||state.status==='empty'){status.hidden=true;status.textContent='';status.className='storyboard-theme-status';return;}
+  const copy={
+    current:'当前故事板与所选主题模板一致，可直接生成图文。',
+    'render-only':'已切换同模板主题，故事板内容可复用，生成图文时会直接换肤渲染。',
+    legacy:'这是历史故事板，未记录主题快照，可直接按当前主题渲染。',
+    'needs-storyboard':'当前主题或渠道改变了模板能力，请先重新生成故事板，再生成图文。',
+  }[state.status]||state.reason||'';
+  status.hidden=!copy;
+  status.className=`storyboard-theme-status ${state.status}`;
+  status.textContent=copy;
+  const regenerate=document.getElementById('analyze-card-editorial');
+  if(regenerate&&state.status==='needs-storyboard')regenerate.textContent='重新生成故事板（必需）';
+  else if(regenerate)regenerate.textContent=currentCardPlan.length?'重新生成故事板':'生成故事板';
+}
+
+function syncStoryboardActionLabels() {
+  const inspect=document.getElementById('inspect-repository');
+  const generate=document.getElementById('analyze-card-editorial');
+  if(inspect){
+    inspect.hidden=selectedContentType!=='repository';
+    inspect.textContent='分析仓库';
+  }
+  if(generate&&storyboardThemeState?.status!=='needs-storyboard')generate.textContent=currentCardPlan.length?'重新生成故事板':'生成故事板';
+}
 
 function syncCompositionControls(){
   const picker=document.getElementById('social-template-picker');
@@ -85,6 +130,32 @@ function renderDeliveryImage(){
   document.getElementById('social-download-image').href=image.downloadUrl;
   document.getElementById('social-gallery-film').querySelectorAll('button').forEach((button,index)=>button.classList.toggle('active',index===deliveryIndex));
 }
+
+function factCandidateLabel(factId){
+  const candidate=(currentFactIndex?.candidates||[]).find((item)=>String(item?.id)===String(factId));
+  if(!candidate)return String(factId||'未知事实');
+  const raw=candidate.label&&candidate.text?`${candidate.label}：${candidate.text}`:candidate.text||candidate.label||candidate.id;
+  const label=String(raw).replace(/!?(?:\[[^\]]*\])\([^)]*\)/g,'').replace(/`+/g,'').replace(/\s+/g,' ').trim();
+  return label.slice(0,96);
+}
+function adjustmentSourceLabel(source){
+  if(source==='deterministic-fact-supplement')return '程序自动补充';
+  if(source==='ai-content-planner')return 'AI 内容计划';
+  if(source==='programmatic-repair')return '程序结构修复';
+  return source?'程序调整':'调整';
+}
+function adjustmentOperationLabel(operation){
+  if(operation?.op==='add_fact_block'){
+    const facts=(operation.fact_ids||operation.block?.fact_ids||[]).map(factCandidateLabel).slice(0,2);
+    const slot=operation.slot_id||operation.block?.supplement_slot_id||'未命名槽位';
+    const sources=(operation.source_refs||operation.block?.source_refs||[]).length;
+    return `P${operation.page||operation.target_page||'?'} · 补充 ${slot}${facts.length?` · ${facts.join('；')}`:''}${sources?` · ${sources} 个来源`:''}`;
+  }
+  if(operation?.op==='move_block')return `移动内容块 P${operation.from_page||'?'}→P${operation.to_page||'?'}`;
+  if(operation?.op==='merge_pages')return `合并页面 ${(operation.pages||[]).join(' / ')}`;
+  if(operation?.op==='split_page')return `拆分 P${operation.page||'?'}`;
+  return operation?.op||'调整';
+}
 function renderProof(){
   if(!delivery)return;
   const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2)};
@@ -96,11 +167,16 @@ async function loadDelivery(candidateId=selectedId){
   const data=await request(`/api/candidates/${candidateId}/social-cards`);
   if(candidateId!==selectedId)return;
   delivery=data;
+  currentFactIndex=data.factIndex||currentFactIndex;
   const panel=document.getElementById('social-delivery');
   panel.hidden=!data.ready;
   if(!data.ready)return;
   deliveryIndex=0;
-  document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}`;
+  const metricRate=(value)=>Number.isFinite(Number(value))?`${Math.round(Number(value)*100)}%`:'—';
+  const metricLabel=data.templateMetrics?.renderedTemplate?.id?` · 模板 ${data.templateMetrics.renderedTemplate.id}${data.templateMetrics.fallback?'（回退）':''}`:'';
+  const metricSummary=data.templateStats?.usageCount?` · 通过率 ${metricRate(data.templateStats.layoutPassRate)} · 过空 ${metricRate(data.templateStats.underfilledRate)} · 溢出 ${metricRate(data.templateStats.overflowRate)}`:'';
+  const planSummary=data.contentPlanAdjustments?.rounds?.length?` · 内容计划调整 ${data.contentPlanAdjustments.rounds.length} 轮`:'';
+  document.getElementById('social-delivery-meta').textContent=`${data.images.length} 张 · 布局审计${data.layout?.valid?'通过':'待确认'} · 交付门禁${data.delivery?.valid?'通过':'待确认'}${metricLabel}${metricSummary}${planSummary}`;
   document.getElementById('social-open-html').href=data.htmlUrl;
   document.getElementById('social-download-all').href=data.bundleUrl;
   document.getElementById('social-gallery-film').innerHTML=data.images.map((image,index)=>`<button type="button" data-social-image="${index}" aria-label="查看第 ${index+1} 张图文"><img src="${image.url}?s=${image.size}" alt="第 ${index+1} 张缩略图"><span>${String(index+1).padStart(2,'0')}</span></button>`).join('');
@@ -110,10 +186,10 @@ async function loadDelivery(candidateId=selectedId){
 
 let lastGate=null;
 function renderGate(gate) {
-  lastGate=gate;  document.getElementById("card-ready-title").textContent=gate.ready?"故事板已就绪":selectedContentType==='event'?"请先生成事件故事板":selectedContentType==='custom'?"请先完善自定义事实基座":"请先分析仓库生成故事板";
+  lastGate=gate;  const themeBlocked=storyboardThemeState?.status==='needs-storyboard';document.getElementById("card-ready-title").textContent=themeBlocked?"请先重新生成故事板":gate.ready?"故事板已就绪":selectedContentType==='event'?"请先生成事件故事板":selectedContentType==='custom'?"请先完善自定义事实基座":"请先分析仓库，再生成故事板";
   const generate=document.getElementById("generate-social-card");
-  generate.disabled=!gate.ready;
-  generate.title=gate.ready?"根据当前卡片故事板开始生成":selectedContentType==='event'?"请先根据事实基座生成事件故事板":selectedContentType==='custom'?"门禁项全部通过后才能生成图文":"请先分析仓库并生成卡片故事板";
+  generate.disabled=!gate.ready||themeBlocked;generate.dataset.ready=String(gate.ready);
+  generate.title=themeBlocked?(storyboardThemeState.reason||'当前主题模板能力与故事板不一致'):gate.ready?"根据当前卡片故事板开始生成":selectedContentType==='event'?"请先根据事实基座生成事件故事板":selectedContentType==='custom'?"门禁项全部通过后才能生成图文":"请先分析仓库，再生成故事板";
   syncGenerateButton();
 }
 
@@ -129,19 +205,38 @@ function renderScore(score) {
 
 async function loadSimilarSocialCards(candidateId){const container=document.getElementById('similar-social-cards');if(!container)return;container.hidden=true;container.innerHTML='';try{const items=await request(`/api/candidates/${candidateId}/similar-social`);if(candidateId!==selectedId||!items.length)return;container.innerHTML=`<b>历史图文覆盖</b>${items.map((item)=>`<div><button type="button" class="inline-button" data-cal-social="${item.candidateRowId}" title="打开历史图文">${escapeHtml(item.title||item.candidateId)}</button> <small>${escapeHtml(item.batchDate||'')} · ${escapeHtml(item.reason||'相似内容')}</small></div>`).join('')}`;container.hidden=false;}catch{container.hidden=true;}}
 
-function renderCardPlan(value,decisions=currentLayoutDecisions) {
+function renderCardPlan(value,decisions=currentLayoutDecisions,layoutReportPages=currentLayoutReportPages,reflowPreview=undefined,renderState=undefined) {
   let plan=[];try{plan=Array.isArray(value)?value:JSON.parse(value||'[]');}catch{}
-  currentCardPlan=plan;currentLayoutDecisions=Array.isArray(decisions)?decisions:[];storyboardDirty=false;
+  currentCardPlan=plan;currentLayoutDecisions=Array.isArray(decisions)?decisions:[];currentLayoutReportPages=Array.isArray(layoutReportPages)?layoutReportPages:currentLayoutReportPages;storyboardDirty=false;
+  if(reflowPreview!==undefined)storyboardReflowPreview=reflowPreview;
+  if(renderState!==undefined)storyboardRenderState=renderState;
   const options=(selected)=>Object.entries(CARD_LAYOUT_LABELS).map(([value,label])=>`<option value="${value}"${value===selected?' selected':''}>${label}</option>`).join('');
   const blockEditor=(block,blockIndex)=>cardBlockEditorHtml(block,blockIndex);
-  document.getElementById("card-plan-preview").innerHTML=plan.length?plan.map((page,index)=>{
+  const preview=storyboardReflowPreview?.type==='storyboard-restructure'?`<div class="storyboard-reflow-preview" role="status"><div><b>故事板已调整，等待整组重渲染</b><span>页面 ${storyboardReflowPreview.beforePageCount} → ${storyboardReflowPreview.afterPageCount}${storyboardReflowPreview.pageDelta>0?` · 新增 ${storyboardReflowPreview.pageDelta} 个续页`:''}。HTML 与 PNG 尚未更新。</span></div><div class="storyboard-reflow-preview-pages">${(storyboardReflowPreview.addedPages||[]).map((item)=>`<span>P${item.page} · ${escapeHtml(item.title||'续页')}</span>`).join('')}</div><button type="button" class="text-button" data-dismiss-storyboard-preview>知道了</button></div>`:'';
+  const adjustmentSummary=currentContentPlanAdjustments?.rounds?.length?`<div class="storyboard-reflow-preview" role="status"><div><b>内容计划调整记录</b><span>已执行 ${currentContentPlanAdjustments.rounds.length} 轮；每轮最多 4 个受控操作，结果已重新编译并审计。</span></div><div class="storyboard-reflow-preview-pages">${currentContentPlanAdjustments.rounds.flatMap((round)=>(round.operations||[]).map((operation)=>({operation,source:round.source,round:round.round}))).slice(0,8).map(({operation,source,round})=>{const label=`${adjustmentSourceLabel(source)} · 第${round||'?'}轮 · ${adjustmentOperationLabel(operation)}`;return `<span title="${escapeHtml(label)}">${escapeHtml(label)}</span>`;}).join('')}</div></div>`:'';
+  document.getElementById("card-plan-preview").innerHTML=adjustmentSummary+preview+(plan.length?plan.map((page,index)=>{
     const decision=currentLayoutDecisions[index]||{layout:page.layout_style||'auto',source:page.layout_style&&page.layout_style!=='auto'?'manual':'recommended',reason:''};
+    const layoutReport=currentLayoutReportPages[index]||null;
+    const issues=Array.isArray(layoutReport?.issues)?layoutReport.issues:[];
+    const hasSplittableBlock=(page.content_blocks||[]).some((block)=>['list','steps','timeline','scenes','stats','compare'].includes(block?.type)&&((Array.isArray(block?.items)&&block.items.length>=2)||(Array.isArray(block?.rows)&&block.rows.length>=2)||block?.type==='list'));
+    const structuralProblem=issues.some((issue)=>['overflow','clipped','horizontal_overflow','invalid_page_grid_structure','missing_content_stack','empty_page_body'].includes(issue));
+    const structuralIssue=structuralProblem&&hasSplittableBlock;
+    const editMode=structuralIssue?'restructure':issues.includes('overfilled')||structuralProblem?'compress':issues.includes('underfilled')?'expand':issues.includes('text_too_small')?'compress':null;
+    const editLabel=editMode==='restructure'?'调整故事板 / 拆分本页':editMode==='compress'?'AI 缩写本页':'AI 扩写本页';
+    const auditMeta=layoutReport?`布局审计 · 利用率 ${Math.round(Number(layoutReport.utilization)||0)}%${issues.length?` · ${issues.map((issue)=>CARD_AUDIT_ISSUE_LABELS[issue]||issue).join('、')}`:' · 正常'}`:'尚无布局审计 · 生成后按结果提供扩写或缩写';
+    const aiEditButton=editMode?`<button type="button" class="outline-button storyboard-ai-edit storyboard-ai-${editMode}" data-regenerate-storyboard-page="${index+1}" data-regenerate-mode="${editMode}">${editLabel}</button>`:'';
+    const groupId=page.page_group_id?String(page.page_group_id):'';
+    const groupPages=groupId?plan.filter((item)=>String(item?.page_group_id||'')===groupId):[];
+    const continuationIndex=Number(page.continuation_index)||0;
+    const continuationOf=Number(page.continuation_of)||0;
+    const continuationBadge=groupPages.length>1?`<span class="storyboard-continuation-badge">${continuationIndex>1?`P${continuationOf||index+1} 续页 ${continuationIndex}/${groupPages.length}`:`内容组 ${continuationIndex||1}/${groupPages.length}`}</span>`:'';
+    const aiEditAction=editMode?`<div class="storyboard-page-ai-action"><span data-storyboard-ai-status>${editMode==='restructure'?'本页存在结构性溢出，建议按完整条目拆页':editMode==='compress'?'本页内容过满，建议先缩短文字':'本页内容偏少，建议结合素材扩写'}</span>${aiEditButton}</div>`:'';
     const selected=page.layout_style||'auto';
     const control=decision.mode==='smart'
       ? `<span class="layout-status ${escapeHtml(decision.source||'recommended')}">智能构图 · ${escapeHtml(CARD_ROLE_LABELS[decision.role]||decision.role||'内容')} · ${escapeHtml(CARD_COMPOSITION_LABELS[decision.composition?.id]||decision.composition?.id||'默认构图')} · 变体 ${(decision.variantIndex??0)+1}/${decision.variantCount||1}</span><small>${escapeHtml(CARD_DECORATION_LABELS[decision.composition?.decoration]||'无装饰')} · ${escapeHtml(CARD_OVERLAP_LABELS[decision.composition?.overlap]||'标准层级')}</small>`
       : `<label>页面版式<select data-card-page-layout="${index+1}">${options(selected)}</select></label><span class="layout-status ${escapeHtml(decision.source||'recommended')}">${escapeHtml(CARD_LAYOUT_STATUS[decision.source]||'自动推荐')} · ${escapeHtml(CARD_LAYOUT_LABELS[decision.layout]||decision.layout||'')}</span>`;
-    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p><details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<div class="storyboard-block-add"><select data-add-storyboard-block-type>${cardBlockTypeOptions('text')}</select><button type="button" class="outline-button" data-add-storyboard-block>＋ 添加内容块</button></div><button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div></details></div><div class="storyboard-layout-control">${control}${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
-  }).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`;
+    return `<article data-card-page="${index+1}"><b>${index+1}</b><div class="storyboard-page-copy"><small>${escapeHtml(page.kind||'content')} ${continuationBadge}</small><h4>${escapeHtml(page.title||'未命名页面')}</h4><p>${escapeHtml(page.goal||'')}</p>${aiEditAction}<details class="storyboard-page-editor"><summary>编辑本页内容</summary><div class="storyboard-page-editor-fields"><label>页面标题<input data-storyboard-title value="${escapeHtml(page.title||'')}"></label><label>内部说明<textarea data-storyboard-goal rows="2">${escapeHtml(page.goal||'')}</textarea></label>${(page.content_blocks||[]).map(blockEditor).join('')}<div class="storyboard-block-add"><select data-add-storyboard-block-type>${cardBlockTypeOptions('text')}</select><button type="button" class="outline-button" data-add-storyboard-block>＋ 添加内容块</button></div><div class="storyboard-block-add"><button type="button" class="outline-button" data-save-storyboard-page="${index+1}">保存本页修改</button></div><small>${auditMeta} · 会读取完整事实基座和原始素材；不会改动其他页。</small></div></details></div><div class="storyboard-layout-control">${control}${decision.reason?`<small>${escapeHtml(decision.reason)}</small>`:''}</div></article>`;
+  }).join(''):`<div class="empty-state">${selectedContentType==='event'?'根据事实基座生成 4～10 页事件卡片。':selectedContentType==='custom'?'根据自定义事实基座生成 4～10 页卡片。':'核验仓库后，AI 会自动规划 4～7 页卡片。'}</div>`);
 }
 
 async function confirmDiscardStoryboardEdits(){
@@ -165,10 +260,12 @@ export async function openSocialEditor(id) {
   const factsActions=document.getElementById('social-facts-title')?.closest('.workspace-head')?.querySelector(':scope>div:last-child');
   if(channelPicker&&factsActions&&!factsActions.contains(channelPicker))factsActions.prepend(channelPicker);
   const inspect=document.getElementById('inspect-repository'),reanalyze=document.getElementById('analyze-card-editorial');
-  inspect.textContent=selectedContentType==='event'?'根据事实基座生成故事板':selectedContentType==='custom'?'根据事实基座生成故事板':'分析仓库并生成故事板';
-  reanalyze.textContent='重新生成故事板';reanalyze.hidden=selectedContentType==='event'&&!data.editorial?.card_plan_json?.length;
-  renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);renderGate(data.gate);
-  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';currentGroupLayout=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';document.getElementById('social-visual-style').dispatchEvent(new Event('theme-ui-sync'));syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
+  inspect.textContent='分析仓库';
+  reanalyze.textContent=data.editorial?.card_plan_json?.length?'重新生成故事板':'生成故事板';
+  reanalyze.hidden=false;
+  renderFacts(data.facts,data.eventAnalysis);renderScore(data.score);currentFactIndex=data.factIndex||null;currentContentPlanAdjustments=data.contentPlanAdjustments||null;currentLayoutReportPages=Array.isArray(data.layoutReport?.pages)?data.layoutReport.pages:[];renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions,currentLayoutReportPages,null,null);renderStoryboardThemeState(data.themeState);renderGate(data.gate);
+  syncStoryboardActionLabels();
+  document.getElementById('social-channel').value=selectedChannelMode;document.getElementById('social-composition-mode').value=selectedCompositionMode;document.getElementById('social-layout-style').value=data.editorial?.layout_style||'auto';currentGroupLayout=data.editorial?.layout_style||'auto';document.getElementById('social-visual-style').value=data.editorial?.visual_style||'ice-blue';document.getElementById('social-visual-style').dataset.previousValue=document.getElementById('social-visual-style').value;document.getElementById('social-visual-style').dispatchEvent(new Event('theme-ui-sync'));syncCompositionControls();await Promise.all([loadSocialSkillControls(data),loadDelivery(selectedId),loadSimilarSocialCards(selectedId)]);
 }
 
 async function analyzeEditorial(candidateId=selectedId) {
@@ -176,7 +273,12 @@ async function analyzeEditorial(candidateId=selectedId) {
     stageSkills:selectedStageSkills(document.getElementById('social-stage-skills')),
   })});
   if(candidateId===selectedId){
-    renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions);
+    // 新故事板建立新的计划基线；旧的布局审计、重排预览和内容计划调整记录必须失效。
+    currentContentPlanAdjustments=null;
+    currentLayoutReportPages=[];
+    storyboardReflowPreview=null;
+    storyboardRenderState={status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false};
+    renderCardPlan(data.editorial?.card_plan_json,data.layoutDecisions,[],null,storyboardRenderState);
     const preview=document.getElementById('card-plan-preview');
     const plan=Array.isArray(data.cardPlan)?data.cardPlan:[];
     const summary=[
@@ -186,7 +288,7 @@ async function analyzeEditorial(candidateId=selectedId) {
       plan.length?`页面规划：${plan.length} 页（${plan.map((page)=>page.title||page.kind).filter(Boolean).join(' → ')}）`:''
     ].filter(Boolean).join('\n');
     if(preview&&summary)preview.insertAdjacentHTML('afterbegin',`<details class="thinking-box"><summary>故事板规划摘要</summary><div class="thinking-text">${escapeHtml(summary)}</div></details>`);
-    renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
+    renderStoryboardThemeState(data.themeState);renderGate(data.gate);if(data.eventAnalysis)renderFacts(null,data.eventAnalysis);toast(selectedContentType==='event'?'AI 已根据突发事实基座生成事件故事板':selectedContentType==='custom'?'AI 已根据自定义事实基座生成故事板':'AI 已根据仓库事实生成卡片故事板');}return data;
 }
 
 let storyboardProgressTimer=null;
@@ -213,10 +315,30 @@ function renderStoryboardLoading(message){
   update();storyboardProgressTimer=setInterval(update,1000);
 }
 
-async function runStoryboard({inspect=false}={}){
-  if(!selectedId)return;const candidateId=selectedId;const inspectButton=document.getElementById("inspect-repository");const analyzeButton=document.getElementById("analyze-card-editorial");
-  const eventMode=selectedContentType==='event';const customMode=selectedContentType==='custom';const sourceButton=inspect?inspectButton:analyzeButton;const original=sourceButton.textContent;inspectButton.disabled=true;analyzeButton.disabled=true;sourceButton.textContent=eventMode?"正在规划事件故事板…":customMode?"正在规划故事板…":inspect?"正在分析 README…":"正在重新规划…";renderStoryboardLoading(eventMode?"正在根据事实基座生成事件故事板":customMode?"正在根据自定义事实基座生成故事板":inspect?"正在核验仓库并生成故事板":"正在根据已有事实重新生成故事板");
-  try{if(inspect&&selectedContentType==='repository'){const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});if(candidateId===selectedId){renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);renderStoryboardLoading('仓库事实已核验，正在规划故事板');}}await analyzeEditorial(candidateId);}catch(error){toast(error.message,'error');if(candidateId===selectedId)renderCardPlan(currentCardPlan,currentLayoutDecisions);}finally{stopStoryboardProgress();inspectButton.disabled=false;analyzeButton.disabled=false;sourceButton.textContent=original;}
+async function inspectRepository(){
+  if(!selectedId||selectedContentType!=='repository')return;
+  const candidateId=selectedId;const inspectButton=document.getElementById('inspect-repository');const analyzeButton=document.getElementById('analyze-card-editorial');
+  const factsPanel=document.getElementById('repository-facts');const original=inspectButton.textContent;
+  inspectButton.disabled=true;analyzeButton.disabled=true;inspectButton.textContent='正在分析 README…';
+  if(factsPanel)factsPanel.innerHTML='<div class="storyboard-loading" role="status">正在分析仓库并刷新事实基座…</div>';
+  try{
+    const data=await request(`/api/candidates/${candidateId}/repository/inspect`,{method:'POST',body:'{}'});
+    if(candidateId===selectedId){
+      renderFacts(data.facts);renderScore(data.score);renderGate(data.gate);
+      toast('仓库事实已更新，请点击“生成故事板”');
+    }
+  }catch(error){toast(error.message,'error');}
+  finally{inspectButton.disabled=false;analyzeButton.disabled=false;inspectButton.textContent=original;syncStoryboardActionLabels();}
+}
+
+async function runStoryboard(){
+  if(!selectedId)return;const candidateId=selectedId;const inspectButton=document.getElementById('inspect-repository');const analyzeButton=document.getElementById('analyze-card-editorial');
+  const eventMode=selectedContentType==='event';const customMode=selectedContentType==='custom';const original=analyzeButton.textContent;
+  inspectButton.disabled=true;analyzeButton.disabled=true;analyzeButton.textContent=currentCardPlan.length?'正在重新规划…':'正在生成故事板…';
+  renderStoryboardLoading(eventMode?'正在根据事实基座生成事件故事板':customMode?'正在根据自定义事实基座生成故事板':currentCardPlan.length?'正在根据已有事实重新生成故事板':'正在根据仓库事实生成故事板');
+  try{await analyzeEditorial(candidateId);}
+  catch(error){toast(error.message,'error');if(candidateId===selectedId)renderCardPlan(currentCardPlan,currentLayoutDecisions);}
+  finally{stopStoryboardProgress();inspectButton.disabled=false;analyzeButton.disabled=false;analyzeButton.textContent=original;syncStoryboardActionLabels();}
 }
 
 // 布局审计失败时定位到对应故事板页：解析「P\d+」页码，展开该页编辑器并滚动高亮，
@@ -236,7 +358,7 @@ function locateStoryboardPages(error) {
     if (summary && !summary.querySelector('.layout-failed-badge')) {
       const badge = document.createElement('em');
       badge.className = 'layout-failed-badge';
-      badge.textContent = '布局审计未通过 · 修改本页后重新生成';
+      badge.textContent = '布局审计未通过 · 可修改或 AI 重生成本页';
       summary.appendChild(badge);
     }
   }
@@ -245,13 +367,38 @@ function locateStoryboardPages(error) {
 
 // 生成任务按候选追踪，按钮按当前选中候选渲染——页面级单按钮不再被多个候选的任务进度交替覆盖
 const socialJobs = new Map();
+function socialGenerationProgressLabel(progress='') {
+  const text=String(progress||'');
+  const planner=text.match(/内容计划调整第\s*(\d+)\s*(?:次尝试|轮)/);
+  if(planner)return `调整内容计划（第${planner[1]}次）…`;
+  if(/逐页生成高清 PNG/.test(text))return '生成卡片图片…';
+  if(/浏览器布局审计/.test(text))return '检查卡片布局…';
+  if(/生成配套文案/.test(text))return '生成配套文案…';
+  if(/布局契约组装/.test(text))return '组装卡片页面…';
+  if(/读取|事实基座/.test(text))return '读取项目事实…';
+  if(/封面标题/.test(text))return '处理封面标题…';
+  if(/文字修复|AI 改写/.test(text))return '优化页面文字…';
+  return '正在生成图文…';
+}
 function syncGenerateButton() {
   const generate = document.getElementById("generate-social-card"); if (!generate) return;
   const job = selectedId ? socialJobs.get(Number(selectedId)) : null;
   const active = job && (job.status === 'running' || job.status === 'queued');
-  if (active) { generate.disabled = true; generate.textContent = job.status === 'queued' ? '排队等待执行…' : (job.progress || '图文任务执行中…'); return; }
+  if (active) {
+    // 任务进度可能包含页码、校验原因和来源 URL，不能直接塞进按钮文本，
+    // 否则会把底部操作栏撑成一条很长的灰色提示条。完整进度仍保留在任务日志，
+    // 并通过 title 给需要快速查看的用户提供悬浮提示。
+    generate.disabled = true;
+    generate.textContent = job.status === 'queued' ? '排队等待执行…' : socialGenerationProgressLabel(job.progress);
+    generate.title = '图文任务执行中，详细进度请查看任务日志';
+    return;
+  }
+  const ready=generate.dataset.ready!=='false';
+  if (storyboardThemeState?.status==='needs-storyboard') { generate.disabled=true;generate.textContent='请先重新生成故事板';generate.title=storyboardThemeState.reason||'当前主题模板能力与故事板不一致';return; }
+  generate.disabled=!ready;
   if (job && job.status === 'completed') { generate.textContent = '重新生成整组图文'; return; }
-  if (!job) generate.textContent = '生成整组图文';
+  if(generate.dataset.pendingRender==='true'){generate.textContent='重新生成整组图文';generate.title='故事板已更新，确认页面关系后重新生成整组 HTML/PNG';return;}
+  generate.textContent = '生成整组图文';
 }
 async function watchSocialJob(jobId, candidateId) {
   while (true) { await new Promise((resolve) => setTimeout(resolve, 2000)); const job = await request(`/api/jobs/${jobId}`);
@@ -293,7 +440,7 @@ if(!window.__socialPageLayoutBound){window.__socialPageLayoutBound=true;
     select.disabled=true;
     try{
       const data=await request(`/api/candidates/${selectedId}/card-pages/${page}/layout`,{method:'PUT',body:JSON.stringify({layout_style:select.value})});
-      renderCardPlan(data.cardPlan,data.layoutDecisions);
+      const nextLayoutReportPages=[...currentLayoutReportPages];nextLayoutReportPages[page-1]=null;renderCardPlan(data.cardPlan,data.layoutDecisions,nextLayoutReportPages);
     }catch(error){toast(error.message, "error");renderCardPlan(currentCardPlan,currentLayoutDecisions);}
   });
 }
@@ -302,6 +449,27 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
     if(event.target.closest('.storyboard-page-editor'))storyboardDirty=true;
   });
   document.addEventListener('click',async(event)=>{
+    const dismissPreview=event.target.closest('[data-dismiss-storyboard-preview]');
+    if(dismissPreview){storyboardReflowPreview=null;renderCardPlan(currentCardPlan,currentLayoutDecisions,currentLayoutReportPages,null,storyboardRenderState);return;}
+    const regenerate=event.target.closest('[data-regenerate-storyboard-page]');
+    if(regenerate&&selectedId){
+      const pageNumber=Number(regenerate.dataset.regenerateStoryboardPage);
+      if(!await confirmDiscardStoryboardEdits())return;
+      const originalText=regenerate.textContent;regenerate.disabled=true;regenerate.textContent='AI 正在结合素材重生成…';
+      try{
+        const status=regenerate.closest('.storyboard-page-ai-action')?.querySelector('[data-storyboard-ai-status]');
+        if(status)status.textContent=regenerate.dataset.regenerateMode==='restructure'?'正在读取布局报告并规划续页…':'正在结合完整素材改写本页…';
+        const data=await requestStoryboardAi(`/api/candidates/${selectedId}/card-pages/${pageNumber}/ai`,{method:'POST',body:JSON.stringify({mode:regenerate.dataset.regenerateMode,stageSkills:selectedStageSkills(document.getElementById('social-stage-skills'))})});
+        const nextLayoutReportPages=regenerate.dataset.regenerateMode==='restructure'?new Array(Array.isArray(data.cardPlan)?data.cardPlan.length:0).fill(null):[...currentLayoutReportPages];
+        if(regenerate.dataset.regenerateMode!=='restructure')nextLayoutReportPages[pageNumber-1]=null;
+        storyboardRenderState=data.renderState||{status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false};
+        const preview=data.restructure?.preview||null;
+        renderCardPlan(data.cardPlan,data.layoutDecisions,nextLayoutReportPages,preview,storyboardRenderState);renderGate(data.gate);
+        const generate=document.getElementById('generate-social-card');if(generate){generate.dataset.ready='true';generate.dataset.pendingRender='true';syncGenerateButton();}
+        toast(regenerate.dataset.regenerateMode==='restructure'?'本页已按结构修复拆分；已展示续页关系，请确认后重新生成整组图文。':`本页已按 AI ${regenerate.dataset.regenerateMode==='expand'?'扩写':'缩写'} 更新；确认后请重新生成整组图文。`);
+      }catch(error){const status=regenerate.closest('.storyboard-page-ai-action')?.querySelector('[data-storyboard-ai-status]');if(status)status.textContent='修复失败，故事板未修改';toast(error.message,'error');regenerate.disabled=false;regenerate.textContent=originalText;}
+      return;
+    }
     const remove=event.target.closest('[data-remove-storyboard-block]');
     if(remove){remove.closest('[data-storyboard-block]')?.remove();storyboardDirty=true;return;}
     const add=event.target.closest('[data-add-storyboard-block]');
@@ -322,6 +490,13 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
       article.querySelectorAll('[data-storyboard-block]').forEach((node)=>{
         const type=node.querySelector('[data-storyboard-block-type]')?.value||'text';
         const block={type,title:node.querySelector('[data-storyboard-block-title]')?.value.trim()||''};
+        const supplementSlot=String(node.dataset.supplementSlotId||'').trim();
+        let factIds=[];let sourceRefs=[];
+        try{factIds=JSON.parse(node.dataset.factIds||'[]');}catch{}
+        try{sourceRefs=JSON.parse(node.dataset.sourceRefs||'[]');}catch{}
+        if(supplementSlot)block.supplement_slot_id=supplementSlot;
+        if(Array.isArray(factIds)&&factIds.length)block.fact_ids=factIds.map(String);
+        if(Array.isArray(sourceRefs)&&sourceRefs.length)block.source_refs=sourceRefs.map(String);
         const field=node.querySelector('[data-storyboard-block-content]');
         if(isStructuredCardBlockType(type))Object.assign(block,JSON.parse(field.value||'{}'),{content:''});
         else block.content=field?.value.trim()||'';
@@ -335,7 +510,7 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
         goal:article.querySelector('[data-storyboard-goal]')?.value||'',
         content_blocks:contentBlocks,
       })});
-      renderCardPlan(data.cardPlan,data.layoutDecisions);renderGate(data.gate);
+      const nextLayoutReportPages=[...currentLayoutReportPages];nextLayoutReportPages[pageNumber-1]=null;renderCardPlan(data.cardPlan,data.layoutDecisions,nextLayoutReportPages);renderGate(data.gate);const generate=document.getElementById('generate-social-card');if(generate){generate.dataset.ready='true';generate.dataset.pendingRender='true';syncGenerateButton();}
       toast('本页故事板已保存；生成图文时会整组重新渲染');
     }catch(error){toast(error.message, "error");button.disabled=false;button.textContent=originalText;}
   });
@@ -347,6 +522,10 @@ if(!window.__socialPageEditorBound){window.__socialPageEditorBound=true;
     const title=fieldset.querySelector('[data-storyboard-block-title]')?.value||'';
     const currentValue=fieldset.querySelector('[data-storyboard-block-content]')?.value||'';
     let block={type,title};
+    const supplementSlot=String(fieldset.dataset.supplementSlotId||'').trim();
+    if(supplementSlot)block.supplement_slot_id=supplementSlot;
+    try{const factIds=JSON.parse(fieldset.dataset.factIds||'[]');if(Array.isArray(factIds)&&factIds.length)block.fact_ids=factIds;}catch{}
+    try{const sourceRefs=JSON.parse(fieldset.dataset.sourceRefs||'[]');if(Array.isArray(sourceRefs)&&sourceRefs.length)block.source_refs=sourceRefs;}catch{}
     if(isStructuredCardBlockType(type)){
       try{Object.assign(block,JSON.parse(currentValue||'{}'));}catch{block.items=[];block.headers=[];block.rows=[];}
     }else{block.content=currentValue;}
@@ -371,9 +550,16 @@ if(!window.__socialThemeBound){
   window.__socialThemeBound=true;
   document.getElementById('social-visual-style')?.addEventListener('change',async(event)=>{
     if(!selectedId)return;
+    const previous=storyboardThemeState?.current?.themeId||document.getElementById('social-visual-style').dataset.previousValue||event.target.value;
+    if(!await confirmDiscardStoryboardEdits()){event.target.value=previous;event.target.dispatchEvent(new Event('theme-ui-sync'));return;}
+    event.target.disabled=true;
     try{
-      await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});
-    }catch(error){toast(error.message, "error");}
+      const data=await request(`/api/candidates/${selectedId}/card-editorial`,{method:'PUT',body:JSON.stringify({visual_style:event.target.value})});
+      renderStoryboardThemeState(data.themeState);renderGate(data.gate);
+      toast(data.themeState?.status==='needs-storyboard'?'已切换主题；该主题需要重新生成故事板':'已切换主题；当前故事板可直接重新渲染');
+      event.target.dataset.previousValue=event.target.value;
+    }catch(error){event.target.value=previous;event.target.dispatchEvent(new Event('theme-ui-sync'));toast(error.message, "error");}
+    finally{event.target.disabled=false;}
   });
 }
 if(!window.__socialCompositionBound){
@@ -416,7 +602,7 @@ if(!window.__socialChannelBound){
     try{
       const data=await request(`/api/candidates/${selectedId}/card-channel`,{method:'POST',body:JSON.stringify({channel})});
       selectedChannelMode=data.channelMode;
-      renderCardPlan(currentCardPlan,data.layoutDecisions);
+      renderCardPlan(currentCardPlan,data.layoutDecisions);renderStoryboardThemeState(data.themeState);renderGate(data.themeState?.status==='needs-storyboard'?{...(lastGate||{}),ready:false}:lastGate||{ready:false});
       if(selectedContentType==='custom')document.getElementById('social-facts-title').textContent=`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`;
     }catch(error){event.target.value=selectedChannelMode;toast(error.message, "error");}
   });
@@ -436,7 +622,7 @@ if(!window.__socialSkillSelectionBound){window.__socialSkillSelectionBound=true;
   });
 }
 const inspectButton=freshButton("inspect-repository");
-inspectButton?.addEventListener("click",()=>runStoryboard({inspect:true}));
+inspectButton?.addEventListener("click",inspectRepository);
 const analyzeButton=freshButton("analyze-card-editorial");
 analyzeButton?.addEventListener("click",()=>runStoryboard());
 const generateButton=freshButton("generate-social-card");

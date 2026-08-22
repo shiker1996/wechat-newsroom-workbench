@@ -7,12 +7,26 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
+import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
+
+function legacyTheme(id='peach') {
+  const definition=structuredClone(socialThemeDefinition(id));
+  delete definition.social.templatePack;
+  delete definition.hash;delete definition.file;
+  return definition;
+}
+
+// 这些构图断言验证的是迁移前 standard-v1 的骨架；批次 B/C 的新主题单独由 Phase 6 测试覆盖。
+function renderStoryboardHtml(options={}){
+  if ((!options.visualStyle || options.visualStyle==='peach') && !options.themeDefinition) options={...options,visualStyle:'peach',themeDefinition:legacyTheme()};
+  return renderStoryboardHtmlBase(options);
+}
 
 test('图文管线在内部使用版式白名单时建立本地 ESM 绑定', () => {
   const pipeline = fs.readFileSync(path.join(root, 'lib', 'llm', 'social-card-pipeline.mjs'), 'utf8');
@@ -27,6 +41,13 @@ test('故事板保存通过共享类型判断解析结构化内容，不引用�
   assert.match(editor, /if\(isStructuredCardBlockType\(type\)\)Object\.assign/);
   assert.doesNotMatch(editor, /CARD_STRUCTURED_BLOCK_TYPES/);
   assert.match(model, /export function isStructuredCardBlockType\(type\)/);
+});
+
+test('图文生成任务结束后按故事板门禁恢复生成按钮',()=>{
+  const editor=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
+  assert.match(editor,/generate\.disabled=!gate\.ready\|\|themeBlocked/);
+  assert.match(editor,/const ready=generate\.dataset\.ready!=='false';[\s\S]*generate\.disabled=!ready;/);
+  assert.match(editor,/job && job\.status === 'completed'\) \{ generate\.textContent = '重新生成整组图文'; return; \}/);
 });
 
 test('项目图文技能加载完整文案、标题、设计与布局契约', () => {
@@ -172,25 +193,50 @@ test('图文编辑室可以独立选择版式和视觉主题',()=>{
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
   const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');
   assert.match(html,/id="social-layout-style"[\s\S]*智能混排[\s\S]*海报大字[\s\S]*杂志分栏[\s\S]*数据报告[\s\S]*卡片清单[\s\S]*教程步骤[\s\S]*极简留白/);
+  assert.match(html,/id="social-storyboard-theme-status"/);
+  assert.match(html,/id="inspect-repository"[\s\S]*分析仓库/);
+  assert.match(html,/id="analyze-card-editorial"[\s\S]*生成故事板/);
+  assert.match(html,/social-facts-stage[\s\S]*id="inspect-repository"/);
+  assert.match(html,/social-storyboard-head[\s\S]*id="analyze-card-editorial"/);
   assert.match(source,/layout_style/);
   assert.match(source,/__socialLayoutBound/);
   assert.match(source,/data-card-page-layout/);
   assert.match(source,/data-save-storyboard-page/);
+  assert.match(source,/data-regenerate-storyboard-page/);
+  assert.match(source,/data-regenerate-mode/);
+  assert.match(source,/repository\/inspect/);
+  assert.match(source,/仓库事实已更新，请点击“生成故事板”/);
+  assert.match(source,/AI 扩写本页/);
+  assert.match(source,/AI 缩写本页/);
+  assert.match(source,/storyboard-page-ai-action/);
+  assert.doesNotMatch(source,/AI 改写本页/);
+  assert.match(source,/layoutReportPages/);
+  assert.match(source,/card-pages\/\$\{pageNumber\}\/ai/);
   assert.match(source,/data-storyboard-block-content/);
   assert.match(source,/生成图文时会整组重新渲染/);
+  assert.match(source,/storyboardThemeState/);
+  assert.match(source,/needs-storyboard/);
   assert.match(source,/social-facts-title[\s\S]*factsActions\.prepend\(channelPicker\)/);
   assert.match(source,/card-pages\/\$\{page\}\/layout/);
   assert.match(source,/自动推荐[\s\S]*手动指定[\s\S]*自动降级/);
   assert.match(styles,/\.storyboard-layout-control/);
   assert.match(styles,/\.layout-status\.fallback/);
+  assert.match(styles,/\.storyboard-ai-expand/);
+  assert.match(styles,/\.storyboard-ai-compress/);
 });
 
 test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
   const source=fs.readFileSync(path.join(root,'lib/http/routes/social-card-routes.mjs'),'utf8');
   const storyboardPrompt=fs.readFileSync(path.join(root,'lib','domain','social-card-prompts','channel-xiaohongshu.md'),'utf8');
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)$/)"));
+  assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)\\/ai$/)"));
   assert.match(source,/每页至少保留一个内容块/);
   assert.match(source,/card_plan_json:JSON\.stringify\(cardPlan\),status:'AI_READY'/);
+  assert.match(source,/layoutReport/);
+  assert.match(source,/modeInstruction/);
+  assert.doesNotMatch(source,/\['expand','compress','rewrite'\]/);
+  assert.match(source,/AI 扩写本页/);
+  assert.match(source,/AI 缩写本页/);
   // 故事板策划 prompt 约束 stat 数值长度，避免窄数据卡内长算式折行
   assert.match(storyboardPrompt,/num 不超过 6 个字符/);
 });
@@ -227,17 +273,19 @@ test('图文文案由模型生成，HTML 根据故事板确定性组装', () => 
   assert.match(source, /purpose:'social-card-copy'/);
   assert.doesNotMatch(source, /purpose:'social-card-html'/);
   assert.doesNotMatch(source, /purpose:'social-card-generation'/);
-  const html = renderStoryboardHtml({ topic:'测试工具', repository:'org/repo', pages:[
+  const html = renderStoryboardHtml({ visualStyle:'peach', topic:'测试工具', repository:'org/repo', pages:[
     { kind:'cover', title:'封面', goal:'说明价值', evidence:['事实一'], content_blocks:[{type:'list',title:'能力',content:'功能一\n功能二'},{type:'code',title:'安装',content:'npm i demo'}] },
-    { kind:'ending', title:'结尾', evidence:['仓库地址'] },
+    { kind:'ending', title:'结尾', continuation_index:2, evidence:['仓库地址'] },
   ] });
   assert.match(html, /<\/html>$/);
   assert.equal((html.match(/class="page /g) || []).length, 2);
   assert.equal([...html.matchAll(/class=["']([^"']*)["']/gi)].filter((match) => match[1].split(/\s+/).includes('page')).length, 2);
   assert.ok(html.includes('page-inner'));
   assert.match(html,/<pre><code>npm i demo<\/code><\/pre>/);
+  assert.match(html, /class="continuation-badge" data-text-role="auxiliary"/);
+  assert.match(html, /\.page-body\{[^}]*min-width:0/);
   assert.match(html, /\.page-ending \.note-block h2[^}]*color:inherit/);
-  assert.match(html, /\.theme-ice-blue \.page-ending \.note-block[^}]*color:var\(--ink\)/);
+  assert.match(html, /\.theme-peach \.page-ending \.note-block[^}]*color:var\(--ink\)/);
   assert.match(html, /\.page-ending \.highlight-block h2[^}]*color:inherit/);
 });
 
@@ -605,6 +653,15 @@ test('渲染保留全部内容块和对象型列表的标题正文',()=>{
   assert.match(html,/blocks-5/);
   assert.match(html,/正文5/);
   assert.match(html,/内存：降低 40%/);
+});
+
+test('scenes 块只有换行正文时仍按场景列表渲染',()=>{
+  const html=renderStoryboardHtml({topic:'场景回退',pages:[{kind:'scenario',title:'适用场景',content_blocks:[{
+    type:'scenes',title:'适合谁',content:'直播打赏前需要冷静期\n误触会员入口时需要拦截\n临时支付时需要可控放行',items:[],
+  }]}]});
+  assert.match(html,/scenes-block/);
+  assert.match(html,/<li>直播打赏前需要冷静期<\/li>/);
+  assert.match(html,/<li>临时支付时需要可控放行<\/li>/);
 });
 
 test('underfilled density adjustment uses bounded relaxed and expanded tiers',()=>{

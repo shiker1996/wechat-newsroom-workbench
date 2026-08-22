@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { buildAiThemeMessages, normalizeAiThemeCandidate } from '../lib/themes/ai-theme-generator.mjs';
 import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { renderStoryboardHtml, normalizeCoverTitleLines } from '../lib/llm/social-card-pipeline.mjs';
+import { renderStoryboardHtml, deterministicCoverTitleLines, normalizeCoverTitleLines } from '../lib/llm/social-card-pipeline.mjs';
 import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
@@ -26,6 +26,7 @@ const execFileAsync=promisify(execFile);
 function themeWithCoverTitle(value){
   const definition=structuredClone(socialThemeDefinition('ice-blue'));
   delete definition.hash;delete definition.file;
+  delete definition.social.templatePack;
   definition.social.recipes.coverTitle=value;
   return definition;
 }
@@ -93,6 +94,30 @@ test('封面标题 AI 语义断行：校验、优先使用与代码兜底',()=>{
   assert.ok(ai.includes('<span class="cover-title-line">用 LangChain</span><span class="cover-title-line">编排智能体工作流</span>'));
   const fallback=renderStoryboardHtml({topic:'轻量级工作流编排引擎',visualStyle:'neon',coverTitleLines:['轻量级','引擎'],pages:[{kind:'cover',title:'轻量级工作流编排引擎',content_blocks:[]}]});
   assert.equal((fallback.match(/class="cover-title-line"/g)||[]).length,2);
+});
+
+test('封面标题确定性兜底不拆开英文专名和数字片段',()=>{
+  const title='告别聊天改稿：可视化编辑 HTML/Markdown，一键反馈给 AI';
+  const lines=deterministicCoverTitleLines(title);
+  assert.deepEqual(lines,['告别聊天改稿：','可视化编辑','HTML/Markdown，','一键反馈给 AI']);
+  assert.equal(lines.join('').replace(/\s+/g,''),title.replace(/\s+/g,''));
+  const html=renderStoryboardHtml({topic:title,visualStyle:'lavender',pages:[{kind:'cover',title,content_blocks:[]} ]});
+  assert.match(html,/class="clean-title-line">HTML\/Markdown，<\/span>/);
+  assert.doesNotMatch(html,/class="clean-title-line">[^<]*H[^<]*<\/span><span class="clean-title-line">TML/);
+});
+
+test('四个图文模板的封面 kicker 与内容页对齐且正文组居中',()=>{
+  const cases=[
+    ['lavender','template-clean-v1'],
+    ['paper-craft','template-editorial-v1'],
+    ['brutalist','template-brutalist-v1'],
+    ['neon','template-neon-v1'],
+  ];
+  for(const [visualStyle,templateClass] of cases){
+    const html=renderStoryboardHtml({topic:'封面标题',visualStyle,pages:[{kind:'cover',title:'封面标题',content_blocks:[]}]});
+    assert.match(html,new RegExp(`\\.${templateClass}\\.page-cover \\.page-content-stack\\{justify-content:flex-start`),`${visualStyle} 封面 kicker 应保持顶部对齐`);
+    assert.match(html,new RegExp(`\\.${templateClass}\\.page-cover h1\\{margin-top:auto;margin-bottom:0`),`${visualStyle} 封面正文组应在剩余空间居中`);
+  }
 });
 
 test('正式长标题样稿可预览且封面字段聚焦到封面标题',()=>{

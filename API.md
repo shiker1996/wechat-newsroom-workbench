@@ -66,6 +66,13 @@
 - `POST /api/themes`：创建用户主题草稿。
 - `POST /api/themes/ai/generate`：根据文章/图文/封面视觉描述生成短期 AI 主题候选（封面主题为纯 token 主题，无组件配方），执行结构化输出修复、确定性规范化、五项发布审计、正式样稿编译及与内置/用户主题的视觉相似度比较；响应包含最近主题、差异摘要和重新生成建议，候选默认 15 分钟过期且不写入主题草稿。
 - `POST /api/themes/ai/candidates/:candidateId/create`：确认服务端短期候选并创建用户主题草稿；只接受可选名称和描述，不接受前端回传主题定义，成功后候选立即失效。
+- `POST /api/social/template-proposals`：根据 Social 主题意图和可选基础模板包生成短期模板提案。模型只能返回受控 JSON；服务端补齐提案 ID、状态、来源和 provenance，并执行字段、角色、内容块和安全清理。请求可用 `draftMode=html-css` 生成仅隔离预览草稿，默认 `json`；提案默认 20 分钟过期且不会写入生产模板目录。
+- `POST /api/social/template-proposals/ai/generate`：上述模板提案生成接口的语义别名，兼容按 AI 生成路径调用的客户端。
+- `POST /api/themes/social-template-proposals/generate`：主题中心使用的模板提案生成兼容入口，契约与 Social 模板提案接口一致。
+- `GET /api/social/template-proposals/:proposalId`：读取仍在 TTL 内的短期模板提案；过期返回 `410`。提案进入生产前仍需后续编译、正式样稿门禁和用户确认。
+- `POST /api/social/template-proposals/:proposalId/compile`：将受控 JSON 提案编译为正式 Social renderer 配置，生成固定 375×667 样稿并执行角色、内容块、对比度、字体层级、伪元素可见性和安全门禁；仅返回预览与审计结果，不创建生产模板包。
+- `POST /api/social/template-proposals/:proposalId/confirm`：在正式样稿门禁通过后，将模板提案作为版本化自定义模板包绑定到指定 Social 用户主题草稿；不直接发布主题，需继续调用主题发布接口。
+- `GET /api/social/template-proposals/metrics`：读取 Social 模板提案生成、正式编译、确认绑定和门禁失败指标；返回接受率、正式通过率、失败角色、过空/溢出统计，以及是否有足够真实证据进入 renderer 扩展评估。
 - `POST /api/themes/preview`：对请求中的未保存文章或图文主题定义执行严格校验，并用正式生产编译器返回固定样稿 HTML、`usageMap` 和可选字段影响高亮；不写入草稿。
 - `POST /api/themes/:id/clone`：复制内置或已发布用户主题为新草稿。
 - `PUT /api/themes/:id/draft`：保存结构化主题草稿。
@@ -524,6 +531,9 @@ AI 规划配图占位
 
 ## 图文故事板与交付
 
+### GET /api/social/template-metrics
+读取 Social 图文按模板包、主题和页面角色聚合的运行指标与容量校准建议。支持 `templatePackId`、`themeId`、`pageRole` 查询参数；容量偏差只建议调整 profile，只有发现未覆盖的结构原语时才建议评估 renderer 扩展。
+
 ### GET /api/candidates/:id/card-editorial
 读取图文事实基座、门禁、渠道和当前故事板。
 
@@ -535,6 +545,9 @@ AI 规划配图占位
 
 ### PUT /api/candidates/:id/card-pages/:page/layout
 设置或清除指定页的版式 / 构图选择。
+
+### POST /api/candidates/:id/card-pages/:page/ai
+根据布局审计和完整事实基座，对指定故事板页执行 AI 扩写或缩写；只更新故事板，不直接重绘 PNG。
 
 ### POST /api/candidates/:id/card-channel
 切换 `wechat` / `xiaohongshu` 渠道并持久化到候选轨道与编辑决策。

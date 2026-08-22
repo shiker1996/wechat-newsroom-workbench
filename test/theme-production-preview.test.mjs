@@ -18,10 +18,11 @@ test('阶段 2 文章固定样稿直接包含正式排版编译结果',()=>{
 });
 
 test('阶段 2 图文固定样稿直接包含正式故事板编译结果',()=>{
-  const definition=socialThemeDefinition('ice-blue');
+  const definition=structuredClone(socialThemeDefinition('ice-blue'));
+  delete definition.social.templatePack;
   const production=renderStoryboardHtml({...SOCIAL_THEME_SPECIMEN,visualStyle:definition.id,themeDefinition:definition});
   const preview=compileThemePreview({target:'social',definition});
-  for(const signature of ['--page:#f9fcff','class="page page-cover','class="stat-row"','class="content-block code-block"','class="page page-ending']){
+  for(const signature of [`--page:${definition.tokens.colors.page.toLowerCase()}`,'class="page page-cover','class="stat-row"','class="content-block code-block"','class="page page-ending']){
     assert.ok(production.includes(signature),signature);
     assert.ok(preview.html.includes(signature),signature);
   }

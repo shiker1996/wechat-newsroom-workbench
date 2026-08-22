@@ -336,7 +336,7 @@
             <div class="similar-hint" id="similar-social-cards" hidden></div>
             <header class="social-editor-title social-project-hero"><div class="social-project-index"><span id="social-editor-code" class="kicker"></span><small>当前图文项目</small></div><div class="social-project-copy"><h3 id="social-editor-title"></h3><a id="social-repository-link" target="_blank" rel="noreferrer"></a></div><ol class="social-flow-indicator" aria-label="图文创作流程"><li><b>01</b><span>核对事实</span></li><li><b>02</b><span>规划故事板</span></li><li><b>03</b><span>生成与交付</span></li></ol></header>
             <div class="social-foundation-grid">
-              <section class="repository-facts-panel social-stage-panel social-facts-stage"><div class="social-stage-head"><span class="social-stage-number">01</span><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3><p>先确认事实和素材边界，再让 AI 规划页面。</p></div><div class="social-stage-actions"><button type="button" class="outline-button" id="inspect-repository">分析仓库并生成故事板</button><button type="button" class="text-button" id="analyze-card-editorial">重新生成故事板</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
+              <section class="repository-facts-panel social-stage-panel social-facts-stage"><div class="social-stage-head"><span class="social-stage-number">01</span><div><span class="kicker" id="social-facts-kicker">REPOSITORY FACTS</span><h3 id="social-facts-title">仓库事实基座</h3><p>先确认事实和素材边界，再让 AI 规划页面。</p></div><div class="social-stage-actions"><button type="button" class="outline-button" id="inspect-repository">分析仓库</button></div></div><div id="repository-facts" class="repository-facts"></div></section>
               <section class="social-score-panel social-stage-panel"><div class="social-score-hero"><span class="kicker">SOCIAL FIT</span><strong id="social-fit-score">—</strong><small>图文适配度</small></div><div id="social-score-parts"></div></section>
             </div>
             <section class="repository-facts-panel social-stage-panel social-storyboard-stage">
@@ -347,6 +347,7 @@
                   <h3>卡片故事板</h3>
                   <p>先确定叙事顺序，再微调构图与视觉。逐页修改会保留到最终生成。</p>
                 </div>
+                <div class="social-stage-actions"><button type="button" class="text-button" id="analyze-card-editorial">生成故事板</button></div>
               </div>
               <div class="social-control-deck">
                 <details class="creation-skill-settings social-skill-settings">
@@ -402,6 +403,7 @@
                     <small id="social-theme-meta" class="theme-catalog-meta" aria-live="polite">正在读取主题目录</small>
                   </label>
                 </div>
+                <div id="social-storyboard-theme-status" class="storyboard-theme-status" role="status" aria-live="polite" hidden></div>
               </div>
               <div id="card-plan-preview" class="card-plan-preview"></div>
             </section>
@@ -942,6 +944,8 @@
               <small class="ai-theme-input-error" id="ai-theme-create-error" aria-live="polite"></small>
               <div class="ai-theme-candidate-actions">
                 <button type="button" class="text-button" id="regenerate-ai-theme">重新生成</button>
+                <button type="button" class="outline-button" id="compile-ai-template-proposal" hidden>正式 renderer 预览</button>
+                <button type="button" class="primary-button" id="confirm-ai-template-proposal" hidden>确认并绑定当前主题</button>
                 <button type="button" class="primary-button" id="create-ai-theme-draft">创建为草稿</button>
               </div>
             </aside>

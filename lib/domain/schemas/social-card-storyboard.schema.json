@@ -25,7 +25,19 @@
           "title": { "type": "string", "minLength": 1 },
           "goal": { "type": "string" },
           "evidence": { "type": "array" },
-          "content_blocks": { "type": "array", "minItems": 1, "maxItems": 4 },
+          "source_refs": { "type": "array", "items": { "type": "string" } },
+          "content_blocks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_refs": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": true
+            }
+          },
           "composition": { "type": "object" }
         },
         "additionalProperties": true

@@ -11,9 +11,19 @@ import {
   buildSocialCardStoryboardSystemPrompt,
   toLegacySocialCardPromptInput,
 } from '../lib/domain/social-card-storyboard-contracts.mjs';
+import { continuationBadge, renderStoryboardBlock, renderTechnicalText } from '../lib/rendering/storyboard-html-content.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sha256=(value)=>crypto.createHash('sha256').update(value).digest('hex');
+
+test('技术命令和 URL 以安全可换行片段渲染，续页显示连续标识',()=>{
+  const text=renderTechnicalText('执行 npx -y human-review setup --global，访问 https://github.com/shiker1996/stop-pay-bilibili。');
+  assert.match(text,/class="inline-technical technical-command"/);
+  assert.match(text,/class="inline-technical technical-url"/);
+  assert.match(renderStoryboardBlock({type:'steps',items:[{title:'安装',content:'运行 npm install --save-dev demo'}]}),/inline-technical technical-command/);
+  assert.equal(continuationBadge({continuation_index:1}), '');
+  assert.match(continuationBadge({continuation_index:2}),/CONTINUED · 02/);
+});
 
 test('P0 固化图文故事板三项 JSON Schema 契约',()=>{
   assert.deepEqual(SOCIAL_CARD_STORYBOARD_CONTRACTS,{
@@ -60,12 +70,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'7368a91e2f63bf9a7eb306f73df4f669526d0152b46c65e09132e735a7d90695',
-    'repository/xiaohongshu':'1f6101824eaad2c359aaf8069bb11e67472274936150a9bc088e0e1fc9e0fe86',
-    'event/wechat':'5609fcfbf8fdd420bf65ff18b07225bf17774fcc65bd8c2b10bd4f9ca3f33899',
-    'event/xiaohongshu':'ba2b0a8f46a9bb099ad9730feceb746cb61a2c4606d4ff374a5ed5a846525895',
-    'custom/wechat':'5575e900dcf8f9e8058261112ef7234f0565c217108e63903004aae0cff22475',
-    'custom/xiaohongshu':'a85b20bce2433efc0501f6887a612a884cff75980fa101d921c9b4d998043595',
+    'repository/wechat':'0bb9505c29499d19941e8484c199e9c41201fa0718f163e85ceec4adb716d0c8',
+    'repository/xiaohongshu':'493ca9619b1c61e62251624bc62032f3558a802d4d99c262e262bc03fcb55902',
+    'event/wechat':'9d95a99b8f07c1fc5c26e2c94fba08b01163a38ae47cb5c25e1047084099e9e7',
+    'event/xiaohongshu':'222c409414e68f712ab43060421b51ca29091a08a32c5d9f2804862fd6f5c616',
+    'custom/wechat':'a84b1f7e6bb24bb1ba7792055bfcc9fd397d94fdf67d0cd4d41292844bfdfca7',
+    'custom/xiaohongshu':'581275f2cdeba82c1b0eb43690b9b3ec6997872a367c2ceab3973291a3c6e32e',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
@@ -152,6 +162,9 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.match(repository.prompt,/核心能力怎样工作/);
   assert.match(repository.prompt,/Star、Trending 和项目知名度只作为证据/);
   assert.match(repository.prompt,/运行时继续允许 4～7 页/);
+  assert.match(repository.prompt,/awesome\/list\/catalog/);
+  assert.match(repository.prompt,/禁止所有仓库机械套用/);
+  assert.match(repository.prompt,/不单设信息贫乏的“适用场景”页/);
   assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);
   assert.match(repository.prompt,/不用“点赞、收藏、转发”代替内容结论/);
   assert.match(event.prompt,/传播张力不得高于证据强度/);

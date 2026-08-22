@@ -88,6 +88,32 @@
       "type": "object", "additionalProperties": false, "required": ["recipes", "effects"],
       "properties": {
         "recipes": { "type": "object", "additionalProperties": { "type": "string" } },
+        "templatePack": {
+          "type": "object", "additionalProperties": false, "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string" }, "version": { "type": "integer", "minimum": 1 },
+            "label": { "type": "string", "maxLength": 80 }, "renderer": { "type": "string", "maxLength": 80 },
+            "proposalId": { "type": "string", "maxLength": 80 }, "source": { "enum": ["proposal", "builtin", "inherited"] },
+            "fallbackTemplate": { "type": ["string", "null"] }, "css": { "type": "string", "maxLength": 20000 },
+            "surface": { "type": "object", "additionalProperties": false, "properties": { "density": { "enum": ["compact", "standard", "airy"] }, "decoration": { "enum": ["none", "grid-line", "orbit", "stamp", "index-line", "paper-rule", "accent-edge"] }, "headingTreatment": { "enum": ["plain", "accent-bar", "highlight-block", "underline", "numbered"] } } },
+            "roleTemplates": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 64 } },
+            "roles": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": false, "required": ["template", "supportedBlocks", "maxBlocks", "maxItems"], "properties": { "template": { "type": "string", "maxLength": 64 }, "supportedBlocks": { "type": "array", "maxItems": 10, "items": { "type": "string" } }, "maxBlocks": { "type": "integer", "minimum": 1, "maximum": 6 }, "maxItems": { "type": "integer", "minimum": 1, "maximum": 12 }, "notes": { "type": "string", "maxLength": 160 } } } }
+          }
+        },
+        "templateMatch": {
+          "type": "object", "additionalProperties": false, "required": ["schemaVersion", "packId", "source", "confidence", "reasonCode", "score", "runnerUpScore", "margin", "reason", "signals"],
+          "properties": {
+            "schemaVersion": { "const": 1 }, "packId": { "type": "string" },
+            "source": { "enum": ["program-recommended", "user-selected", "inherited", "compatibility"] },
+            "confidence": { "enum": ["high", "medium", "low"] },
+            "reasonCode": { "enum": ["CLEAR_DIRECTION", "NO_DIRECTION_SIGNAL", "WEAK_DIRECTION_SIGNAL", "AMBIGUOUS_DIRECTION_SIGNAL"] },
+            "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "runnerUpScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "margin": { "type": "integer", "minimum": -100, "maximum": 100 },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 240 },
+            "signals": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 40 } }
+          }
+        },
         "components": {
           "type": "object", "additionalProperties": false,
           "properties": {

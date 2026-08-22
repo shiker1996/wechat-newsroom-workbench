@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { evaluateCustomCardGate, CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS } from '../lib/domain/social-card-gate.mjs';
 import { buildCustomFactSheet, customFactMarkdown, parsePointLine, customSourceUrl } from '../lib/domain/custom-fact-builder.mjs';
 import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
+import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 
 const okEditorial={must_disclose:'体验来自作者确认',forbidden_claims:'不得夸大效果',target_reader:'职场新人',pain_point:'整理效率低',recommended_pages:6};
 const okFact={kind:'custom',content_type:'tutorial',topic:'三步同步笔记',thesis:'',points:[
@@ -81,13 +82,14 @@ test('自定义事实清单标注来源等级与体验边界', async () => {
 });
 
 test('自定义图文渲染使用独立标签体系与品牌行', () => {
+  const legacyTheme=structuredClone(socialThemeDefinition('peach')); delete legacyTheme.social.templatePack; delete legacyTheme.hash; delete legacyTheme.file;
   const pages=[{kind:'cover',title:'封面',goal:'目标'},{kind:'step',title:'第一步',goal:'操作',content_blocks:[{type:'text',content:'内容'}]},{kind:'ending',title:'结尾',goal:'收尾'}];
-  const wechat=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'wechat'});
+  const wechat=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'wechat',visualStyle:'peach',themeDefinition:legacyTheme});
   assert.match(wechat,/HOW TO/);
   assert.match(wechat,/CUSTOM \/ 教程/);
   assert.match(wechat,/内容整理自作者素材/);
   assert.match(wechat,/data-channel="wechat"/);
-  const xhs=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'xiaohongshu'});
+  const xhs=renderStoryboardHtml({topic:'主题',pages,contentType:'custom',sourceLabel:'教程',channelMode:'xiaohongshu',visualStyle:'peach',themeDefinition:legacyTheme});
   assert.match(xhs,/小红书 · 教程/);
   assert.match(xhs,/data-channel="xiaohongshu"/);
   assert.match(xhs,/\.page\{width:375px;height:667px/);

@@ -18,7 +18,13 @@ export function cardBlockEditorHtml(block, index) {
   const type = CARD_ALLOWED_BLOCK_TYPES.includes(block?.type) ? block.type : 'text';
   const structured = isStructuredCardBlockType(type);
   const payload = structured ? JSON.stringify({ items: block.items || [], headers: block.headers || [], rows: block.rows || [] }, null, 2) : String(block.content || '');
-  return `<fieldset class="storyboard-block-editor" data-storyboard-block="${index}"><legend>内容块 ${index + 1}<select data-storyboard-block-type>${cardBlockTypeOptions(type)}</select></legend><label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title || '')}"></label><label>${structured ? '结构化内容（JSON）' : '正文'}<textarea data-storyboard-block-content rows="${structured ? 6 : 3}">${escapeHtml(payload)}</textarea></label><button type="button" class="text-button" data-remove-storyboard-block>删除此块</button></fieldset>`;
+  const factIds = Array.isArray(block?.fact_ids) ? block.fact_ids.map(String) : [];
+  const sourceRefs = Array.isArray(block?.source_refs) ? block.source_refs.map(String) : [];
+  const supplementSlot = String(block?.supplement_slot_id || '');
+  const provenance = supplementSlot || factIds.length || sourceRefs.length
+    ? `<small class="storyboard-block-provenance">${supplementSlot ? `自动补充槽位：${escapeHtml(supplementSlot)}` : '来源内容'}${factIds.length ? ` · ${factIds.length} 条事实候选` : ''}${sourceRefs.length ? ` · ${sourceRefs.length} 个来源` : ''}</small>`
+    : '';
+  return `<fieldset class="storyboard-block-editor" data-storyboard-block="${index}" data-supplement-slot-id="${escapeHtml(supplementSlot)}" data-fact-ids="${escapeHtml(JSON.stringify(factIds))}" data-source-refs="${escapeHtml(JSON.stringify(sourceRefs))}"><legend>内容块 ${index + 1}<select data-storyboard-block-type>${cardBlockTypeOptions(type)}</select></legend>${provenance}<label>小标题<input data-storyboard-block-title value="${escapeHtml(block.title || '')}"></label><label>${structured ? '结构化内容（JSON）' : '正文'}<textarea data-storyboard-block-content rows="${structured ? 6 : 3}">${escapeHtml(payload)}</textarea></label><button type="button" class="text-button" data-remove-storyboard-block>删除此块</button></fieldset>`;
 }
 
 export function isCustomOutput(mode) { return String(mode || '').includes('custom-cards'); }

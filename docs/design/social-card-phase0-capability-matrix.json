@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "status": "phase-0-baseline",
+  "scope": "social-card",
+  "capturedAt": "2026-08-20",
+  "sourceFiles": [
+    "lib/rendering/social-card-role.mjs",
+    "lib/rendering/social-card-composition.mjs",
+    "lib/rendering/social-card-layout.mjs",
+    "lib/rendering/storyboard-html-content.mjs",
+    "lib/domain/social-card-storyboard-contracts.mjs",
+    "lib/themes/recipe-catalog.mjs"
+  ],
+  "pageRoles": {
+    "values": [
+      "cover",
+      "concept",
+      "feature",
+      "steps",
+      "data",
+      "compare",
+      "evidence",
+      "timeline",
+      "risk",
+      "ending"
+    ],
+    "inference": {
+      "cover": "page.kind=cover",
+      "ending": "page.kind=ending",
+      "timeline": "content block timeline or kind timeline/what-happened",
+      "steps": "content block steps or kind quickstart/step/howto/tutorial",
+      "data": "content block stats",
+      "compare": "content block compare or kind positions",
+      "evidence": "kind contains evidence",
+      "risk": "kind contains risk/limitation/boundary",
+      "feature": "kind contains capability/feature/scenario/item",
+      "concept": "fallback role"
+    }
+  },
+  "contentBlocks": {
+    "storyboardContract": {
+      "xiaohongshu": [
+        "text",
+        "list",
+        "code",
+        "note",
+        "stats",
+        "compare",
+        "steps",
+        "timeline",
+        "scenes",
+        "highlight"
+      ],
+      "wechat": ["text", "list", "code", "note"]
+    },
+    "rendererSupported": [
+      "text",
+      "list",
+      "code",
+      "note",
+      "stats",
+      "compare",
+      "steps",
+      "timeline",
+      "scenes",
+      "highlight"
+    ],
+    "pageBlockLimits": {
+      "cover": 2,
+      "content": 3,
+      "ending": 2,
+      "schemaMax": 4
+    },
+    "listItemBudget": 9,
+    "notes": [
+      "未知 block type 当前会回退为 text-block",
+      "超过 pageBlockLimits 的内容会进入预算裁剪逻辑",
+      "列表超过 listItemBudget 时会截断列表条目"
+    ]
+  },
+  "currentCompositionVariants": {
+    "cover": ["hero-stack", "hero-frame"],
+    "concept": ["concept-split", "concept-offset"],
+    "feature": ["feature-ledger", "feature-stack"],
+    "steps": ["sequence-rail", "sequence-offset"],
+    "data": ["metric-board", "metric-split"],
+    "compare": ["comparison-board", "comparison-split"],
+    "evidence": ["evidence-ledger", "evidence-frame"],
+    "timeline": ["timeline-rail", "timeline-offset"],
+    "risk": ["risk-sidebar", "risk-frame"],
+    "ending": ["closing-focus", "closing-note"]
+  },
+  "currentCompositionFields": {
+    "columns": ["single", "split-wide", "split-even", "split-narrow"],
+    "flow": ["stack", "alternate"],
+    "alignment": ["start", "center", "end"],
+    "decoration": ["none", "orbit", "index-line", "stamp"],
+    "overlap": ["none", "title-card", "accent-edge"]
+  },
+  "currentLayouts": ["auto", "poster", "editorial", "data", "checklist", "steps", "minimal"],
+  "themeRecipes": {
+    "surface": ["base", "palette", "neon", "brutalist"],
+    "frame": ["soft-orbit", "palette-frame", "neon-frame", "brutalist-frame"],
+    "decoration": ["orbit", "scanlines", "paper-offset", "soft-blur", "circle", "none"],
+    "eyebrow": ["plain", "accent", "stamp", "underline"],
+    "coverTitle": ["classic", "editorial", "poster", "highlight-block"],
+    "skeleton": ["stacked", "editorial-split", "terminal-rail", "paper-offset", "impact-band"],
+    "coverSupport": ["none", "lead", "statement", "metric"],
+    "ending": ["dark-fill", "accent-fill", "hard-fill"],
+    "list": ["soft-card", "tinted-card", "outlined-card", "hard-card", "hard-accent"],
+    "code": ["dark-panel", "terminal-panel", "hard-panel", "accent-panel", "ink-panel"]
+  },
+  "plannedTemplatePacks": {
+    "standard-v1": {
+      "status": "planned",
+      "renderer": "current-deterministic-renderer",
+      "roles": "all pageRoles",
+      "fallback": null
+    },
+    "neon-v1": {
+      "status": "planned",
+      "renderer": "social-template-renderer",
+      "roleTemplates": {
+        "cover": "hero-metrics",
+        "concept": "problem-stack",
+        "feature": "feature-stack",
+        "steps": "steps-rail",
+        "data": "metric-board",
+        "compare": "comparison-board",
+        "evidence": "evidence-ledger",
+        "timeline": "timeline-rail",
+        "risk": "risk-frame",
+        "ending": "closing-cta"
+      },
+      "fallback": "standard-v1"
+    }
+  },
+  "compatibilityRules": {
+    "selectionOrder": [
+      "validated-layout-intent",
+      "theme-role-template",
+      "role-default-template",
+      "standard-v1"
+    ],
+    "beforeStoryboard": "inject selected theme template capabilities into the social storyboard prompt",
+    "afterStoryboard": "validate content block compatibility; do not silently delete facts or content blocks",
+    "singlePageRewrite": "preserve page role, template id, facts, page size and page order",
+    "auditFallbackOrder": [
+      "same-template content/spacing repair",
+      "same-theme compatible template",
+      "standard-v1"
+    ]
+  },
+  "versionPolicy": {
+    "templatePackId": "stable semantic identifier",
+    "templateVersion": "integer; increment for structural or contract-breaking changes",
+    "themeVersion": "independent visual-token version",
+    "artifactSnapshot": "record theme id/version, template pack/version, page template and fallback state"
+  }
+}

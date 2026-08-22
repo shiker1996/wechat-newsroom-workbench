@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://write-assistant.local/schemas/social-template-proposal-v1.json",
+  "title": "Social Template Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "proposalId", "target", "label", "description", "visualDirection", "roles", "surface", "status", "source"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "proposalId": { "type": "string", "pattern": "^proposal-social-[a-z0-9-]{4,64}$" },
+    "target": { "const": "social" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 30 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "visualDirection": {
+      "type": "array", "minItems": 1, "maxItems": 12,
+      "items": { "type": "string", "minLength": 1, "maxLength": 32 },
+      "uniqueItems": true
+    },
+    "baseTemplatePack": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$" },
+    "roles": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cover", "concept", "feature", "steps", "data", "compare", "evidence", "timeline", "risk", "ending"],
+      "properties": {
+        "cover": { "$ref": "#/$defs/roleProposal" },
+        "concept": { "$ref": "#/$defs/roleProposal" },
+        "feature": { "$ref": "#/$defs/roleProposal" },
+        "steps": { "$ref": "#/$defs/roleProposal" },
+        "data": { "$ref": "#/$defs/roleProposal" },
+        "compare": { "$ref": "#/$defs/roleProposal" },
+        "evidence": { "$ref": "#/$defs/roleProposal" },
+        "timeline": { "$ref": "#/$defs/roleProposal" },
+        "risk": { "$ref": "#/$defs/roleProposal" },
+        "ending": { "$ref": "#/$defs/roleProposal" }
+      }
+    },
+    "surface": { "$ref": "#/$defs/surface" },
+    "draft": { "$ref": "#/$defs/draft" },
+    "status": { "enum": ["draft", "preview-only", "ready", "published", "rejected"] },
+    "source": { "enum": ["ai-proposal", "ai-html-draft", "user-authored", "inherited"] },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "maxLength": 120 },
+        "promptVersion": { "type": "string", "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "baseThemeId": { "type": "string", "maxLength": 64 }
+      }
+    }
+  },
+  "$defs": {
+    "roleProposal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["layout", "maxBlocks", "maxItems", "supportedBlocks"],
+      "properties": {
+        "layout": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 64 },
+        "maxBlocks": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "maxItems": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "supportedBlocks": {
+          "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true,
+          "items": { "enum": ["text", "list", "code", "note", "stats", "compare", "steps", "timeline", "scenes", "highlight"] }
+        },
+        "notes": { "type": "string", "maxLength": 160 }
+      }
+    },
+    "surface": {
+      "type": "object", "additionalProperties": false,
+      "required": ["density", "decoration", "headingTreatment"],
+      "properties": {
+        "density": { "enum": ["compact", "standard", "airy"] },
+        "decoration": { "enum": ["none", "grid-line", "orbit", "stamp", "index-line", "paper-rule", "accent-edge"] },
+        "headingTreatment": { "enum": ["plain", "accent-bar", "highlight-block", "underline", "numbered"] }
+      }
+    },
+    "draft": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "html": { "type": "string", "maxLength": 300000 },
+        "css": { "type": "string", "maxLength": 300000 },
+        "sanitized": { "type": "boolean" },
+        "sandboxOnly": { "type": "boolean" }
+      }
+    }
+  }
+}
