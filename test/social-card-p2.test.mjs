@@ -696,6 +696,7 @@ test('补充仍不足时内容框按内容高度收缩并垂直居中',()=>{
   assert.match(html,/class="page fit-content-stack page-content/);
   assert.match(html,/\.page\.fit-content-stack \.page-body\{align-items:center\}/);
   assert.match(html,/\.page\.fit-content-stack \.page-content-stack\{min-height:0!important;height:max-content;align-self:center\}/);
+  assert.match(html,/\.page\.page-content \.page-content-stack/);
 });
 
 test('只有 underfilled 的页面启用内容自适应后按软门禁通过',()=>{
