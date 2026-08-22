@@ -175,7 +175,8 @@ PNG 截图、文案、交付门禁和产物登记
       "component_id": "component-fact-id@p4-run-note",
       "render_type": "note",
       "fact_ids": ["fact-id"],
-      "source_refs": ["README:Usage"]
+      "source_refs": ["README:Usage"],
+      "block": { "type": "note", "title": "使用方式", "content": "生成后的简洁展示文案" }
     }
   ]
 }
@@ -185,6 +186,7 @@ PNG 截图、文案、交付门禁和产物登记
 
 - AI 不填写 `slot_id`；
 - `component_id` 必须来自目标页 `pageCandidates`；
+- `block` 必须由 AI 返回展示文案；`source_text` 只能作为证据，不能原样写入；
 - AI 不得返回 `add_fact_block`、完整 `card_plan`、HTML、CSS 或任意新事实；
 - 程序根据组件的页面绑定和统一语义表解析 `slot_id`；
 - 程序继续校验角色、故事线、来源、事实 ID、内容块类型、容量和原子守恒；

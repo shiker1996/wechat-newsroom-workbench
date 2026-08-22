@@ -41,4 +41,4 @@
 
 ## 内容计划调整器
 
-布局失败后的内容计划调整使用 `social-card-content-planner` 用途。模型只能返回 `split_page`、`move_block`、`merge_pages`、`add_component` 四类受控操作；不得返回 HTML、CSS、完整 `card_plan` 或任意新事实。`add_component` 必须引用目标页 `pageCandidates` 中列出的页面专属组件，并携带已登记的 `source_refs`，可携带事实候选 `fact_ids` 和渲染类型；模型不填写 `slot_id`，程序根据组件的页面绑定和统一槽位语义表解析槽位，再校验页面角色、故事线、槽位与内容块类型、候选事实、操作数量、来源引用和原子守恒，校验通过后才应用，并重新编译和审计。
+布局失败后的内容计划调整使用 `social-card-content-planner` 用途。模型只能返回 `split_page`、`move_block`、`merge_pages`、`add_component` 四类受控操作；不得返回 HTML、CSS、完整 `card_plan` 或任意新事实。`add_component` 必须引用目标页 `pageCandidates` 中列出的页面专属组件，携带已登记的 `source_refs`，并返回由 AI 生成的展示 `block`；`source_text` 只作为证据，不能原样写入 block。模型不填写 `slot_id`，程序根据组件的页面绑定和统一槽位语义表解析槽位，再校验展示文案、页面角色、故事线、槽位与内容块类型、候选事实、操作数量、来源引用和原子守恒，校验通过后才应用，并重新编译和审计。

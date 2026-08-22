@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { buildAiThemeMessages, normalizeAiThemeCandidate } from '../lib/themes/ai-theme-generator.mjs';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
+import { compileSocialTheme, resolveSocialCoverTitleShadowRole, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
 import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
 import { renderStoryboardHtml, deterministicCoverTitleLines, normalizeCoverTitleLines } from '../lib/llm/social-card-pipeline.mjs';
 import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
@@ -47,7 +47,7 @@ test('旧图文主题缺少 coverTitle 时保持兼容并按 classic 编译',()=
   const compiled=compileSocialTheme(legacy);
   assert.equal(compiled.recipes.coverTitle,'classic');
   assert.match(compiled.css,/\.page-cover h1\{[^}]+border-left:2px solid var\(--accent\)/);
-  assert.doesNotMatch(compiled.css,/text-shadow:3px 3px 0 var\(--accent2\)|\.cover-title-line/);
+  assert.doesNotMatch(compiled.css,/text-shadow:3px 3px 0 var\(--cover-title-shadow\)|\.cover-title-line/);
 });
 
 test('14 个内置图文主题按视觉语言分配四种封面标题',()=>{
@@ -76,7 +76,9 @@ test('四种配方形成可辨认的标题版式语言',()=>{
   const css=Object.fromEntries(recipes.map((recipe)=>[recipe,compileSocialTheme(themeWithCoverTitle(recipe)).css]));
   assert.match(css.classic,/border-left:2px solid var\(--accent\)/);assert.match(css.classic,/max-width:96%/);
   assert.match(css.editorial,/border-top:4px double var\(--ink\)/);assert.match(css.editorial,/font-family:Georgia/);
-  assert.match(css.poster,/text-shadow:3px 3px 0 var\(--accent2\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
+  assert.match(css.poster,/text-shadow:3px 3px 0 var\(--cover-title-shadow\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
+  assert.equal(resolveSocialCoverTitleShadowRole(themeWithCoverTitle('poster')), 'accentSecondary');
+  assert.equal(resolveSocialCoverTitleShadowRole(socialThemeDefinition('brutalist')), 'accent');
   assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--ink\)/);
   const html=compileThemePreview({target:'social',definition:themeWithCoverTitle('highlight-block')}).html;
   assert.equal((html.match(/class="cover-title-line"/g)||[]).length,3);

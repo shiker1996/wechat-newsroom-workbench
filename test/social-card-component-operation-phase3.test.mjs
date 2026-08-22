@@ -48,8 +48,8 @@ const contentComponents = {
   },
 };
 
-test('阶段 3 add_component 契约不要求 AI 返回 slot_id', () => {
-  const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-fact-export@p1-capability-note', render_type: 'note', fact_ids: ['fact-export'], source_refs: sourceRefs }] };
+test('阶段 3 add_component 契约不要求 AI 返回 slot_id，但必须返回展示 block', () => {
+  const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-fact-export@p1-capability-note', render_type: 'note', fact_ids: ['fact-export'], source_refs: sourceRefs, block: { type: 'note', content: '支持导出 PNG。' } }] };
   assert.equal(validateSocialCardContentPlannerSchema(raw).valid, true);
   assert.equal('slot_id' in raw.operations[0], false);
   const prompt = buildSocialCardContentPlannerPrompt({ cardPlan: plan, contentComponents });
@@ -58,7 +58,7 @@ test('阶段 3 add_component 契约不要求 AI 返回 slot_id', () => {
 });
 
 test('阶段 3 程序根据页面组件语义解析槽位并应用组件操作', () => {
-  const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-fact-export@p1-capability-note', render_type: 'note', fact_ids: ['fact-export'], source_refs: sourceRefs }] };
+  const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-fact-export@p1-capability-note', render_type: 'note', fact_ids: ['fact-export'], source_refs: sourceRefs, block: { type: 'note', content: '支持导出 PNG。' } }] };
   const normalized = normalizeSocialCardContentPlannerResult(raw, { cardPlan: plan, contentComponents });
   assert.equal(normalized.operations[0].op, 'add_fact_block');
   assert.equal(normalized.operations[0].slot_id, 'capability');

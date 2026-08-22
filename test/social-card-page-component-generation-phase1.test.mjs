@@ -50,7 +50,7 @@ test('阶段 1 事实候选提示不再向模型暴露元数据候选', () => {
   });
   const prompt = JSON.parse(buildSocialCardFactCandidatePrompt(index));
   assert.equal(prompt.candidates.some((item) => item.text === 'metadata-only'), false);
-  const capability = prompt.candidates.find((item) => item.text === '支持导出 PNG');
+  const capability = prompt.candidates.find((item) => item.source_text === '支持导出 PNG');
   assert.equal(capability.display_label, '具体能力');
   assert.ok(capability.semantic_intent_candidates.includes('capability'));
 });
@@ -58,4 +58,21 @@ test('阶段 1 事实候选提示不再向模型暴露元数据候选', () => {
 test('阶段 1 槽位兼容性统一读取组件资格标记', () => {
   assert.equal(isSocialCardFactComponentCompatibleWithSlot({ id: 'excluded', component_eligible: false, tags: ['run'] }, 'steps', 'run'), false);
   assert.equal(isSocialCardFactComponentCompatibleWithSlot({ id: 'run', component_eligible: true, tags: ['run'] }, 'steps', 'run'), true);
+});
+
+test('纯英文事实只保留来源证据，不直接进入补充组件内容', () => {
+  const snapshot = buildSocialCardContentComponents({
+    cardPlan: [{ kind: 'content', role: 'steps', content_blocks: [] }],
+    factIndex: { candidates: [{
+      id: 'fact-en', path: 'facts.readme.sections[4]', label: 'sections',
+      text: 'Your terminal may conflict with terminal-code shortcuts.', tags: ['run', 'limitation'],
+      priority: 'supporting', source_status: 'provided', source_refs: ['README:shortcuts'],
+    }] },
+  });
+  const component = snapshot.supplements[0];
+  assert.equal(component.displayTextStatus, 'pending');
+  assert.equal(component.content.text, '');
+  assert.equal(component.sourceText.includes('Your terminal'), true);
+  assert.equal(component.sizeVariants.find((variant) => variant.id === 'slot-fit').content.text, '');
+  assert.ok(component.sizeVariants.find((variant) => variant.id === 'slot-fit').capacityContent.text.length > 0);
 });

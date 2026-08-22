@@ -212,7 +212,7 @@ AI 返回 semantic_intent=run
 
 #### 阶段 3 执行记录（已完成）
 
-- 内容计划 Schema 新增 `add_component`，只要求 `page`、`component_id` 和来源引用，`slot_id` 不再是 AI 输出字段；
+- 内容计划 Schema 新增 `add_component`，要求 `page`、`component_id`、来源引用和 AI 生成的展示 `block`；`slot_id` 不再是 AI 输出字段；
 - 组件操作在程序侧根据页面专属候选、角色和语义标签解析为内部校验结构，复用既有来源、事实和容量门禁；
 - `render_type` 可由组件候选或操作显式选择，缺省时使用组件首选渲染形式；
 - 无法解析组件、角色槽位或事实来源时明确失败，不静默补入通用槽位；

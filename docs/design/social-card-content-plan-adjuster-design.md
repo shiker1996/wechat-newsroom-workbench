@@ -194,7 +194,7 @@ AI 不直接返回 HTML 或完整任意 `card_plan`，而是返回结构化操�
     {"op": "merge_pages", "pages": [6, 7], "reason": "同一快速上手故事线，P7 只有注意事项"},
     {"op": "split_page", "page": 3, "groups": [{"blocks": [{"block": 0, "items": [0, 1, 2]}]}, {"blocks": [{"block": 0, "items": [3, 4, 5]}]}]},
     {"op": "move_block", "from_page": 5, "to_page": 6, "block": 1},
-    {"op": "add_component", "page": 4, "component_id": "component-fact-id@p4-verify-note", "render_type": "note", "fact_ids": ["fact-id"], "source_refs": ["README:Usage"]}
+    {"op": "add_component", "page": 4, "component_id": "component-fact-id@p4-verify-note", "render_type": "note", "fact_ids": ["fact-id"], "source_refs": ["README:Usage"], "block": {"type": "note", "content": "生成后的简洁展示文案"}}
   ]
 }
 ```
@@ -205,6 +205,7 @@ AI 不直接返回 HTML 或完整任意 `card_plan`，而是返回结构化操�
 - `split_page` 必须覆盖全部可拆条目，不得遗漏或重复；
 - `move_block` 只能移动完整原子块，不得截取半个事实；
 - `add_component` 必须引用目标页 `pageCandidates` 中列出的组件、事实 ID 和已登记来源；AI 不填写 `slot_id`，由程序根据页面绑定和统一语义表解析；
+- `add_component` 必须返回 AI 生成的展示 `block`；`source_text` 只能作为证据，不能原样写入；AI 不填写 `slot_id`，由程序根据页面绑定和统一语义表解析；
 - 封面和结尾页默认不可被普通内容计划操作影响；
 - 所有操作执行后都要重新进行结构、事实和布局校验。
 

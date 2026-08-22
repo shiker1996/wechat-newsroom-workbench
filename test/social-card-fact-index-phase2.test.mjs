@@ -35,7 +35,8 @@ test('事实候选按角色槽位匹配并可编译为带来源的补充块', ()
   const selected = selectSocialCardFactCandidates(index, { role: 'steps', slotId: 'install', blockType: 'code', limit: 2 });
   assert.ok(selected.length >= 1);
   assert.ok(selected[0].tags.includes('install'));
-  const block = buildSocialCardFactBlockFromCandidates(index, { role: 'steps', slotId: 'install', blockType: 'code', factIds: selected.map((item) => item.id) });
+  const displayIndex = { ...index, candidates: index.candidates.map((item) => ({ ...item, display_text: item.text, display_text_status: 'provided' })) };
+  const block = buildSocialCardFactBlockFromCandidates(displayIndex, { role: 'steps', slotId: 'install', blockType: 'code', factIds: selected.map((item) => item.id) });
   assert.equal(block.type, 'code');
   assert.equal(block.supplement_slot_id, 'install');
   assert.ok(block.source_refs.includes('https://example.com/readme'));
@@ -62,8 +63,9 @@ test('事实候选提示只暴露候选 id、文本、标签和来源', () => {
 
 test('内容不足时程序可按角色槽位生成一条有来源的补充操作', () => {
   const index = buildSocialCardFactIndex({ sourceUrl: 'https://example.com', coreCapabilities: ['提供可核验的能力说明'] });
+  const displayIndex = { ...index, candidates: index.candidates.map((item) => ({ ...item, display_text: item.text, display_text_status: 'provided' })) };
   const plan = [{ kind: 'content', role: 'feature', content_blocks: [{ type: 'text', content: '已有内容', source_refs: ['https://example.com'] }] }];
-  const operations = buildDeterministicSocialCardFactSupplementOperations(plan, [{ page: 1, issues: ['underfilled'] }], index, { maxBlocksByRole: { feature: 4 }, allowedBlockTypes: ['text', 'note'] });
+  const operations = buildDeterministicSocialCardFactSupplementOperations(plan, [{ page: 1, issues: ['underfilled'] }], displayIndex, { maxBlocksByRole: { feature: 4 }, allowedBlockTypes: ['text', 'note'] });
   assert.equal(operations.length, 1);
   assert.equal(operations[0].op, 'add_fact_block');
   assert.equal(operations[0].slot_id, 'capability');
@@ -75,11 +77,26 @@ test('add_component 的 fact_ids 必须能回指候选及其来源', () => {
   const index = buildSocialCardFactIndex({ sourceUrl: 'https://example.com', coreCapabilities: ['提供能力说明'] });
   const candidate = index.candidates.find((item) => item.tags.includes('capability'));
   const plan = [{ kind: 'content', role: 'feature', page_group_id: 'g1', content_blocks: [{ type: 'text', content: '已有', source_refs: ['https://example.com'] }] }];
-  const component = { id: `component-${candidate.id}`, componentId: `component-${candidate.id}`, page: 1, role: 'feature', slotId: 'capability', factIds: [candidate.id], sourceRefs: candidate.source_refs, sourceStatus: 'provided', semanticTags: candidate.tags, preferredRender: 'text', renderCandidates: ['text'], content: { title: '具体能力', text: candidate.text } };
+  const component = { id: `component-${candidate.id}`, componentId: `component-${candidate.id}`, page: 1, role: 'feature', slotId: 'capability', factIds: [candidate.id], sourceRefs: candidate.source_refs, sourceStatus: 'provided', semanticTags: candidate.tags, preferredRender: 'text', renderCandidates: ['text'], content: { title: '具体能力', text: '' }, displayTextStatus: 'pending' };
   const componentOptions = { factIndex: index, contentComponents: { supplements: [component], pageCandidates: { '1': { supplements: [component] } } } };
-  const valid = validateSocialCardContentPlannerOperations(plan, { operations: [{ op: 'add_component', page: 1, component_id: component.id, render_type: 'text', fact_ids: [candidate.id], source_refs: candidate.source_refs, block: { type: 'text', content: candidate.text, fact_ids: [candidate.id] } }] }, componentOptions);
+  const valid = validateSocialCardContentPlannerOperations(plan, { operations: [{ op: 'add_component', page: 1, component_id: component.id, render_type: 'text', fact_ids: [candidate.id], source_refs: candidate.source_refs, block: { type: 'text', content: '中文能力展示文案', fact_ids: [candidate.id] } }] }, componentOptions);
   assert.equal(valid.valid, true);
   const invalid = validateSocialCardContentPlannerOperations(plan, { operations: [{ op: 'add_component', page: 1, component_id: component.id, render_type: 'text', fact_ids: ['fact-unknown'], source_refs: candidate.source_refs, block: { type: 'text', content: '伪造', fact_ids: ['fact-unknown'] } }] }, componentOptions);
   assert.equal(invalid.valid, false);
   assert.match(invalid.issues.join('；'), /未知事实候选/);
+});
+
+test('纯英文事实在候选提示中标记为待本地化，槽位标签不从正文关键词推断', () => {
+  const index = buildSocialCardFactIndex({
+    sourceUrl: 'https://example.com/readme',
+    readme: { sections: [{ title: 'Shortcuts', content: 'Your terminal and terminal-code may conflict on shortcuts.' }] },
+  });
+  const candidate = index.candidates.find((item) => item.path.endsWith('sections[0]'));
+  assert.equal(candidate.display_text_status, 'pending');
+  assert.equal(candidate.display_text, '');
+  assert.equal(candidate.tags.includes('run'), true);
+  const promptCandidate = JSON.parse(buildSocialCardFactCandidatePrompt(index)).candidates.find((item) => item.id === candidate.id);
+  assert.equal(promptCandidate.text, undefined);
+  assert.equal(promptCandidate.source_text, candidate.text);
+  assert.equal(promptCandidate.display_text_status, 'pending');
 });
