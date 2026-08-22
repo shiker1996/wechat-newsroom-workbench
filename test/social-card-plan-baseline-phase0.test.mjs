@@ -32,13 +32,22 @@ test('阶段 0 基线记录计划变化、操作计数、模板容量和审计�
     operations: [{ op: 'split_block', page: 2 }, { op: 'merge_pages', pages: [2, 3] }],
     report,
     auditAttempts: [{ attempt: 1, valid: false }],
-    repair: { structuralReflowAttempted: true, structureRepairCount: 1, textRepairCount: 2, relaxedDensityPages: [1] },
+    repair: {
+      structuralReflowAttempted: true,
+      structureRepairCount: 1,
+      textRepairCount: 2,
+      relaxedDensityPages: [1],
+      fitContentPages: [1],
+      phaseHistory: [{ attempt: 1, phase: 'structure', action: 'split-page', changed: true }],
+    },
   });
   assert.equal(baseline.changes.pageDelta, 1);
   assert.deepEqual(baseline.changes.operations.counts, { split_block: 1, merge_pages: 1 });
   assert.equal(baseline.template.capacityProfile.roles.feature.visual.bodyHeightPx, 410);
   assert.equal(baseline.audits.final.pages[1].utilization, 42);
   assert.equal(baseline.repairs.textRepairCount, 2);
+  assert.deepEqual(baseline.repairs.fitContentPages, [1]);
+  assert.equal(baseline.repairs.phaseHistory[0].phase, 'structure');
 });
 
 test('阶段 0 布局摘要不携带完整页面正文', () => {
