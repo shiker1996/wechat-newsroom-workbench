@@ -35,9 +35,17 @@ test('Phase 5 brutalist-v1 输出硬边框、角色模板和逐页元数据', ()
   assert.match(html, /brutalist-template-numbered-steps/);
   assert.match(html, /brutalist-template-hard-cta/);
   assert.match(html, /border:4px solid var\(--ink\)/);
+  assert.match(html, /\.template-brutalist-v1\.page-cover \.brutalist-title-line\{[^}]*background:var\(--ink\);color:var\(--inverse\)/);
+  assert.match(html, /\.template-brutalist-v1\.page-cover \.brutalist-title-line:nth-child\(even\)\{[^}]*background:var\(--inverse\);color:var\(--ink\)/);
   assert.match(html, /\.template-brutalist-v1 \.brand\{[^}]*background:var\(--ink\);color:var\(--inverse\)/);
   assert.match(html, /\.template-brutalist-v1 \.page li:before\{[^}]*background:var\(--ink\);box-shadow:2px 2px 0 var\(--accentSecondary\)/);
   assert.doesNotMatch(html, /onload=/);
+});
+
+test('brutalist-v1 封面标题交替交换正文色与反色', () => {
+  const charcoal = compileSocialTheme(socialThemeDefinition('charcoal', { fallback: false })).css;
+  assert.match(charcoal, /--ink:#ededed/);
+  assert.match(charcoal, /--inverse:#111111/);
 });
 
 test('Phase 5 editorial-v1 注册并绑定纸艺暖调 social 主题', () => {

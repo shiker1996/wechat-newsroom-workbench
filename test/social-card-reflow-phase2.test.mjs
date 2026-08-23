@@ -336,3 +336,49 @@ test('超过绝对页数只产生阻断标记，不执行静默截断', () => {
   assert.ok(result.warnings.some((item) => item.includes('绝对安全上限')));
   assert.equal(result.pages.flatMap((page) => page.content_blocks[0]?.items || []).length, items.length);
 });
+
+test('高度建议模式不会因静态高度高估提前拆页，浏览器可接管最终裁决', () => {
+  const capacityProfile = {
+    roles: {
+      feature: {
+        structural: { maxBlocks: 4, maxItems: 99 },
+        visual: { bodyHeightPx: 120, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['text'] },
+      },
+    },
+  };
+  const page = {
+    kind: 'content',
+    role: 'feature',
+    title: '静态模型容易高估的页面',
+    content_blocks: [{ type: 'text', title: '说明', content: '这是一段较长说明。'.repeat(30) }],
+  };
+  const strict = compileTemplateAwareCardPlan({ cardPlan: [page], capacityProfile, maxPages: 7 });
+  const advisory = compileTemplateAwareCardPlan({ cardPlan: [page], capacityProfile, maxPages: 7, heightAdvisory: true });
+  assert.ok(strict.finalPageCount > 1 || strict.operations.some((item) => item.op === 'compact_page'));
+  assert.equal(advisory.finalPageCount, 1);
+  assert.equal(advisory.operations.some((item) => item.op === 'split_page' || item.op === 'compact_page'), false);
+});
+
+test('高度建议模式仍遵守块数量等模板结构硬上限', () => {
+  const capacityProfile = {
+    roles: {
+      feature: {
+        structural: { maxBlocks: 1, maxItems: 99 },
+        visual: { bodyHeightPx: 1000, maxTitleLines: 3 },
+        split: { allowed: true, blockTypes: ['text'] },
+      },
+    },
+  };
+  const page = {
+    kind: 'content',
+    role: 'feature',
+    title: '结构超限页面',
+    content_blocks: [
+      { type: 'text', title: '一', content: '内容一' },
+      { type: 'text', title: '二', content: '内容二' },
+    ],
+  };
+  const result = compileTemplateAwareCardPlan({ cardPlan: [page], capacityProfile, maxPages: 7, heightAdvisory: true });
+  assert.equal(result.finalPageCount, 2);
+});

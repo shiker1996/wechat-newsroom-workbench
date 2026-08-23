@@ -86,6 +86,13 @@ test('冰川冷调为三项功能页提供受控的信息分层',()=>{
   assert.equal(ice.definition.social.components.note.borderColorRole,'accentSecondary');
 });
 
+test('结尾页列表在组件主题覆盖后仍保持深底浅字',()=>{
+  const css=compileSocialTheme(socialThemeDefinition('ice-blue')).css;
+  const generic=css.lastIndexOf('.theme-ice-blue .page li{color:');
+  const ending=css.lastIndexOf('.theme-ice-blue .page-ending li{color:var(--inverse);background:rgba(255,255,255,.08)');
+  assert.ok(generic>=0&&ending>generic,'结尾页反色规则必须晚于通用列表组件规则');
+});
+
 test('内置主题的轨道与柔焦装饰会实际编译为可见的视觉层',()=>{
   const orbit=compileSocialTheme(socialThemeDefinition('mocha'));
   assert.match(orbit.css,/\.page:after\{border-radius:50%;box-shadow:0 0 0 9px/);

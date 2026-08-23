@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, acceptSoftDensityOnlyLayoutReport, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, acceptSoftDensityOnlyLayoutReport, adaptiveContentPageIndexes, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
 import { createZip } from '../lib/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
@@ -32,6 +32,42 @@ test('图文管线在内部使用版式白名单时建立本地 ESM 绑定', () 
   const pipeline = fs.readFileSync(path.join(root, 'lib', 'llm', 'social-card-pipeline.mjs'), 'utf8');
   assert.match(pipeline, /import \{ SOCIAL_CARD_LAYOUTS \} from '\.\.\/rendering\/social-card-layout\.mjs';/);
   assert.match(pipeline, /layout_style:SOCIAL_CARD_LAYOUTS\.includes/);
+});
+
+test('结构修复先退化稳定构图，再执行模板感知重排',()=>{
+  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const degrade=pipeline.indexOf('结构修复先退化稳定构图');
+  const reflow=pipeline.indexOf("action:'template-aware-reflow'",degrade);
+  assert.ok(degrade>=0&&reflow>degrade,'构图退化必须位于模板重排之前');
+  assert.equal((pipeline.match(/结构修复先退化稳定构图/g)||[]).length,1,'结构构图退化应只有一个统一入口');
+  assert.doesNotMatch(pipeline,/结构溢出先切换安全单列构图/);
+});
+
+test('软密度放行位于续页重排、组件装箱和容器调整之后',()=>{
+  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const continuation=pipeline.indexOf("action:'continuation-repack-core-blocks'");
+  const packing=pipeline.indexOf("phase:'content-plan',action:'apply-plan-operations'");
+  const fit=pipeline.indexOf("action:'fit-content-center'");
+  const accept=pipeline.indexOf('const acceptedSoftDensityReport=acceptSoftDensityOnlyLayoutReport');
+  assert.ok(continuation>=0&&packing>continuation&&fit>packing&&accept>fit,'软放行必须是第三层最后的结束条件');
+  assert.equal((pipeline.match(/const acceptedSoftDensityReport=acceptSoftDensityOnlyLayoutReport/g)||[]).length,1);
+});
+
+test('重复修复状态只记录诊断，不在固定轮数前提前阻断',()=>{
+  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  assert.doesNotMatch(pipeline,/failStrictLayout\(`布局修复无进展/);
+  assert.doesNotMatch(pipeline,/shouldStopRepeatedRepairState/);
+  assert.match(pipeline,/noProgressStateSignatures\.set\(repairStateSignature,attempt \+ 1\)/);
+});
+
+test('内容补充候选由下一轮浏览器审计提交，真实溢出时回滚',()=>{
+  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const audit=pipeline.indexOf("action:'browser-layout-audit'");
+  const rollback=pipeline.indexOf("action:'browser-candidate-rollback'",audit);
+  const apply=pipeline.indexOf('pendingBrowserCandidate={beforePages:beforeBrowserCandidatePages,round:plannerRound}',rollback);
+  assert.ok(audit>=0&&rollback>audit&&apply>rollback,'候选必须在应用后的下一轮浏览器审计中支持回滚');
+  assert.match(pipeline,/cardPlan=structuredClone\(rejected\.beforePages\)/);
+  assert.match(pipeline,/if\(structuralPages\.length\)/);
 });
 
 test('故事板保存通过共享类型判断解析结构化内容，不引用未定义常量', () => {
@@ -713,4 +749,9 @@ test('只有 underfilled 的页面启用内容自适应后按软门禁通过',()
   assert.deepEqual(accepted.pages[1].issues,[]);
   assert.deepEqual(accepted.pages[1].acceptedIssues,['underfilled']);
   assert.equal(acceptSoftDensityOnlyLayoutReport({...report,pages:[{...report.pages[1],issues:['underfilled','vertical_imbalance']},...report.pages.slice(0,1),...report.pages.slice(2)]},[1]),null);
+});
+
+test('内容页默认自适应容器可承接纯 underfilled 软门禁',()=>{
+  const indexes=adaptiveContentPageIndexes([{kind:'cover'},{kind:'problem'},{kind:'content'},{kind:'ending'}],[]);
+  assert.deepEqual([...indexes],[1,2]);
 });
