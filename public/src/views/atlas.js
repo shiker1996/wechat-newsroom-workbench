@@ -6,6 +6,7 @@ import { escapeHtml, toast, withLoading, confirmAction, debounce } from "../core
 import { dimensionLabels, dimensionRoles } from "../core/dimensions.js";
 
 let bound = false;
+const HOTLIST_DISPLAY_LIMIT = 50;
 const graphView = { scale: 1, x: 0, y: 0, dragging: false, pointerX: 0, pointerY: 0 };
 let graphAutoFocusPending = true;
 
@@ -49,6 +50,16 @@ function bindAtlas() {
     renderAtlasDebounced();
   });
   document.addEventListener("click", (event) => {
+    const modeButton = event.target.closest("[data-atlas-mode]");
+    if (modeButton && state.atlas) {
+      state.atlasMode = modeButton.dataset.atlasMode || "hotlist";
+      $$('[data-atlas-mode]').forEach((button) => {
+        const active = button === modeButton;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+      });
+      renderAtlas();
+    }
     const scopeButton = event.target.closest("[data-atlas-scope]");
     if (scopeButton && state.atlas) {
       state.atlasFilters.scope = scopeButton.dataset.atlasScope;
@@ -89,6 +100,12 @@ function bindAtlas() {
       const eventId = eventPool.dataset.eventPool;
       const tracks = String(eventPool.dataset.eventTracks || "article").split(",").filter(Boolean);
       withLoading(eventPool, "合成中…", () => createCompositeFromEvent(state.activeBatchId, eventId, "", tracks)).catch((error) => toast(error.message, "error"));
+    }
+    const eventHotlistPool = event.target.closest("[data-event-hotlist-pool]");
+    if (eventHotlistPool && state.atlas && state.activeBatchId) {
+      const eventId = eventHotlistPool.dataset.eventHotlistPool;
+      const tracks = String(eventHotlistPool.dataset.eventTracks || "article").split(",").filter(Boolean);
+      withLoading(eventHotlistPool, "合成中…", () => createCompositeFromHotlist(state.activeBatchId, eventId, tracks)).catch((error) => toast(error.message, "error"));
     }
     const dimensionPool = event.target.closest("[data-dimension-pool]");
     if (dimensionPool && state.activeBatchId) {
@@ -173,12 +190,40 @@ function atlasEvents() {
   return events;
 }
 
+function atlasHotlistItems() {
+  if (!state.atlas) return [];
+  let items = state.atlas.eventHotlist || [];
+  const f = state.atlasFilters;
+  if (f.scope !== "全部") items = items.filter((item) => (item.marketScopes || []).includes(f.scope));
+  if (f.multi) items = items.filter((item) => Number(item.sourceCount || 0) > 1);
+  if (f.query) {
+    const q = f.query.toLowerCase();
+    items = items.filter((item) => [item.title, ...(item.keywords || []), ...(item.reason || [])]
+      .filter(Boolean).some((value) => String(value).toLowerCase().includes(q)));
+  }
+  return items;
+}
+
 function activeLens() {
   return state.atlasGraphLens || "who";
 }
 
-function dimensionGroups() {
+function filteredGraph(events) {
   const graph = state.atlas?.graph;
+  if (!graph?.nodes) return { nodes: [], edges: [] };
+  const eventIds = new Set((events || []).map((event) => `event:${event.event_id}`));
+  const edges = (graph.edges || []).filter((edge) => eventIds.has(edge.from));
+  const dimensionIds = new Set(edges.map((edge) => edge.to));
+  const visibleEventCount = new Map();
+  for (const edge of edges) visibleEventCount.set(edge.to, (visibleEventCount.get(edge.to) || 0) + 1);
+  const nodes = (graph.nodes || [])
+    .filter((node) => eventIds.has(node.id) || dimensionIds.has(node.id))
+    .map((node) => node.type === "event" ? node : { ...node, eventCount: visibleEventCount.get(node.id) || 0 });
+  return { ...graph, nodes, edges };
+}
+
+function dimensionGroups(events) {
+  const graph = filteredGraph(events);
   if (!graph?.nodes) return [];
   return graph.nodes
     .filter((node) => node.type !== "event")
@@ -212,10 +257,10 @@ async function loadAtlas() {
   finally { graph?.removeAttribute("aria-busy"); }
 }
 
-function renderGraph() {
+function renderGraph(events) {
   const container = document.getElementById("event-graph");
   if (!container) return;
-  const graph = state.atlas?.graph;
+  const graph = filteredGraph(events);
   if (!graph?.nodes?.length) {
     container.innerHTML = '<div class="empty-state">暂无关系图数据。完成打标与研判后，主体、动作与场合维度会在这里连成图。</div>';
     return;
@@ -302,8 +347,8 @@ function renderGraph() {
   applyGraphTransform();
 }
 
-function renderDimensionCards() {
-  const groups = dimensionGroups();
+function renderDimensionCards(events) {
+  const groups = dimensionGroups(events);
   const cl = document.getElementById("coverage-list");
   if (!cl) return;
   if (!groups.length) {
@@ -331,6 +376,37 @@ function renderDimensionCards() {
   }).join("");
 }
 
+function renderEventHotlist() {
+  const container = document.getElementById("event-hotlist");
+  if (!container) return;
+  const allItems = atlasHotlistItems();
+  const items = allItems.slice(0, HOTLIST_DISPLAY_LIMIT);
+  if (!allItems.length) {
+    container.innerHTML = '<div class="empty-state">当前筛选下没有稳定事件热榜项。完成归并后，首次出现和有事实增量的事件会优先进入这里。</div>';
+    return;
+  }
+  const stateLabels = { new_event: "新事件", new_update: "有增量", continuing: "持续", stale: "过时" };
+  const summary = `<div class="event-hotlist-summary">默认展示前 ${Math.min(HOTLIST_DISPLAY_LIMIT, allItems.length)} 条，共 ${allItems.length} 条符合当前筛选；完整事件请切换到「事件全景」查看。</div>`;
+  container.innerHTML = summary + items.map((item) => {
+    const stateLabel = stateLabels[item.state] || item.state || "持续";
+    const delta = item.rankDelta == null ? "新上榜" : (item.rankDelta > 0 ? `↑${item.rankDelta}` : item.rankDelta < 0 ? `↓${Math.abs(item.rankDelta)}` : "—");
+    const scopes = (item.marketScopes || []).join(" / ") || "待标注";
+    const reason = (item.reason || []).slice(0, 3).map((value) => `<span>${escapeHtml(value)}</span>`).join("");
+    return `<article class="event-hotlist-item event-hotlist-${escapeHtml(item.state || "continuing")}">
+      <div class="event-hotlist-rank"><b>${item.rank}</b><span>${escapeHtml(delta)}</span></div>
+      <div class="event-hotlist-main"><h4>${escapeHtml(item.title || item.eventId)}</h4><div class="event-hotlist-meta"><span class="event-state">${escapeHtml(stateLabel)}</span><span>热度 ${item.heatScore}</span><span>${item.reportCount} 条报道</span><span>${item.sourceCount} 个来源</span><span>${escapeHtml(scopes)}</span></div><div class="event-hotlist-reasons">${reason}</div></div>
+      <div class="event-hotlist-score"><strong>${item.heatScore}</strong><button class="ink-button" data-event-hotlist-pool="${escapeHtml(item.eventId)}" data-event-tracks="article">进入研判</button></div>
+    </article>`;
+  }).join("");
+}
+
+function renderAtlasMode() {
+  const mode = state.atlasMode || "hotlist";
+  document.querySelectorAll("[data-atlas-mode-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.atlasModePanel !== mode;
+  });
+}
+
 function renderAtlas() {
   const atlas = state.atlas;
   if (!atlas) return;
@@ -341,10 +417,11 @@ function renderAtlas() {
   [
     document.querySelector("#view-overview .atlas-notice"),
     document.getElementById("atlas-controls"),
-    document.querySelector("#view-overview .atlas-semantic-grid"),
-    document.querySelector("#view-overview .atlas-table"),
+    document.querySelector("#view-overview .atlas-mode-tabs"),
+    ...document.querySelectorAll("#view-overview [data-atlas-mode-panel]"),
   ].forEach((section)=>{if(section)section.hidden=noBatchData;});
   if(noBatchData)return;
+  renderAtlasMode();
   document.getElementById("atlas-filter-count").textContent = `显示 ${events.length} / ${atlas.eventCount} 个事件`;
 
   const scopeTotal = Math.max(1, events.length);
@@ -368,8 +445,9 @@ function renderAtlas() {
       : '<div class="empty-state">当前筛选下没有来源</div>';
   }
 
-  renderGraph();
-  renderDimensionCards();
+  renderEventHotlist();
+  renderGraph(events);
+  renderDimensionCards(events);
 }
 
 async function createCompositeFromEvent(batchId, eventId, eventTitle, tracks = ['article']) {
@@ -394,6 +472,27 @@ async function createCompositeFromEvent(batchId, eventId, eventTitle, tracks = [
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
   if (document.querySelector(".nav-item.active")?.dataset.view === "overview") await loadAtlas();
+}
+
+async function createCompositeFromHotlist(batchId, eventId, tracks = ['article']) {
+  const item = state.atlas?.eventHotlist?.find((entry) => entry.eventId === eventId);
+  if (!item) return toast("没有找到该热榜事件，请先刷新热点全景");
+  const hotspotIds = item.hotspotIds || [];
+  if (!hotspotIds.length) return toast("该事件没有可进入研判的当前报道");
+  const title = prompt("综合选题名称（可选，默认以事件标题命名）：", item.title || "") || item.title;
+  let message;
+  if (hotspotIds.length === 1) {
+    await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds, tracks }) });
+    message = `已加入选题池：${item.title}`;
+  } else {
+    const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
+      method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "事件热榜研判", tracks }),
+    });
+    message = `已从事件热榜创建综合选题：${candidate.candidate_id}`;
+  }
+  offerPoolExit(tracks, message);
+  const { default: loadTopicPool } = await import("./topics.js");
+  loadTopicPool();
 }
 
 // 创建成功后给出可跳转的出口，避免"成功了但不知道去哪看"的死路

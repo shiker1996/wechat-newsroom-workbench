@@ -255,6 +255,30 @@ curl.exe -X POST http://127.0.0.1:4317/api/system/backup/restore ^
 热点全景数据（事件聚类、热词）
 → 热点全景
 
+### GET /api/batches/:id/event-heat-ranking
+稳定事件热榜（新鲜度、事实增量、来源扩散、传播动量、国内相关度、证据完整度与历史衰减）。同一稳定事件只占一个排名位，维度组不参与排名。
+→ 热点全景
+
+### GET /api/event-resolution-metrics?days=7
+读取最近窗口的事件归并运营指标：人工校正率、重复事件率、跨批次重复入池率，以及按批次的合并/拆分/待复核明细。
+→ 热点全景、运营校准
+
+### GET /api/topic-score-metrics?days=7
+读取选题评分新旧公式双跑指标：成稿线入池变化、排名变化、平均分差，以及高 T/低 A、低 T/高 A、重复事件和读者利益缺失样本；仅用于运营校准，不自动调整权重。
+→ 选题池、运营校准
+
+### GET /api/batches/:id/event-resolution-review
+读取本批次事件归并差异（待复核合并、拆分、误报候选）和已记录的人工校正决定；只读，不改变自动归并结果。
+→ 热点全景
+
+### POST /api/batches/:id/event-resolution-decisions
+记录人工校正 `{ decisionType: merge|split|misreport, eventId?, targetEventId?, hotspotIds?, reason?, actor?, metadata? }`，作为后续规则校准的审计依据。
+→ 热点全景
+
+### DELETE /api/batches/:id/event-resolution-decisions/:decisionId
+撤销一条人工校正记录（软撤销，保留审计历史）。
+→ 热点全景
+
 ### GET /api/batches/:id/ranking
 文章池的研判排名与预选结果。
 

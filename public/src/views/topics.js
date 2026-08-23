@@ -17,7 +17,10 @@ function trackElements(track) {
 }
 
 function isDraftEligible(item) { return item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD; }
-const articleScoreLabels = { h: "历史 H", b: "潜力 B", p: "匹配 P", s: "饱和 S", d: "修正 D", f: "总分 F" };
+const articleScoreFields = [
+  ["event_value", "事件价值 T"], ["article_value", "文章化 A"], ["h_score", "历史 H"],
+  ["b_score", "潜力 B"], ["p_score", "账号契合 P"], ["s_score", "饱和 S"], ["d_score", "修正 D"], ["f_score", "总分 F"],
+];
 const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
   DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判",
@@ -75,13 +78,13 @@ function renderCandidates(candidates, track = activeTrack()) {
             : isEvent
               ? `<div class="score-strip"><span>类型<b>事件图文</b></span><span>渠道<b>${socialChannel}</b></span></div>`
               : `<div class="score-strip social-fit-strip">${socialParts.map(([label,value])=>`<span>${label}<b>${value==null?'—':Number(value).toFixed(Number(value)%1?1:0)}</b></span>`).join('')}</div>`)
-          : `<div class="score-strip article-score-strip">${["h", "b", "p", "s", "d", "f"].map((k) => `<span title="${articleScoreLabels[k]}">${articleScoreLabels[k]}<b>${item[k + "_score"] == null ? "—" : Number(item[k + "_score"]).toFixed(item[k + "_score"] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
+          : `<div class="score-strip article-score-strip">${articleScoreFields.map(([field,label]) => `<span title="${label}">${label}<b>${item[field] == null ? "—" : Number(item[field]).toFixed(item[field] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
         // 综合候选（维度组）展示组标题（如"腾讯近期动态"），单热点候选优先展示事件摘要，与编辑室口径一致
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
         const dimensionLabel = dimensionLabels[item.dimension] || "";
         const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
         const lane=distributionLane(item.distribution_lane);
-        const distributionSummary=track==="article"?`<div class="candidate-distribution" aria-label="分发判断"><span class="distribution-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><p><b>读者利益</b>${escapeHtml(readerStakeText(item.reader_stake))}</p></div>`:"";
+        const distributionSummary=track==="article"?`<div class="candidate-distribution" aria-label="分发判断"><span class="distribution-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><p><b>读者利益</b>${escapeHtml(readerStakeText(item.reader_stake))}${item.reader_stake_score==null?'':` <small>（B 受众 ${Number(item.reader_stake_score).toFixed(1)}/5）</small>`}</p></div>`:"";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
           <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
           ${track==='article'&&!item.composite&&item.event_conclusion?`<p class="candidate-description">代表报道：${escapeHtml(item.hotspot_title)}</p>`:''}

@@ -11,6 +11,7 @@
         "dev": "node --disable-warning=ExperimentalWarning --watch --watch-path=server.mjs --watch-path=lib server.mjs",
         "test": "node --disable-warning=ExperimentalWarning --test test/**/*.test.mjs",
         "test:fast": "node scripts/test-fast.mjs",
+        "event-resolution:backfill": "node scripts/backfill-event-resolution.mjs",
         "build": "node scripts/build.mjs",
         "check:legacy-config-guidance": "node scripts/check-legacy-configuration-guidance.mjs",
         "postinstall": "node scripts/install-skill-deps.mjs",

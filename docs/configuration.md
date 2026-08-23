@@ -64,7 +64,7 @@
 - `port`（4317）、`workspaceRoot`、`contentRoots`：服务端口与内容扫描根目录。
 - `reddit`：Reddit 采集连接参数。`cdpUrl`、`navigationTimeoutMs`。具体分区来源在「采集源」页面维护（存入 `collection_sources` 表），不再由配置文件声明。
 - `rsshub`：RSSHub 采集连接参数。`baseUrl`、`maxAgeHours`（168，旧闻窗口）、`concurrency`（5）、`keepAlive`、`startupTimeoutMs`。具体路由 / 直连 Feed 来源在「采集源」页面维护（存入 `collection_sources` 表）。
-- `githubDiscovery`：GitHub 新项目发现采集器参数。`createdWithinDays`（30）、`minStars`（1000）、`limit`、`cacheTtlMs`。`github:search` 采集源实例在「采集源」页面维护（存入 `collection_sources` 表）。
+- `githubDiscovery`：GitHub 新项目发现采集器参数。`createdWithinDays`（7，最近 7 天）、`minStars`（1000）、`limit`、`cacheTtlMs`。`github:search` 采集源实例在「采集源」页面维护（存入 `collection_sources` 表）。
   - `aiQueries`：AI 兴趣仓库发现。`enabled`、`refreshDays`（7，查询组缓存天数，缓存文件 `data/repo-discovery-queries.json`，可手工编辑）、`maxQueries`（6）、`perQueryLimit`（15）、`relevanceFilter`、`minInterestScore`（6，兴趣分阈值）。LLM 按 `account-context.json` 内容支柱生成 Search 查询组并做相关性打分过滤；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）。
 - `llm`：模型网关。
   - `defaultProvider`、`requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。
@@ -83,7 +83,8 @@
 - 双分发策略（可选）：`distributionStrategy.recommendation|notification|experiment`。每个池可配置 `purpose`、`preferredTopics` 和 `titleRule`，由选题、编辑会、标题和成稿技能读取；这些字段只描述内容规划，不授予自动群发或发布权限。
 - 通知资格（可选）：`notificationPolicy.minimumMatchedCriteria`、`minimumNotificationFit`（默认 4/5）、`minimumFactSupport`（默认 4/5）、`maxPerBatch`（默认 2，允许 0）、`blockedRiskLevels`、`readerStakes`、`criteria`。通知池必须有具体读者、明确动作或决策和具体后果；传闻、待核事实及禁入风险会确定性降到实验池，缺失配置时使用内置严格规则。
 - `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`lib/llm/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
-  - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——总分公式 `F = H×h + B×b + P×p - S`。
+  - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`。
+  - `eventValueWeight`（0.30，限制在 0.25–0.40）：事件价值 T 在最终分中的权重；当前公式为 `F = A×(1-eventValueWeight) + T×eventValueWeight - S - D`。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
   - `toolEngineeringBonus`（10）：维度组命中 GitHub、开源、开发工具、工程实践、框架、插件、代码模型或 Agent Skills 等强工具信号时加分；可在私有账号配置中单独提高，不会奖励泛 AI 新闻。
   - `minimumToolCandidates`（2）：常规核心候选中至少保留的强工具/工程候选数；没有足够合格工具时按实际数量保留，不会用泛 AI 事件补位。私有账号可按内容配比提高。

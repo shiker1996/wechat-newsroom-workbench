@@ -34,6 +34,13 @@ test("筛选和关系维度向辅助技术同步选中状态", () => {
   assert.match(atlas, /setAttribute\("aria-selected", String\(button === lensButton\)\)/);
 });
 
+test("热点全景筛选同步作用于关系图和维度分组", () => {
+  assert.match(atlas, /function filteredGraph\(events\)/);
+  assert.match(atlas, /const graph = filteredGraph\(events\)/);
+  assert.match(atlas, /renderGraph\(events\);/);
+  assert.match(atlas, /renderDimensionCards\(events\);/);
+});
+
 test("动态反馈通过状态区域播报并尊重减少动态偏好", () => {
   assert.match(html, /id="toast" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(styles, /@media \(prefers-reduced-motion:reduce\)/);

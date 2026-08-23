@@ -20,7 +20,7 @@
   },
   "githubDiscovery": {
     "enabled": true,
-    "createdWithinDays": 30,
+    "createdWithinDays": 7,
     "minStars": 1000,
     "limit": 30,
     "cacheTtlMs": 1800000,

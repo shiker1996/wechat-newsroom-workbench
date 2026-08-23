@@ -318,6 +318,8 @@ test('refactoring stage 4: page role and composition seed are deterministic pure
 test('refactoring stage 4: semantic card columns are decided without pipeline side effects', () => {
   const blocks = [{ type: 'stats', content: 'A' }, { type: 'stats', content: 'B' }];
   assert.equal(semanticCardColumns({ content_blocks: blocks }, blocks), 'split-even');
+  const quickStartBlocks = [{ type: 'code', content: 'npm install' }, { type: 'note', content: 'Node.js 20+' }];
+  assert.equal(semanticCardColumns({ role: 'steps', content_blocks: quickStartBlocks }, quickStartBlocks), 'single');
 });
 
 test('refactoring stage 4: smart composition normalization is independent from the pipeline', () => {

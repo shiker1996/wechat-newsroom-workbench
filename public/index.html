@@ -147,21 +147,30 @@
         <label class="atlas-multi"><input id="atlas-multisource" type="checkbox"> 只看多源报道</label>
         <label class="atlas-search"><span>⌕</span><input id="atlas-query" placeholder="搜索事件、关键词或来源"></label>
       </div>
-      <div class="atlas-grid atlas-semantic-grid">
-        <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
-        <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
+      <div class="atlas-mode-tabs" role="tablist" aria-label="事件观察模式">
+        <button type="button" class="active" data-atlas-mode="hotlist" role="tab" aria-selected="true">事件热榜 <small>RANKING</small></button>
+        <button type="button" data-atlas-mode="atlas" role="tab" aria-selected="false">事件全景 <small>ATLAS</small></button>
       </div>
-      <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+      <section class="atlas-mode-panel" data-atlas-mode-panel="hotlist">
+        <section class="panel atlas-hotlist-panel"><div class="panel-head"><div><span class="kicker">EVENT HEAT RANKING</span><h3>事件热榜</h3></div><div class="atlas-legend"><span>稳定事件唯一占位</span><span>按事件语义命名</span></div></div><div id="event-hotlist" class="event-hotlist"></div></section>
+      </section>
+      <section class="atlas-mode-panel" data-atlas-mode-panel="atlas" hidden>
+        <div class="atlas-grid atlas-semantic-grid">
+          <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
+          <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
+        </div>
+        <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+      </section>
     </section>
 
     <section class="view" id="view-topics">
-      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>比较候选的历史表现、成稿潜力、账号匹配与同题竞争，选择值得进入编辑会的文章方向。</p></div>
+      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>比较候选的历史表现、成稿潜力、账号契合与同题竞争，选择值得进入编辑会的文章方向。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
           <div class="scope-tabs" id="article-type-tabs" aria-label="文章类型筛选"><button type="button" class="active" data-article-type="all">全部</button><button type="button" data-article-type="hotspot">热点事件</button><button type="button" data-article-type="independent">自主写作</button></div>
           <div class="topic-pool-hint">选题请在「<a href="#overview">热点全景</a>」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
-          <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>历史表现 H</b>相似题材的历史传播信号</span><span><b>成稿潜力 B</b>角度、情绪、标题、受众与事实支撑</span><span><b>账号匹配 P</b>与账号内容方向及独家素材的匹配度</span><span><b>同题饱和 S</b>市场中同类内容的竞争扣分</span><span><b>竞争修正 D</b>额外竞争因素校正</span><span><b>综合成稿分 F</b>最终排序依据，低于 55 默认隐藏</span></div><small>公式：F = H × 60% + B × 25% + P × 15% − S；缩写仅用于与研判报告对照。</small></details>
+          <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>事件价值 T</b>事件热榜的价值分，反映热度、增量、来源扩散和时效</span><span><b>文章化质量 A</b>由 H、B、P 合成，反映是否值得写成文章</span><span><b>历史表现 H</b>相似题材的历史传播信号</span><span><b>成稿潜力 B</b>角度、情绪、标题、受众与事实支撑</span><span><b>账号契合 P</b>内容支柱、读者画像和账号定位的承接程度；不等同于事件热度或具体读者利益</span><span><b>同题饱和 S</b>市场中同类内容的竞争扣分</span><span><b>竞争修正 D</b>额外竞争因素校正</span><span><b>综合成稿分 F</b>最终排序依据，低于 55 默认隐藏</span></div><small>当前公式：A = H × 60% + B × 25% + P × 15%；F = A × 70% + T × 30% − S − D。</small></details>
           <div id="candidate-list" class="candidate-list"></div>
         </section>
       </div>

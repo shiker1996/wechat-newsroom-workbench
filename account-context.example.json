@@ -61,6 +61,7 @@
   },
   "scoring": {
     "weights": { "h": 0.6, "b": 0.25, "p": 0.15 },
+    "eventValueWeight": 0.3,
     "accountFitBonus": 6,
     "toolEngineeringBonus": 10,
     "minimumToolCandidates": 2,

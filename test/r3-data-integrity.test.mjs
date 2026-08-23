@@ -19,6 +19,22 @@ test('数据库迁移版本持久化且重复启动不重复执行结构修复',
   } finally { store?.close();fs.rmSync(root,{recursive:true,force:true}); }
 });
 
+test('存量迁移补齐 candidates 的 reader_stake_score 列',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-r3-reader-stake-'));
+  const dbPath=path.join(root,'workbench.db');
+  let store;
+  try {
+    store=new Store(dbPath);
+    store.db.exec('ALTER TABLE candidates DROP COLUMN reader_stake_score');
+    store.db.prepare('DELETE FROM schema_migrations WHERE version IN (16,17)').run();
+    store.close();store=null;
+    store=new Store(dbPath);
+    const columns=new Set(store.db.prepare('PRAGMA table_info(candidates)').all().map((column)=>column.name));
+    assert.ok(columns.has('reader_stake_score'));
+    assert.equal(store.db.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,WORKBENCH_SCHEMA_VERSION);
+  } finally { store?.close();fs.rmSync(root,{recursive:true,force:true}); }
+});
+
 test('批次级文稿在 NULL candidate 下仍保持唯一',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-r3-doc-'));let store;
   try {

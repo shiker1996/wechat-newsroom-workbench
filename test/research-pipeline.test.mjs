@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../lib/llm/research-pipeline.mjs';
+import { brainstorm, buildScoreDualRun, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../lib/llm/research-pipeline.mjs';
 
 function hotspot(id, title, eventKey, source='rsshub') {
   return { id, title, source, url:`https://example.com/${id}`, category:'🤖 AI/技术动态', market_scope:'全球性', score:80,
@@ -75,6 +75,68 @@ test('成稿线前置：F 低于 55 的候选不进入选题池', () => {
   assert.match(source, /saveAnalyzedCandidates\(batchId,draftable\.map/);
 });
 
+test('文章选题池只从事件热榜前50事件中产生维度候选', () => {
+  const clusters = clusterItems(Array.from({ length: 60 }, (_, i) => hotspot(i + 1, `事件${i + 1}`, `主体${i + 1}|动作|对象`)));
+  const ranking = preselection(clusters).map((item, index) => ({ ...item, eventHeatRank: index + 1, eventHeatState: 'new_event' }));
+  const pool = selectDimensionPool(clusters, ranking, { coreLimit: 8, blackLimit: 0, backupLimit: 0 });
+  const hotlistIds = new Set(ranking.slice(0, 50).map((item) => item.eventId));
+  assert.ok(pool.selected.every((group) => group.events.every((event) => hotlistIds.has(event.event_id))));
+  assert.equal(pool.selected.length, 8);
+});
+
+test('新选题价值评分把开发者直接利益事件保留为单事件候选', () => {
+  const clusters = clusterItems([
+    hotspot(1, 'DeepSeek API 计费调整：周末统一低谷价', 'deepseek|计费|api'),
+    ...Array.from({ length: 5 }, (_, index) => hotspot(index + 2, `普通事件${index + 1}`, `主体${index + 1}|发布|模型`)),
+  ]);
+  const ranking = preselection(clusters).map((item, index) => ({ ...item,
+    eventHeatRank: item.title.includes('DeepSeek') ? 2 : index + 10,
+    eventHeatScore: item.title.includes('DeepSeek') ? 73 : 80,
+    eventHeatState: 'new_event',
+  }));
+  const pool = selectArticlePool(clusters, ranking, { coreLimit: 3, blackLimit: 0, backupLimit: 0,
+    accountContext: { contentPillars: ['AI 行业热点：开发者影响'], scoring: { accountFitBonus: 6 } } });
+  const deepseek = pool.selected.find((group) => group.title.includes('DeepSeek'));
+  assert.ok(deepseek);
+  assert.equal(deepseek.dimension, 'event');
+  assert.equal(deepseek.developerImpact, true);
+  assert.ok(deepseek.topicValue >= 70);
+  assert.ok(topicValueForEvent(clusters.find((event) => event.representative_title.includes('DeepSeek')), ranking.find((item) => item.title.includes('DeepSeek'))).reader >= 16);
+});
+
+test('阶段2事件池按 T 排序，账号契合不再叠加到事件分', () => {
+  const clusters = clusterItems([
+    hotspot(1, '匹配事件', '主体1|发布|模型'),
+    hotspot(2, '非匹配事件', '主体2|发布|模型'),
+  ]);
+  clusters[1].topic_category = '💼 职场生态';
+  const ranking = preselection(clusters).map((item, index) => ({ ...item,
+    eventHeatRank: index + 1, eventHeatScore: 80, eventValue: 80, eventHeatState: 'new_event',
+  }));
+  const pool = selectArticlePool(clusters, ranking, { coreLimit: 2, blackLimit: 0, backupLimit: 0,
+    accountContext: { contentPillars: ['AI 行业热点：开发者影响'], scoring: { accountFitBonus: 6 } } });
+  const matched = pool.articleCandidates.find((item) => item.title === '匹配事件');
+  const unmatched = pool.articleCandidates.find((item) => item.title === '非匹配事件');
+  assert.equal(matched.score, matched.topicValue);
+  assert.equal(unmatched.score, unmatched.topicValue);
+  assert.equal(matched.score, unmatched.score);
+  assert.equal(matched.accountFit, 80);
+  assert.equal(unmatched.accountFit, 25);
+});
+
+test('维度组从文章池拆到早报候选池', () => {
+  const clusters = clusterItems([
+    dimensionHotspot(1, { who:'openai', what:'发布gpt5', actionType:'发布', labels:{ who:'OpenAI' } }),
+    dimensionHotspot(2, { who:'openai', what:'回应安全争议', actionType:'争议回应', labels:{ who:'OpenAI' } }),
+    dimensionHotspot(3, { who:'google', what:'发布gemini', actionType:'发布', labels:{ who:'Google' } }),
+  ]);
+  const ranking = preselection(clusters).map((item, index) => ({ ...item, eventHeatRank: index + 1, eventHeatState: 'new_event' }));
+  const articlePool = selectArticlePool(clusters, ranking, { coreLimit: 3, blackLimit: 0, backupLimit: 0 });
+  const briefPool = selectBriefPool(clusters, ranking);
+  assert.ok(articlePool.selected.every((group) => group.dimension === 'event' && group.events.length === 1));
+  assert.ok(briefPool.some((group) => group.title === 'OpenAI近期动态' && group.events.length === 2));
+});
+
 test('账号契合：命中内容支柱类目的维度组获得加分', () => {
   const accountContext={contentPillars:['AI 行业热点：技术动态与战略观察']};
   const focused=focusedCategories(accountContext);
@@ -94,8 +156,67 @@ test('H/B/P/S/D/F由服务端公式计算', () => {
   const cards=[{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
   const result=scoreCards(cards,{items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]})[0];
-  assert.equal(result.b,80); assert.equal(result.p,40); assert.equal(result.s,5); assert.equal(result.d,0);
-  assert.equal(result.f,62.4);
+  assert.equal(result.b,80); assert.equal(result.p,80); assert.equal(result.s,5); assert.equal(result.d,0);
+  assert.equal(result.a,73.4);
+  assert.equal(result.f,46.4);
+});
+
+test('阶段5 T 接入 F：同等文章化质量下事件价值更高者优先', () => {
+  const base={candidateId:'C-T',status:'PASS',source:{title:'事件',category:'🤖 AI/技术动态',poolRole:'核心8条',accountFit:80,riskLevel:'低'},
+    bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}};
+  const scored=scoreCards([{...base,candidateId:'C-HIGH',source:{...base.source,eventValue:90}},{...base,candidateId:'C-LOW',source:{...base.source,eventValue:40}}],{items:[]});
+  assert.equal(scored[0].candidateId,'C-HIGH');
+  assert.equal(scored[0].a,scored[1].a);
+  assert.equal(Number((scored[0].f-scored[1].f).toFixed(1)),15);
+});
+
+test('阶段6 新旧公式双跑：记录高低 T/A、入池和排名差异但不改生产排序', () => {
+  const scored=[
+    {candidateId:'C-HIGH-T',finalRank:1,source:{title:'高热度低文章化'},eventValue:90,a:40,s:0,d:0,f:55,readerStake:'具体后果'},
+    {candidateId:'C-HIGH-A',finalRank:2,source:{title:'低热度高文章化'},eventValue:40,a:80,s:0,d:0,f:68,readerStake:'具体后果'},
+    {candidateId:'C-REPEAT',finalRank:3,source:{title:'重复事件'},eventValue:60,a:70,s:0,d:12,f:55,readerStake:''},
+  ];
+  const report=buildScoreDualRun(scored);
+  assert.equal(report.summary.candidateCount,3);
+  assert.equal(report.summary.highTLowACount,1);
+  assert.equal(report.summary.lowTHighACount,1);
+  assert.equal(report.summary.repeatPenaltyCount,1);
+  assert.equal(report.summary.readerStakeMissingCount,1);
+  assert.equal(report.items.find((item)=>item.candidateId==='C-HIGH-T').legacyF,40);
+  assert.equal(report.items.find((item)=>item.candidateId==='C-HIGH-T').currentDraftable,true);
+});
+
+test('阶段4 readerStakeScore 只进入 B 的受众项一次', () => {
+  const source={candidateId:'C-STAKE',title:'接口变化',category:'🤖 AI/技术动态',accountFit:80,poolRole:'核心8条',riskLevel:'低'};
+  const result=scoreCards([{candidateId:'C-STAKE',status:'PASS',source,
+    packaging:{readerStake:'开发者需要迁移接口，否则部署会中断',readerStakeScore:5,readerTarget:'使用旧接口的开发者',readerAction:'在截止日前完成迁移',readerConsequence:'避免部署中断',readerStakeEvidence:'官方迁移公告'},
+    bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,readerStakeScore:1,audienceRelevance:1,factSupport:4},
+    hProfile:{historicalType:'bigtech'}}],{items:[]})[0];
+  assert.equal(result.readerStakeScore,5);
+  assert.equal(result.audienceRelevance,5);
+  assert.equal(result.b,84);
+  assert.equal(result.readerTarget,'使用旧接口的开发者');
+  assert.equal(result.readerAction,'在截止日前完成迁移');
+  assert.equal(result.readerConsequence,'避免部署中断');
+  assert.equal(result.readerStakeEvidence,'官方迁移公告');
+});
+
+test('阶段4 结构化读者分不能绕过通知池文字门槛', () => {
+  const source={candidateId:'C-STAKE-GATE',title:'平台变化',category:'🤖 AI/技术动态',accountFit:80,poolRole:'核心8条',riskLevel:'低'};
+  const result=scoreCards([{candidateId:'C-STAKE-GATE',status:'PASS',source,
+    packaging:{distributionLane:'通知池',readerStake:'影响技术选择',readerStakeScore:5,readerTarget:'开发者',readerAction:'关注变化',readerConsequence:'影响技术选择',readerStakeEvidence:'报道摘要',notificationFit:5},
+    bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,readerStakeScore:5,factSupport:5},hProfile:{historicalType:'bigtech'}}],{items:[]})[0];
+  assert.equal(result.readerStakeScore,2);
+  assert.equal(result.notificationEligible,false);
+  assert.equal(result.distributionLane,'实验池');
+});
+
+test('阶段3最终 P 直接读取账号契合，不再读取旧 pBase', () => {
+  const source={candidateId:'C-FIT',title:'事件',category:'🤖 AI/技术动态',accountFit:63,poolRole:'核心8条',credibleScoop:12,riskLevel:'低'};
+  const result=scoreCards([{candidateId:'C-FIT',status:'PASS',source,
+    bScores:{angleUniqueness:3,emotionSpread:3,titleHook:3,audienceRelevance:3,factSupport:3},
+    hProfile:{historicalType:'bigtech'}}],{items:[]})[0];
+  assert.equal(result.p,63);
 });
 
 test('GitHub、开源和开发工具使用独立配置加分，不依赖泛 AI 分类', () => {
@@ -382,12 +503,12 @@ test('评分权重可通过 scoring 配置覆盖', () => {
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
   const synthesis={items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]};
   const defaults=scoreCards(cards,synthesis)[0];
-  assert.equal(defaults.f,62.4);
-  // H=69,B=80,P=40,S=5：默认 69×.6+80×.25+40×.15-5=62.4；自定义权重只改聚合比例
-  const custom=resolveScoring({scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
+  assert.equal(defaults.f,46.4);
+  // H=69,B=80,P=80：A=73.4；无 T 的兼容候选按 T=0 计算 F=A×.7-S=46.4；自定义权重只改 A 聚合比例
+  const custom=resolveScoring({contentPillars:['AI 行业热点：开发者影响'],scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
   const adjusted=scoreCards(cards,synthesis,custom)[0];
-  assert.equal(adjusted.h,69); assert.equal(adjusted.b,80); assert.equal(adjusted.p,40); assert.equal(adjusted.s,5);
-  assert.equal(adjusted.f,Number((69*0.5+80*0.3+40*0.2-5).toFixed(1)));
+  assert.equal(adjusted.h,69); assert.equal(adjusted.b,80); assert.equal(adjusted.p,80); assert.equal(adjusted.s,5);
+  assert.equal(adjusted.f,Number(((69*0.5+80*0.3+80*0.2)*0.7-5).toFixed(1)));
 });
 
 test('scoring 覆盖分类偏好与账号契合加分，非法值回退默认', () => {
@@ -401,6 +522,8 @@ test('scoring 覆盖分类偏好与账号契合加分，非法值回退默认', 
   assert.equal(ranking[0].categoryPreference,4);
   const pool=selectDimensionPool(events,ranking,{accountContext:{contentPillars:['AI 行业热点：x'],scoring:{accountFitBonus:12}}});
   assert.equal(pool.groups.find((g)=>g.accountFit>0).accountFit,12);
+  assert.equal(resolveScoring({scoring:{eventValueWeight:0.2}}).eventValueWeight,0.25);
+  assert.equal(resolveScoring({scoring:{eventValueWeight:0.8}}).eventValueWeight,0.4);
 });
 
 test('选题报告公式文案跟随实际权重', () => {
@@ -408,6 +531,6 @@ test('选题报告公式文案跟随实际权重', () => {
   const scored=scoreCards([{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}],{items:[]});
   const custom=resolveScoring({scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
-  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}},[],custom),/F = H×50% \+ B×30% \+ P×20% - S/);
-  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}}),/F = H×60% \+ B×25% \+ P×15% - S/);
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}},[],custom),/A = H×50% \+ B×30% \+ P×20%[；;].*F = A×70% \+ T×30% - S - D/);
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}}),/A = H×60% \+ B×25% \+ P×15%[；;].*F = A×70% \+ T×30% - S - D/);
 });
