@@ -16,8 +16,8 @@ data/
 logs/
 
 # Generated articles
-articles/
-topics/
+/articles/
+/topics/
 /social-cards/
 
 # Chrome / browser profiles
