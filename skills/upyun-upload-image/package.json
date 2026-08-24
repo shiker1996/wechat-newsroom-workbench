@@ -5,7 +5,7 @@
   "type": "module",
   "main": "upyun-upload-image.js",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.995.0",
+    "@aws-sdk/client-s3": "^3.1115.0",
     "dotenv": "^17.3.1"
   }
 }
