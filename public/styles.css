@@ -1055,6 +1055,8 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 .editorial-chat.immersive .editorial-reply { flex: none; margin-top: 14px; }
 .editorial-chat.immersive .editorial-chat-head h3, .editorial-chat.immersive .editorial-chat-head h4 { font-size: 20px; }
 .editorial-chat.immersive .editorial-message { font-size: 15px; max-width: 92%; }
+/* 流式消息会在布局完成后立即贴底，避免 smooth 滚动与思考框高度变化竞争。 */
+.editorial-messages { scroll-behavior:auto; }
 .chat-immersive-toggle { display:inline-flex;align-items:center;justify-content:center;align-self:stretch;width:34px;margin:0;padding:0;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#cdd8d4;border-radius:3px;transition:border-color .18s ease,background .18s ease,color .18s ease,box-shadow .18s ease,transform .12s ease; }
 .chat-immersive-toggle::before { content:"";width:15px;height:15px;flex:0 0 auto;background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a8d9ca' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M6 1H1v5M10 1h5v5M6 15H1v-5M10 15h5v-5'/%3E%3C/svg%3E"); }
 .chat-immersive-toggle:hover { border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.12);color:white; }
