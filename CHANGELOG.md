@@ -17,6 +17,8 @@
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-08-24
+
 ### Added
 
 - 第三方本地工具插件 Manifest 声明目录外能力时，包校验与安装接口同样返回目录条目草案（R3 草案辅助补齐本地场景），人工确认后经 `POST /api/system/capability-catalog` 入库。
@@ -26,6 +28,11 @@
 - 消费者—能力基线脚本的适配信息改为从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 即可。
 - 自主写作与自定义图文 Agent 的 url.fetch 成功结果回填资源目录正文，段落检索（`content.passage.retrieve`）在这两个入口可对已抓取素材走严格资源分支。
 - 资源适配层的授权拒绝文案外置到 `config/agent-adaptation-messages.json`，按"Agent + capability"二维维护（`messages.<consumerId>.<capability>`），各 Agent 措辞直接改配置；文件或条目缺失时回退档案内联兜底。
+
+### Fixed
+
+- 修复事件图文内容规划器因单个非法补充块操作导致整批操作丢失的问题；严格要求多项内容使用 `items`，并按操作隔离校验与落地。
+- 修复事件热榜缺少直接加入事件图文池入口、操作按钮溢出和文案不一致的问题。
 
 ## [0.6.3] - 2026-08-15
 
@@ -240,7 +247,8 @@
 
 - 初始版本：热点采集、事件研判、选题、编辑室决策、文章成稿、公众号排版与社交图文批次的本地工作台
 
-[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.6.3...HEAD
+[Unreleased]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.6.8...HEAD
+[0.6.8]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.6.7...0.6.8
 [0.6.3]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.1...0.6.3
 [0.5.1]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/shiker1996/wechat-newsroom-workbench/compare/v0.4.3...0.5.0

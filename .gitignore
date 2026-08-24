@@ -18,7 +18,7 @@ logs/
 # Generated articles
 articles/
 topics/
-social-cards/
+/social-cards/
 
 # Chrome / browser profiles
 data/reddit-chrome-profile/
