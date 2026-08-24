@@ -395,7 +395,7 @@ function renderEventHotlist() {
     return `<article class="event-hotlist-item event-hotlist-${escapeHtml(item.state || "continuing")}">
       <div class="event-hotlist-rank"><b>${item.rank}</b><span>${escapeHtml(delta)}</span></div>
       <div class="event-hotlist-main"><h4>${escapeHtml(item.title || item.eventId)}</h4><div class="event-hotlist-meta"><span class="event-state">${escapeHtml(stateLabel)}</span><span>热度 ${item.heatScore}</span><span>${item.reportCount} 条报道</span><span>${item.sourceCount} 个来源</span><span>${escapeHtml(scopes)}</span></div><div class="event-hotlist-reasons">${reason}</div></div>
-      <div class="event-hotlist-score"><strong>${item.heatScore}</strong><button class="ink-button" data-event-hotlist-pool="${escapeHtml(item.eventId)}" data-event-tracks="article">进入研判</button></div>
+      <div class="event-hotlist-score"><strong>${item.heatScore}</strong><button class="ink-button" data-event-hotlist-pool="${escapeHtml(item.eventId)}" data-event-tracks="article">加入文章池</button><button class="outline-button" data-event-hotlist-pool="${escapeHtml(item.eventId)}" data-event-tracks="social_cards">加入图文池</button></div>
     </article>`;
   }).join("");
 }
@@ -459,16 +459,16 @@ async function createCompositeFromEvent(batchId, eventId, eventTitle, tracks = [
   let message;
   if (hotspotIds.length === 1) {
     await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, {
-      method: "POST", body: JSON.stringify({ hotspotIds, tracks }),
+      method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialOutputMode: tracks.includes("social_cards") ? "wechat-event-cards" : undefined, poolRole: tracks.includes("social_cards") ? "事件热榜图文" : undefined }),
     });
-    message = `已加入选题池：${event.representative_title}`;
+    message = tracks.includes("social_cards") ? `已加入事件图文：${event.representative_title}` : `已加入选题池：${event.representative_title}`;
   } else {
     const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
       method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "综合选题", tracks }),
     });
-    message = `已从事件簇创建综合选题：${candidate.candidate_id}`;
+    message = tracks.includes("social_cards") ? `已从事件簇创建事件图文：${candidate.candidate_id}` : `已从事件簇创建综合选题：${candidate.candidate_id}`;
   }
-  offerPoolExit(tracks, message);
+  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards") });
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
   if (document.querySelector(".nav-item.active")?.dataset.view === "overview") await loadAtlas();
@@ -482,23 +482,23 @@ async function createCompositeFromHotlist(batchId, eventId, tracks = ['article']
   const title = prompt("综合选题名称（可选，默认以事件标题命名）：", item.title || "") || item.title;
   let message;
   if (hotspotIds.length === 1) {
-    await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds, tracks }) });
-    message = `已加入选题池：${item.title}`;
+    await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialOutputMode: tracks.includes("social_cards") ? "wechat-event-cards" : undefined, poolRole: tracks.includes("social_cards") ? "事件热榜图文" : undefined }) });
+    message = tracks.includes("social_cards") ? `已加入事件图文：${item.title}` : `已加入选题池：${item.title}`;
   } else {
     const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
       method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "事件热榜研判", tracks }),
     });
-    message = `已从事件热榜创建综合选题：${candidate.candidate_id}`;
+    message = tracks.includes("social_cards") ? `已从事件热榜创建事件图文：${candidate.candidate_id}` : `已从事件热榜创建综合选题：${candidate.candidate_id}`;
   }
-  offerPoolExit(tracks, message);
+  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards") });
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
 }
 
 // 创建成功后给出可跳转的出口，避免"成功了但不知道去哪看"的死路
-async function offerPoolExit(tracks, message) {
-  const target = tracks.includes("social_cards") ? "social-topics" : "topics";
-  const label = target === "topics" ? "文章选题池" : "图文选题池";
+async function offerPoolExit(tracks, message, { eventSocial = false } = {}) {
+  const target = eventSocial ? "social-event" : tracks.includes("social_cards") ? "social-topics" : "topics";
+  const label = target === "topics" ? "文章选题池" : target === "social-event" ? "事件图文" : "图文选题池";
   if (await confirmAction(`${message}\n\n是否前往${label}查看？`, { confirmText: `前往${label}` })) window.go(target);
 }
 

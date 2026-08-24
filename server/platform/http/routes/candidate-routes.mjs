@@ -60,6 +60,13 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
     const batchId = decodeURIComponent(candidatesMatch[1]); const input = await body(request);
     if (!Array.isArray(input.hotspotIds)) return respond(json, response, 400, { error: 'hotspotIds 必须是数组' });
     const tracks = Array.isArray(input.tracks) && input.tracks.length ? input.tracks : ['article']; const added = store.addCandidates(batchId, input.hotspotIds, { tracks });
+    if (tracks.includes('social_cards') && input.socialOutputMode === 'wechat-event-cards') {
+      const socialCandidates = store.listCandidates(batchId, 'social_cards').filter((candidate) => input.hotspotIds.some((hotspotId) => Number(hotspotId) === Number(candidate.hotspot_id)));
+      for (const candidate of socialCandidates) {
+        store.updateCandidateTrack(candidate.id, 'social_cards', { output_mode: 'wechat-event-cards', pool_role: input.poolRole || '事件热榜图文' });
+        store.saveCardEditorial(candidate.id, { ...store.getCardEditorial(candidate.id), output_mode: 'wechat-event-cards' });
+      }
+    }
     if (tracks.includes('social_cards') && input.socialScoreDetails && input.hotspotIds.length === 1) { const candidate = added.find((item) => Number(item.hotspot_id) === Number(input.hotspotIds[0])); if (candidate) store.saveSocialScore(candidate.id, input.socialScoreDetails); }
     return respond(json, response, 201, store.listCandidates(batchId, input.track || tracks[0]));
   }

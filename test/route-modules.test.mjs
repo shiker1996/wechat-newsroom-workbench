@@ -47,6 +47,31 @@ test('候选详情路由使用注入的 candidateEventGroups 返回事件组', a
   assert.equal(payload.data.event_card.conclusion,'事实卡');
 });
 
+test('事件热榜加入事件图文时写入事件图文输出模式', async () => {
+  const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
+  const calls = [];
+  const socialCandidate = { id: 9, hotspot_id: 42, candidate_id: 'C001' };
+  let editorial = { output_mode: 'wechat-tool-cards', status: 'DISCUSS' };
+  let payload = null;
+  const handled = await handleCandidateRoutes({
+    request: { method: 'POST' }, response: {}, pathname: '/api/batches/b1/candidates', searchParams: new URLSearchParams(),
+    store: {
+      addCandidates(batchId, hotspotIds, options) { calls.push({ batchId, hotspotIds, options }); return []; },
+      listCandidates(batchId, track) { return track === 'social_cards' ? [socialCandidate] : []; },
+      updateCandidateTrack(candidateId, track, fields) { calls.push({ candidateId, track, fields }); },
+      getCardEditorial() { return editorial; },
+      saveCardEditorial(candidateId, input) { editorial = input; calls.push({ candidateId, editorial }); },
+    },
+    body: async () => ({ hotspotIds: [42], tracks: ['social_cards'], socialOutputMode: 'wechat-event-cards', poolRole: '事件热榜图文' }),
+    json(_response, status, data) { payload = { status, data }; },
+  });
+  assert.equal(handled, true);
+  assert.equal(payload.status, 201);
+  assert.deepEqual(calls[0], { batchId: 'b1', hotspotIds: [42], options: { tracks: ['social_cards'] } });
+  assert.deepEqual(calls[1], { candidateId: 9, track: 'social_cards', fields: { output_mode: 'wechat-event-cards', pool_role: '事件热榜图文' } });
+  assert.equal(editorial.output_mode, 'wechat-event-cards');
+});
+
 test('服务端路由模块均可通过 Node 语法编译', () => {
   const routeDirectory=new URL('../server/platform/http/routes/',import.meta.url);
   const routeFiles=fs.readdirSync(routeDirectory).filter((name)=>name.endsWith('.mjs'));

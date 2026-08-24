@@ -33,6 +33,9 @@ test('事件关系图使用固定视窗、缩放平移和确定性维度排序',
   assert.match(html, /data-graph-zoom="reset"/);
   assert.match(html, /data-graph-lens="what"[^>]*>动作/);
   assert.match(css, /\.event-graph \{[^}]*height:500px/);
+  assert.match(ui, /data-event-tracks="article">加入文章池/);
+  assert.match(ui, /data-event-tracks="social_cards">加入图文池/);
+  assert.match(ui, /socialOutputMode: tracks\.includes\("social_cards"\) \? "wechat-event-cards"/);
 });
 
 test('事件关系图连接事件与维度节点，孤立主体不建维度节点', () => {
