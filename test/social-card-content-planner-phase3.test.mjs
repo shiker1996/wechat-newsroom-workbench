@@ -6,6 +6,7 @@ import {
   buildSocialCardContentPlannerPrompt,
   buildSocialCardPlannerComponentPool,
   normalizeSocialCardContentPlannerResult,
+  partitionSocialCardContentPlannerOperationsBySchema,
   validateSocialCardContentPlannerSchema,
   validateSocialCardContentPlannerOperations,
 } from '../server/features/social-cards/application/social-card-content-planner.mjs';
@@ -106,6 +107,23 @@ test('旧操作不再被静默转换，Schema 门禁会明确拒绝', () => {
 test('旧 add_fact_block 操作在 Schema 层被拒绝', () => {
   const result = validateSocialCardContentPlannerSchema({ operations: [{ op: 'add_fact_block', page: 6, slot_id: 'source', source_refs: ['repo:readme'], block: { type: 'note' } }] });
   assert.equal(result.valid, false);
+});
+
+test('列表补充块禁止使用数组 content，坏操作可被单独隔离', () => {
+  const raw = { operations: [{ op: 'add_component', page: 1, component_id: 'component-fact-export@p1-capability-note', render_type: 'list', fact_ids: ['fact-export'], source_refs: sourceRefs, block: { type: 'list', content: ['第一条', '第二条'] } }] };
+  assert.equal(validateSocialCardContentPlannerSchema(raw).valid, false);
+  const partitioned = partitionSocialCardContentPlannerOperationsBySchema({ operations: [raw.operations[0], { op: 'merge_pages', pages: [1, 2] }] });
+  assert.deepEqual(partitioned.operations, [{ op: 'merge_pages', pages: [1, 2] }]);
+  assert.match(partitioned.rejectedOperations[0].issues.join('；'), /不符合允许的结构/);
+});
+
+test('Schema 坏操作不会拖掉同批合法操作', () => {
+  const valid = { op: 'merge_pages', pages: [1, 2] };
+  const invalid = { op: 'add_component', page: 1, component_id: 'broken', source_refs: [], block: { type: 'note' } };
+  const partitioned = partitionSocialCardContentPlannerOperationsBySchema({ operations: [invalid, valid] });
+  assert.deepEqual(partitioned.operations, [valid]);
+  assert.equal(partitioned.rejectedOperations.length, 1);
+  assert.equal(partitioned.rejectedOperations[0].index, 0);
 });
 
 test('AI 补充事实块也必须经过页面容量守卫', () => {
