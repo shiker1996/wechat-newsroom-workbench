@@ -519,6 +519,205 @@ function reindexContinuationGroups(pages) {
   });
 }
 
+const EVENT_AUXILIARY_PAGE_ROLES = new Set(['evidence', 'risk']);
+const EVENT_AUXILIARY_PAGE_KINDS = new Set(['evidence', 'risk']);
+
+function eventPageRole(page) {
+  return String(page?.role || inferCardPageRole(page) || '').toLowerCase();
+}
+
+function isEventAuxiliaryPage(page) {
+  return EVENT_AUXILIARY_PAGE_ROLES.has(eventPageRole(page))
+    || EVENT_AUXILIARY_PAGE_KINDS.has(String(page?.kind || '').toLowerCase());
+}
+
+function isEventDiscussionPage(page) {
+  const role = eventPageRole(page);
+  const kind = String(page?.kind || '').toLowerCase();
+  return role === 'compare' || kind === 'positions'
+    || /争议|讨论|回应|观点|影响/.test(String(page?.title || ''));
+}
+
+function eventTimelineItemCount(page) {
+  return (Array.isArray(page?.content_blocks) ? page.content_blocks : [])
+    .filter((block) => String(block?.type || '') === 'timeline')
+    .reduce((count, block) => count + (Array.isArray(block?.items) ? block.items.length : 0), 0);
+}
+
+function eventMergeFits(page, capacityProfile, role, slack = 1.04) {
+  const capacity = capacityProfileForRole(capacityProfile, role);
+  if (!capacity) return false;
+  const estimate = estimateSocialCardPageLoad(page, capacity);
+  const hardReasons = estimate.reasons.filter((reason) => reason !== 'estimated-height');
+  return !hardReasons.length && estimate.estimatedHeightPx <= estimate.bodyHeightPx * Math.max(1, Number(slack) || 1.04);
+}
+
+/**
+ * 事件图文专用的叙事归一化：
+ * - 把旧故事板中的 evidence/risk 独立页收束到一个 compare 讨论页；
+ * - 在模板容量允许时，把“发生了什么”与至少两个节点的时间线合并。
+ *
+ * 这不是内容改写，也不删除事实；来源引用、事实边界和开放问题仍作为
+ * 内容块保留。它只修正页面职责，避免把读者最关心的讨论拆成免责声明页。
+ */
+export function normalizeEventStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04 } = {}) {
+  const output = (Array.isArray(pages) ? pages : []).map(clone);
+  const operations = [];
+  if (!output.length) return { pages: output, operations, changed: false };
+
+  const auxiliaryIndexes = output
+    .map((page, index) => isEventAuxiliaryPage(page) ? index : -1)
+    .filter((index) => index >= 0);
+  if (auxiliaryIndexes.length) {
+    const discussionIndex = output.findIndex((page, index) => !auxiliaryIndexes.includes(index) && isEventDiscussionPage(page));
+    const sourcePages = auxiliaryIndexes.map((index) => output[index]);
+    const targetPage = discussionIndex >= 0
+      ? output[discussionIndex]
+      : {
+        ...clone(sourcePages[0]),
+        kind: 'positions',
+        role: 'compare',
+        title: '争议焦点',
+        goal: '把已知事实、信息缺口和可讨论影响放在同一页',
+        content_blocks: [],
+      };
+    const mergedBlocks = [
+      ...(Array.isArray(targetPage.content_blocks) ? targetPage.content_blocks : []),
+      ...sourcePages.flatMap((page) => Array.isArray(page.content_blocks) ? page.content_blocks : []),
+    ];
+    const candidate = {
+      ...targetPage,
+      kind: discussionIndex >= 0 ? targetPage.kind : 'positions',
+      role: 'compare',
+      content_blocks: mergedBlocks,
+      evidence: [...new Set([
+        ...(Array.isArray(targetPage.evidence) ? targetPage.evidence : []),
+        ...sourcePages.flatMap((page) => Array.isArray(page.evidence) ? page.evidence : []),
+      ].map(String))],
+    };
+    if (eventMergeFits(candidate, capacityProfile, 'compare', mergeSlack)) {
+      const targetOriginalIndex = discussionIndex >= 0 ? discussionIndex : auxiliaryIndexes[0];
+      const removed = new Set(auxiliaryIndexes);
+      const next = [];
+      output.forEach((page, index) => {
+        if (index === targetOriginalIndex) next.push(candidate);
+        if (!removed.has(index) && index !== targetOriginalIndex) next.push(page);
+      });
+      if (discussionIndex < 0 && next.length > 1) {
+        const createdIndex = next.indexOf(candidate);
+        const endingIndex = next.findIndex((page) => page.kind === 'ending');
+        if (endingIndex >= 0 && createdIndex > endingIndex) {
+          next.splice(createdIndex, 1);
+          next.splice(endingIndex, 0, candidate);
+        }
+      }
+      output.splice(0, output.length, ...next);
+      operations.push({
+        op: 'merge_event_auxiliary_pages',
+        sourcePages: auxiliaryIndexes.map((index) => index + 1),
+        targetPage: targetOriginalIndex + 1,
+        targetRole: 'compare',
+        source: 'event-storyboard-narrative-normalizer',
+      });
+    }
+  }
+
+  let index = 0;
+  while (index < output.length - 1) {
+    const first = output[index];
+    const second = output[index + 1];
+    const firstRole = eventPageRole(first);
+    const secondRole = eventPageRole(second);
+    if ((firstRole !== 'concept' && String(first?.kind || '').toLowerCase() !== 'what-happened')
+      || (secondRole !== 'timeline' && String(second?.kind || '').toLowerCase() !== 'timeline')
+      || eventTimelineItemCount(second) < 2) {
+      index += 1;
+      continue;
+    }
+    const candidate = {
+      ...first,
+      kind: 'what-happened',
+      role: 'concept',
+      title: /关键变化|时间|节点/.test(String(first.title || '')) ? first.title : '发生了什么与关键变化',
+      content_blocks: [
+        ...(Array.isArray(first.content_blocks) ? first.content_blocks : []),
+        ...(Array.isArray(second.content_blocks) ? second.content_blocks : []),
+      ],
+      evidence: [...new Set([
+        ...(Array.isArray(first.evidence) ? first.evidence : []),
+        ...(Array.isArray(second.evidence) ? second.evidence : []),
+      ].map(String))],
+    };
+    if (!eventMergeFits(candidate, capacityProfile, 'concept', mergeSlack)) {
+      index += 1;
+      continue;
+    }
+    output.splice(index, 2, candidate);
+    operations.push({
+      op: 'merge_event_timeline_into_summary',
+      pages: [index + 1, index + 2],
+      timelineItems: eventTimelineItemCount(second),
+      targetRole: 'concept',
+      source: 'event-storyboard-narrative-normalizer',
+    });
+  }
+  return { pages: output, operations, changed: operations.length > 0 };
+}
+
+const REPOSITORY_MERGE_RULES = Object.freeze([
+  { first: 'concept', second: 'feature', role: 'concept', kind: 'problem', title: '问题与核心能力', op: 'merge_repository_problem_capability' },
+  { first: 'feature', second: 'steps', role: 'feature', kind: 'capability', title: '能力与上手路径', op: 'merge_repository_capability_quickstart' },
+  { first: 'risk', second: 'ending', role: 'ending', kind: 'ending', title: null, op: 'merge_repository_limitations_ending' },
+]);
+
+/**
+ * 工具图文的相邻职责合并。只允许三组低风险语义邻接，避免把“快速上手”
+ * 和结尾或不同场景硬拼在一起；所有合并仍须通过目标角色的容量预检。
+ */
+export function normalizeRepositoryStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04 } = {}) {
+  const output = (Array.isArray(pages) ? pages : []).map(clone);
+  const operations = [];
+  let index = 0;
+  while (index < output.length - 1) {
+    const first = output[index];
+    const second = output[index + 1];
+    const firstRole = eventPageRole(first);
+    const secondRole = eventPageRole(second);
+    const rule = REPOSITORY_MERGE_RULES.find((item) => item.first === firstRole && item.second === secondRole);
+    if (!rule || first.kind === 'cover' || second.kind === 'cover') {
+      index += 1;
+      continue;
+    }
+    const candidate = {
+      ...first,
+      kind: rule.kind,
+      role: rule.role,
+      title: rule.title || second.title || first.title,
+      content_blocks: [
+        ...(Array.isArray(first.content_blocks) ? first.content_blocks : []),
+        ...(Array.isArray(second.content_blocks) ? second.content_blocks : []),
+      ],
+      evidence: [...new Set([
+        ...(Array.isArray(first.evidence) ? first.evidence : []),
+        ...(Array.isArray(second.evidence) ? second.evidence : []),
+      ].map(String))],
+    };
+    if (!eventMergeFits(candidate, capacityProfile, rule.role, mergeSlack)) {
+      index += 1;
+      continue;
+    }
+    output.splice(index, 2, candidate);
+    operations.push({
+      op: rule.op,
+      pages: [index + 1, index + 2],
+      targetRole: rule.role,
+      source: 'repository-storyboard-narrative-normalizer',
+    });
+    if (index > 0) index -= 1;
+  }
+  return { pages: output, operations, changed: operations.length > 0 };
+}
+
 /**
  * 将同一故事板页产生的过短续页重新装箱。
  *

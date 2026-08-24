@@ -28,6 +28,34 @@ function numberOrZero(value) {
   return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
+function summarizeDynamicFillAudits(value) {
+  const audits = (Array.isArray(value) ? value : value ? [value] : []).filter((item) => item && typeof item === 'object');
+  const pages = audits.flatMap((audit) => Array.isArray(audit.pages) ? audit.pages : []);
+  const rejected = pages.flatMap((page) => Array.isArray(page.rejectedOperations) ? page.rejectedOperations : []);
+  const stopReasonCounts = {};
+  for (const page of pages) {
+    const reason = String(page?.stopReason || 'unknown');
+    stopReasonCounts[reason] = (stopReasonCounts[reason] || 0) + 1;
+  }
+  const duplicateRejected = rejected.filter((item) => /重复|overlap|already_used|slot/i.test(JSON.stringify(item))).length;
+  const targetReached = pages.filter((page) => page?.stopReason === 'target_utilization_reached').length;
+  const estimatedTargetReached = pages.filter((page) => {
+    const target = Number(page?.targetUtilization);
+    const estimated = Number(page?.estimatedUtilization ?? page?.utilizationAfter);
+    return Number.isFinite(target) && Number.isFinite(estimated) && estimated >= target;
+  }).length;
+  return {
+    runs: audits.length,
+    pages: pages.length,
+    rejectedOperations: rejected.length,
+    duplicateRejectedOperations: duplicateRejected,
+    targetReachedPages: targetReached,
+    targetDensityRate: pages.length ? targetReached / pages.length : null,
+    estimatedTargetDensityRate: pages.length ? estimatedTargetReached / pages.length : null,
+    stopReasonCounts,
+  };
+}
+
 function summarizeJointPackingAudits(value) {
   const audits = (Array.isArray(value) ? value : value ? [value] : []).filter((item) => item && typeof item === 'object');
   const mismatchCount = audits.reduce((sum, item) => sum + numberOrZero(item.mismatchCount ?? item.summary?.mismatchCount), 0);
@@ -90,6 +118,7 @@ export function summarizeSocialTemplateRun({
   avgUtilization = null,
   jointPackingAudit = null,
   rolloutProfile = null,
+  dynamicFillAudits = null,
 } = {}) {
   const pages = Array.isArray(report?.pages) ? report.pages : [];
   const underfilledPages = pages.filter((page) => [...pageIssues(page)].some((issue) => ISSUE_UNDERFILLED.has(issue))).length;
@@ -105,6 +134,7 @@ export function summarizeSocialTemplateRun({
     })()
     : Number(avgUtilization);
   const jointPacking = summarizeJointPackingAudits(jointPackingAudit);
+  const dynamicFill = summarizeDynamicFillAudits(dynamicFillAudits);
   return {
     schemaVersion: 1,
     operation: operation === 'page-regeneration' ? 'page-regeneration' : 'generation',
@@ -144,6 +174,14 @@ export function summarizeSocialTemplateRun({
     jointPackingBrowserOnlyOverflowPages: jointPacking.browserOnlyOverflowPages,
     jointPackingStaticOnlyOverflowPages: jointPacking.staticOnlyOverflowPages,
     jointPackingMeanAbsoluteUtilizationDelta: jointPacking.meanAbsoluteUtilizationDelta,
+    dynamicFillRuns: dynamicFill.runs,
+    dynamicFillPages: dynamicFill.pages,
+    dynamicFillRejectedOperations: dynamicFill.rejectedOperations,
+    duplicateSupplementRejectedCount: dynamicFill.duplicateRejectedOperations,
+    dynamicFillTargetReachedPages: dynamicFill.targetReachedPages,
+    dynamicFillTargetDensityRate: dynamicFill.targetDensityRate,
+    dynamicFillEstimatedTargetDensityRate: dynamicFill.estimatedTargetDensityRate,
+    dynamicFillStopReasonCounts: dynamicFill.stopReasonCounts,
     rolloutProfile: rolloutProfile && typeof rolloutProfile === 'object' ? rolloutProfile : null,
     noOpRepair: Boolean(noOpRepair),
     hardGateFailure: Boolean(hardGateFailure),
@@ -262,6 +300,10 @@ export function aggregateSocialTemplateMetrics(rows = []) {
     pagesMerged: generations.reduce((sum, row) => sum + numberOrZero(row.pagesMerged ?? row.pages_merged), 0),
     blocksMoved: generations.reduce((sum, row) => sum + numberOrZero(row.blocksMoved ?? row.blocks_moved), 0),
     factBlocksAdded: generations.reduce((sum, row) => sum + numberOrZero(row.factBlocksAdded ?? row.fact_blocks_added), 0),
+    dynamicFillRuns: generations.reduce((sum, row) => sum + numberOrZero(row.dynamicFillRuns ?? row.dynamic_fill_runs), 0),
+    dynamicFillRejectedOperations: generations.reduce((sum, row) => sum + numberOrZero(row.dynamicFillRejectedOperations ?? row.dynamic_fill_rejected_operations), 0),
+    duplicateSupplementRejectedCount: generations.reduce((sum, row) => sum + numberOrZero(row.duplicateSupplementRejectedCount ?? row.duplicate_supplement_rejected_count), 0),
+    dynamicFillTargetReachedPages: generations.reduce((sum, row) => sum + numberOrZero(row.dynamicFillTargetReachedPages ?? row.dynamic_fill_target_reached_pages), 0),
     contentPlanAdjustmentRounds: generations.reduce((sum, row) => sum + numberOrZero(row.contentPlanAdjustmentCount ?? row.content_plan_adjustment_count), 0),
     averageContentPlanAdjustmentRounds: generations.length ? generations.reduce((sum, row) => sum + numberOrZero(row.contentPlanAdjustmentCount ?? row.content_plan_adjustment_count), 0) / generations.length : 0,
     sourceAtomLossCount: generations.reduce((sum, row) => sum + numberOrZero(row.sourceAtomLossCount ?? row.source_atom_loss_count), 0),

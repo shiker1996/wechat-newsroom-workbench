@@ -17,7 +17,10 @@ export function isStructuredCardBlockType(type) {
 export function cardBlockEditorHtml(block, index) {
   const type = CARD_ALLOWED_BLOCK_TYPES.includes(block?.type) ? block.type : 'text';
   const structured = isStructuredCardBlockType(type);
-  const payload = structured ? JSON.stringify({ items: block.items || [], headers: block.headers || [], rows: block.rows || [] }, null, 2) : String(block.content || '');
+  const listPayload = type === 'list' && !String(block?.content || '').trim() && Array.isArray(block?.items)
+    ? block.items.map((item) => typeof item === 'string' ? item : [item?.title || item?.label || item?.time || item?.date, item?.content || item?.text || item?.description].filter(Boolean).join('：')).filter(Boolean).join('\n')
+    : String(block?.content || '');
+  const payload = structured ? JSON.stringify({ items: block.items || [], headers: block.headers || [], rows: block.rows || [] }, null, 2) : listPayload;
   const factIds = Array.isArray(block?.fact_ids) ? block.fact_ids.map(String) : [];
   const sourceRefs = Array.isArray(block?.source_refs) ? block.source_refs.map(String) : [];
   const supplementSlot = String(block?.supplement_slot_id || '');

@@ -76,3 +76,21 @@ test('布局修复状态指纹在计划或已启用变体变化时变化', () =>
   assert.notEqual(variantChanged, socialCardRepairStateSignature(input));
   assert.notEqual(fitContentChanged, socialCardRepairStateSignature(input));
 });
+
+test('应用层兜底拒绝同页重复的来源核验语义职责', () => {
+  const evidencePlan = [{ kind: 'content', role: 'evidence', title: '信息来源与核验', content_blocks: [
+    { type: 'list', title: '来源清单', items: ['来源一'] },
+    { type: 'note', title: '核验状态', content: '部分信息尚未获官方确认。' },
+  ] }];
+  const operation = {
+    op: 'add_fact_block', page: 1, slot_id: 'source', component_id: 'fact-source',
+    fact_ids: ['fact-source'], source_refs: ['README:source'],
+    block: { type: 'note', title: '来源证据', content: '四起事件均有来源支持。', fact_ids: ['fact-source'], source_refs: ['README:source'], supplement_slot_id: 'source' },
+  };
+  const result = validateSocialCardRestructureOperations(evidencePlan, [operation], {
+    factIndex: { candidates: [{ id: 'fact-source', text: '四起事件均有来源支持。', tags: ['source'], source_status: 'provided', source_refs: ['README:source'] }] },
+    knownSourceRefs: ['README:source'], maxFactBlocksAdded: 1,
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.issues.some((issue) => issue.includes('语义职责重复')));
+});

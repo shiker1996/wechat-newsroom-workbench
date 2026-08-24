@@ -6,7 +6,7 @@ import { continuationBadge, escapeHtml, renderStoryboardBlock, renderTechnicalTe
 const BRUTALIST_TEMPLATE_IDS = new Set(['poster-cover', 'thesis-split', 'feature-grid', 'numbered-steps', 'stat-stamp', 'versus-board', 'proof-ledger', 'event-strip', 'warning-panel', 'hard-cta']);
 const LABELS = Object.freeze({
   repository: { cover: 'TOOL / POSTER', concept: 'THESIS / FIRST', feature: 'FEATURE / GRID', steps: 'HOW / NUMBERED', data: 'DATA / STAMP', compare: 'VERSUS / BOARD', evidence: 'PROOF / LEDGER', timeline: 'EVENT / STRIP', risk: 'RISK / NOTICE', ending: 'NEXT / ACTION' },
-  event: { cover: 'EVENT / POSTER', concept: 'SIGNAL / FIRST', feature: 'FACT / GRID', steps: 'RESPONSE / NUMBERED', data: 'DATA / STAMP', compare: 'POSITION / BOARD', evidence: 'PROOF / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
+  event: { cover: 'EVENT / POSTER', concept: 'SIGNAL / FIRST', feature: 'FACT / GRID', steps: 'RESPONSE / NUMBERED', data: 'DATA / STAMP', compare: 'DISCUSSION / BOARD', evidence: 'PROOF / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
   custom: { cover: 'NOTE / POSTER', concept: 'POINT / FIRST', feature: 'POINT / GRID', steps: 'HOW / NUMBERED', data: 'DATA / STAMP', compare: 'VERSUS / BOARD', evidence: 'SOURCE / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
 });
 

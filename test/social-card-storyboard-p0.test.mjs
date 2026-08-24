@@ -85,10 +85,10 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'7a598602aa715955c4cde6d338d4f57cdcd7c795ec3a94e51bcdc14ce1efb89a',
-    'repository/xiaohongshu':'a1f0a47871dd8d22807481bdb7a584ffcde7663386590330844743ee2d0e8cc1',
-    'event/wechat':'fafdd660f17a3fc741474b083802d1cb3580aae67e1fbf08c75f61fb55df32f0',
-    'event/xiaohongshu':'b186411f608a5c345b44d4a943256a49821decfb4b173b82500c9a6678f6ee9b',
+    'repository/wechat':'f5c751c173488a41bb14c5600b2d124e63ee99e4a412a412d89a09ff031bfe6c',
+    'repository/xiaohongshu':'480e884fca0cd7a9f3b6267db48b3f0603a4f278b78aa1b3c8d82fffa9282665',
+    'event/wechat':'83f0cd37b135297a73d14cbf4258f35bd776cbcbc98432f9078e90854e5f16e5',
+    'event/xiaohongshu':'15045ead8eb8b5ad610886a511ee192b6c7c8b656d321c0eb014efa8789e1901',
     'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
     'custom/xiaohongshu':'3493bf0e112e398aee9d3bf295b5d99758fb74630f86c45e82f89689bc29c253',
   };

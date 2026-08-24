@@ -7,7 +7,7 @@ import { resolveSocialCardTemplate } from './social-card-template-resolver.mjs';
 
 const PAGE_LABELS = Object.freeze({
   repository: { cover: 'TOOL RADAR', problem: 'WHY IT MATTERS', capability: 'CORE FEATURES', quickstart: 'QUICK START', scenario: 'USE CASES', limitation: 'BEFORE YOU USE', ending: 'SAVE FOR LATER' },
-  event: { cover: 'BREAKING FOCUS', 'what-happened': 'WHAT HAPPENED', timeline: 'TIMELINE', evidence: 'EVIDENCE CHECK', positions: 'WHO SAID WHAT', impact: 'WHY IT MATTERS', risk: 'FACT BOUNDARY', ending: 'KEEP WATCHING' },
+  event: { cover: 'BREAKING FOCUS', 'what-happened': 'WHAT HAPPENED', timeline: 'TIMELINE', evidence: 'EVIDENCE CHECK', positions: 'DISCUSSION', impact: 'WHY IT MATTERS', risk: 'FACT BOUNDARY', ending: 'KEEP WATCHING' },
   custom: { cover: 'NEW NOTE', highlight: 'KEY POINTS', step: 'HOW TO', item: 'THE LIST', boundary: 'FACT BOUNDARY', ending: 'SAVE FOR LATER' },
 });
 

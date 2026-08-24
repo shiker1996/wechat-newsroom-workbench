@@ -55,6 +55,16 @@ test('内容计划提示只暴露目标页候选，不暴露跨角色全局事�
   const prompt = buildSocialCardContentPlannerPrompt({ cardPlan: plan, contentComponents, layoutReport: { pages: [{ page: 1 }] } });
   assert.doesNotMatch(prompt, /component-global-source-only/);
   assert.match(prompt, /component-fact-export@p1-capability-note/);
+  const withoutUsedFact = buildSocialCardPlannerComponentPool(contentComponents, {
+    pages: [{ page: 1, content_blocks: [{ fact_ids: ['fact-export'] }] }],
+  });
+  assert.deepEqual(withoutUsedFact.pageCandidates['1'].supplements, []);
+
+  const overlapping = { ...scoped, id: 'component-core-overlap', componentId: 'component-core-overlap', factIds: ['fact-overlap'], content: { title: '补充', text: '核心能力已经在页面中说明，不能重复添加。' } };
+  const overlapPool = buildSocialCardPlannerComponentPool({ supplements: [overlapping], pageCandidates: { '1': { supplements: [overlapping] } } }, {
+    pages: [{ page: 1, content_blocks: [{ type: 'text', content: '核心能力已经在页面中说明，不能重复添加。' }] }],
+  });
+  assert.deepEqual(overlapPool.pageCandidates['1'].supplements, []);
 });
 
 test('内容计划调整器支持同组完整块移动并守恒来源引用', () => {
@@ -82,6 +92,71 @@ test('补充组件必须引用已知事实来源，跨故事线合并被拒绝',
   assert.equal(validateSocialCardContentPlannerOperations(plan, unknown, options).valid, false);
   const otherGroup = [{ ...plan[0] }, { ...plan[1], page_group_id: 'g2' }];
   assert.equal(validateSocialCardContentPlannerOperations(otherGroup, { operations: [{ op: 'merge_pages', pages: [1, 2] }] }, { knownSourceRefs: sourceRefs }).valid, false);
+});
+
+test('补充块不能重复核心块的条目内容', () => {
+  const corePlan = [{ kind: 'content', role: 'feature', content_blocks: [
+    { type: 'list', items: ['2019年：阿里巴巴港股上市', '2025年：宣布配售800亿港元'], source_refs: [sourceRefs[0]] },
+  ] }];
+  const component = { id: 'component-fact-stage', componentId: 'component-fact-stage', page: 1, role: 'feature', slotId: 'usage', factIds: ['fact-stage'], sourceRefs: [sourceRefs[1]], sourceStatus: 'provided', semanticTags: ['usage'], preferredRender: 'list', renderCandidates: ['list'], content: { title: '阶段变化', text: '2019年：阿里巴巴港股上市；2026年：继续投入基础设施' } };
+  const result = validateSocialCardContentPlannerOperations(corePlan, { operations: [{
+    op: 'add_component', page: 1, component_id: component.id, render_type: 'list', fact_ids: ['fact-stage'], source_refs: [sourceRefs[1]],
+    block: { type: 'list', items: ['2019年：阿里巴巴港股上市', '2026年：继续投入基础设施'] },
+  }] }, {
+    knownSourceRefs: sourceRefs,
+    maxFactBlocksAdded: 1,
+    contentComponents: { supplements: [component], pageCandidates: { '1': { supplements: [component] } } },
+    factIndex: { candidates: [{ id: 'fact-stage', path: 'facts.timeline[0]', tags: ['usage'], source_refs: [sourceRefs[1]], source_status: 'provided' }] },
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('；'), /内容已存在于核心内容中/);
+});
+
+test('补充事实跨页面互斥，且同页槽位互斥', () => {
+  const componentA = { id: 'component-fact-a', componentId: 'component-fact-a', page: 1, role: 'feature', slotId: 'capability', factIds: ['fact-a'], sourceRefs: [sourceRefs[0]], sourceStatus: 'provided', semanticTags: ['capability'], preferredRender: 'note', renderCandidates: ['note'], content: { title: '能力 A', text: '能力 A' } };
+  const componentB = { id: 'component-fact-b', componentId: 'component-fact-b', page: 1, role: 'feature', slotId: 'output', factIds: ['fact-b'], sourceRefs: [sourceRefs[1]], sourceStatus: 'provided', semanticTags: ['output'], preferredRender: 'note', renderCandidates: ['note'], content: { title: '能力 B', text: '能力 B' } };
+  const componentSameFact = { ...componentA, id: 'component-fact-a@p2', componentId: 'component-fact-a@p2', page: 2 };
+  const twoPages = [
+    { kind: 'content', role: 'feature', content_blocks: [] },
+    { kind: 'content', role: 'feature', content_blocks: [] },
+  ];
+  const common = {
+    knownSourceRefs: sourceRefs,
+    maxFactBlocksAdded: 3,
+    maxFactBlocksPerPage: 2,
+    contentComponents: { supplements: [componentA, componentB, componentSameFact], pageCandidates: {
+      '1': { supplements: [componentA, componentB] }, '2': { supplements: [componentSameFact] },
+    } },
+    factIndex: { candidates: [
+      { id: 'fact-a', path: 'facts.a', tags: ['capability'], source_refs: [sourceRefs[0]], source_status: 'provided' },
+      { id: 'fact-b', path: 'facts.b', tags: ['output'], source_refs: [sourceRefs[1]], source_status: 'provided' },
+    ] },
+  };
+  const operations = { operations: [
+    { op: 'add_component', page: 1, component_id: componentA.id, render_type: 'note', fact_ids: ['fact-a'], source_refs: [sourceRefs[0]], block: { type: 'note', content: '能力 A' } },
+    { op: 'add_component', page: 1, component_id: componentB.id, render_type: 'note', fact_ids: ['fact-b'], source_refs: [sourceRefs[1]], block: { type: 'note', content: '能力 B' } },
+    { op: 'add_component', page: 2, component_id: componentSameFact.id, render_type: 'note', fact_ids: ['fact-a'], source_refs: [sourceRefs[0]], block: { type: 'note', content: '能力 A（重复）' } },
+  ] };
+  const result = applySocialCardContentPlannerOperationsPartial(twoPages, operations, common);
+  assert.equal(result.changed, true);
+  assert.equal(result.operations.length, 2);
+  assert.equal(result.rejectedOperations.length, 1);
+  assert.match(result.rejectedOperations[0].issues.join('；'), /槽位已占用|事实已被其他补充块使用/);
+  assert.equal(result.pages[0].content_blocks.length, 2);
+  assert.equal(result.pages[1].content_blocks.length, 0);
+
+  const sameSlot = { ...componentA, id: 'component-fact-c', componentId: 'component-fact-c', factIds: ['fact-c'], content: { title: '能力 C', text: '能力 C' } };
+  const sameSlotResult = applySocialCardContentPlannerOperationsPartial([twoPages[0]], { operations: [
+    { op: 'add_component', page: 1, component_id: componentA.id, render_type: 'note', fact_ids: ['fact-a'], source_refs: [sourceRefs[0]], block: { type: 'note', content: '能力 A' } },
+    { op: 'add_component', page: 1, component_id: sameSlot.id, render_type: 'note', fact_ids: ['fact-c'], source_refs: [sourceRefs[0]], block: { type: 'note', content: '能力 C' } },
+  ] }, {
+    ...common,
+    maxFactBlocksAdded: 2,
+    contentComponents: { supplements: [componentA, sameSlot], pageCandidates: { '1': { supplements: [componentA, sameSlot] } } },
+    factIndex: { candidates: [...common.factIndex.candidates, { id: 'fact-c', path: 'facts.c', tags: ['capability'], source_refs: [sourceRefs[0]], source_status: 'provided' }] },
+  });
+  assert.equal(sameSlotResult.operations.length, 1);
+  assert.match(sameSlotResult.rejectedOperations[0].issues.join('；'), /槽位已占用/);
 });
 
 test('第一步槽位契约：目录完整且槽位类型、页角色不越界', () => {

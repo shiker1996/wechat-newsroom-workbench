@@ -16,7 +16,7 @@ const LABELS = Object.freeze({
   },
   event: {
     cover: 'FIELD NOTES / EVENT', concept: 'CONTEXT / FIRST', feature: 'FACTS / NOTES',
-    steps: 'RESPONSE / STEPS', data: 'DATA / TABLE', compare: 'POSITIONS / SHEET',
+    steps: 'RESPONSE / STEPS', data: 'DATA / TABLE', compare: 'DISCUSSION / SHEET',
     evidence: 'SOURCES / LEDGER', timeline: 'TIMELINE / FILE', risk: 'BOUNDARY / NOTE', ending: 'EDITOR’S NOTE',
   },
   custom: {
@@ -95,4 +95,6 @@ export const EDITORIAL_V1_CSS = `
 .template-editorial-v1.page-cover .page-content-stack{justify-content:flex-start}
 .template-editorial-v1.page-cover h1{margin-top:auto;margin-bottom:0}
 .template-editorial-v1.page-cover .editorial-block-stack{margin-bottom:auto}
+/* Keep comparison cell text above the 11px body-text audit floor. */
+.template-editorial-v1 .compare-block td{font-size:11px}
 `;

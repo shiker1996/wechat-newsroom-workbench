@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { evaluateCustomCardGate, CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS } from '../server/features/social-cards/index.mjs';
 import { buildCustomFactSheet, customFactMarkdown, parsePointLine, customSourceUrl } from '../server/features/social-cards/index.mjs';
 import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { sanitizeCardPlan } from '../server/shared/rendering/storyboard-content.mjs';
 import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
 
 const okEditorial={must_disclose:'体验来自作者确认',forbidden_claims:'不得夸大效果',target_reader:'职场新人',pain_point:'整理效率低',recommended_pages:6};
@@ -127,6 +128,46 @@ test('新版式块缺少 items 时退化为列表或文本块', () => {
   assert.doesNotMatch(html,/stats-block/);
   assert.match(html,/<li>7月16日：发布<\/li>/);
   assert.match(html,/无结构化数据/);
+});
+
+test('时间线归一化模型别名但不在归一化阶段删除重复块', () => {
+  const pages = sanitizeCardPlan([{ kind:'content', role:'timeline', title:'时间线', content_blocks:[
+    { type:'timeline', title:'阶段变化', items:[{ time:'2025年', text:'阿里巴巴宣布拟配售新股，资金投入 AI 基础设施。' }] },
+    { type:'timeline', title:'阶段变化', items:[{ time:'2025年', text:'阿里巴巴宣布拟配售新股，资金投入 AI 基础设施。' }] },
+  ] }]);
+  assert.equal(pages[0].content_blocks.length, 2);
+  assert.equal(pages[0].content_blocks[0].type, 'text');
+  assert.equal(pages[0].content_blocks[1].type, 'text');
+  assert.match(pages[0].content_blocks[0].content, /资金投入 AI 基础设施/);
+  const html = renderStoryboardHtml({ topic:'主题', pages, contentType:'event', sourceLabel:'事件专题', channelMode:'xiaohongshu' });
+  assert.equal((html.match(/timeline-block/g) || []).length, 0);
+  assert.match(html, /资金投入 AI 基础设施/);
+});
+
+test('列表数组拆成条目，单条时间线不渲染骨架且保留跨页补充', () => {
+  const pages = sanitizeCardPlan([
+    { kind:'content', role:'concept', title:'背景', content_blocks:[
+      { type:'list', title:'关键节点', content:['2019年：上市','2025年：配售'], items:[] },
+      { type:'note', title:'来源证据', content:'同一来源说明', fact_ids:['fact-source'], supplement_slot_id:'context' },
+    ] },
+    { kind:'content', role:'evidence', title:'来源', content_blocks:[
+      { type:'note', title:'来源证据', content:'同一来源说明', fact_ids:['fact-source'], supplement_slot_id:'source' },
+      { type:'timeline', title:'阶段变化', items:[{time:'2025年', text:'只有一个阶段'}] },
+    ] },
+  ]);
+  assert.deepEqual(pages[0].content_blocks[0].items, ['2019年：上市', '2025年：配售']);
+  assert.equal(pages[0].content_blocks[0].content, '2019年：上市\n2025年：配售');
+  assert.equal(pages[1].content_blocks.some((block) => block.type === 'timeline'), false);
+  assert.equal(pages[0].content_blocks.filter((block) => block.title === '来源证据').length, 1);
+  assert.equal(pages[1].content_blocks.filter((block) => block.title === '来源证据').length, 1);
+});
+
+test('旧版逗号拼接列表在最终入口恢复为独立条目', () => {
+  const pages = sanitizeCardPlan([{ kind:'content', role:'timeline', content_blocks:[
+    { type:'list', title:'关键节点', content:'2019年：上市,2025年：配售金额800亿港元,所得款项投入AI基础设施', items:[] },
+  ] }]);
+  assert.deepEqual(pages[0].content_blocks[0].items, ['2019年：上市', '2025年：配售金额800亿港元', '所得款项投入AI基础设施']);
+  assert.equal(pages[0].content_blocks[0].content, '2019年：上市\n2025年：配售金额800亿港元\n所得款项投入AI基础设施');
 });
 
 test('list 块支持 items 字符串数组兜底', () => {

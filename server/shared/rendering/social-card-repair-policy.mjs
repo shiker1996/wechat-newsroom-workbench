@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { listBlockValues } from './social-card-plan.mjs';
-import { buildSocialCardContentAtoms, compareSocialCardContentAtomConservation } from './social-card-content-atoms.mjs';
+import {
+  buildSocialCardContentAtoms,
+  compareSocialCardContentAtomConservation,
+  validateSocialCardSupplementUniqueness,
+} from './social-card-content-atoms.mjs';
 import { findSocialCardSupplementSlot } from './social-card-supplement-slots.mjs';
 import { inferCardPageRole } from './social-card-role.mjs';
 import { knownSourceRefsFromSocialCardFactIndex, socialCardFactDisplaySpec } from './social-card-fact-index.mjs';
@@ -233,6 +237,13 @@ function validateAddFactBlockOperation(pages, operation, { knownSourceRefs = [],
       else for (const ref of candidate.source_refs || []) if (!(sourceRefs || []).map(String).includes(String(ref))) issues.push(`P${pageNumber} 补充内容块未携带候选事实来源：${ref}`);
     }
   }
+  issues.push(...validateSocialCardSupplementUniqueness({
+    pages,
+    pageNumber,
+    block,
+    factIds,
+    slotId,
+  }));
   if (!known.size) issues.push('补充内容块缺少可校验的事实来源集合');
   for (const sourceRef of sourceRefs || []) if (!known.has(String(sourceRef))) issues.push(`补充内容块来源未在事实基座中登记：${sourceRef}`);
   if (Number(maxFactBlocksAdded) < 1) issues.push('当前计划不允许补充内容块');

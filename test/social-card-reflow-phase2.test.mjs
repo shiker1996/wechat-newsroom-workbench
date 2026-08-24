@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSocialCardTemplatePack } from '../server/shared/rendering/social-card-template-registry.mjs';
 import { resolveSocialCardCapacityProfile } from '../server/shared/rendering/social-card-capacity.mjs';
-import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad } from '../server/shared/rendering/social-card-reflow.mjs';
+import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages } from '../server/shared/rendering/social-card-reflow.mjs';
 
 function profile(pack = 'brutalist-v1') {
   return resolveSocialCardCapacityProfile({
@@ -53,6 +53,49 @@ test('未超容量页面保持原计划和页数', () => {
   assert.equal(result.changed, false);
   assert.deepEqual(result.pages, [page]);
   assert.equal(estimateSocialCardPageLoad(page, profile().roles.feature).overCapacity, false);
+});
+
+test('事件故事板收束来源边界页，并在容量允许时合并主事实与多节点时间线', () => {
+  const capacityProfile = profile('clean-v1');
+  const pages = [
+    { kind: 'cover', role: 'cover', title: '封面', content_blocks: [] },
+    { kind: 'what-happened', role: 'concept', title: '发生了什么', content_blocks: [{ type: 'text', content: '主体在公开场合宣布一项重要计划。' }] },
+    { kind: 'timeline', role: 'timeline', title: '关键节点', content_blocks: [{ type: 'timeline', items: [
+      { time: '2019年', title: '上市', content: '完成上市' },
+      { time: '2025年', title: '宣布计划', content: '发布公告' },
+    ] }] },
+    { kind: 'evidence', role: 'evidence', title: '信息来源与核验', content_blocks: [{ type: 'list', items: ['来源一支持该事实', '来源二提供补充'] }] },
+    { kind: 'risk', role: 'risk', title: '事实边界和开放问题', content_blocks: [{ type: 'list', items: ['时间细节仍待确认', '后续影响尚待观察'] }] },
+    { kind: 'ending', role: 'ending', title: '后续观察', content_blocks: [{ type: 'list', items: ['关注后续公告'] }] },
+  ];
+  const result = normalizeEventStoryboardPages({ pages, capacityProfile });
+  assert.equal(result.pages.length, 4);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'concept', 'compare', 'ending']);
+  assert.equal(result.pages[1].content_blocks.some((block) => block.type === 'timeline'), true);
+  assert.equal(result.pages[2].title, '争议焦点');
+  assert.equal(result.pages[2].content_blocks.length, 2);
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_event_auxiliary_pages'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_event_timeline_into_summary'));
+});
+
+test('工具故事板按相邻职责白名单合并，不跨封面和快速上手结尾', () => {
+  const capacityProfile = profile('clean-v1');
+  const pages = [
+    { kind: 'cover', role: 'cover', title: '封面', content_blocks: [] },
+    { kind: 'problem', role: 'concept', title: '痛点', content_blocks: [{ type: 'text', content: '手动处理重复配置，维护成本高。' }] },
+    { kind: 'capability', role: 'feature', title: '核心能力', content_blocks: [{ type: 'list', items: ['统一配置入口', '减少重复处理'] }] },
+    { kind: 'quickstart', role: 'steps', title: '快速上手', content_blocks: [{ type: 'code', content: 'npm install demo\nnpm run start' }] },
+    { kind: 'limitation', role: 'risk', title: '使用边界', content_blocks: [{ type: 'note', content: '权限和网络条件需要单独确认。' }] },
+    { kind: 'ending', role: 'ending', title: '最后确认', content_blocks: [{ type: 'list', items: ['确认运行环境'] }] },
+  ];
+  const result = normalizeRepositoryStoryboardPages({ pages, capacityProfile });
+  assert.equal(result.pages.length, 4);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'concept', 'steps', 'ending']);
+  assert.equal(result.pages[1].content_blocks.length, 2);
+  assert.equal(result.pages[2].content_blocks.some((block) => block.type === 'code'), true);
+  assert.equal(result.pages[3].content_blocks.length, 2);
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_repository_problem_capability'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_repository_limitations_ending'));
 });
 
 test('拆页不可用时，程序化压缩以省略号作为最后兜底且不触碰命令', () => {

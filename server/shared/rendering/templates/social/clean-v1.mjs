@@ -10,7 +10,7 @@ const CLEAN_TEMPLATE_IDS = new Set([
 
 const LABELS = Object.freeze({
   repository: { cover: 'TOOL / BRIEF', concept: 'CONTEXT / FIRST', feature: 'FEATURE / NOTES', steps: 'METHOD / STEPS', data: 'DATA / SIGNAL', compare: 'COMPARE / VIEW', evidence: 'SOURCES / CHECK', timeline: 'TIMELINE / FLOW', risk: 'BOUNDARY / NOTE', ending: 'SAVE / LATER' },
-  event: { cover: 'EVENT / BRIEF', concept: 'CONTEXT / FIRST', feature: 'FACTS / NOTES', steps: 'RESPONSE / STEPS', data: 'DATA / SIGNAL', compare: 'POSITIONS / VIEW', evidence: 'SOURCES / CHECK', timeline: 'TIMELINE / FLOW', risk: 'BOUNDARY / NOTE', ending: 'SAVE / LATER' },
+  event: { cover: 'EVENT / BRIEF', concept: 'CONTEXT / FIRST', feature: 'FACTS / NOTES', steps: 'RESPONSE / STEPS', data: 'DATA / SIGNAL', compare: 'DISCUSSION / VIEW', evidence: 'SOURCES / CHECK', timeline: 'TIMELINE / FLOW', risk: 'BOUNDARY / NOTE', ending: 'SAVE / LATER' },
   custom: { cover: 'NOTE / BRIEF', concept: 'CONTEXT / FIRST', feature: 'POINTS / NOTES', steps: 'METHOD / STEPS', data: 'DATA / SIGNAL', compare: 'COMPARE / VIEW', evidence: 'SOURCES / CHECK', timeline: 'TIMELINE / FLOW', risk: 'BOUNDARY / NOTE', ending: 'SAVE / LATER' },
 });
 
@@ -94,4 +94,5 @@ export const CLEAN_V1_CSS = `
 .template-clean-v1.page-cover .page-content-stack{justify-content:flex-start}
 .template-clean-v1.page-cover h1{margin-top:auto;margin-bottom:0}
 .template-clean-v1.page-cover .clean-block-stack{margin-bottom:auto}
+.template-clean-v1 .compare-block td{font-size:11px}
 `;

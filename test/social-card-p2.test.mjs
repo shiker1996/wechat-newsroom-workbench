@@ -224,6 +224,30 @@ test('11 项紧凑清单通过真实浏览器布局审计',async(t)=>{
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('四种图文模板的对比表正文保持 11px 以上并通过真实浏览器布局审计',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-compare-text-'));
+  try{
+    const page={kind:'positions',role:'compare',title:'市场反应与争议焦点',content_blocks:[{type:'compare',title:'市场反应对比',headers:['事件','市场反应','关键争议'],rows:[
+      ['阿里巴巴配售','开盘跌近10%','配售细节未披露，市场担忧摊薄'],
+      ['希音IPO','发行价区间确定','基石投资者名单未披露'],
+      ['商汤医疗融资','估值突破百亿元','Pre-IPO阶段具体细节未披露'],
+      ['脑器时代融资','种子轮完成','具体金额未披露，产品性能未验证'],
+    ]}]};
+    for (const visualStyle of ['ice-blue','neon','paper-craft','brutalist']) {
+      const htmlPath=path.join(dir,`${visualStyle}.html`);
+      const reportPath=path.join(dir,`${visualStyle}.json`);
+      const html=renderStoryboardHtml({topic:'融资事件',contentType:'event',channelMode:'wechat',visualStyle,themeDefinition:socialThemeDefinition(visualStyle),pages:[page]});
+      assert.match(html,/typographyStyle|font-size:11px/);
+      fs.writeFileSync(htmlPath,html,'utf8');
+      await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true});
+      const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+      assert.equal(report.valid,true,`${visualStyle}: ${JSON.stringify(report.pages)}`);
+      assert.doesNotMatch(JSON.stringify(report.pages),/text_too_small/);
+    }
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('图文编辑室可以独立选择版式和视觉主题',()=>{
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');

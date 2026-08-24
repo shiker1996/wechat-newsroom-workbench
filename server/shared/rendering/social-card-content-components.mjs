@@ -1,4 +1,8 @@
-import { buildSocialCardContentAtoms } from './social-card-content-atoms.mjs';
+import {
+  buildSocialCardContentAtoms,
+  buildSocialCardSupplementUsageIndex,
+  normalizeSocialCardContentFingerprint,
+} from './social-card-content-atoms.mjs';
 import { estimateSocialCardPageLoad } from './social-card-reflow.mjs';
 import { getSocialCardSupplementSlots } from './social-card-supplement-slots.mjs';
 import { inferCardPageRole } from './social-card-role.mjs';
@@ -371,6 +375,21 @@ export function buildSocialCardPageComponentCandidates(cardPlan = [], snapshot =
     ? new Set(targetPages.map((value) => Number(value)).filter(Number.isInteger))
     : null;
   const pageCandidates = {};
+  const usage = buildSocialCardSupplementUsageIndex(pages);
+  const globallyUsedFactIds = new Set([...usage.coreFactIds, ...usage.supplementFactIds]);
+  const existingTextFingerprints = new Set([...usage.coreTextFingerprints, ...usage.supplementTextFingerprints]);
+  const componentSemanticIntents = (component) => [component?.semanticIntent, ...(Array.isArray(component?.semanticIntentCandidates) ? component.semanticIntentCandidates : [])]
+    .map(text).filter(Boolean);
+  const componentTextFingerprints = (component) => [
+    component?.displayText,
+    component?.sourceText,
+    component?.content?.title,
+    component?.content?.text,
+    component?.content?.item,
+  ].map(normalizeSocialCardContentFingerprint).filter((value) => value.length >= 8);
+  const overlapsExistingText = (component) => componentTextFingerprints(component).some((candidateText) =>
+    [...existingTextFingerprints].some((existingText) => existingText.length >= 8
+      && (candidateText.includes(existingText) || existingText.includes(candidateText))));
   for (let index = 0; index < pages.length; index += 1) {
     const pageNumber = index + 1;
     if (requestedPages && !requestedPages.has(pageNumber)) continue;
@@ -379,10 +398,18 @@ export function buildSocialCardPageComponentCandidates(cardPlan = [], snapshot =
     const roleCapacity = capacityProfile?.roles?.[role] || capacityProfile || {};
     const core = (Array.isArray(snapshot?.core) ? snapshot.core : []).filter((component) => Number(component?.page) === pageNumber);
     const scoped = [];
+    let rejectedBySemanticIntent = 0;
+    const usedPageSemanticIntents = usage.pageUsage.get(pageNumber)?.semanticIntents || new Set();
     const slots = getSocialCardSupplementSlots(role).sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
     for (const slot of slots) {
       for (const component of supplements) {
         if (component?.sourceStatus !== 'provided' || !component.factIds?.length || !component.sourceRefs?.length) continue;
+        if (component.factIds.some((factId) => globallyUsedFactIds.has(String(factId)))) continue;
+        if (overlapsExistingText(component)) continue;
+        if (componentSemanticIntents(component).some((intent) => usedPageSemanticIntents.has(intent))) {
+          rejectedBySemanticIntent += 1;
+          continue;
+        }
         if (!isSocialCardFactComponentCompatibleWithSlot({
           id: component.factIds[0],
           path: component.path,
@@ -446,6 +473,7 @@ export function buildSocialCardPageComponentCandidates(cardPlan = [], snapshot =
         coreCount: core.length,
         supplementCount: Math.min(scoped.length, Math.max(0, Number(maxCandidatesPerPage) || 0)),
         rejectedByCapacity: capacityProfile ? true : false,
+        rejectedBySemanticIntent,
       },
     };
   }
@@ -467,6 +495,27 @@ export function buildSocialCardContentComponents({ cardPlan = [], factIndex = nu
   const supplements = candidates
     .filter((candidate) => candidate?.component_eligible !== false && !isSocialCardFactMetadataCandidate(candidate))
     .map((candidate, index) => factComponent(candidate, index));
+  const usage = buildSocialCardSupplementUsageIndex(pages);
+  const globallyUsedFactIds = new Set([...usage.coreFactIds, ...usage.supplementFactIds]);
+  const existingTextFingerprints = new Set([...usage.coreTextFingerprints, ...usage.supplementTextFingerprints]);
+  const componentTextFingerprints = (component) => [
+    component?.displayText,
+    component?.sourceText,
+    component?.content?.title,
+    component?.content?.text,
+    component?.content?.item,
+  ].map(normalizeSocialCardContentFingerprint).filter((value) => value.length >= 8);
+  const componentEligibility = supplements.map((component) => {
+    const factOverlap = component.factIds?.find((factId) => globallyUsedFactIds.has(String(factId)));
+    const textOverlap = componentTextFingerprints(component).find((candidateText) =>
+      [...existingTextFingerprints].find((existingText) => existingText.length >= 8
+        && (candidateText.includes(existingText) || existingText.includes(candidateText))));
+    return {
+      componentId: component.id,
+      globalEligibility: !factOverlap && !textOverlap,
+      exclusionReason: factOverlap ? 'fact_already_used' : textOverlap ? 'core_content_overlap' : null,
+    };
+  });
   const components = [...core, ...supplements];
   const pageCandidates = capacityProfile
     ? buildSocialCardPageComponentCandidates(pages, { core, supplements }, { capacityProfile, targetPages })
@@ -479,6 +528,11 @@ export function buildSocialCardContentComponents({ cardPlan = [], factIndex = nu
     core,
     supplements,
     components,
+    coreCoverage: {
+      factIds: [...usage.coreFactIds],
+      textFingerprints: [...usage.coreTextFingerprints],
+    },
+    globalEligibility: componentEligibility,
     summary: {
       componentCount: components.length,
       coreCount: core.length,

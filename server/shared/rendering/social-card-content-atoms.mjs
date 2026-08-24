@@ -37,6 +37,144 @@ function itemText(value) {
   return text(display);
 }
 
+/**
+ * 用于补充块互斥判断的稳定文本指纹。这里不做语义相似度，避免把
+ * 不同事实误判成重复；事实 ID 和完全相同的展示条目分别负责事实级、
+ * 内容级去重。
+ */
+export function normalizeSocialCardContentFingerprint(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\s\u3000]+/gu, '')
+    .replace(/[，。！？；：、“”‘’（）()【】《》〈〉「」,.!?;:'"()[\]{}<>]/gu, '')
+    .trim();
+}
+
+export function socialCardBlockContentValues(block = {}) {
+  const values = itemValues(block);
+  if (values) return values.map(itemText).map(normalizeSocialCardContentFingerprint).filter(Boolean);
+  const value = block?.type === 'code' ? block.content : block?.content || block?.title || block?.text || '';
+  return [normalizeSocialCardContentFingerprint(value)].filter(Boolean);
+}
+
+const SEMANTIC_INTENT_PATTERNS = Object.freeze([
+  ['source', /来源|证据|核验|核查|出处|引用|参考/iu],
+  ['maturity', /成熟度|成熟|当前状态|状态限制|阶段限制/iu],
+  ['boundary', /边界|限制|风险|未知|未核实|缺口/iu],
+  ['timeline', /时间线|时间点|阶段变化|发布记录/iu],
+  ['release', /发布|上线|上市|融资/iu],
+  ['metric', /指标|数据|规模|金额|数量/iu],
+  ['capability', /能力|功能|特性/iu],
+  ['context', /背景|概览|简介|说明/iu],
+]);
+
+const SLOT_INTENTS = Object.freeze({
+  source: 'source',
+  evidence: 'source',
+  maturity: 'maturity',
+  status: 'maturity',
+  permission: 'boundary',
+  network: 'boundary',
+  cost_security: 'boundary',
+  event: 'timeline',
+  change: 'timeline',
+  release: 'release',
+  metric: 'metric',
+  capability: 'capability',
+  context: 'context',
+});
+
+/**
+ * 页面级语义职责兜底。组件候选带有 semanticIntent，但历史核心块和
+ * 已落地补充块未必带该字段，因此这里从页面角色、槽位和标题恢复稳定
+ * 语义，供同页候选过滤及最终应用层兜底校验使用。
+ */
+export function socialCardBlockSemanticIntents(block = {}, page = {}) {
+  const intents = new Set();
+  const explicit = block?.semantic_intent ?? block?.semanticIntent;
+  if (explicit) intents.add(String(explicit).trim());
+  const slotId = String(block?.supplement_slot_id || block?.supplementSlotId || '').trim();
+  if (SLOT_INTENTS[slotId]) intents.add(SLOT_INTENTS[slotId]);
+  const role = String(page?.role || '').trim();
+  if (role === 'evidence') intents.add('source');
+  const title = String(block?.title || '').trim();
+  for (const [intent, pattern] of SEMANTIC_INTENT_PATTERNS) if (pattern.test(title)) intents.add(intent);
+  return [...intents].filter(Boolean);
+}
+
+/**
+ * 汇总当前计划的核心覆盖和补充使用情况。
+ * supplement_slot_id 是唯一可靠的来源边界：没有该字段的块视为故事板核心块，
+ * 有该字段的块视为后续补充块。这样不会把历史核心块误当成补充候选。
+ */
+export function buildSocialCardSupplementUsageIndex(cardPlan = []) {
+  const pages = Array.isArray(cardPlan) ? cardPlan : [];
+  const coreFactIds = new Set();
+  const supplementFactIds = new Set();
+  const coreTextFingerprints = new Set();
+  const supplementTextFingerprints = new Set();
+  const pageUsage = new Map();
+
+  pages.forEach((page, pageIndex) => {
+    const pageNumber = pageIndex + 1;
+    const pageFacts = new Set();
+    const pageSlots = new Set();
+    const pageTexts = new Set();
+    const pageSemanticIntents = new Set();
+    const blocks = Array.isArray(page?.content_blocks) ? page.content_blocks : [];
+    blocks.forEach((block) => {
+      const isSupplement = Boolean(String(block?.supplement_slot_id || '').trim());
+      const factIds = Array.isArray(block?.fact_ids) ? block.fact_ids.map(String).filter(Boolean) : [];
+      const texts = socialCardBlockContentValues(block);
+      socialCardBlockSemanticIntents(block, page).forEach((intent) => pageSemanticIntents.add(intent));
+      factIds.forEach((factId) => (isSupplement ? supplementFactIds : coreFactIds).add(factId));
+      texts.forEach((fingerprint) => {
+        (isSupplement ? supplementTextFingerprints : coreTextFingerprints).add(fingerprint);
+        pageTexts.add(fingerprint);
+      });
+      if (isSupplement) {
+        factIds.forEach((factId) => pageFacts.add(factId));
+        pageSlots.add(String(block.supplement_slot_id).trim());
+      }
+    });
+    pageUsage.set(pageNumber, { factIds: pageFacts, slots: pageSlots, textFingerprints: pageTexts, semanticIntents: pageSemanticIntents });
+  });
+
+  return { coreFactIds, supplementFactIds, coreTextFingerprints, supplementTextFingerprints, pageUsage };
+}
+
+export function validateSocialCardSupplementUniqueness({
+  pages = [], pageNumber, block = null, factIds = [], slotId = '',
+} = {}) {
+  const usage = buildSocialCardSupplementUsageIndex(pages);
+  const issues = [];
+  const pageUsage = usage.pageUsage.get(Number(pageNumber));
+  const normalizedFactIds = (Array.isArray(factIds) ? factIds : []).map(String).filter(Boolean);
+  const normalizedSlotId = String(slotId || '').trim();
+  const fingerprints = socialCardBlockContentValues(block || {});
+  const page = pages[Number(pageNumber) - 1] || {};
+  const semanticIntents = socialCardBlockSemanticIntents({ ...(block || {}), supplement_slot_id: normalizedSlotId }, page);
+  const prefix = `P${Number(pageNumber) || '?'} 补充内容块`;
+
+  const coreFact = normalizedFactIds.find((factId) => usage.coreFactIds.has(factId));
+  if (coreFact) issues.push(`${prefix}引用的事实已由核心内容覆盖：${coreFact}`);
+  const usedSupplementFact = normalizedFactIds.find((factId) => usage.supplementFactIds.has(factId));
+  if (usedSupplementFact) issues.push(`${prefix}引用的事实已被其他补充块使用：${usedSupplementFact}`);
+  if (pageUsage && normalizedSlotId && pageUsage.slots.has(normalizedSlotId)) {
+    issues.push(`${prefix}槽位已占用：${normalizedSlotId}`);
+  }
+  const coreDuplicate = fingerprints.find((fingerprint) => usage.coreTextFingerprints.has(fingerprint));
+  if (coreDuplicate) issues.push(`${prefix}内容已存在于核心内容中：${coreDuplicate}`);
+  const supplementDuplicate = fingerprints.find((fingerprint) => usage.supplementTextFingerprints.has(fingerprint));
+  if (supplementDuplicate) issues.push(`${prefix}内容已存在于其他补充块中：${supplementDuplicate}`);
+  const pageDuplicate = fingerprints.find((fingerprint) => pageUsage?.textFingerprints.has(fingerprint));
+  if (pageDuplicate && !supplementDuplicate && !coreDuplicate) issues.push(`${prefix}与当前页面已有内容重复：${pageDuplicate}`);
+  const semanticDuplicate = semanticIntents.find((intent) => pageUsage?.semanticIntents?.has(intent));
+  if (semanticDuplicate) issues.push(`${prefix}与当前页面已有内容语义职责重复：${semanticDuplicate}`);
+  return issues;
+}
+
 function atomId(pageIndex, blockIndex, itemIndex = null, value = '') {
   const digest = createHash('sha1').update(`${pageIndex}|${blockIndex}|${itemIndex ?? 'block'}|${value}`).digest('hex').slice(0, 10);
   return `atom-p${pageIndex + 1}-b${blockIndex + 1}-${itemIndex == null ? 'block' : `i${itemIndex + 1}`}-${digest}`;

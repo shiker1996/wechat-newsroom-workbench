@@ -224,6 +224,26 @@ test('阶段 5 静态预估接近上限时仍保留候选，交给浏览器审�
   assert.ok(['safe', 'near-limit', 'soft-limit'].includes(pageCandidates['1'].supplements[0].capacityRisk));
 });
 
+test('同页已有来源核验职责时，来源补充候选在装箱前被排除', () => {
+  const plan = [{ kind: 'evidence', role: 'evidence', title: '信息来源与核验', content_blocks: [
+    { type: 'list', title: '来源清单', items: ['来源一', '来源二'] },
+    { type: 'note', title: '核验状态', content: '部分信息尚未获官方确认。' },
+  ] }];
+  const component = {
+    id: 'component-fact-source', componentId: 'component-fact-source', path: 'facts.sourceAudit.status',
+    factIds: ['fact-source'], sourceRefs: ['README:source'], sourceStatus: 'provided',
+    semanticIntent: 'source', semanticIntentCandidates: ['source'], semanticTags: ['source'],
+    preferredRender: 'note', renderCandidates: ['note'],
+    content: { title: '来源证据', text: '四起事件均有来源支持。' },
+    sizeVariants: [{ id: 'normal', mode: 'normal', fontScale: 1, content: { title: '来源证据', text: '四起事件均有来源支持。' } }],
+  };
+  const candidates = buildSocialCardPageComponentCandidates(plan, { supplements: [component], core: [] }, {
+    capacityProfile: { roles: { evidence: { bodyHeightPx: 420, maxTitleLines: 3, maxTextChars: 300, maxListItemLines: 2 } } },
+  });
+  assert.equal(candidates['1'].supplements.length, 0);
+  assert.ok(candidates['1'].summary.rejectedBySemanticIntent > 0);
+});
+
 test('slot-fit 摘要不会把普通说明误渲染成 code block', () => {
   const component = {
     id: 'component-summary', factIds: ['fact-summary'], sourceRefs: ['README:summary'], sourceStatus: 'provided',

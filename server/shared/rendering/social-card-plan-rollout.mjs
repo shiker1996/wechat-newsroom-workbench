@@ -62,6 +62,7 @@ export function summarizeSocialCardPlanRolloutRows(rows = []) {
   const planRounds = list.map((row) => metric(row, 'contentPlanAdjustmentCount', 'content_plan_adjustment_count', 0));
   const textRounds = list.map((row) => metric(row, 'textRepairCount', 'text_repair_count', 0));
   const sourceLoss = list.map((row) => metric(row, 'sourceAtomLossCount', 'source_atom_loss_count', 0));
+  const targetDensityRate = list.map((row) => metric(row, 'dynamicFillTargetDensityRate', 'dynamic_fill_target_density_rate'));
   const jointMismatchRate = list.map((row) => {
     const attempts = Number(metric(row, 'jointPackingAuditAttempts', 'joint_packing_audit_attempts', 0) || 0);
     const mismatches = Number(metric(row, 'jointPackingMismatchCount', 'joint_packing_mismatch_count', 0) || 0);
@@ -80,6 +81,8 @@ export function summarizeSocialCardPlanRolloutRows(rows = []) {
     averageJointPackingMismatchRate: average(jointMismatchRate),
     overflowRate: pages ? overflowPages / pages : null,
     planAdjustmentRunRate: list.length ? list.filter((row) => Number(metric(row, 'contentPlanAdjustmentCount', 'content_plan_adjustment_count', 0) || 0) > 0).length / list.length : null,
+    averageDuplicateSupplementRejectedCount: average(list.map((row) => metric(row, 'duplicateSupplementRejectedCount', 'duplicate_supplement_rejected_count', 0))) ?? 0,
+    targetDensityRate: average(targetDensityRate),
   };
 }
 
@@ -115,13 +118,14 @@ export function buildSocialCardPlanRolloutReport(rows = [], { minSamples = 3 } =
     const overflowNotWorse = !baseline || newer.overflowRate == null || baseline.overflowRate == null || newer.overflowRate <= baseline.overflowRate;
     const repairNotWorse = !baseline || newer.averagePlanAdjustmentRounds <= baseline.averagePlanAdjustmentRounds + 0.5;
     const auditAlignmentNotWorse = !baseline || newer.averageJointPackingMismatchRate == null || baseline.averageJointPackingMismatchRate == null || newer.averageJointPackingMismatchRate <= baseline.averageJointPackingMismatchRate;
+    const targetDensityNotWorse = !baseline || newer.targetDensityRate == null || baseline.targetDensityRate == null || newer.targetDensityRate >= baseline.targetDensityRate;
     return {
       templatePackId,
       currentMode: current?.mode || 'unknown',
       baselineMode: baseline?.mode || null,
       newerMode: newer?.mode || null,
-      readyForPromotion: Boolean(enoughSamples && sourceAtomLossZero && successNotWorse && overflowNotWorse && repairNotWorse && auditAlignmentNotWorse),
-      gates: { enoughSamples, sourceAtomLossZero, successNotWorse, overflowNotWorse, repairNotWorse, auditAlignmentNotWorse },
+      readyForPromotion: Boolean(enoughSamples && sourceAtomLossZero && successNotWorse && overflowNotWorse && repairNotWorse && auditAlignmentNotWorse && targetDensityNotWorse),
+      gates: { enoughSamples, sourceAtomLossZero, successNotWorse, overflowNotWorse, repairNotWorse, auditAlignmentNotWorse, targetDensityNotWorse },
       baseline: baseline || null,
       newer: newer || null,
     };
@@ -134,7 +138,7 @@ export function evaluateSocialCardPlanRollout({ rows = [], templatePackId = '', 
   return report.comparisons.find((item) => item.templatePackId === String(templatePackId || '')) || {
     templatePackId: String(templatePackId || ''),
     readyForPromotion: false,
-    gates: { enoughSamples: false, sourceAtomLossZero: true, successNotWorse: false, overflowNotWorse: false, repairNotWorse: false },
+    gates: { enoughSamples: false, sourceAtomLossZero: true, successNotWorse: false, overflowNotWorse: false, repairNotWorse: false, auditAlignmentNotWorse: false, targetDensityNotWorse: false },
     baseline: null,
     newer: null,
   };

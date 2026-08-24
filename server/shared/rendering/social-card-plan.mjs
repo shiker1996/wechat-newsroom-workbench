@@ -2,8 +2,13 @@ const AUXILIARY_TYPES = new Set(['note', 'highlight']);
 const isAuxiliary = (block) => AUXILIARY_TYPES.has(block?.type) || block?.role === 'auxiliary' || block?.importance === 'secondary';
 export const listBlockValues = (block) => {
   if (Array.isArray(block?.items) && block.items.length) return block.items;
+  if (Array.isArray(block?.content)) return block.content;
   const lines = String(block?.content || '').split(/\n+/).filter((item) => item.trim());
-  return lines.length === 1 && (lines[0].match(/、/g) || []).length >= 2 ? lines[0].split('、') : lines;
+  if (lines.length === 1 && (lines[0].match(/、/g) || []).length >= 2) return lines[0].split('、').map((item) => item.trim()).filter(Boolean);
+  if (lines.length === 1 && (lines[0].match(/\d{4}年/g) || []).length >= 2 && lines[0].includes(',')) {
+    return lines[0].split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return lines;
 };
 
 export function cardPageDensity(page) {

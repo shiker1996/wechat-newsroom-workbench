@@ -35,6 +35,17 @@ test('故事板编辑器展示补充槽位与事实来源，并保留回写字�
   assert.match(html, /data-source-refs=/);
 });
 
+test('故事板编辑器不会把仅含 items 的列表块展示为空', () => {
+  const html = cardBlockEditorHtml({
+    type: 'list',
+    title: '关键节点',
+    content: '',
+    items: ['2019年：上市', '2025年：配售'],
+  }, 0);
+  assert.match(html, /2019年：上市/);
+  assert.match(html, /2025年：配售/);
+});
+
 test('故事板调整记录显示来源模式、轮次、页码和事实候选', () => {
   const editor = read('../public/src/views/social-editor.js');
   assert.match(editor, /function adjustmentSourceLabel/);

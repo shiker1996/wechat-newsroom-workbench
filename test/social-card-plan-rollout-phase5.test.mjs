@@ -57,3 +57,24 @@ test('阶段 5 审计偏差变差时阻止灰度推广', () => {
   assert.equal(comparison.gates.auditAlignmentNotWorse, false);
   assert.equal(comparison.readyForPromotion, false);
 });
+
+test('阶段 5 动态填充指标记录重复拒绝与目标密度达成', () => {
+  const row = summarizeSocialTemplateRun({
+    requestedTemplate: { id: 'clean-v1' },
+    report: { valid: true, pages: [{ valid: true, utilization: 72, issues: [] }] },
+    dynamicFillAudits: [{ pages: [{ page: 1, stopReason: 'target_utilization_reached', rejectedOperations: [{ reason: 'core_content_overlap' }] }] }],
+  });
+  assert.equal(row.duplicateSupplementRejectedCount, 1);
+  assert.equal(row.dynamicFillTargetDensityRate, 1);
+  assert.equal(row.dynamicFillTargetReachedPages, 1);
+});
+
+test('阶段 5 灰度目标密度达成率下降时阻止推广', () => {
+  const rows = [
+    ...Array.from({ length: 3 }, () => ({ operation: 'generation', success: true, layoutPass: true, pageCount: 1, requested_template_id: 'clean-v1', rolloutProfile: { mode: 'gray' }, dynamic_fill_target_density_rate: 0.5 })),
+    ...Array.from({ length: 3 }, () => ({ operation: 'generation', success: true, layoutPass: true, pageCount: 1, requested_template_id: 'clean-v1', rolloutProfile: { mode: 'legacy' }, dynamic_fill_target_density_rate: 1 })),
+  ];
+  const comparison = buildSocialCardPlanRolloutReport(rows, { minSamples: 3 }).comparisons.find((item) => item.templatePackId === 'clean-v1');
+  assert.equal(comparison.gates.targetDensityNotWorse, false);
+  assert.equal(comparison.readyForPromotion, false);
+});

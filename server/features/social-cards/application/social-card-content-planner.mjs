@@ -3,7 +3,11 @@ import {
   applySocialCardRestructureOperations,
   validateSocialCardRestructureOperations,
 } from '../../../shared/rendering/social-card-repair-policy.mjs';
-import { buildSocialCardContentAtoms } from '../../../shared/rendering/social-card-content-atoms.mjs';
+import {
+  buildSocialCardContentAtoms,
+  buildSocialCardSupplementUsageIndex,
+  normalizeSocialCardContentFingerprint,
+} from '../../../shared/rendering/social-card-content-atoms.mjs';
 import { inferCardPageRole } from '../../../shared/rendering/social-card-role.mjs';
 import { getSocialCardSupplementSlots } from '../../../shared/rendering/social-card-supplement-slots.mjs';
 import { buildSocialCardFactCandidatePrompt, knownSourceRefsFromSocialCardFactIndex } from '../../../shared/rendering/social-card-fact-index.mjs';
@@ -40,7 +44,7 @@ const plannerJson = (value) => JSON.stringify(value ?? null);
 /**
  * 内容计划调整器的模型契约。模型只能给出操作，不接触 HTML/CSS，也不能回传完整故事板。
  */
-export function buildSocialCardContentPlannerPrompt({ facts = {}, layoutReport = {}, cardPlan = [], totalPageCount = null, contentAtoms = [], templateCapabilities = {}, factIndex = null, contentComponents = null, maxPages = 10, recommendedPages = null, absoluteMaxPages = null, maxOperations = 4, maxFactBlocksPerRound = 2, maxFactBlocksPerPage = 1 } = {}) {
+export function buildSocialCardContentPlannerPrompt({ facts = {}, layoutReport = {}, cardPlan = [], totalPageCount = null, contentAtoms = [], templateCapabilities = {}, factIndex = null, contentComponents = null, maxPages = 10, recommendedPages = null, absoluteMaxPages = null, maxOperations = 4, maxFactBlocksPerRound = 2, maxFactBlocksPerPage = Infinity } = {}) {
   const componentPool = buildSocialCardPlannerComponentPool(contentComponents, layoutReport);
   const hasNumber = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
   const hardMaxPages = hasNumber(absoluteMaxPages) ? Number(absoluteMaxPages) : Number(maxPages);
@@ -50,14 +54,14 @@ export function buildSocialCardContentPlannerPrompt({ facts = {}, layoutReport =
   const absolutePageCapExceeded = actualPageCount > hardMaxPages;
   return [
     '你是 Social 图文内容计划调整器。只解决内容如何承载，不生成 HTML、CSS 或完整 card_plan。',
-    `本轮最多返回 ${maxOperations} 个操作，绝对安全上限为 ${hardMaxPages} 页；推荐控制在 ${softMaxPages} 页以内。add_component 本轮最多 ${maxFactBlocksPerRound} 个，且每个页面最多 ${maxFactBlocksPerPage} 个。每个补充块必须先从组件候选池选择一个事实组件，再选择其 renderCandidates 中能被目标模板承载的渲染类型。`,
+    `本轮最多返回 ${maxOperations} 个操作，绝对安全上限为 ${hardMaxPages} 页；推荐控制在 ${softMaxPages} 页以内。add_component 本轮最多 ${maxFactBlocksPerRound} 个，单页不设固定 1 个上限，必须按目标页 remainingBlockCapacity 在安全容量内动态填充${Number.isFinite(Number(maxFactBlocksPerPage)) ? `（本轮最大剩余容量 ${maxFactBlocksPerPage}）` : ''}。每个补充块必须先从组件候选池选择一个事实组件，再选择其 renderCandidates 中能被目标模板承载的渲染类型。`,
     ...(pageCapExceeded ? [`当前计划已有 ${actualPageCount} 页，超过模板允许的 ${softMaxPages} 页（推荐页数）；本轮优先使用 merge_pages 合并相邻同故事线续页或移动完整内容块后再合并，但没有安全合并时不要为了回到推荐页数而删除事实。仅 add_component 不能解决超页问题。`] : []),
     ...(absolutePageCapExceeded ? [`当前计划已有 ${actualPageCount} 页，超过绝对安全上限 ${hardMaxPages} 页；必须优先合并安全续页，无法降至绝对上限时返回 {"operations":[]}，程序将阻断而不会截断事实。`] : []),
     '允许的操作只有 split_page、move_block、merge_pages、add_component。',
     'split_page 必须覆盖原内容块全部条目且不重复；move_block 只能移动相邻同故事线页面的完整内容块，并保持原始顺序；merge_pages 只能合并相邻同角色同故事线页面；add_component 必须包含 page、component_id、source_refs 和由 AI 生成的 display block，可选 render_type、fact_ids，不要填写 slot_id，程序会根据目标页候选的语义自动解析槽位。',
     '字段必须严格使用契约名称：合并用 {"op":"merge_pages","pages":[5,6]}；补充用 {"op":"add_component","page":6,"component_id":"component-fact-id@p6-verify-note","render_type":"note","fact_ids":["fact-id"],"source_refs":["已登记来源"],"block":{"type":"note","title":"…","content":"…","fact_ids":["fact-id"],"source_refs":["已登记来源"]}}。列表、步骤、时间线和场景块的多条内容必须放入 items，content 只能是字符串。不要使用 target_page、merge_with 或 slot_id；组件不存在、语义不匹配或容量不安全时返回空操作。',
     '每个目标页的 pageCandidates、role、allowedSupplementSlots、allowedBlockTypes 和 remainingBlockCapacity 以布局审计输入为准；add_component 只能使用目标页列出的组件和渲染形式。',
-    '禁止删除事实、修改封面/结尾职责、跨故事线合并、修改主题/模板、缩小字号或返回任意代码。补充事实前必须以目标页剩余容量为硬约束，不能为了填满而引入可能溢出的长事实；没有安全操作时返回 {"operations":[]}。sourceText/source_text 只是来源证据，禁止原样写入 block。displayTextStatus=pending 的候选必须先为本次页面生成简洁中文或技术展示文案 display_text，再按 capacityEstimate 生成；不能直接复用任何 source_text。',
+    '禁止删除事实、修改封面/结尾职责、跨故事线合并、修改主题/模板、缩小字号或返回任意代码。补充事实前必须以目标页剩余容量为硬约束，不能为了填满而引入可能溢出的长事实；没有安全操作时返回 {"operations":[]}。核心内容和已有补充块是不可重复的事实覆盖，跨页面不得重复同一 fact_id 或同一展示条目，同页不得重复已占用 supplement_slot_id；若候选事实已被核心块覆盖、已在其他补充块出现或没有安全容量，直接跳过。sourceText/source_text 只是来源证据，禁止原样写入 block。displayTextStatus=pending 的候选必须先为本次页面生成简洁中文或技术展示文案 display_text，再按 capacityEstimate 生成；不能直接复用任何 source_text。',
     '只返回 JSON 对象：{"operations":[...]}。',
     `布局审计：${plannerJson(layoutReport)}`,
     `当前卡片计划（仅目标页及相邻关系页；每页含真实 page_number）：${plannerJson(cardPlan)}`,
@@ -82,19 +86,45 @@ export function buildSocialCardPlannerComponentPool(contentComponents = null, la
   const targetPages = Array.isArray(layoutReport?.pages) && layoutReport.pages.length
     ? new Set(layoutReport.pages.map((item) => String(Number(item?.page))).filter((page) => page !== '0' && page !== 'NaN'))
     : null;
+  const targetPageByNumber = new Map((Array.isArray(layoutReport?.pages) ? layoutReport.pages : [])
+    .map((page) => [String(Number(page?.page)), page]));
+  const targetPagesList = [...targetPageByNumber.values()];
+  const usage = buildSocialCardSupplementUsageIndex(targetPagesList);
+  const globallyUsedFactIds = new Set([...usage.coreFactIds, ...usage.supplementFactIds]);
+  const coreTextFingerprints = usage.coreTextFingerprints;
+  const supplementTextFingerprints = usage.supplementTextFingerprints;
+  const componentTextFingerprints = (component) => [
+    component?.displayText,
+    component?.sourceText,
+    component?.content?.title,
+    component?.content?.text,
+    component?.content?.item,
+  ].map(normalizeSocialCardContentFingerprint).filter((value) => value.length >= 8);
+  const overlapsExistingText = (component) => componentTextFingerprints(component).some((candidateText) =>
+    [...coreTextFingerprints, ...supplementTextFingerprints].some((existingText) =>
+      existingText.length >= 8 && (candidateText.includes(existingText) || existingText.includes(candidateText))));
   const pageCandidates = {};
   for (const [pageKey, scope] of Object.entries(sourcePages)) {
     if (targetPages && !targetPages.has(String(pageKey))) continue;
     const role = String(scope?.role || '');
     const scopedSupplements = Array.isArray(scope?.supplements) ? scope.supplements : [];
     const globalSupplements = Array.isArray(contentComponents?.supplements) ? contentComponents.supplements : [];
-    const supplements = scopedSupplements.length ? scopedSupplements : globalSupplements.filter((component) =>
+    const targetPage = targetPageByNumber.get(String(pageKey));
+    const usedSupplementSlots = new Set((Array.isArray(targetPage?.content_blocks) ? targetPage.content_blocks : [])
+      .map((block) => String(block?.supplement_slot_id || '').trim()).filter(Boolean));
+    const roleCompatibleSupplements = scopedSupplements.length ? scopedSupplements : globalSupplements.filter((component) =>
       getSocialCardSupplementSlots(role).some((slot) => isSocialCardFactComponentCompatibleWithSlot({
         id: component?.factIds?.[0] || component?.id,
         path: component?.path,
         tags: component?.semanticTags,
         component_eligible: component?.componentEligible,
       }, role, slot.id)));
+      // 页面已经使用过的事实不能再以另一种 render_type 补一次，
+      // 否则同一时间线会同时出现 timeline 和 list 两份。
+    const supplements = roleCompatibleSupplements
+      .filter((component) => !(Array.isArray(component?.factIds) && component.factIds.some((id) => globallyUsedFactIds.has(String(id)))))
+      .filter((component) => !(component?.slotId && usedSupplementSlots.has(String(component.slotId))))
+      .filter((component) => !overlapsExistingText(component));
     pageCandidates[String(pageKey)] = {
       page: Number(scope?.page || pageKey),
       role,

@@ -13,7 +13,7 @@ import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../plat
 import { compileSocialTheme, socialThemeDefinition } from '../../../shared/themes/social-theme-compiler.mjs';
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
 import { budgetCardPlan, layoutAuditFailureMessage, normalizeCoverTitleLines, underfilledDensityTier } from '../../../shared/rendering/social-card-plan.mjs';
-import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, rebalanceContinuationPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
+import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages, rebalanceContinuationPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
 import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, socialCardRepairStateSignature, structuralLayoutPages } from '../../../shared/rendering/social-card-repair-policy.mjs';
 import { applySocialCardContentPlannerOperations, applySocialCardContentPlannerOperationsPartial, buildSocialCardContentPlannerPrompt, buildSocialCardPlannerComponentPool, partitionSocialCardContentPlannerOperationsBySchema, validateSocialCardContentPlannerSchema } from './social-card-content-planner.mjs';
 import { buildSocialCardFactIndex } from '../../../shared/rendering/social-card-fact-index.mjs';
@@ -24,7 +24,7 @@ import { renderStoryboardSections } from '../../../shared/rendering/storyboard-p
 import { renderStoryboardDocument } from '../../../shared/rendering/storyboard-document-renderer.mjs';
 import { createSocialCardStoryboardThemeSnapshot, getSocialCardTemplateCapabilities, resolveSocialCardTemplateContext, validateSocialCardTemplateCompatibility } from '../../../shared/rendering/social-card-template-resolver.mjs';
 import { buildSocialCardPlanBaseline } from '../../../shared/rendering/social-card-plan-baseline.mjs';
-import { buildSocialCardContentAtomSnapshot, compareSocialCardContentAtomConservation } from '../../../shared/rendering/social-card-content-atoms.mjs';
+import { buildSocialCardContentAtomSnapshot, buildSocialCardSupplementUsageIndex, compareSocialCardContentAtomConservation } from '../../../shared/rendering/social-card-content-atoms.mjs';
 import { auditSocialCardJointPacking, buildSocialCardComponentPackingOperations, buildSocialCardContentComponents, buildSocialCardContinuationSupplementOperations, sanitizeSocialCardPlanFactBindings, selectBestSocialCardJointPackingOperations, validateSocialCardContentComponents } from '../../../shared/rendering/social-card-content-components.mjs';
 import { assessSocialCardDensityTargets } from '../../../shared/rendering/social-card-density-targets.mjs';
 import { getSocialCardPlanRolloutProfile } from '../../../shared/rendering/social-card-plan-rollout.mjs';
@@ -44,7 +44,7 @@ export { SOCIAL_CARD_LAYOUTS };
 export { inferCardPageRole, SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_PAGE_ROLES, stableCardCompositionSeed } from '../../../shared/rendering/social-card-role.mjs';
 export { describeCardLayouts, normalizeCardComposition, resolveCardCompositionDecision } from '../../../shared/rendering/social-card-composition.mjs';
 export { cardPlanRepairStructureIssues } from '../../../shared/rendering/storyboard-content.mjs';
-export { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
+export { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
 export { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, buildDeterministicSocialCardPageCapOperations, cardPlanHash, classifySocialCardLayoutIssue, socialCardRepairStateSignature, structuralLayoutPages, validateSocialCardRestructureOperations } from '../../../shared/rendering/social-card-repair-policy.mjs';
 export { socialCardPageBudget, socialCardPageBudgetMessage, socialCardPageBudgetStatus } from '../../../shared/rendering/social-card-page-budget.mjs';
 export { applySocialCardContentPlannerOperations, applySocialCardContentPlannerOperationsPartial, buildSocialCardContentPlannerPrompt, buildSocialCardPlannerComponentPool, partitionSocialCardContentPlannerOperationsBySchema, validateSocialCardContentPlannerOperations, validateSocialCardContentPlannerSchema } from './social-card-content-planner.mjs';
@@ -87,6 +87,125 @@ export async function runAudit(script, htmlPath, reportPath, cwd) {
   }
   if(!fs.existsSync(reportPath))throw new Error('布局审计未生成本轮报告');
   return JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+}
+
+function socialCardUsageAudit(cardPlan = []) {
+  const usage = buildSocialCardSupplementUsageIndex(cardPlan);
+  const pageSlots = Object.fromEntries([...usage.pageUsage.entries()].map(([page, value]) => [String(page), [...value.slots]]));
+  return {
+    usedFactIds: [...new Set([...usage.coreFactIds, ...usage.supplementFactIds])],
+    supplementFactIds: [...usage.supplementFactIds],
+    usedSlots: pageSlots,
+  };
+}
+
+function buildDynamicFillAudit({ beforePlan = [], afterPlan = [], report = null, targetPages = [], capacityProfile = null, acceptedOperations = [], rejectedOperations = [], fallbackCandidateCount = 0, changed = false, error = '' } = {}) {
+  const reportPages = new Map((Array.isArray(report?.pages) ? report.pages : []).map((page) => [Number(page?.page), page]));
+  const beforeUsage = socialCardUsageAudit(beforePlan);
+  const afterUsage = socialCardUsageAudit(afterPlan);
+  const operationPage = (operation) => Number(operation?.page || operation?.from_page || operation?.to_page) || null;
+  const accepted = Array.isArray(acceptedOperations) ? acceptedOperations : [];
+  const rejected = Array.isArray(rejectedOperations) ? rejectedOperations : [];
+  const pages = (Array.isArray(targetPages) ? targetPages : []).map((target) => {
+    const pageNumber = Number(target?.page);
+    const beforePage = beforePlan[pageNumber - 1] || {};
+    const afterPage = afterPlan[pageNumber - 1] || beforePage;
+    const role = String(beforePage?.role || target?.role || '');
+    const capacity = capacityProfile?.roles?.[role] || capacityProfile || {};
+    const estimate = estimateSocialCardPageLoad(afterPage, capacity);
+    const estimatedUtilization = Number(estimate?.bodyHeightPx) > 0
+      ? Number(estimate?.estimatedHeightPx || 0) / Number(estimate.bodyHeightPx)
+      : null;
+    const measuredUtilization = Number(reportPages.get(pageNumber)?.utilization);
+    const utilizationBefore = Number.isFinite(measuredUtilization) ? measuredUtilization / 100 : null;
+    const utilizationAfter = Number.isFinite(estimatedUtilization) ? estimatedUtilization : utilizationBefore;
+    const targetUtilization = Number(target?.targetUtilization);
+    const targetRatio = Number.isFinite(targetUtilization) ? targetUtilization / 100 : null;
+    const acceptedCount = accepted.filter((operation) => operationPage(operation) === pageNumber).length;
+    const pageRejected = rejected.filter((item) => operationPage(item?.operation || item) === pageNumber);
+    const remainingCapacity = target?.remainingBlockCapacity;
+    let stopReason = '';
+    if (!changed && error) stopReason = 'planner_error';
+    else if (targetRatio != null && utilizationAfter != null && utilizationAfter >= targetRatio) stopReason = 'target_utilization_reached';
+    else if (!changed && Number.isFinite(Number(remainingCapacity)) && Number(remainingCapacity) <= 0) stopReason = 'template_capacity_reached';
+    else if (!changed && Number(fallbackCandidateCount) <= 0 && !acceptedCount) stopReason = 'no_safe_candidate';
+    else if (!changed && pageRejected.length && !acceptedCount) stopReason = 'all_candidates_rejected';
+    else if (changed) stopReason = 'continue_next_round';
+    else stopReason = 'no_progress';
+    return {
+      page: pageNumber,
+      role,
+      stopReason,
+      acceptedOperations: acceptedCount,
+      rejectedOperations: pageRejected.map((item) => ({ operation: item?.operation || item, reason: item?.issues || item?.reason || 'rejected' })),
+      utilizationBefore,
+      utilizationAfter,
+      estimatedUtilization: utilizationAfter,
+      observedUtilization: Number.isFinite(measuredUtilization) ? measuredUtilization / 100 : null,
+      targetUtilization: targetRatio,
+      usedFactIdsBefore: [...beforeUsage.usedFactIds],
+      usedFactIdsAfter: [...afterUsage.usedFactIds],
+      usedSlotsBefore: beforeUsage.usedSlots[String(pageNumber)] || [],
+      usedSlotsAfter: afterUsage.usedSlots[String(pageNumber)] || [],
+    };
+  });
+  return {
+    schemaVersion: 1,
+    changed: Boolean(changed),
+    pages,
+    stopReason: pages.every((page) => page.stopReason === 'target_utilization_reached')
+      ? 'target_utilization_reached'
+      : pages.every((page) => page.stopReason === 'template_capacity_reached')
+        ? 'template_capacity_reached'
+        : pages.some((page) => page.stopReason === 'continue_next_round')
+          ? 'continue_next_round'
+          : pages.length ? pages[0].stopReason : (error ? 'planner_error' : 'no_target_page'),
+  };
+}
+
+export function reconcileSocialCardDynamicFillAuditWithFinalReport(audit, report) {
+  if (!audit || typeof audit !== 'object') return audit;
+  const reportPages = new Map((Array.isArray(report?.pages) ? report.pages : []).map((page) => [Number(page?.page), page]));
+  const pages = (Array.isArray(audit.pages) ? audit.pages : []).map((page) => {
+    const observed = Number(reportPages.get(Number(page?.page))?.utilization);
+    if (!Number.isFinite(observed)) return page;
+    const observedUtilization = observed / 100;
+    const target = Number(page?.targetUtilization);
+    const targetReached = Number.isFinite(target) && observedUtilization >= target;
+    const accepted = Number(page?.acceptedOperations) || 0;
+    const rejected = Array.isArray(page?.rejectedOperations) ? page.rejectedOperations.length : 0;
+    const stopReason = targetReached
+      ? 'target_utilization_reached'
+      : accepted > 0
+        ? 'continue_next_round'
+        : rejected > 0
+          ? 'all_candidates_rejected'
+          : 'no_safe_candidate';
+    return {
+      ...page,
+      estimatedUtilization: Number.isFinite(Number(page?.estimatedUtilization)) ? Number(page.estimatedUtilization) : Number(page?.utilizationAfter),
+      observedUtilization,
+      utilizationAfter: observedUtilization,
+      stopReason,
+      stopReasonSource: 'final-layout-report',
+    };
+  });
+  const stopReason = pages.length && pages.every((page) => page.stopReason === 'target_utilization_reached')
+    ? 'target_utilization_reached'
+    : pages.some((page) => page.stopReason === 'continue_next_round')
+      ? 'continue_next_round'
+      : pages.some((page) => page.stopReason === 'all_candidates_rejected')
+        ? 'all_candidates_rejected'
+        : pages.length && pages.every((page) => page.stopReason === 'no_safe_candidate')
+          ? 'no_safe_candidate'
+          : audit.stopReason || 'no_target_page';
+  return { ...audit, pages, stopReason, observedFromFinalLayout: true };
+}
+
+export function reconcileSocialCardDynamicFillAuditsWithFinalReport(history, report) {
+  for (const round of Array.isArray(history) ? history : []) {
+    if (round?.dynamicFill) round.dynamicFill = reconcileSocialCardDynamicFillAuditWithFinalReport(round.dynamicFill, report);
+  }
 }
 
 function eventFactMarkdown(analysis) {
@@ -185,10 +304,16 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     error.absoluteMaxPages = absoluteMaxPagesForContent;
     throw error;
   };
+  // 各类故事板先做相邻职责归一化，再进入通用模板容量预检。
+  const storyboardNormalization = contentType === 'event'
+    ? normalizeEventStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
+    : contentType === 'repository'
+      ? normalizeRepositoryStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
+    : { pages: originalCardPlan, operations: [], changed: false };
   // 阶段 2：先以模板容量做确定性预检和续页，避免旧预算器在渲染前静默截断事实。
   // budgetCardPlan 保留为历史兼容导出；生产链路不再用它直接裁剪列表。
   const reflowResult = compileTemplateAwareCardPlan({
-    cardPlan: originalCardPlan,
+    cardPlan: storyboardNormalization.pages,
     capacityProfile: templateCapabilities.capacityProfile,
     maxPages: recommendedPagesForContent,
     absoluteMaxPages: absoluteMaxPagesForContent,
@@ -205,7 +330,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     card_plan_json: JSON.stringify(plan),
     ...(status ? { status } : {}),
   });
-  if (reflowResult.changed) persistEffectiveCardPlan(cardPlan, 'AI_READY');
+  if (storyboardNormalization.changed || reflowResult.changed) persistEffectiveCardPlan(cardPlan, 'AI_READY');
   let templateCompatibility=validateSocialCardTemplateCompatibility(cardPlan,{themeDefinition,channelMode,contentType});
   const planPath = path.join(workdir, 'card-plan.json');
   const originalPlanPath = path.join(workdir, 'card-plan-original.json');
@@ -244,18 +369,21 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   };
   persistContentAtomSnapshot('effective-plan');
   writeFile(originalPlanPath, JSON.stringify({ schemaVersion: 1, source: 'storyboard', topic: candidate.hotspot_title, pages: originalCardPlan }, null, 2));
-  writeFile(reflowPath, JSON.stringify({ schemaVersion: 1, source: 'template-aware-deterministic', ...reflowResult, pageCapOperations }, null, 2));
-  const reflowHistory = [{ phase: 'preflight', changed: reflowResult.changed || pageCapOperations.length > 0, operations: [...reflowResult.operations, ...pageCapOperations], warnings: reflowResult.warnings, unresolved: reflowResult.unresolved }];
+  writeFile(reflowPath, JSON.stringify({ schemaVersion: 1, source: 'template-aware-deterministic', storyboardNormalization, ...reflowResult, pageCapOperations }, null, 2));
+  const reflowOperations = [...storyboardNormalization.operations, ...reflowResult.operations, ...pageCapOperations];
+  const reflowChanged = storyboardNormalization.changed || reflowResult.changed || pageCapOperations.length > 0;
+  const reflowHistory = [{ phase: 'preflight', changed: reflowChanged, operations: reflowOperations, warnings: reflowResult.warnings, unresolved: reflowResult.unresolved }];
   const contentPlanAdjustmentHistory = [];
   let contentPlanAdjustmentCount = 0;
   let contentPlanAdjustmentAttemptCount = 0;
   // 计划调整产物在首次写入时也要带上无进展门禁状态；必须先初始化，
   // 否则首次 persistContentPlanAdjustments() 会触发 TDZ。
   let noProgressGuard={detected:false,states:[],reason:''};
-  // 事实补充按“每轮最多 2 个、每页最多 1 个”受控执行；容量试装失败的
-  // 候选不会阻塞同一页或其他页继续尝试更短、语义相近的组件。
+  // 事实补充保留每轮的技术安全上限，但单页不再使用固定 1 个的业务上限；
+  // 每轮按目标页的剩余块容量动态计算，容量试装失败的候选不会阻塞同一页
+  // 或其他页继续尝试更短、语义相近的组件。
   const maxFactBlocksPerRound = Math.max(1, Math.min(2, Number(rolloutProfile.maxOperationsPerRound) || 2));
-  const maxFactBlocksPerPage = 1;
+  let maxFactBlocksPerPage = 0;
   const maxContentPlanAttempts = rolloutProfile.maxPlanRounds + 2;
   const persistContentPlanAdjustments = () => writeFile(contentPlanAdjustmentsPath, JSON.stringify({
     schemaVersion: 1,
@@ -266,13 +394,16 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     maxOperationsPerRound: rolloutProfile.maxOperationsPerRound,
     rolloutProfile,
     noProgressGuard,
+    acceptedOperations: contentPlanAdjustmentHistory.flatMap((round) => Array.isArray(round?.operations) ? round.operations : []),
+    rejectedOperations: contentPlanAdjustmentHistory.flatMap((round) => Array.isArray(round?.rejectedOperations) ? round.rejectedOperations : []),
+    dynamicFill: contentPlanAdjustmentHistory.map((round) => round?.dynamicFill).filter(Boolean),
     rounds: contentPlanAdjustmentHistory,
   }, null, 2));
   persistContentPlanAdjustments();
-  let planOperations = [...reflowResult.operations, ...pageCapOperations].map((item) => ({ ...item, source: item.source || 'deterministic-preflight' }));
-  const planningMeta = { schemaVersion: 3, channel_mode:outputMode||editorial.output_mode || 'xiaohongshu', composition_mode:editorial.composition_mode||'template', layout_style:editorial.layout_style||'auto', template:{pack:templateCompatibility.templatePack.id,version:templateCompatibility.templatePack.version,source:templateCompatibility.source,fallback:templateCompatibility.fallback}, capacityProfileVersion:templateCapabilities.capacityProfileVersion, capacityProfile:templateCapabilities.capacityProfile, rolloutProfile, pageBudget: pageBudget, topic:candidate.hotspot_title, source_page_count: originalCardPlan.length, reflow: { changed: reflowResult.changed || pageCapOperations.length > 0, operations: [...reflowResult.operations, ...pageCapOperations], warnings: reflowResult.warnings, unresolved: reflowResult.unresolved, history: reflowHistory }, pages:cardPlan };
+  let planOperations = reflowOperations.map((item) => ({ ...item, source: item.source || 'deterministic-preflight' }));
+  const planningMeta = { schemaVersion: 3, channel_mode:outputMode||editorial.output_mode || 'xiaohongshu', composition_mode:editorial.composition_mode||'template', layout_style:editorial.layout_style||'auto', template:{pack:templateCompatibility.templatePack.id,version:templateCompatibility.templatePack.version,source:templateCompatibility.source,fallback:templateCompatibility.fallback}, capacityProfileVersion:templateCapabilities.capacityProfileVersion, capacityProfile:templateCapabilities.capacityProfile, rolloutProfile, pageBudget: pageBudget, topic:candidate.hotspot_title, source_page_count: originalCardPlan.length, reflow: { changed: reflowChanged, operations: reflowOperations, warnings: reflowResult.warnings, unresolved: reflowResult.unresolved, history: reflowHistory }, pages:cardPlan };
   writeFile(planPath, JSON.stringify(planningMeta, null, 2));
-  record('planning', storyboardSkillId, planPath, reflowResult.changed ? `模板感知重排：${reflowResult.operations.map((item)=>item.op==='split_block'?`P${item.page} ${item.blockType} 拆为 ${item.createdChunks} 页`:item.op==='merge_pages'?`P${item.pages.join('/')} 合并过短续页`:item.op==='dedupe_duplicate_block'?`P${item.page} 去除与 P${item.duplicateOfPage} 重复的 ${item.blockType}`:item.op==='coalesce_code_blocks'?`P${item.page} 合并相关代码块`:item.op==='move_block'&&item.from_page?`P${item.from_page} ${item.blockType} 移至 P${item.to_page}`:`P${item.page} 移动 ${item.blockType}`).join('；')}${reflowResult.warnings.length?`；${reflowResult.warnings.join('；')}`:''}` : '模板容量预检通过，未触发续页');
+  record('planning', storyboardSkillId, planPath, reflowChanged ? `模板感知重排：${reflowOperations.map((item)=>item.op==='merge_event_auxiliary_pages'?`事件辅助页合并为争议讨论页（${item.sourcePages.map((page)=>`P${page}`).join('、')}）`:item.op==='merge_event_timeline_into_summary'?`P${item.pages.join('/')} 合并主事实与时间线`:item.op==='merge_repository_problem_capability'?`P${item.pages.join('/')} 合并痛点与核心能力`:item.op==='merge_repository_capability_quickstart'?`P${item.pages.join('/')} 合并能力与上手路径`:item.op==='merge_repository_limitations_ending'?`P${item.pages.join('/')} 合并限制与结尾`:item.op==='split_block'?`P${item.page} ${item.blockType} 拆为 ${item.createdChunks} 页`:item.op==='merge_pages'?`P${item.pages.join('/')} 合并过短续页`:item.op==='dedupe_duplicate_block'?`P${item.page} 去除与 P${item.duplicateOfPage} 重复的 ${item.blockType}`:item.op==='coalesce_code_blocks'?`P${item.page} 合并相关代码块`:item.op==='move_block'&&item.from_page?`P${item.from_page} ${item.blockType} 移至 P${item.to_page}`:`P${item.page} 移动 ${item.blockType}`).join('；')}${reflowResult.warnings.length?`；${reflowResult.warnings.join('；')}`:''}` : '模板容量预检通过，未触发续页');
 
   const providerConfig = skillRuntime.providerConfig;
   // 强调色块封面的标题断行交给 AI 做语义切分（英文单词、专有名词不拆开）；
@@ -337,6 +468,9 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   let expandedDensityPages=new Set();
   let fitContentPages=new Set();
   const renderCurrentStoryboard=()=>{
+    // 每次渲染前只做结构兼容归一化；不在渲染阶段删除内容块，
+    // 让浏览器审计看到的计划与持久化计划保持一致。
+    cardPlan = sanitizeCardPlan(cardPlan);
     // 生成链路中的内容页统一按实际内容高度收缩并居中；
     // fitContentPages 仍保留在状态中，用于记录“补充后仍偏空”的额外处理。
     const adaptiveContentPages=adaptiveContentPageIndexes(cardPlan,fitContentPages);
@@ -406,6 +540,8 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   };
   const persistTemplateMetrics=()=>{
     if(templateMetrics)return templateMetrics;
+    reconcileSocialCardDynamicFillAuditsWithFinalReport(contentPlanAdjustmentHistory, report);
+    persistContentPlanAdjustments();
     const finalAtoms=finalContentAtomSnapshot || buildSocialCardContentAtomSnapshot(cardPlan,{source:'metrics-final'});
     const conservation=compareSocialCardContentAtomConservation(originalContentAtomSnapshot.atoms,finalAtoms.atoms);
     const beforeRefs=new Set(conservation.beforeSourceRefs);
@@ -429,6 +565,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
       planOperations,
       sourceAtomLossCount,
       jointPackingAudit:auditAttempts.map((item)=>item.jointPackingAudit).filter(Boolean),
+      dynamicFillAudits:contentPlanAdjustmentHistory.map((round)=>round?.dynamicFill).filter(Boolean),
       rolloutProfile,
       hardGateFailure:report?.valid!==true,
     });
@@ -576,11 +713,18 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
           issues:[...(Array.isArray(item.issues)?item.issues.map(String):[]),...(densityTarget?['underfilled_target']:[])],
           utilization:item.utilization,
           targetUtilization:densityTarget?.target ?? null,
+          content_blocks:structuredClone(blocks),
           allowedSupplementSlots:(supplementSlots[role]||[]).map((slot)=>({id:slot.id,blockTypes:[...(slot.blockTypes||[])],maxItems:slot.maxItems,priority:slot.priority})),
           allowedBlockTypes:Array.isArray(capability.supportedBlocks)?[...capability.supportedBlocks]:[...(templateCapabilities.allowedBlockTypes||[])],
           remainingBlockCapacity:Number.isFinite(Number(capability.maxBlocks))?Math.max(0,Number(capability.maxBlocks)-blocks.length):null,
         };
       });
+    const remainingBlockCapacities=plannerPages
+      .map((item)=>Number(item.remainingBlockCapacity))
+      .filter((value)=>Number.isFinite(value));
+    maxFactBlocksPerPage=remainingBlockCapacities.length
+      ? Math.max(1,Math.max(...remainingBlockCapacities))
+      : maxFactBlocksPerRound;
     const canFitFactBlock=({page,block,role,pageNumber:providedPageNumber})=>{
       const capacity=templateCapabilities.capacityProfile?.roles?.[role]||templateCapabilities.capacityProfile||{};
       const projected={...page,content_blocks:[...(Array.isArray(page?.content_blocks)?page.content_blocks:[]),block]};
@@ -745,6 +889,17 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
         }
         plannerRound.valid=applied.valid;
         plannerRound.changed=applied.changed===true;
+        plannerRound.dynamicFill=buildDynamicFillAudit({
+          beforePlan:cardPlan,
+          afterPlan:applied.pages || cardPlan,
+          report,
+          targetPages:plannerPages,
+          capacityProfile:templateCapabilities.capacityProfile,
+          acceptedOperations:applied.changed ? (applied.operations || plannerRound.operations) : [],
+          rejectedOperations:[...(Array.isArray(plannerRound.schemaRejectedOperations) ? plannerRound.schemaRejectedOperations : []), ...(Array.isArray(applied.rejectedOperations) ? applied.rejectedOperations : [])],
+          fallbackCandidateCount:factSupplementFallbackCandidatePool.length,
+          changed:applied.changed===true,
+        });
         if(applied.changed){
           const beforeBrowserCandidatePages=structuredClone(cardPlan);
           contentPlanAdjustmentCount+=1;
@@ -786,6 +941,17 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
           plannerRound.recompileOperations=allRecompileOperations;
           plannerRound.continuationSupplementOperations=continuationSupplementOperations;
           plannerRound.finalPageCount=cardPlan.length;
+          plannerRound.dynamicFill=buildDynamicFillAudit({
+            beforePlan:beforeBrowserCandidatePages,
+            afterPlan:cardPlan,
+            report,
+            targetPages:plannerPages,
+            capacityProfile:templateCapabilities.capacityProfile,
+            acceptedOperations:plannerRound.operations,
+            rejectedOperations:plannerRound.rejectedOperations,
+            fallbackCandidateCount:factSupplementFallbackCandidatePool.length,
+            changed:true,
+          });
           contentPlanAdjustmentHistory.push(plannerRound);
           pendingBrowserCandidate={beforePages:beforeBrowserCandidatePages,round:plannerRound};
           persistContentPlanAdjustments();
@@ -802,6 +968,17 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
           plannerRound.changed=false;
           plannerRound.pageBudgetBlocked=true;
         }
+      }
+      if(!plannerRound.dynamicFill) {
+        plannerRound.dynamicFill=buildDynamicFillAudit({
+          beforePlan:cardPlan,
+          afterPlan:cardPlan,
+          report,
+          targetPages:plannerPages,
+          capacityProfile:templateCapabilities.capacityProfile,
+          fallbackCandidateCount:factSupplementFallbackCandidatePool.length,
+          error:plannerRound.error || '',
+        });
       }
       contentPlanAdjustmentHistory.push(plannerRound);
       persistContentPlanAdjustments();

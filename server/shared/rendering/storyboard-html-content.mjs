@@ -93,10 +93,16 @@ export function renderStoryboardBlock(block, { pageLayout = 'stacked', pageRole 
   if (block.type === 'compare' && ((Array.isArray(block.headers) && block.headers.length) || (Array.isArray(block.rows) && block.rows.length))) {
     const headers = Array.isArray(block.headers) ? block.headers : [];
     const rows = Array.isArray(block.rows) ? block.rows : [];
-    return `<div class="content-block compare-block">${title}<table><thead><tr>${headers.map((cell) => `<th data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${renderTechnicalText(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${(Array.isArray(row) ? row : []).map((cell) => `<td${typographyStyle(scale, 10, 1.4)}>${renderTechnicalText(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    return `<div class="content-block compare-block">${title}<table><thead><tr>${headers.map((cell) => `<th data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${renderTechnicalText(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${(Array.isArray(row) ? row : []).map((cell) => `<td${typographyStyle(scale, 11, 1.4)}>${renderTechnicalText(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   if (block.type === 'steps' && items.length) return `<div class="content-block steps-block">${title}<div class="step-col">${items.map((item, index) => `<div class="step"><b${typographyStyle(scale, 11, 1.2)}>${index + 1}</b><div><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || '')}</p></div></div>`).join('')}</div></div>`;
-  if (block.type === 'timeline' && items.length) return `<div class="content-block timeline-block">${title}<div class="tl">${items.map((item) => `<div class="tl-node"><span class="tl-time" data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${escapeHtml(item.time || '')}</span><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || '')}</p></div>`).join('')}</div></div>`;
+  if (block.type === 'timeline' && items.length >= 2) return `<div class="content-block timeline-block">${title}<div class="tl">${items.map((item) => `<div class="tl-node"><span class="tl-time" data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${escapeHtml(item.time || item.date || '')}</span><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || item.event || item.label || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || item.text || item.fact || item.description || '')}</p></div>`).join('')}</div></div>`;
+  if (block.type === 'timeline' && items.length === 1) {
+    const item = items[0] || {};
+    const singleTimelineText = [item.time || item.date, item.title || item.event || item.label, item.content || item.text || item.fact || item.description]
+      .filter(Boolean).join('：');
+    return `<div class="content-block text-block">${title}<p${typographyStyle(scale, 11, 1.5)}>${renderTechnicalText(singleTimelineText || content)}</p></div>`;
+  }
   if (block.type === 'scenes' && items.length) return `<div class="content-block scenes-block">${title}<div class="scene-row">${items.map((item) => `<div class="scene"><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || '')}</p></div>`).join('')}</div></div>`;
   if (block.type === 'scenes' && content) {
     const lines = content.split(/\n+/).map((item) => item.replace(/^[-*+•·✓✔✅☑]\uFE0F?\s*/u, '').trim()).filter(Boolean);

@@ -5,7 +5,7 @@ import { continuationBadge, escapeHtml, renderStoryboardBlock, renderTechnicalTe
 
 const LABELS = Object.freeze({
   repository: { cover: 'TOOL / RADAR', concept: 'PROBLEM / SIGNAL', feature: 'FEATURE / STACK', steps: 'FLOW / STEPS', data: 'DATA / BOARD', compare: 'COMPARE / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'RISK / BOUNDARY', ending: 'NEXT / MOVE' },
-  event: { cover: 'EVENT / RADAR', concept: 'EVENT / SIGNAL', feature: 'FACT / STACK', steps: 'RESPONSE / FLOW', data: 'DATA / BOARD', compare: 'POSITION / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'RISK / BOUNDARY', ending: 'NEXT / MOVE' },
+  event: { cover: 'EVENT / RADAR', concept: 'EVENT / SIGNAL', feature: 'FACT / STACK', steps: 'RESPONSE / FLOW', data: 'DATA / BOARD', compare: 'DISCUSSION / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'RISK / BOUNDARY', ending: 'NEXT / MOVE' },
   custom: { cover: 'NOTE / RADAR', concept: 'NOTE / SIGNAL', feature: 'POINT / STACK', steps: 'HOW / TO', data: 'DATA / BOARD', compare: 'COMPARE / MODE', evidence: 'SOURCE / LOG', timeline: 'TIME / LINE', risk: 'BOUNDARY / CHECK', ending: 'NEXT / MOVE' },
 });
 const NEON_TEMPLATE_IDS = new Set(['hero-metrics', 'problem-stack', 'feature-stack', 'steps-rail', 'metric-board', 'comparison-board', 'evidence-ledger', 'timeline-rail', 'risk-frame', 'closing-cta']);

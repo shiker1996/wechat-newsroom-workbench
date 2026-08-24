@@ -13,9 +13,79 @@ function cleanInstructionText(text) {
   return value.replace(/^[，。；、:：\s]+/, '').trim();
 }
 
+function cleanStructuredItem(item, blockType) {
+  if (typeof item === 'string') return cleanInstructionText(item);
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+  const next = Object.fromEntries(Object.entries(item).map(([key, value]) => [
+    key,
+    typeof value === 'string' ? cleanInstructionText(value) : value,
+  ]));
+  if (blockType === 'timeline') {
+    // 时间线模型偶尔把正文放在 text/fact，渲染契约使用 content。
+    // 在故事板入口统一归一化，避免时间能显示但事件正文为空。
+    const title = String(next.title || next.event || next.label || '').trim();
+    const content = String(next.content || next.text || next.fact || next.description || '').trim();
+    if (title && !next.title) next.title = title;
+    if (content && !next.content) next.content = content;
+    for (const key of ['event', 'label', 'text', 'fact', 'description']) delete next[key];
+  }
+  return next;
+}
+
+function legacyListContentItems(content) {
+  if (Array.isArray(content)) return content;
+  const value = String(content || '').trim();
+  if (!value) return [];
+  const lines = value.split(/\r?\n+/).map((item) => item.trim()).filter(Boolean);
+  if (lines.length > 1) return lines;
+  // 旧版重排器曾把列表数组 join 成逗号字符串。只有在同一字符串
+  // 至少包含两个年份节点时才拆 ASCII 逗号，避免误拆普通句子里的逗号。
+  if ((value.match(/\d{4}年/g) || []).length >= 2 && value.includes(',')) {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function listItemDisplayText(item) {
+  if (typeof item === 'string') return item;
+  if (!item || typeof item !== 'object') return String(item ?? '');
+  return [item.title || item.label || item.time || item.date, item.content || item.text || item.description]
+    .filter(Boolean).join('：');
+}
+
 export function sanitizeCardPlan(cardPlan) {
-  return (Array.isArray(cardPlan) ? cardPlan : []).map((page, pageIndex) => {
+  const pages = (Array.isArray(cardPlan) ? cardPlan : []).map((page, pageIndex) => {
     const smart = normalizeCardComposition(page, { pageIndex });
+    let contentBlocks = (Array.isArray(page.content_blocks) ? page.content_blocks : []).map((block) => {
+      const listItems = block.type === 'list' && (!Array.isArray(block.items) || !block.items.length)
+        ? legacyListContentItems(block.content)
+        : [];
+      const normalizedItems = (Array.isArray(block.items) && block.items.length ? block.items : listItems)
+        .map((item) => cleanStructuredItem(item, block.type));
+      return ({
+      ...block,
+      title: cleanInstructionText(block.title),
+      // 列表数组以及旧版逗号拼接字符串都归一化为 items；同时保留
+      // 换行文本，兼容编辑室仍以 content 作为列表编辑入口的旧界面。
+      content: block.type === 'list' && normalizedItems.length
+        ? normalizedItems.map(listItemDisplayText).filter(Boolean).join('\n')
+        : cleanInstructionText(block.content),
+      items: normalizedItems,
+      headers: (Array.isArray(block.headers) ? block.headers : []).map(cleanInstructionText),
+      rows: (Array.isArray(block.rows) ? block.rows : []).map((row) => (Array.isArray(row) ? row : []).map(cleanInstructionText)),
+    });
+    });
+    const hasRichList = contentBlocks.some((block) => block.type === 'list' && block.items.length >= 2);
+    contentBlocks = contentBlocks.flatMap((block) => {
+      if (block.type !== 'timeline' || block.items.length >= 2) return [block];
+      // 单条事实没有时间线结构；已有多条列表时直接移除冗余时间线，
+      // 否则降级为普通文本，绝不渲染只有一个节点的时间线骨架。
+      if (hasRichList) return [];
+      const item = block.items[0] || {};
+      const content = [item.time || item.date, item.title || item.event || item.label, item.content || item.text || item.fact || item.description]
+        .filter(Boolean).join('：');
+      return [{ ...block, type: 'text', content, items: [], headers: [], rows: [] }];
+    });
     return {
       ...page,
       role: smart.role,
@@ -23,18 +93,10 @@ export function sanitizeCardPlan(cardPlan) {
       title: cleanInstructionText(page.title),
       goal: cleanInstructionText(page.goal),
       evidence: (Array.isArray(page.evidence) ? page.evidence : []).map(cleanInstructionText),
-      content_blocks: (Array.isArray(page.content_blocks) ? page.content_blocks : []).map((block) => ({
-        ...block,
-        title: cleanInstructionText(block.title),
-        content: cleanInstructionText(block.content),
-        items: (Array.isArray(block.items) ? block.items : []).map((item) => typeof item === 'string'
-          ? cleanInstructionText(item)
-          : Object.fromEntries(Object.entries(item || {}).map(([key, value]) => [key, typeof value === 'string' ? cleanInstructionText(value) : value]))),
-        headers: (Array.isArray(block.headers) ? block.headers : []).map(cleanInstructionText),
-        rows: (Array.isArray(block.rows) ? block.rows : []).map((row) => (Array.isArray(row) ? row : []).map(cleanInstructionText)),
-      })),
+      content_blocks: contentBlocks,
     };
   });
+  return pages;
 }
 
 export function cardPlanRepairStructureIssues(previousPlan, nextPlan) {
