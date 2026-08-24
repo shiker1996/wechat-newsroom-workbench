@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
-import { resolveArticleLength } from '../lib/core/config.mjs';
-import { brainstorm, breakingSynthesis } from '../lib/llm/research-pipeline.mjs';
-import { hasScoreScaleContradiction } from '../lib/llm/breaking-analysis-pipeline.mjs';
-import { runAudit } from '../lib/llm/social-card-pipeline.mjs';
+import { inspectArticleQuality } from '../server/features/articles/domain/article-quality.mjs';
+import { resolveArticleLength } from '../server/platform/core/config.mjs';
+import { brainstorm, breakingSynthesis } from '../server/features/research/application/research-pipeline.mjs';
+import { hasScoreScaleContradiction } from '../server/features/articles/llm/breaking-analysis-pipeline.mjs';
+import { runAudit } from '../server/features/social-cards/application/social-card-pipeline.mjs';
 
 test('普通有序列表不再被当作来源脚注',()=>{
   const report=inspectArticleQuality('# 标题\n\n1. 第一步\n2. 第二步');

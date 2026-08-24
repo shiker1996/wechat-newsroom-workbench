@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { dailyFocusOptions, dailyVisibleChars, normalizeDailyQuality, selectDailyEvents } from '../lib/llm/daily-pipeline.mjs';
+import { dailyFocusOptions, dailyVisibleChars, normalizeDailyQuality, selectDailyEvents } from '../server/features/articles/llm/daily-pipeline.mjs';
 
 test('批次早报执行标题、自然化、审阅与 SEO 完整阶段',()=>{
-  const source=fs.readFileSync(new URL('../lib/llm/daily-pipeline.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../server/features/articles/llm/daily-pipeline.mjs',import.meta.url),'utf8');
   for(const skill of ['title-generator','humanizer-zh','article-reviewer','seo-content-optimizer']){
     assert.match(source,new RegExp(skill));
   }

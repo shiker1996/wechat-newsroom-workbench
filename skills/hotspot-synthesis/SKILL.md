@@ -20,4 +20,4 @@ description: 热点综合研判器。比较全部临时探索卡后输出竞争�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/research-pipeline.mjs` 的 `SYNTHESIS_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback
+- 从 `server/features/research/application/research-pipeline.mjs` 的 `SYNTHESIS_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback

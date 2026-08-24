@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { SOCIAL_CARD_PAGE_ROLES } from '../lib/rendering/social-card-role.mjs';
-import { SOCIAL_CARD_RENDERER_BLOCK_TYPES, SOCIAL_CARD_TEMPLATE_PACKS } from '../lib/rendering/social-card-template-registry.mjs';
-import { matchSocialTemplate, templateMatchMetadata } from '../lib/themes/social-template-matcher.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { SOCIAL_CARD_PAGE_ROLES } from '../server/shared/rendering/social-card-role.mjs';
+import { SOCIAL_CARD_RENDERER_BLOCK_TYPES, SOCIAL_CARD_TEMPLATE_PACKS } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { matchSocialTemplate, templateMatchMetadata } from '../server/shared/themes/social-template-matcher.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 test('Phase 0 模板提案 Schema 固化 Social 目标、角色、草稿和状态字段', () => {
   const schema = JSON.parse(fs.readFileSync(new URL('../themes/schema/social-template-proposal.schema.json', import.meta.url), 'utf8'));

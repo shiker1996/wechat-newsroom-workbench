@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { WORKBENCH_SCHEMA_VERSION } from '../lib/persistence/migrations.mjs';
-import { acquireInstanceLock } from '../lib/core/instance-lock.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { WORKBENCH_SCHEMA_VERSION } from '../server/platform/persistence/migrations.mjs';
+import { acquireInstanceLock } from '../server/platform/core/instance-lock.mjs';
 
 test('数据库迁移版本持久化且重复启动不重复执行结构修复',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'write-assistant-r3-migration-'));

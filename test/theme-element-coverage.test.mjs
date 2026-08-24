@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { articleThemeDefinition, compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { themeConfigLeafPaths, unconsumedThemeConfigFields } from '../lib/themes/theme-publish-gate.mjs';
+import { articleThemeDefinition, compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
+import { compileSocialTheme, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { themeConfigLeafPaths, unconsumedThemeConfigFields } from '../server/platform/application/themes/theme-publish-gate.mjs';
 
 const matrix=JSON.parse(fs.readFileSync(new URL('./fixtures/theme-element-coverage.json',import.meta.url),'utf8'));
 const sourcePattern=/^(token|recipe|fixed):.+$|^not-applicable$/;

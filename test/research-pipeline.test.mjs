@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { brainstorm, buildScoreDualRun, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../lib/llm/research-pipeline.mjs';
+import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../server/features/research/application/research-pipeline.mjs';
+import { buildScoreDualRun } from '../scripts/migration/replay-topic-score.mjs';
 
 function hotspot(id, title, eventKey, source='rsshub') {
   return { id, title, source, url:`https://example.com/${id}`, category:'🤖 AI/技术动态', market_scope:'全球性', score:80,
@@ -69,7 +70,7 @@ test('维度统一选题：核心8混排 + 黑马2 + 候补3，事件回填入�
 });
 
 test('成稿线前置：F 低于 55 的候选不进入选题池', () => {
-  const source = fs.readFileSync(new URL('../lib/llm/research-pipeline.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../server/features/research/application/research-pipeline.mjs', import.meta.url), 'utf8');
   assert.match(source, /const DRAFT_FLOOR = 55/);
   assert.match(source, /draftable = breaking \? scored : scored\.filter\(\(item\) => item\.f >= DRAFT_FLOOR\)/);
   assert.match(source, /saveAnalyzedCandidates\(batchId,draftable\.map/);
@@ -170,7 +171,7 @@ test('阶段5 T 接入 F：同等文章化质量下事件价值更高者优先',
   assert.equal(Number((scored[0].f-scored[1].f).toFixed(1)),15);
 });
 
-test('阶段6 新旧公式双跑：记录高低 T/A、入池和排名差异但不改生产排序', () => {
+test('阶段6 离线回放脚本：记录高低 T/A、入池和排名差异但不改生产排序', () => {
   const scored=[
     {candidateId:'C-HIGH-T',finalRank:1,source:{title:'高热度低文章化'},eventValue:90,a:40,s:0,d:0,f:55,readerStake:'具体后果'},
     {candidateId:'C-HIGH-A',finalRank:2,source:{title:'低热度高文章化'},eventValue:40,a:80,s:0,d:0,f:68,readerStake:'具体后果'},
@@ -472,6 +473,9 @@ test('事件卡复用：已生成的不重复调用模型，缺失时补生成�
   const first = await ensureBatchEventCards({ gateway, store, batchId:'b1', provider:'deepseek', workspaceRoot:root });
   assert.equal(first.total, 3);
   assert.equal(first.generated, 3);
+  assert.ok(first.clusters.every((event) => /^S/.test(event.event_id)));
+  const stableClusters = JSON.parse(fs.readFileSync(path.join(root, 'topics', 'b1-orchestrated', 'sources', 'event-clusters.json'), 'utf8'));
+  assert.ok(stableClusters.events.every((event) => /^S/.test(event.event_id)));
   assert.ok(fs.existsSync(first.path));
   const callsAfterFirst = calls;
   const second = await ensureBatchEventCards({ gateway, store, batchId:'b1', provider:'deepseek', workspaceRoot:root });

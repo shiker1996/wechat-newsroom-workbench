@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { handleSystemRoutes } from '../lib/http/routes/system-routes.mjs';
-import { createZip } from '../lib/artifacts/zip-bundle.mjs';
-import { readStoredZip, validateWorkbenchBackup } from '../lib/artifacts/backup-archive.mjs';
-import { createRemoteAdapter, privateIp } from '../lib/tools/remote-adapter.mjs';
+import { handleSystemRoutes } from '../server/platform/http/routes/system-routes.mjs';
+import { createZip } from '../server/platform/artifacts/zip-bundle.mjs';
+import { readStoredZip, validateWorkbenchBackup } from '../server/platform/artifacts/backup-archive.mjs';
+import { createRemoteAdapter, privateIp } from '../server/platform/tools/remote-adapter.mjs';
 import { execute as urlFetchExecute } from '../plugins/url-fetch/adapter.mjs';
 
 function json(response, status, data) {
@@ -140,7 +140,7 @@ test('远程插件响应超过大小限制即中断读取', async () => {
 });
 
 test('artifact 预览标题的双引号被转义，无法注入属性', async () => {
-  const { imageArtifactPreviewHtml } = await import('../lib/artifacts/artifact-preview.mjs');
+  const { imageArtifactPreviewHtml } = await import('../server/platform/artifacts/artifact-preview.mjs');
   const html = imageArtifactPreviewHtml('/content/x.png', 'x" onerror="alert(1)');
   assert.ok(!html.includes('alt="x" onerror='), 'title 中的双引号必须被转义');
   assert.ok(html.includes('&quot;'));

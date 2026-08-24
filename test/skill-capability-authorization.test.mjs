@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { Store } from '../lib/core/store.mjs';
-import { getToolRegistry } from '../lib/tools/index.mjs';
-import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
-import { activeConfigIntegrity, describeActiveSkillConfig, readActiveSkillConfig, writeActiveSkillConfig, writeVersionedSkillConfig } from '../lib/skills/configuration.mjs';
-import { assertAuthorizationChange, describeSkillAuthorization, previewSkillAuthorizationChange, saveSkillAuthorization } from '../lib/skills/capability-authorization.mjs';
-import { handleSystemRoutes } from '../lib/http/routes/system-routes.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { getToolRegistry } from '../server/platform/tools/index.mjs';
+import { buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
+import { activeConfigIntegrity, describeActiveSkillConfig, readActiveSkillConfig, writeActiveSkillConfig, writeVersionedSkillConfig } from '../server/platform/skills/configuration.mjs';
+import { assertAuthorizationChange, describeSkillAuthorization, previewSkillAuthorizationChange, saveSkillAuthorization } from '../server/platform/skills/capability-authorization.mjs';
+import { handleSystemRoutes } from '../server/platform/http/routes/system-routes.mjs';
 
 // 阶段 4a/4b：版本协商与 hash 链、历史 run 授权冻结、技能能力授权编辑的服务端边界
 
@@ -77,7 +77,7 @@ test('Agent run 启动时冻结能力授权快照',(t)=>{
 test('授权边界：required、未声明与目录外能力都被服务端拒绝',async (t)=>{
   const root=makeWorkspace(t),graph=await graphFor(root);
   // 阶段 5 起 custom-card-storyboard 的 passage.retrieve 已补齐适配（ready 且 optional），允许从白名单移除；
-  // 原"degraded 不得停用"场景随适配完成而消失（lib/agent/resource-adaptation.mjs 的 resourceIds 映射 + 透传回退）
+  // 原"degraded 不得停用"场景随适配完成而消失（server/platform/agent/resource-adaptation.mjs 的 resourceIds 映射 + 透传回退）
   assert.doesNotThrow(()=>assertAuthorizationChange(root,graph,'custom-card-storyboard',
     ['content.url.fetch','content.web.search','content.news.search','content.document.search','content.repository.inspect']));
   // 未在消费者登记中声明的能力不得通过配置引入

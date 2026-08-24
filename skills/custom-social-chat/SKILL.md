@@ -38,5 +38,5 @@ assistantReply 先概括本轮确定了什么，再问下一个问题；方案�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/custom-social-chat.mjs` 的 `SYSTEM` 内联常量原样提取为技能，本技能为 prompt 唯一事实源（技能缺失时加载直接报错）
+- 从 `server/features/social-cards/llm/custom-social-chat.mjs` 的 `SYSTEM` 内联常量原样提取为技能，本技能为 prompt 唯一事实源（技能缺失时加载直接报错）
 - 账号上下文位置使用 `{{ACCOUNT_CONTEXT}}` 占位符，由代码在加载后替换为 `account-context.json` 的格式化内容

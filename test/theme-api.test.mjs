@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleThemeRoutes, themeCatalog } from '../lib/http/routes/theme-routes.mjs';
+import { handleThemeRoutes, themeCatalog } from '../server/platform/http/routes/theme-routes.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 test('阶段 4 主题目录 API 按前端契约返回两类主题与预览元数据',()=>{

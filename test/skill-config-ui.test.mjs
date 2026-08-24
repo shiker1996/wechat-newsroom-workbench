@@ -5,7 +5,7 @@ import test from 'node:test';
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const skills=fs.readFileSync(new URL('../public/src/views/skills.js',import.meta.url),'utf8');
 const main=fs.readFileSync(new URL('../public/src/main.js',import.meta.url),'utf8');
-const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+const routes=fs.readFileSync(new URL('../server/platform/http/routes/system-routes.mjs',import.meta.url),'utf8');
 const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 
 test('技能与工具页展示工具健康状态',()=>{

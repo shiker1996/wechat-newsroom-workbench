@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { budgetCardPlan, CARD_PLAN_BLOCK_BUDGET, CARD_PLAN_PAGE_ITEM_BUDGET } from '../lib/llm/social-card-pipeline.mjs';
+import { budgetCardPlan, CARD_PLAN_BLOCK_BUDGET, CARD_PLAN_PAGE_ITEM_BUDGET } from '../server/features/social-cards/application/social-card-pipeline.mjs';
 
 const textBlock=(title)=>({type:'text',title,content:`${title}的正文说明`});
 

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {
   buildSocialCardFactCandidatePrompt,
   buildSocialCardFactIndex,
-} from '../lib/rendering/social-card-fact-index.mjs';
+} from '../server/shared/rendering/social-card-fact-index.mjs';
 import {
   buildSocialCardContentComponents,
   isSocialCardFactComponentCompatibleWithSlot,
-} from '../lib/rendering/social-card-content-components.mjs';
+} from '../server/shared/rendering/social-card-content-components.mjs';
 
 test('阶段 1 事实索引写入自然展示标签、语义意图和组件资格', () => {
   const index = buildSocialCardFactIndex({

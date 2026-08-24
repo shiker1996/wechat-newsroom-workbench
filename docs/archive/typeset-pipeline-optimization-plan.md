@@ -1,11 +1,11 @@
 # 公众号排版流水线优化方案
 
 > 状态：P0、P1-b（方案 A）已完成（2026-07-27）；主题预设不做（用户决定），P2 待实施
-> 涉及核心文件：`lib/llm/typeset-pipeline.mjs`、`skills/wechat-*`、`server.mjs`
+> 涉及核心文件：`server/platform/llm/typeset-pipeline.mjs`、`skills/wechat-*`、`server.mjs`
 
 ## 背景与现状
 
-`runTypesetPipeline()`（`lib/llm/typeset-pipeline.mjs:190`）执行 6 阶段契约：
+`runTypesetPipeline()`（`server/platform/llm/typeset-pipeline.mjs:190`）执行 6 阶段契约：
 
 | 阶段 | 现状 | 问题 |
 | --- | --- | --- |

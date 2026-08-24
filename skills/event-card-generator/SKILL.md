@@ -15,4 +15,4 @@ description: 事件事实卡生成器。按事件聚合的若干报道（标题�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/research-pipeline.mjs` 的 `EVENT_CARD_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback
+- 从 `server/features/research/application/research-pipeline.mjs` 的 `EVENT_CARD_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback

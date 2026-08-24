@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { socialCardPageBudget, socialCardPageBudgetMessage, socialCardPageBudgetStatus } from '../lib/rendering/social-card-page-budget.mjs';
+import { socialCardPageBudget, socialCardPageBudgetMessage, socialCardPageBudgetStatus } from '../server/shared/rendering/social-card-page-budget.mjs';
 
 test('Social 页数预算区分推荐值和绝对安全上限', () => {
   assert.deepEqual(socialCardPageBudget('repository'), { contentType: 'repository', recommended: 7, absolute: 12 });

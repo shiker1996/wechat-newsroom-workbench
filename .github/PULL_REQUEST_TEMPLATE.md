@@ -15,4 +15,4 @@
 - [ ] 涉及路由变更时已同步 `API.md`
 - [ ] 涉及配置/环境变量变更时已同步 `.env.example` / `config.example.json`
 - [ ] 未包含密钥、私有数据或真实账号内容
-- [ ] 新增依赖已说明许可证，并通过 `node scripts/license-scan.mjs`
+- [ ] 新增依赖已说明许可证，并通过 `node scripts/quality/license-scan.mjs`

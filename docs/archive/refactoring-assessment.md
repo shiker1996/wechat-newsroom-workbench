@@ -19,13 +19,13 @@
 | 阶段 4 | 完成 | 渲染器、生成管线和前端文档模型分层 |
 | 阶段 5 | 完成 | Store 收口为兼容 facade，直接 SQL 清零 |
 
-最终验收：`store.mjs` 约从 2030 行降至 510 行；构建通过；全量测试 749/749；`lib/data/` 遗留空目录已删除。下文保留各轮执行记录，其中“下一轮”和“后续事项”描述均为当时的历史计划，不代表当前仍有未完成任务。
+最终验收：`store.mjs` 约从 2030 行降至 510 行；构建通过；全量测试 749/749；`server/data/` 遗留空目录已删除。下文保留各轮执行记录，其中“下一轮”和“后续事项”描述均为当时的历史计划，不代表当前仍有未完成任务。
 
 需要优先处理的是职责边界，而不是为了降低行数机械拆文件。当前最重要的三个重构对象是：
 
-1. `lib/core/store.mjs`：数据访问、迁移和多个业务领域全部集中在一个 `Store` 类中。
+1. `server/platform/core/store.mjs`：数据访问、迁移和多个业务领域全部集中在一个 `Store` 类中。
 2. `server.mjs`：已经抽出部分路由，但仍同时承担应用组装、HTTP 适配、业务编排和大量内联路由。
-3. `lib/llm/ai-job-manager.mjs`：阶段 2 已将流水线分发移出，当前保留任务队列、并发控制、日志持久化和统一执行收口。
+3. `server/platform/llm/ai-job-manager.mjs`：阶段 2 已将流水线分发移出，当前保留任务队列、并发控制、日志持久化和统一执行收口。
 
 这三个位置会放大后续需求的修改范围和回归风险，建议优先重构。
 
@@ -52,11 +52,11 @@ npm.cmd test
 | 文件 | 规模 | 主要问题 |
 | --- | ---: | --- |
 | `server.mjs` | 325 行左右 | 启动、静态资源、备份、路由装配和顶层入口 |
-| `lib/core/store.mjs` | 2031 行 | 覆盖批次、热点、候选、文章、产物、AI、工具、主题等多个领域 |
-| `lib/llm/social-card-pipeline.mjs` | 873 行 | 构图、版式、密度、HTML 渲染和流水线编排混合 |
-| `lib/llm/typeset-pipeline.mjs` | 684 行 | Markdown 渲染、主题、图片、技能执行和排版编排混合 |
-| `lib/llm/research-pipeline.mjs` | 730 行 | 聚类、维度池、评分、事件卡和研究流水线混合 |
-| `lib/http/routes/system-routes.mjs` | 623 行 | 设置、插件、技能、订阅、备份恢复和运行时控制混合 |
+| `server/platform/core/store.mjs` | 2031 行 | 覆盖批次、热点、候选、文章、产物、AI、工具、主题等多个领域 |
+| `server/platform/llm/social-card-pipeline.mjs` | 873 行 | 构图、版式、密度、HTML 渲染和流水线编排混合 |
+| `server/platform/llm/typeset-pipeline.mjs` | 684 行 | Markdown 渲染、主题、图片、技能执行和排版编排混合 |
+| `server/platform/llm/research-pipeline.mjs` | 730 行 | 聚类、维度池、评分、事件卡和研究流水线混合 |
+| `server/platform/http/routes/system-routes.mjs` | 623 行 | 设置、插件、技能、订阅、备份恢复和运行时控制混合 |
 | `public/src/views/editor.js` | 927 行 | 编辑器状态、预览、自动保存、质量检查、配图和 AI 操作混合 |
 | `public/src/views/social-editor.js` | 620 行 | 仓库、事件、自定义图文、聊天、故事板和任务轮询混合 |
 
@@ -66,7 +66,7 @@ npm.cmd test
 
 ### 1. `Store` 已成为全局数据上帝对象
 
-文件：[`lib/core/store.mjs`](../lib/core/store.mjs)
+文件：[`server/platform/core/store.mjs`](../server/platform/core/store.mjs)
 
 `Store` 从构造和迁移开始，连续承载批次、热点、候选、编辑会话、文档、产物、模型调用、生成快照、AI 运行、工具审计、技能版本和主题版本等操作。方法大致分布如下：
 
@@ -87,7 +87,7 @@ npm.cmd test
 建议采用“兼容外观 + 内部仓储拆分”的渐进方式：
 
 ```text
-lib/data/
+server/data/
   db.mjs
   migrations.mjs
   repositories/
@@ -113,7 +113,7 @@ lib/data/
 建议继续按资源和用例拆分：
 
 ```text
-lib/http/routes/
+server/platform/http/routes/
   batch-routes.mjs
   candidate-routes.mjs
   ai-job-routes.mjs
@@ -140,7 +140,7 @@ lib/http/routes/
 
 ### 3. `AiJobManager` 同时负责调度和所有任务知识
 
-文件：[`lib/llm/ai-job-manager.mjs`](../lib/llm/ai-job-manager.mjs)
+文件：[`server/platform/llm/ai-job-manager.mjs`](../server/platform/llm/ai-job-manager.mjs)
 
 该文件同时处理：
 
@@ -155,7 +155,7 @@ lib/http/routes/
 阶段 2 前任务类型通过大型分支选择执行器，现已改为：
 
 ```text
-lib/jobs/
+server/platform/jobs/
   ai-job-manager.mjs       # 队列、并发和互斥
   ai-job-handlers.mjs      # 任务类型注册表
   ai-job-context.mjs       # 统一运行上下文
@@ -168,56 +168,56 @@ lib/jobs/
 
 ### 4. 图文流水线内部职责过多
 
-文件：[`lib/llm/social-card-pipeline.mjs`](../lib/llm/social-card-pipeline.mjs)
+文件：[`server/platform/llm/social-card-pipeline.mjs`](../server/platform/llm/social-card-pipeline.mjs)
 
 该文件同时提供页面角色推断、构图 DSL 规范化、页面密度预算、版式选择、故事板 HTML 渲染、布局修复和完整 AI 生产流程。
 
 建议拆成：
 
 ```text
-lib/pipelines/social-card-pipeline.mjs
-lib/rendering/social-card-renderer.mjs
-lib/rendering/social-card-composition.mjs
-lib/rendering/social-card-layout-audit.mjs
+server/pipelines/social-card-pipeline.mjs
+server/shared/rendering/social-card-renderer.mjs
+server/shared/rendering/social-card-composition.mjs
+server/shared/rendering/social-card-layout-audit.mjs
 ```
 
 其中构图和渲染应保持纯函数优先，AI 调用、文件写入和任务状态更新只留在 pipeline 层。
 
 ### 5. 排版流水线混合纯渲染和运行时编排
 
-文件：[`lib/llm/typeset-pipeline.mjs`](../lib/llm/typeset-pipeline.mjs)
+文件：[`server/platform/llm/typeset-pipeline.mjs`](../server/platform/llm/typeset-pipeline.mjs)
 
 `markdownToHtml`、主题 token 消费、图片处理、技能运行、文档落盘和完成状态更新目前集中在同一模块。
 
 建议形成：
 
 ```text
-lib/rendering/markdown-to-html.mjs
-lib/rendering/typeset-renderer.mjs
-lib/pipelines/typeset-pipeline.mjs
+server/shared/rendering/markdown-to-html.mjs
+server/shared/rendering/typeset-renderer.mjs
+server/pipelines/typeset-pipeline.mjs
 ```
 
-这里有一个值得优先修正的依赖方向：[`lib/themes/theme-preview.mjs`](../lib/themes/theme-preview.mjs) 直接依赖 `llm/typeset-pipeline.mjs` 和 `llm/social-card-pipeline.mjs`。主题预览不应该加载完整的 LLM 流水线，建议让主题模块和正式流水线共同依赖 `lib/rendering/` 下的纯渲染模块。
+这里有一个值得优先修正的依赖方向：[`server/shared/themes/theme-preview.mjs`](../server/shared/themes/theme-preview.mjs) 直接依赖 `llm/typeset-pipeline.mjs` 和 `llm/social-card-pipeline.mjs`。主题预览不应该加载完整的 LLM 流水线，建议让主题模块和正式流水线共同依赖 `server/shared/rendering/` 下的纯渲染模块。
 
 ### 6. `research-pipeline.mjs` 是多个阶段的聚合点
 
-文件：[`lib/llm/research-pipeline.mjs`](../lib/llm/research-pipeline.mjs)
+文件：[`server/platform/llm/research-pipeline.mjs`](../server/platform/llm/research-pipeline.mjs)
 
 该模块同时负责事件聚类、时效判断、维度池、候选预选、评分、事件卡生成和批次研究编排。建议按判断责任拆出：
 
 ```text
-lib/domain/event-clustering.mjs
-lib/domain/topic-scoring.mjs
-lib/domain/dimension-selection.mjs
-lib/pipelines/event-card-pipeline.mjs
-lib/pipelines/research-pipeline.mjs
+server/domain/event-clustering.mjs
+server/domain/topic-scoring.mjs
+server/domain/dimension-selection.mjs
+server/pipelines/event-card-pipeline.mjs
+server/pipelines/research-pipeline.mjs
 ```
 
 纯规则函数可以先迁移，模型调用和文件产物暂时保留在 pipeline 层。
 
 ### 7. `system-routes.mjs` 横跨多个管理领域
 
-文件：[`lib/http/routes/system-routes.mjs`](../lib/http/routes/system-routes.mjs)
+文件：[`server/platform/http/routes/system-routes.mjs`](../server/platform/http/routes/system-routes.mjs)
 
 当前约 623 行，包含系统设置、技能包、工具插件、远程插件、能力槽位、订阅源、备份导出、备份校验、备份恢复和 RSSHub/Reddit 控制。
 
@@ -231,7 +231,7 @@ backup-routes.mjs
 subscription-routes.mjs
 ```
 
-备份恢复中的 staging、swap、rollback 逻辑也应移动到 `lib/artifacts/backup-service.mjs`，路由只负责确认头和响应码。
+备份恢复中的 staging、swap、rollback 逻辑也应移动到 `server/platform/artifacts/backup-service.mjs`，路由只负责确认头和响应码。
 
 ## P1：前端视图模块拆分
 
@@ -274,14 +274,14 @@ public/src/views/editor.js
 - `plugins/`：内置工具插件源目录。
 - `skills/`：内置技能源目录。
 
-这些位置属于产品扩展边界，当前分离是有意设计。真正需要调整的是 `lib/` 内部的职责命名：
+这些位置属于产品扩展边界，当前分离是有意设计。真正需要调整的是 `server/` 内部的职责命名：
 
 ```text
-lib/llm/         # gateway、上下文、模型调用、prompt 运行时
-lib/pipelines/   # article、research、typeset、social-card 等流程
-lib/rendering/   # Markdown、故事板、主题和确定性 HTML 渲染
-lib/data/        # 数据库连接、迁移和仓储
-lib/application/ # 面向 HTTP/任务入口的用例编排
+server/platform/llm/         # gateway、上下文、模型调用、prompt 运行时
+server/pipelines/   # article、research、typeset、social-card 等流程
+server/shared/rendering/   # Markdown、故事板、主题和确定性 HTML 渲染
+server/data/        # 数据库连接、迁移和仓储
+server/application/ # 面向 HTTP/任务入口的用例编排
 ```
 
 这类移动应在完成导入边界后进行，不建议先改目录再处理依赖。
@@ -296,7 +296,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 1：抽取 HTTP 路由
 
-1. 把 `server.mjs:302-960` 的内联路由迁入 `lib/http/routes/`。
+1. 把 `server.mjs:302-960` 的内联路由迁入 `server/platform/http/routes/`。
 2. 保持 URL、响应结构、状态码和确认头不变。
 3. 将大段文件操作和备份恢复逻辑移动到应用服务/基础设施模块。
 
@@ -320,7 +320,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 5：Store 收口
 
-1. 把完整建表和兼容迁移从 `Store` 移入 `lib/persistence/migrations.mjs`，由数据库启动层统一执行和校验。
+1. 把完整建表和兼容迁移从 `Store` 移入 `server/platform/persistence/migrations.mjs`，由数据库启动层统一执行和校验。
 2. 将 `Store` 中剩余的领域 CRUD 下沉到对应 Repository，把跨领域统计与日历、相似内容等只读聚合迁入 Query Service。
 3. 保留 `Store` 作为兼容 facade，最终只承担连接生命周期、事务边界、Repository 暴露和短转发；暂不引入 ORM，避免在职责尚未收口时叠加查询层迁移风险。
 
@@ -330,10 +330,10 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 阶段 1 已完成第一轮 HTTP 路由拆分，活动实现已接入 `server.mjs`：
 
-- `lib/http/routes/batch-routes.mjs`：批次 CRUD、删除影响评估、采集、排名、社交排名和热点全景。
-- `lib/http/routes/candidate-routes.mjs`：候选列表/创建/综合候选、相似候选、突发素材、候选 CRUD、候选轨道、自定义图文与自主写作入口。
-- `lib/http/routes/task-routes.mjs`：打标、研究、自动化、事件卡、日报和任务查询。
-- `lib/http/route-helpers.mjs`：统一 HTTP 响应、批次装饰、事件卡关联、事件事实查询和文件写入辅助逻辑。
+- `server/platform/http/routes/batch-routes.mjs`：批次 CRUD、删除影响评估、采集、排名、社交排名和热点全景。
+- `server/platform/http/routes/candidate-routes.mjs`：候选列表/创建/综合候选、相似候选、突发素材、候选 CRUD、候选轨道、自定义图文与自主写作入口。
+- `server/platform/http/routes/task-routes.mjs`：打标、研究、自动化、事件卡、日报和任务查询。
+- `server/platform/http/route-helpers.mjs`：统一 HTTP 响应、批次装饰、事件卡关联、事件事实查询和文件写入辅助逻辑。
 
 本阶段保持原 URL、请求方法、响应状态码、`x-admin-confirm` 校验和 AI 任务类型不变。旧内联代码已删除；后续仍应继续收紧路由上下文，减少 `server.mjs` 的依赖注入数量。
 
@@ -343,9 +343,9 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 阶段 2 已完成 AI 任务分发拆分：
 
-- `lib/llm/ai-job-manager.mjs` 只保留队列、并发、互斥、thinking 日志、任务状态持久化和统一成功/失败收口。
-- `lib/jobs/ai-job-handlers.mjs` 建立 12 类任务的显式 handler 注册表，并集中维护批次级互斥类型。
-- `lib/jobs/auto-pipeline.mjs` 独立承载普通批次“打标 → 事件卡 → 研判”和突发批次分析流程。
+- `server/platform/llm/ai-job-manager.mjs` 只保留队列、并发、互斥、thinking 日志、任务状态持久化和统一成功/失败收口。
+- `server/platform/jobs/ai-job-handlers.mjs` 建立 12 类任务的显式 handler 注册表，并集中维护批次级互斥类型。
+- `server/platform/jobs/auto-pipeline.mjs` 独立承载普通批次“打标 → 事件卡 → 研判”和突发批次分析流程。
 - 未知任务类型由注册表校验明确拒绝；`social-card` 由显式 handler 执行，不再依赖默认分支兜底。
 - 阶段 0 的任务类型、持久化、并发和参数透传契约继续保留，并新增“每个合法任务必须存在显式 handler”的阶段 2 契约。
 
@@ -357,10 +357,10 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 阶段 3 已开始把数据访问从 `Store` 单体中拆出，同时保留全部旧调用方式：
 
-- `lib/persistence/database.mjs` 统一负责数据库目录创建、SQLite 连接、WAL 和外键配置。
-- `lib/persistence/repositories/ai-run-repository.mjs` 承担 AI 任务创建、更新、查询和最近执行记录。
-- `lib/persistence/repositories/theme-repository.mjs` 承担用户主题、不可变版本、使用统计和归档影响查询。
-- `lib/persistence/repositories/visual-decision-repository.mjs` 承担可视化决策记录与聚合。
+- `server/platform/persistence/database.mjs` 统一负责数据库目录创建、SQLite 连接、WAL 和外键配置。
+- `server/platform/persistence/repositories/ai-run-repository.mjs` 承担 AI 任务创建、更新、查询和最近执行记录。
+- `server/platform/persistence/repositories/theme-repository.mjs` 承担用户主题、不可变版本、使用统计和归档影响查询。
+- `server/platform/persistence/repositories/visual-decision-repository.mjs` 承担可视化决策记录与聚合。
 - `Store` 通过 `repositories` 持有仓储，并以原方法作为兼容 facade；现有路由、流水线和测试无需修改调用协议。
 
 本轮保持 `store.db`、所有公开方法名、返回结构、事务边界和数据库兼容行为不变。建表与补列定义先保留在 `Store`，后续由独立迁移入口统一执行和校验；仓储拆分优先覆盖批次/热点、候选/轨道、文档/产物三个高耦合域。
@@ -403,7 +403,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 ### 阶段 3 最终收口
 
 - 候选创建和综合候选创建迁入 `CandidateRepository`，候选编号、初始评分、成员集合去重和轨道创建保持原语义。
-- `lib/persistence/migrations.mjs` 成为数据库迁移执行入口，统一执行 schema 定义并在完成后运行 `PRAGMA foreign_key_check`。
+- `server/platform/persistence/migrations.mjs` 成为数据库迁移执行入口，统一执行 schema 定义并在完成后运行 `PRAGMA foreign_key_check`。
 - `Store.migrateSchema()` 只保留当前 schema 的幂等建表和补列定义；连接、执行入口和业务仓储均已从单体中分离。
 - 候选列表、候选详情、批次详情和工作台概览继续留在 facade，定位为跨仓储只读聚合，而不是单领域数据访问。
 
@@ -413,7 +413,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第一轮
 
-- 新增 `lib/rendering/typeset-output.mjs`，承载 Markdown/HTML 结构保真检查、模型 HTML 清洗、公众号流式布局保护和自动主题选择。
+- 新增 `server/shared/rendering/typeset-output.mjs`，承载 Markdown/HTML 结构保真检查、模型 HTML 清洗、公众号流式布局保护和自动主题选择。
 - `typeset-pipeline.mjs` 只消费这些纯函数，并从旧路径 re-export，保持现有路由和测试导入兼容。
 - 新模块不依赖文件系统、数据库、模型网关或工作区路径，可单独测试和复用。
 
@@ -421,7 +421,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第二轮
 
-- 新增 `lib/rendering/social-card-plan.mjs`，承载页面密度、故事板内容预算、欠填页识别、密度舒展等级、封面标题分行校验和审计失败摘要。
+- 新增 `server/shared/rendering/social-card-plan.mjs`，承载页面密度、故事板内容预算、欠填页识别、密度舒展等级、封面标题分行校验和审计失败摘要。
 - `social-card-pipeline.mjs` 继续负责构图选择、HTML 组装、模型调用、文件写入和浏览器审计，并从旧路径兼容导出规划函数。
 - 首轮专项测试暴露 `listBlockValues` 同时被预算、构图体量和渲染消费；该共享纯函数已纳入新模块并通过回归。
 
@@ -429,7 +429,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第三轮
 
-- 新增 `lib/rendering/social-card-layout.mjs`，承载允许版式、内容语义推荐、逐页/整组优先级和不匹配安全降级。
+- 新增 `server/shared/rendering/social-card-layout.mjs`，承载允许版式、内容语义推荐、逐页/整组优先级和不匹配安全降级。
 - 智能构图和模板构图统一消费纯版式决策，旧的 `social-card-pipeline.mjs` 导出保持兼容。
 - 当时仍在流水线内的页面角色、智能构图变体和确定性 HTML 渲染，已在阶段 4 后续轮次完成拆分。
 
@@ -437,7 +437,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第四轮
 
-- 新增 `lib/rendering/social-card-role.mjs`，集中声明页面角色、构图模式、稳定构图种子和页面角色推断。
+- 新增 `server/shared/rendering/social-card-role.mjs`，集中声明页面角色、构图模式、稳定构图种子和页面角色推断。
 - 智能构图变体选择继续消费这些纯函数，旧路径保持兼容导出。
 - 角色识别不再与模型、文件系统、主题编译和 HTML 组装处于同一模块。
 
@@ -445,7 +445,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第五轮
 
-- 新增 `lib/rendering/social-card-columns.mjs`，承载内容块体量估算、同级块均衡判断、主辅块识别和语义列宽选择。
+- 新增 `server/shared/rendering/social-card-columns.mjs`，承载内容块体量估算、同级块均衡判断、主辅块识别和语义列宽选择。
 - 高密度内容、体量悬殊内容和三个内容块确定性回退单列；二个或四个以上均衡同级块可选择等宽分栏。
 - 智能构图变体只消费最终列宽结果，不再内嵌内容体量规则。
 
@@ -453,7 +453,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第六轮
 
-- 新增 `lib/rendering/social-card-composition.mjs`，承载十类页面的智能构图变体注册表、安全变体、故事板构图规范化、稳定选择和整组同角色去重。
+- 新增 `server/shared/rendering/social-card-composition.mjs`，承载十类页面的智能构图变体注册表、安全变体、故事板构图规范化、稳定选择和整组同角色去重。
 - 构图模块组合角色推断、语义列宽和模板版式纯函数，不依赖模型、文件系统、主题或浏览器。
 - `social-card-pipeline.mjs` 只消费最终构图决策；HTML 渲染侧仅保留本组已用变体的状态收集。
 
@@ -461,7 +461,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第七轮
 
-- 新增 `lib/rendering/storyboard-content.mjs`，承载故事板展示文字净化、角色与构图字段补齐，以及 AI 布局修复后的结构不变量检查。
+- 新增 `server/shared/rendering/storyboard-content.mjs`，承载故事板展示文字净化、角色与构图字段补齐，以及 AI 布局修复后的结构不变量检查。
 - `social-card-pipeline.mjs` 不再直接维护指令前缀规则和页面、内容块、列表、表格、代码等修复边界，只负责调用纯函数并处理越界结果。
 - 新增直接契约测试，锁定中文指令清理、构图补齐和内容块数量保护行为。
 
@@ -469,7 +469,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第八轮
 
-- 新增 `lib/rendering/storyboard-html-content.mjs`，承载 HTML 转义、编号步骤识别，以及 text、list、code、note、stats、compare、steps、timeline、scenes、highlight 十类内容块的确定性 HTML 分派。
+- 新增 `server/shared/rendering/storyboard-html-content.mjs`，承载 HTML 转义、编号步骤识别，以及 text、list、code、note、stats、compare、steps、timeline、scenes、highlight 十类内容块的确定性 HTML 分派。
 - 缺少结构化 `items` 的步骤与时间线继续确定性降级为列表；清单项目符号净化、对象型清单拼接和全部动态文字转义保持原行为。
 - `social-card-pipeline.mjs` 的页面循环只向内容块渲染器传递最终版式与页面角色，不再维护内容块级 HTML 分支。
 
@@ -477,7 +477,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第九轮
 
-- 新增 `lib/rendering/storyboard-page-renderer.mjs`，承载逐页角色与构图决策、同角色构图去重、密度调整、封面标题与承载信息、品牌和页脚文案，以及页面 HTML 骨架组装。
+- 新增 `server/shared/rendering/storyboard-page-renderer.mjs`，承载逐页角色与构图决策、同角色构图去重、密度调整、封面标题与承载信息、品牌和页脚文案，以及页面 HTML 骨架组装。
 - 页面渲染器组合既有规划、布局、角色、构图和内容块纯模块，不依赖模型、文件系统、主题注册中心或任务状态。
 - `social-card-pipeline.mjs` 不再维护逐页 HTML 循环，只负责解析主题、调用页面渲染器并组装文档壳层。
 
@@ -485,7 +485,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第十轮
 
-- 新增 `lib/rendering/storyboard-document-renderer.mjs`，承载完整 HTML 文档壳层、固定画布基础 CSS、主题 CSS 注入和主题版本元数据。
+- 新增 `server/shared/rendering/storyboard-document-renderer.mjs`，承载完整 HTML 文档壳层、固定画布基础 CSS、主题 CSS 注入和主题版本元数据。
 - `renderStoryboardHtml` 现仅负责解析并编译主题，组合页面渲染器与文档渲染器；确定性故事板渲染已完整脱离 AI 管线实现。
 - 迁移保持基础 CSS 原文与注入顺序不变，并增加文档标题转义、主题元数据和文档闭合结构的直接契约测试。
 
@@ -493,7 +493,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 4 第十一轮
 
-- 新增 `lib/rendering/markdown-renderer.mjs`，承载设计 token 归一化、文章主题样式推导、内联 Markdown、标题、列表、引文、分隔线、脚注、代码围栏和 GFM 表格渲染。
+- 新增 `server/shared/rendering/markdown-renderer.mjs`，承载设计 token 归一化、文章主题样式推导、内联 Markdown、标题、列表、引文、分隔线、脚注、代码围栏和 GFM 表格渲染。
 - `typeset-pipeline.mjs` 只组合排版技能、主题和文件产物，通过纯渲染模块生成确定性公众号 HTML；原 `markdownToHtml` 导出保持兼容。
 - 执行清单写入与主题兼容视图继续留在管线层，避免把文件系统和运行期目录职责带入渲染模块。
 
@@ -521,7 +521,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 5 第一轮
 
-- `lib/persistence/migrations.mjs` 新增 `applyWorkbenchSchema(db)`，完整承接建表、索引、历史列补齐、主题表重建、候选轨道回填和遗留来源规范化。
+- `server/platform/persistence/migrations.mjs` 新增 `applyWorkbenchSchema(db)`，完整承接建表、索引、历史列补齐、主题表重建、候选轨道回填和遗留来源规范化。
 - `runDatabaseMigrations(db)` 默认执行工作台 Schema，再统一运行 `PRAGMA foreign_key_check`；原注入迁移回调仍保留，便于测试和兼容调用。
 - `Store` 构造函数只负责打开数据库并触发迁移，不再拥有 `migrateSchema()`；新增契约防止 Schema 定义回流到 facade。
 
@@ -531,7 +531,7 @@ lib/application/ # 面向 HTTP/任务入口的用例编排
 
 ### 阶段 5 第二轮
 
-- 新增 `lib/persistence/queries/workbench-query-service.mjs`，建立跨领域只读查询的独立承载层。
+- 新增 `server/platform/persistence/queries/workbench-query-service.mjs`，建立跨领域只读查询的独立承载层。
 - 终稿列表、内容日历、文章统计和运行日志已迁入 Query Service；`Store` 保留同名兼容转发，调用方与返回结构不变。
 - 相似文章、相似图文和工作台概览已迁入 Query Service；效率基线、异常待办和来源健康等统计口径保持不变。
 - 新增 Store/Query Service 委托契约，防止已迁出的 SQL 回流到 facade。

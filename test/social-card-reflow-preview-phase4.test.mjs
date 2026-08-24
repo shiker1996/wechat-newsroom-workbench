@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSocialCardReflowPreview } from '../lib/rendering/social-card-reflow-preview.mjs';
+import { buildSocialCardReflowPreview } from '../server/shared/rendering/social-card-reflow-preview.mjs';
 
 test('reflow preview exposes continuation pages without raw copy', () => {
   const before = [{ title: '功能清单', content_blocks: [{ type: 'list', items: ['a', 'b', 'c'] }] }];

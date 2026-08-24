@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, sanitizeCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../lib/themes/cover-components.mjs';
-import { buildCoverHtml } from '../lib/themes/cover-theme-compiler.mjs';
-import { loadThemeDirectory } from '../lib/themes/theme-loader.mjs';
+import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, sanitizeCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../server/shared/themes/cover-components.mjs';
+import { buildCoverHtml } from '../server/shared/themes/cover-theme-compiler.mjs';
+import { loadThemeDirectory } from '../server/shared/themes/theme-loader.mjs';
 
 const validSpec = {
   components: [
@@ -114,10 +114,10 @@ test('all builtin cover themes render every block layout', () => {
 });
 
 test('cover routes, job type and navigation are wired', () => {
-  const routes = fs.readFileSync('lib/http/routes/media-routes.mjs', 'utf8');
+  const routes = fs.readFileSync('server/platform/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('\\/cover\\/generate$'));
   assert.ok(routes.includes('\\/cover\\/local$'));
-  const jobs = fs.readFileSync('lib/jobs/ai-job-handlers.mjs', 'utf8');
+  const jobs = fs.readFileSync('server/features/batches/application/ai-job-handlers.mjs', 'utf8');
   assert.ok(jobs.includes("'cover-image'"));
   assert.ok(jobs.includes('runCoverImageJob'));
   const index = fs.readFileSync('public/index.html', 'utf8');
@@ -201,7 +201,7 @@ test('all builtin cover themes carry a valid baked spec', () => {
 });
 
 test('cover generator resolves themes deterministically from baked specs', () => {
-  const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
+  const source = fs.readFileSync('server/features/articles/application/cover-image-generator.mjs', 'utf8');
   assert.ok(source.includes('resolveWorkspaceTheme'));
   assert.ok(source.includes('coverSpecFromTheme'));
   assert.ok(!source.includes('planCoverSpec'));
@@ -210,8 +210,8 @@ test('cover generator resolves themes deterministically from baked specs', () =>
 
 
 test('runCoverImageJob daily 分支：candidateId 为 null 时走早报终稿与 daily 目录', async () => {
-  const { Store } = await import('../lib/core/store.mjs');
-  const { runCoverImageJob } = await import('../lib/llm/cover-image-generator.mjs');
+  const { Store } = await import('../server/platform/core/store.mjs');
+  const { runCoverImageJob } = await import('../server/features/articles/application/cover-image-generator.mjs');
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-daily-cover-'));
   const store = new Store(path.join(tempRoot, 'test.db'));
   try {
@@ -228,7 +228,7 @@ test('runCoverImageJob daily 分支：candidateId 为 null 时走早报终稿与
     );
     // daily-final 就位后应越过文档检查（后续渲染依赖截图技能，这里只验证到报错点不再是终稿缺失）
     store.saveDocument({ batchId: batch.id, candidateId: null, kind: 'daily-final', title: '测试早报', content: '第一段正文内容足够长，可以作为封面副标题素材。' });
-    const source = fs.readFileSync('lib/llm/cover-image-generator.mjs', 'utf8');
+    const source = fs.readFileSync('server/features/articles/application/cover-image-generator.mjs', 'utf8');
     assert.ok(source.includes("batchArticlesDir(workspaceRoot, batch), 'daily'"));
     assert.ok(source.includes("'daily-final'"));
   } finally {

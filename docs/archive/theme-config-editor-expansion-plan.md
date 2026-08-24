@@ -30,7 +30,7 @@
 | 间距 | `articlePaddingPx`、`sectionPx`、`paragraphPx`、`cardGapPx` |
 | 形状 | `radiusPx`、`borderWidthPx`、`shadow` |
 
-文章主题另有组件配方和行为字段，图文主题另有效果字段。所有配方值均由 `lib/themes/recipe-catalog.mjs` 白名单约束，不允许用户输入 CSS、选择器、HTML 或脚本。
+文章主题另有组件配方和行为字段，图文主题另有效果字段。所有配方值均由 `server/shared/themes/recipe-catalog.mjs` 白名单约束，不允许用户输入 CSS、选择器、HTML 或脚本。
 
 ### 2.2 当前 UI
 
@@ -266,11 +266,11 @@ quote: [
 预计涉及：
 
 - `themes/schema/theme.schema.json`
-- `lib/themes/recipe-catalog.mjs`
-- `lib/themes/theme-validator.mjs`
-- `lib/themes/article-theme-compiler.mjs`
-- `lib/themes/social-theme-compiler.mjs`
-- `lib/themes/user-theme-service.mjs`
+- `server/shared/themes/recipe-catalog.mjs`
+- `server/shared/themes/theme-validator.mjs`
+- `server/shared/themes/article-theme-compiler.mjs`
+- `server/shared/themes/social-theme-compiler.mjs`
+- `server/shared/themes/user-theme-service.mjs`
 - 主题 API 路由模块
 - `public/src/views/theme-manager.js`
 - `public/styles.css`

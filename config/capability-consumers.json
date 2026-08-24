@@ -6,10 +6,10 @@
       "name": "资料检索与事实补充",
       "type": "feature",
       "sourceFiles": [
-        "lib/integrations/information-search.mjs",
-        "lib/integrations/local-project-reader.mjs",
-        "lib/integrations/repository-inspector.mjs",
-        "lib/integrations/source-fetcher.mjs"
+        "server/platform/integrations/information-search.mjs",
+        "server/platform/integrations/local-project-reader.mjs",
+        "server/platform/integrations/repository-inspector.mjs",
+        "server/platform/integrations/source-fetcher.mjs"
       ],
       "dependencies": [
         {
@@ -68,7 +68,7 @@
       "name": "文章段落检索",
       "type": "feature",
       "sourceFiles": [
-        "lib/http/routes/article-routes.mjs"
+        "server/platform/http/routes/article-routes.mjs"
       ],
       "dependencies": [
         {
@@ -87,8 +87,8 @@
       "name": "公众号文章排版",
       "type": "feature",
       "sourceFiles": [
-        "lib/llm/typeset-pipeline.mjs",
-        "lib/llm/image-workflow.mjs"
+        "server/features/articles/application/typeset-pipeline.mjs",
+        "server/features/articles/application/image-workflow.mjs"
       ],
       "dependencies": [
         {
@@ -123,7 +123,7 @@
       "name": "图表预览",
       "type": "feature",
       "sourceFiles": [
-        "lib/http/routes/media-routes.mjs"
+        "server/platform/http/routes/media-routes.mjs"
       ],
       "dependencies": [
         {
@@ -150,7 +150,7 @@
       "name": "编辑室 Agent",
       "type": "agent",
       "entryPoint": "editorial",
-      "adapterModule": "lib/agent/editorial-adapter.mjs",
+      "adapterModule": "server/features/articles/application/agent/editorial-adapter.mjs",
       "capabilityConstant": "EDITORIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "editorial-room-chat"
@@ -238,7 +238,7 @@
       "name": "自主写作 Agent",
       "type": "agent",
       "entryPoint": "independent-writing",
-      "adapterModule": "lib/agent/tutorial-adapter.mjs",
+      "adapterModule": "server/features/articles/application/agent/tutorial-adapter.mjs",
       "capabilityConstant": "TUTORIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "wechat-mp-tutorial",
@@ -339,7 +339,7 @@
       "name": "自定义图文 Agent",
       "type": "agent",
       "entryPoint": "custom-social",
-      "adapterModule": "lib/agent/custom-social-adapter.mjs",
+      "adapterModule": "server/features/social-cards/application/agent/custom-social-adapter.mjs",
       "capabilityConstant": "CUSTOM_SOCIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "custom-card-storyboard"

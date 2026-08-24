@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getToolRegistry } from '../lib/tools/index.mjs';
+import { getToolRegistry, setToolConfigurationResolver } from '../server/platform/tools/index.mjs';
+
+setToolConfigurationResolver((manifest) => manifest.id === 'tavily-search'
+  ? { configured: true, status: 'test-unified', values: { apiKey: process.env.TAVILY_API_KEY || '', enabled: true, maxResults: 5 }, snapshot: { status: 'test-unified' } }
+  : { configured: true, status: 'test-unified', values: {}, snapshot: { status: 'test-unified' } });
 
 function stubFetch(payload, capture) {
   const original = globalThis.fetch;

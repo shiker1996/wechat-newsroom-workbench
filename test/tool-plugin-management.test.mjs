@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
-const registry=fs.readFileSync(new URL('../lib/tools/registry.mjs',import.meta.url),'utf8');
-const index=fs.readFileSync(new URL('../lib/tools/index.mjs',import.meta.url),'utf8');
+const routes=fs.readFileSync(new URL('../server/platform/http/routes/system-routes.mjs',import.meta.url),'utf8');
+const registry=fs.readFileSync(new URL('../server/platform/tools/registry.mjs',import.meta.url),'utf8');
+const index=fs.readFileSync(new URL('../server/platform/tools/index.mjs',import.meta.url),'utf8');
 
 test('插件管理 API 具备变更确认、即时重载和单项检查',()=>{
   assert.match(routes,/\/api\\\/system\\\/tool-plugins/);

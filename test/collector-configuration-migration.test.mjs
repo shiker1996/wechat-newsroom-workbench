@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BUILTIN_COLLECTOR_MANIFESTS } from '../lib/collectors/builtin-registry.mjs';
-import { legacyCollectorConfiguration } from '../lib/extensions/legacy-collector-configuration.mjs';
+import { BUILTIN_COLLECTOR_MANIFESTS } from '../server/platform/collectors/builtin-registry.mjs';
+import { legacyCollectorConfiguration } from '../server/platform/extensions/legacy-collector-configuration.mjs';
 
 const manifest=(id)=>BUILTIN_COLLECTOR_MANIFESTS.find((item)=>item.id===id);
 

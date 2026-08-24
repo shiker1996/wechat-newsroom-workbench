@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
-import { readCapabilityCatalog } from '../lib/tools/capability-catalog.mjs';
+import { readCapabilityCatalog } from '../server/platform/tools/capability-catalog.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 

@@ -24,7 +24,7 @@
 
 - 每个插件目录可以作为独立安装包校验和加载；
 - 插件只依赖自身文件、Node.js 内置模块、宿主运行上下文及明确声明的外部依赖；
-- 禁止插件 import 其他插件、`lib/`、`scripts/`、`skills/` 或用户主目录文件；
+- 禁止插件 import 其他插件、`server/`、`scripts/`、`skills/` 或用户主目录文件；
 - 插件间协作统一通过 capability 调用；
 - 插件代码与缓存、Profile、PID、临时文件分离；
 - 内置与第三方插件使用相同的包边界和安全门禁；
@@ -53,7 +53,7 @@ Manifest 明确声明并由宿主校验的外部运行依赖
 ```text
 plugins/<other-plugin>/**
 plugins/shared/**（最终删除）
-lib/**
+server/**
 scripts/**
 skills/**
 %USERPROFILE%/.codex/**
@@ -144,7 +144,7 @@ plugins/
     adapter.mjs
     upload.mjs
 
-lib/plugin-sdk/
+server/platform/plugin-sdk/
   contracts.mjs
   errors.mjs
   runtime-context.mjs
@@ -157,7 +157,7 @@ data/plugin-runtime/<plugin-id>/
   tmp/
 ```
 
-`lib/plugin-sdk` 是宿主实现，不允许插件通过相对路径 import。运行时通过上下文注入服务；第三方包不需要携带 SDK 源文件。
+`server/plugin-sdk` 是宿主实现，不允许插件通过相对路径 import。运行时通过上下文注入服务；第三方包不需要携带 SDK 源文件。
 
 ## 6. Manifest 扩展
 
@@ -226,10 +226,10 @@ export function createAdapter({
 
 已交付：
 
-- `lib/plugins/boundary-audit.mjs`：仓库级与包级边界扫描；
+- `server/plugins/boundary-audit.mjs`：仓库级与包级边界扫描；
 - `docs/plugin-boundary-baseline.json`：带 Phase、owner、resolution 的存量治理基线；
-- `scripts/audit-plugin-boundaries.mjs`：CI/本地审计命令；
-- `scripts/snapshot-plugin-boundary-baseline.mjs`：仅在经评审后刷新基线；
+- `scripts/quality/audit-plugin-boundaries.mjs`：CI/本地审计命令；
+- `scripts/quality/snapshot-plugin-boundary-baseline.mjs`：仅在经评审后刷新基线；
 - `test/plugin-boundary.test.mjs`：冻结现有违规并阻止新增；
 - 工具与采集器安装校验：拒绝越界 import、项目 `skills/scripts` 和用户 Codex Skill 路径。
 
@@ -334,7 +334,7 @@ export function createAdapter({
 
 任务：
 
-1. 建立 `lib/plugin-sdk` 宿主实现；
+1. 建立 `server/plugin-sdk` 宿主实现；
 2. 通过 Adapter 上下文注入结果、网络、凭据、存储、日志服务；
 3. GitHub 凭据、限流、缓存和审计收敛为宿主受控网络服务；
 4. 插件移除对 `shared/schemas`、`network-safety`、`github-client` 的源码依赖；
@@ -369,7 +369,7 @@ export function createAdapter({
 
 已交付：
 
-- `lib/plugins/distribution.mjs`：补齐分发元数据并生成独立包；
+- `server/plugins/distribution.mjs`：补齐分发元数据并生成独立包；
 - `npm run plugin:verify-distribution`：逐包执行第三方插件校验；
 - `test/plugin-isolated-install.test.mjs`：覆盖 15 个内置插件的隔离加载、安装、启停和卸载；
 - 采集插件升级采用原子替换和版本归档，并支持版本列表与回滚；
@@ -445,7 +445,7 @@ export function createAdapter({
 
 - `plugins/<id>` 之间不存在源码 import；
 - `plugins/shared` 已删除；
-- 插件不引用项目 `lib/`、`scripts/`、`skills/` 和用户目录；
+- 插件不引用项目 `server/`、`scripts/`、`skills/` 和用户目录；
 - 插件间协作全部通过能力契约；
 - 插件运行数据全部位于 `data/plugin-runtime/<id>`；
 - 所有内置插件可以按第三方插件流程独立安装和运行；

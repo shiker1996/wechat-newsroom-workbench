@@ -452,10 +452,10 @@ mode: expand | compress | restructure
 ### 9.1 新增模块
 
 ```text
-lib/rendering/social-card-capacity.mjs
-lib/rendering/social-card-reflow.mjs
-lib/rendering/social-card-repair-policy.mjs
-lib/rendering/social-card-plan-contract.mjs
+server/shared/rendering/social-card-capacity.mjs
+server/shared/rendering/social-card-reflow.mjs
+server/shared/rendering/social-card-repair-policy.mjs
+server/shared/rendering/social-card-plan-contract.mjs
 ```
 
 职责：
@@ -468,11 +468,11 @@ lib/rendering/social-card-plan-contract.mjs
 ### 9.2 修改模块
 
 ```text
-lib/rendering/social-card-template-registry.mjs
-lib/rendering/social-card-template-resolver.mjs
-lib/rendering/social-card-plan.mjs
-lib/llm/social-card-pipeline.mjs
-lib/http/routes/social-card-routes.mjs
+server/shared/rendering/social-card-template-registry.mjs
+server/shared/rendering/social-card-template-resolver.mjs
+server/shared/rendering/social-card-plan.mjs
+server/features/social-cards/application/social-card-pipeline.mjs
+server/platform/http/routes/social-card-routes.mjs
 public/src/views/social-editor.js
 public/styles.css
 ```
@@ -518,7 +518,7 @@ public/styles.css
 #### 阶段 1 实施结果（2026-08-21）
 
 - 五个现有模板包的十个页面角色均增加阶段 1 容量基线，包含结构预算、估算正文高度、标题行数、正文字符量、列表项行数、密度区间和可拆分内容块类型；
-- 新增 `lib/rendering/social-card-capacity.mjs`，将模板包与当前主题 Token 合并为 resolved capacity profile；主题的字号、行高、外层留白、边框和阴影会影响记录中的估算容量；
+- 新增 `server/shared/rendering/social-card-capacity.mjs`，将模板包与当前主题 Token 合并为 resolved capacity profile；主题的字号、行高、外层留白、边框和阴影会影响记录中的估算容量；
 - `getSocialCardTemplateCapabilities()` 返回 `capacityProfileVersion`、`capacityProfile` 以及逐角色容量信息；现有渲染、预算裁剪和布局修复行为保持不变；
 - 故事板主题快照升级为 `schemaVersion: 2`，记录 `capacityProfileVersion`、`capacityHash` 和完整 resolved profile；旧快照仍按历史兼容逻辑读取；
 - Social 图文产物的 `social-theme-snapshot.json` 和 `card-plan.json` 记录模板容量 profile，便于后续阶段执行预检和重排；
@@ -541,7 +541,7 @@ public/styles.css
 
 #### 阶段 2 实施结果（2026-08-21）
 
-- 新增 `lib/rendering/social-card-reflow.mjs`，实现 `compileTemplateAwareCardPlan()` 和确定性页面体量预检；预检合并模板角色容量与主题 Token 结果，估算标题、内容块、列表/结构化条目的占用高度。
+- 新增 `server/shared/rendering/social-card-reflow.mjs`，实现 `compileTemplateAwareCardPlan()` 和确定性页面体量预检；预检合并模板角色容量与主题 Token 结果，估算标题、内容块、列表/结构化条目的占用高度。
 - Social 生产链路在模板渲染前执行预检：列表、步骤、时间线、场景和对比表按完整成员拆分；普通文本、说明块和代码块按明确段落、句子或命令组拆分；指标卡和 CTA 等不可拆原子块不会被静默切掉。
 - 续页会保留原页面角色、事实、内容块标题和模板上下文，写入 `page_group_id`、`continuation_of`、`continuation_index`，并为续页标题追加“（续）”标记；封面和结尾页顺序保持稳定。
 - 生成目录新增 `card-plan-original.json`（原始故事板）和 `card-plan-reflow.json`（预检、操作、警告与未解决项），最终 `card-plan.json` 同时记录模板容量和重排摘要，便于审计与回滚。
@@ -565,7 +565,7 @@ public/styles.css
 
 #### 阶段 3 实施结果（2026-08-21）
 
-- 新增 `lib/rendering/social-card-repair-policy.mjs`，统一识别结构性问题（溢出、裁切、横向溢出、字号过小和页面骨架异常）与轻量密度问题。
+- 新增 `server/shared/rendering/social-card-repair-policy.mjs`，统一识别结构性问题（溢出、裁切、横向溢出、字号过小和页面骨架异常）与轻量密度问题。
 - 浏览器审计发现结构性问题后，先以更保守的容量 profile 执行一次确定性重排；仍未解决时才调用一次受控 AI `split_page` 协议，禁止模型返回完整故事板、HTML 或 CSS。
 - 程序会校验拆页操作的页面角色、可拆内容块、条目索引完整性、重复/漏项、页面上限以及封面/结尾页稳定性；失败或无变化时立即停止，不再继续无效文字修复。
 - 生成管线记录结构重排次数和 `reflow.history`，并把结构修复操作写入 `card-plan.json`；结构性问题不会再进入原有的纯扩写/缩写循环。

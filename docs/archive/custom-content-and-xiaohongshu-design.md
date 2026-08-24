@@ -2,8 +2,8 @@
 
 > 状态：已拍板（2026-07-25），第一批已实施完成（2026-07-25）
 > 拍板结论：决策 2 捆绑设计；决策 3 复用 `repository_fact_sheets` 表（方案 A）；决策 4 共用执行器、facts/GATE 分流（方案 A）；决策 5 首批教程、清单、观点三类（方案 A）；决策 6 来源等级进数据结构 + GATE 检查（方案 A）
-> 历史实施记录：当时使用 `skills/xiaohongshu-article-generator/references/custom-cards.md`；现已拆分为 `skills/custom-card-storyboard/` 与生成交付阶段的 `references/copy-custom.md`。其余记录包括 `lib/domain/custom-fact-builder.mjs`、`lib/domain/social-card-gate.mjs`、自定义创建路由和图文渲染链路。
-> 追加（2026-07-25）：创建入口改为对话式策划——`lib/llm/custom-social-chat.mjs` + 流式路由 `POST /api/batches/:id/custom-social-chat/stream`（无状态，草稿与历史由前端全量传入），AI 策划编辑逐轮把方案回填进创建表单（`formUpdates` 经 `sanitizeFormUpdates` 白名单清洗），表单始终可手改，创建仍走原有路由与门禁；导航拆分为「工具图文」/「自定义图文」两个入口共用 `#view-social-editor`
+> 历史实施记录：当时使用 `skills/xiaohongshu-article-generator/references/custom-cards.md`；现已拆分为 `skills/custom-card-storyboard/` 与生成交付阶段的 `references/copy-custom.md`。其余记录包括 `server/domain/custom-fact-builder.mjs`、`server/domain/social-card-gate.mjs`、自定义创建路由和图文渲染链路。
+> 追加（2026-07-25）：创建入口改为对话式策划——`server/platform/llm/custom-social-chat.mjs` + 流式路由 `POST /api/batches/:id/custom-social-chat/stream`（无状态，草稿与历史由前端全量传入），AI 策划编辑逐轮把方案回填进创建表单（`formUpdates` 经 `sanitizeFormUpdates` 白名单清洗），表单始终可手改，创建仍走原有路由与门禁；导航拆分为「工具图文」/「自定义图文」两个入口共用 `#view-social-editor`
 > 建立日期：2026-07-25
 > 配套文档：[可选功能扩展 TODO](./optional-feature-todos.md)（第 1、6 项）、[实施路线图](./optional-feature-implementation-roadmap.md)（第 4、6 节）
 > 说明：本文档基于 2026-07-25 对当前代码的实际摸底（文件与行号为实施起点，开发时以最新代码为准）。本文只做设计评审，逐项拍板后才进入开发。
@@ -18,24 +18,24 @@
 
 ### 入口与候选
 
-- 非 GitHub URL 在 `lib/integrations/repository-inspector.mjs:47` 直接抛错；非仓库图文当前完全走不通。
-- 手工候选唯一入口是 `store.addManualHotspot`（`lib/core/store.mjs:565`），server 未暴露路由（`API.md:55` 的文档滞后于实现）。
+- 非 GitHub URL 在 `server/platform/integrations/repository-inspector.mjs:47` 直接抛错；非仓库图文当前完全走不通。
+- 手工候选唯一入口是 `store.addManualHotspot`（`server/platform/core/store.mjs:565`），server 未暴露路由（`API.md:55` 的文档滞后于实现）。
 - 唯一现成的"非仓库图文"路径是突发专题：`POST /api/batches/breaking` → breaking-analysis → 建 `social_cards` 轨道，`output_mode='wechat-event-cards'`。
 
 ### 执行器
 
-- 六阶段契约在 `lib/llm/social-card-pipeline.mjs:12-19`（facts → planning → generation → layout-audit → screenshots → delivery-gate）。
-- `contentType` 分流点在 `lib/llm/social-card-pipeline.mjs:143`：读 `candidate_tracks.output_mode`，`'wechat-event-cards'` → event，其余 → repository。
+- 六阶段契约在 `server/platform/llm/social-card-pipeline.mjs:12-19`（facts → planning → generation → layout-audit → screenshots → delivery-gate）。
+- `contentType` 分流点在 `server/platform/llm/social-card-pipeline.mjs:143`：读 `candidate_tracks.output_mode`，`'wechat-event-cards'` → event，其余 → repository。
 - `output_mode` 实际取值只有两个：`'wechat-tool-cards'`（默认）与 `'wechat-event-cards'`（突发）；`'xiaohongshu'` 从未写入数据库。
 
 ### GATE 与 prompt
 
-- CARD GATE：`lib/domain/social-card-gate.mjs`，仓库型 10 项（:1-15）、事件型 8 项（:17-32），在 pipeline facts 阶段前执行（:146-148）。无自定义内容类型。
+- CARD GATE：`server/domain/social-card-gate.mjs`，仓库型 10 项（:1-15）、事件型 8 项（:17-32），在 pipeline facts 阶段前执行（:146-148）。无自定义内容类型。
 - 故事板 prompt 内联在 `server.mjs:585-592`（event / repository 两套，contentType 切换），前缀是 `loadSkillBundle('xiaohongshu-article-generator')`。
 
 ### 渲染与交付
 
-- `renderStoryboardHtml`（`lib/llm/social-card-pipeline.mjs:72-102`）14 套主题 CSS 硬编码；`channel_mode` 不进渲染函数。
+- `renderStoryboardHtml`（`server/platform/llm/social-card-pipeline.mjs:72-102`）14 套主题 CSS 硬编码；`channel_mode` 不进渲染函数。
 - 当时 `skills/xiaohongshu-article-generator/references/` 只有 `layout-contract.md`、`wechat-event-cards.md`、`wechat-tool-cards.md`，无小红书专属 reference；该问题现已通过独立故事板技能与按内容类型加载的 `copy-*.md` 收敛。
 - 无独立 social_cards 表；图文产物落盘 `social-cards/<batch>-<candidate>/` 并登记 artifacts 表。
 
@@ -45,7 +45,7 @@
 
 ### 事实基座存储
 
-- `repository_fact_sheets` 表（`lib/core/store.mjs:215-225`）：`candidate_row_id` 主键 + `data_json` 自由 JSON 字段。GATE 只读 `data_json` 里的业务字段，`repository`/`source_url` 两列不参与校验——复用该表容纳自定义事实基座零迁移。
+- `repository_fact_sheets` 表（`server/platform/core/store.mjs:215-225`）：`candidate_row_id` 主键 + `data_json` 自由 JSON 字段。GATE 只读 `data_json` 里的业务字段，`repository`/`source_url` 两列不参与校验——复用该表容纳自定义事实基座零迁移。
 
 ## 3. 决策点（逐项拍板）
 
@@ -92,8 +92,8 @@
 ## 4. 实施改动清单草案（拍板后细化）
 
 1. **入口**：图文选题池增加"创建自定义图文"（主题、内容类型、目标受众、核心观点、素材链接、作者体验、限制说明、期望页数）；新增 server 路由建手工候选 + `social_cards` 轨道（`output_mode` 按渠道与类型写入）；顺带补 `API.md:55` 滞后的手工候选路由文档。
-2. **事实基座**：新增 `lib/domain/custom-fact-builder.mjs`：表单字段 + 素材 URL（走 `lib/integrations/source-fetcher.mjs` 抓取）组装为事实基座，写 `repository_fact_sheets`（`data_json` 带 `kind:'custom'`、`content_type`、`source_level` 标注）并落盘。
-3. **GATE**：`lib/domain/social-card-gate.mjs` 新增 `evaluateCustomCardGate`，按内容类型（教程/清单/观点）出检查项；公共项含来源等级完整性检查。
+2. **事实基座**：新增 `server/domain/custom-fact-builder.mjs`：表单字段 + 素材 URL（走 `server/platform/integrations/source-fetcher.mjs` 抓取）组装为事实基座，写 `repository_fact_sheets`（`data_json` 带 `kind:'custom'`、`content_type`、`source_level` 标注）并落盘。
+3. **GATE**：`server/domain/social-card-gate.mjs` 新增 `evaluateCustomCardGate`，按内容类型（教程/清单/观点）出检查项；公共项含来源等级完整性检查。
 4. **故事板 prompt**：`server.mjs:585-592` 增加 custom 分支（类型化模板 + 渠道约束），前缀 skill bundle 同步。
 5. **小红书渲染**：`renderStoryboardHtml` 引入 `channel_mode` 分支（页型、页脚、标签页结构）；`skills/xiaohongshu-article-generator/references/` 新增小红书专属 reference。
 6. **前端**：`public/src/views/social-editor.js` 暴露 output_mode / channel 选择；选题池区分仓库候选与自定义候选。

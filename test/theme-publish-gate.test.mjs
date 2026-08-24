@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditThemeForPublish, assertThemePublishable } from '../lib/themes/theme-publish-gate.mjs';
-import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { auditThemeForPublish, assertThemePublishable } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { articleThemeDefinition } from '../server/shared/themes/article-theme-compiler.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 
 function userCopy(definition,id){const value=structuredClone(definition);delete value.hash;delete value.file;value.id=id;value.source='user';value.status='draft';return value;}
 

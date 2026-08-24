@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createZip } from '../lib/artifacts/zip-bundle.mjs';
-import { validateWorkbenchBackup } from '../lib/artifacts/backup-archive.mjs';
-import { APP_VERSION } from '../lib/version.mjs';
+import { createZip } from '../server/platform/artifacts/zip-bundle.mjs';
+import { validateWorkbenchBackup } from '../server/platform/artifacts/backup-archive.mjs';
+import { APP_VERSION } from '../server/platform/version.mjs';
 
 test('工作台备份包校验清单、大小与 SHA-256', () => {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'backup-archive-'));

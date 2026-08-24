@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import { skipBrowser } from './helpers/tiers.mjs';
 import os from 'node:os';
 import path from 'node:path';
-import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput, defaultTypesetTheme, htmlPreservesStructure } from '../lib/llm/typeset-pipeline.mjs';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
+import { markdownToHtml, runTypesetPipeline, TYPESET_STAGE_CONTRACT, enforceWechatFlowLayout, extractHtmlModelOutput, defaultTypesetTheme, htmlPreservesStructure } from '../server/features/articles/application/typeset-pipeline.mjs';
+import { loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 
 test('项目排版总技能声明与执行器使用相同的六阶段契约', () => {
   const bundle = loadSkillBundle({ workspaceRoot:process.cwd(), skillName:'wechat-article-typeset' });

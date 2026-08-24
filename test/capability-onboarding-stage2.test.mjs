@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { deriveAgentEntryCapabilities } from '../lib/agent/entry-capabilities.mjs';
-import { isResourceAdaptedCapability, RESOURCE_ADAPTED_CAPABILITIES } from '../lib/agent/resource-adaptation.mjs';
-import { checkConsumerCapabilityGates } from '../scripts/check-consumer-capability-gates.mjs';
-import { EDITORIAL_AGENT_CAPABILITIES } from '../lib/agent/editorial-adapter.mjs';
-import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../lib/agent/custom-social-adapter.mjs';
+import { deriveAgentEntryCapabilities } from '../server/platform/agent/entry-capabilities.mjs';
+import { isResourceAdaptedCapability, RESOURCE_ADAPTED_CAPABILITIES } from '../server/platform/agent/resource-adaptation.mjs';
+import { checkConsumerCapabilityGates } from '../scripts/quality/check-consumer-capability-gates.mjs';
+import { EDITORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/editorial-adapter.mjs';
+import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../server/features/social-cards/application/agent/custom-social-adapter.mjs';
 
 // 阶段 2 机制二「Agent 目录登记驱动」（docs/design/capability-onboarding-configurability-plan.md §4、§7 阶段 2）：
 // 目录从登记派生；常量=适配代码上界；纯参数能力登记即生效；资源类能力命中 resourceKind

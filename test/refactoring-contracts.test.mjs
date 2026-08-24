@@ -3,23 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { AiJobManager } from '../lib/llm/ai-job-manager.mjs';
-import { handleModelRoutes } from '../lib/http/routes/model-routes.mjs';
-import { handleContentRoutes } from '../lib/http/routes/content-routes.mjs';
-import { AI_JOB_TYPES, createAiJobHandlers } from '../lib/jobs/ai-job-handlers.mjs';
-import { applyWorkbenchSchema, runDatabaseMigrations } from '../lib/persistence/migrations.mjs';
-import { extractHtmlModelOutput as extractPureHtml, defaultTypesetTheme as selectPureTheme } from '../lib/rendering/typeset-output.mjs';
-import { budgetCardPlan } from '../lib/rendering/social-card-plan.mjs';
-import { resolveCardLayoutDecision as resolvePureLayout } from '../lib/rendering/social-card-layout.mjs';
-import { inferCardPageRole as inferPureRole, stableCardCompositionSeed as pureCompositionSeed } from '../lib/rendering/social-card-role.mjs';
-import { semanticCardColumns } from '../lib/rendering/social-card-columns.mjs';
-import { normalizeCardComposition as normalizePureComposition } from '../lib/rendering/social-card-composition.mjs';
-import { cardPlanRepairStructureIssues as pureRepairIssues, sanitizeCardPlan as sanitizePurePlan } from '../lib/rendering/storyboard-content.mjs';
-import { numberedTextSteps, renderStoryboardBlock } from '../lib/rendering/storyboard-html-content.mjs';
-import { renderStoryboardSections } from '../lib/rendering/storyboard-page-renderer.mjs';
-import { renderStoryboardDocument } from '../lib/rendering/storyboard-document-renderer.mjs';
-import { markdownToHtml as renderPureMarkdown, normalizeDesignTokens as normalizePureDesignTokens } from '../lib/rendering/markdown-renderer.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { AiJobManager } from '../server/platform/jobs/ai-job-manager.mjs';
+import { handleModelRoutes } from '../server/platform/http/routes/model-routes.mjs';
+import { handleContentRoutes } from '../server/platform/http/routes/content-routes.mjs';
+import { AI_JOB_TYPES, createAiJobHandlers } from '../server/features/batches/application/ai-job-handlers.mjs';
+import { applyWorkbenchSchema, runDatabaseMigrations } from '../server/platform/persistence/migrations.mjs';
+import { extractHtmlModelOutput as extractPureHtml, defaultTypesetTheme as selectPureTheme } from '../server/shared/rendering/typeset-output.mjs';
+import { budgetCardPlan } from '../server/shared/rendering/social-card-plan.mjs';
+import { resolveCardLayoutDecision as resolvePureLayout } from '../server/shared/rendering/social-card-layout.mjs';
+import { inferCardPageRole as inferPureRole, stableCardCompositionSeed as pureCompositionSeed } from '../server/shared/rendering/social-card-role.mjs';
+import { semanticCardColumns } from '../server/shared/rendering/social-card-columns.mjs';
+import { normalizeCardComposition as normalizePureComposition } from '../server/shared/rendering/social-card-composition.mjs';
+import { cardPlanRepairStructureIssues as pureRepairIssues, sanitizeCardPlan as sanitizePurePlan } from '../server/shared/rendering/storyboard-content.mjs';
+import { numberedTextSteps, renderStoryboardBlock } from '../server/shared/rendering/storyboard-html-content.mjs';
+import { renderStoryboardSections } from '../server/shared/rendering/storyboard-page-renderer.mjs';
+import { renderStoryboardDocument } from '../server/shared/rendering/storyboard-document-renderer.mjs';
+import { markdownToHtml as renderPureMarkdown, normalizeDesignTokens as normalizePureDesignTokens } from '../server/shared/rendering/markdown-renderer.mjs';
 import { lineDiff as editorLineDiff, markdownHeadings as editorMarkdownHeadings, qualityIssues as editorQualityIssues, visibleChars as editorVisibleChars, writingStatistics as editorWritingStatistics } from '../public/src/views/editor-document-model.js';
 import { candidateMode as socialCandidateMode, cardBlockEditorHtml as socialCardBlockEditorHtml, isStructuredCardBlockType, socialFactsHtml, socialScoreView } from '../public/src/views/social-editor-model.js';
 
@@ -173,6 +173,9 @@ test('refactoring baseline: supported AI job types are accepted and persisted', 
       aiJobs: { maxConcurrent: 20 },
       rsshub: { maxAgeHours: 168 },
       workspaceRoot: ctx.root,
+    }, {
+      handlers: new Map(AI_JOB_TYPES.map((type) => [type, async () => ({})])),
+      batchLevelTypes: new Set(['tag','retag','event-cards','research','breaking-analysis','auto','daily']),
     });
     manager.run = (job) => new Promise((resolve) => {
       setImmediate(() => {

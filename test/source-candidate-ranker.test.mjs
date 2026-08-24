@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rankSourceCandidates } from '../lib/llm/source-candidate-ranker.mjs';
+import { rankSourceCandidates } from '../server/features/collection/llm/source-candidate-ranker.mjs';
 
 const candidates=[
   {name:'栏目导航',reason:'导航链接',validation:{matched:8,itemCount:8},preview:[{title:'新闻发布'}]},

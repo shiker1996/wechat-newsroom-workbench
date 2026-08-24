@@ -4,12 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { Store } from '../lib/core/store.mjs';
-import { tagBatch } from '../lib/llm/tasks.mjs';
-import { ensureBatchEventCards } from '../lib/llm/research-pipeline.mjs';
-import { retryPipelineFailure } from '../lib/jobs/pipeline-failure-retry.mjs';
-import { skipPipelineFailure, reopenPipelineFailure } from '../lib/jobs/pipeline-failure-decision.mjs';
-import { classifyResearchFailure, recordResearchFailure } from '../lib/jobs/research-failure.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { tagBatch } from '../server/features/research/llm/tasks.mjs';
+import { ensureBatchEventCards } from '../server/features/research/application/research-pipeline.mjs';
+import { retryPipelineFailure, skipPipelineFailure, reopenPipelineFailure } from '../server/features/batches/index.mjs';
+import { classifyResearchFailure, recordResearchFailure } from '../server/features/research/index.mjs';
 
 function workspace(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'pipeline-failures-'));

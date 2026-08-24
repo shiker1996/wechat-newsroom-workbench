@@ -7,45 +7,45 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { backup as backupSqlite } from 'node:sqlite';
-import { Store } from './lib/core/store.mjs';
-import { loadConfig } from './lib/core/config.mjs';
-import { isInsideRoots } from './lib/artifacts/artifact-indexer.mjs';
-import { JobManager } from './lib/jobs/job-manager.mjs';
+import { Store } from './server/platform/core/store.mjs';
+import { loadConfig } from './server/platform/core/config.mjs';
+import { isInsideRoots } from './server/platform/artifacts/artifact-indexer.mjs';
+import { CollectionJobManager } from './server/features/collection/index.mjs';
 import { ensureStarted } from './plugins/rsshub/collector.mjs';
-import { ModelGateway } from './lib/llm/gateway.mjs';
-import { draftArticle } from './lib/llm/tasks.mjs';
-import { AiJobManager } from './lib/llm/ai-job-manager.mjs';
-import { fetchCandidateSource } from './lib/integrations/source-fetcher.mjs';
+import { ModelGateway } from './server/platform/llm/gateway.mjs';
+import { draftArticle } from './server/features/research/llm/tasks.mjs';
+import { AiJobManager } from './server/platform/jobs/ai-job-manager.mjs';
+import { BATCH_LEVEL_AI_JOB_TYPES, createAiJobHandlers } from './server/features/batches/index.mjs';
+import { recordResearchFailure } from './server/features/research/index.mjs';
+import { fetchCandidateSource } from './server/platform/integrations/source-fetcher.mjs';
 import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
-  planImagePlaceholders, imageManifestFile } from './lib/llm/image-workflow.mjs';
-import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './lib/integrations/repository-inspector.mjs';
-import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from './lib/domain/social-card-gate.mjs';
-import { eventGroupsForCandidate, resolveEventAnalysis } from './lib/domain/event-fact-base.mjs';
-import { loadSkillBundle, setSkillConfigurationResolver } from './lib/llm/skill-runtime.mjs';
-import { createZip } from './lib/artifacts/zip-bundle.mjs';
-import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './lib/core/workspace-paths.mjs';
-import { getBatchDeleteImpact, deleteBatchPermanently } from './lib/domain/batch-deletion.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, describeCardLayouts, normalizeCardComposition } from './lib/llm/social-card-pipeline.mjs';
-import { analyzeVisualComplexity, planArticleVisuals } from './lib/llm/visual-planner.mjs';
-import { defaultTypesetTheme, TYPESET_THEMES } from './lib/llm/typeset-pipeline.mjs';
-import { handleContentRoutes } from './lib/http/routes/content-routes.mjs';
-import { handleModelRoutes } from './lib/http/routes/model-routes.mjs';
-import { handleSystemRoutes } from './lib/http/routes/system-routes.mjs';
-import { handleMediaRoutes } from './lib/http/routes/media-routes.mjs';
-import { handleArticleRoutes } from './lib/http/routes/article-routes.mjs';
-import { handleSocialCardRoutes } from './lib/http/routes/social-card-routes.mjs';
-import { handleThemeRoutes } from './lib/http/routes/theme-routes.mjs';
-import { handleBatchRoutes } from './lib/http/routes/batch-routes.mjs';
-import { handleCandidateRoutes } from './lib/http/routes/candidate-routes.mjs';
-import { handleTaskRoutes } from './lib/http/routes/task-routes.mjs';
-import { createRouteHelpers, writeUtf8 } from './lib/http/route-helpers.mjs';
-import { setToolConfigurationResolver } from './lib/tools/index.mjs';
-import { ExtensionConfigurationService } from './lib/extensions/configuration-service.mjs';
-import { modelProviderManifest } from './lib/extensions/model-provider-configuration.mjs';
-import { seedDemoData } from './lib/demo/seed.mjs';
-import { createLocalSecurity } from './lib/http/local-security.mjs';
-import { APP_VERSION } from './lib/version.mjs';
-import { acquireInstanceLock } from './lib/core/instance-lock.mjs';
+  planImagePlaceholders, imageManifestFile } from './server/features/articles/index.mjs';
+import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './server/platform/integrations/repository-inspector.mjs';
+import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate, eventGroupsForCandidate, resolveEventAnalysis } from './server/features/social-cards/index.mjs';
+import { loadSkillBundle, setSkillConfigurationResolver } from './server/platform/llm/skill-runtime.mjs';
+import { createZip } from './server/platform/artifacts/zip-bundle.mjs';
+import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './server/platform/core/workspace-paths.mjs';
+import { getBatchDeleteImpact, deleteBatchPermanently } from './server/features/batches/index.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, describeCardLayouts, normalizeCardComposition } from './server/features/social-cards/index.mjs';
+import { analyzeVisualComplexity, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES } from './server/features/articles/index.mjs';
+import { handleContentRoutes } from './server/platform/http/routes/content-routes.mjs';
+import { handleModelRoutes } from './server/platform/http/routes/model-routes.mjs';
+import { handleSystemRoutes } from './server/platform/http/routes/system-routes.mjs';
+import { handleMediaRoutes } from './server/platform/http/routes/media-routes.mjs';
+import { handleArticleRoutes } from './server/platform/http/routes/article-routes.mjs';
+import { handleSocialCardRoutes } from './server/platform/http/routes/social-card-routes.mjs';
+import { handleThemeRoutes } from './server/platform/http/routes/theme-routes.mjs';
+import { handleBatchRoutes } from './server/platform/http/routes/batch-routes.mjs';
+import { handleCandidateRoutes } from './server/platform/http/routes/candidate-routes.mjs';
+import { handleTaskRoutes } from './server/platform/http/routes/task-routes.mjs';
+import { createRouteHelpers, writeUtf8 } from './server/platform/http/route-helpers.mjs';
+import { setToolConfigurationResolver } from './server/platform/tools/index.mjs';
+import { ExtensionConfigurationService } from './server/platform/extensions/configuration-service.mjs';
+import { modelProviderManifest } from './server/platform/extensions/model-provider-configuration.mjs';
+import { seedDemoData } from './server/platform/demo/seed.mjs';
+import { createLocalSecurity } from './server/platform/http/local-security.mjs';
+import { APP_VERSION } from './server/platform/version.mjs';
+import { acquireInstanceLock } from './server/platform/core/instance-lock.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const config = loadConfig(root);
@@ -64,10 +64,16 @@ if (demo) {
 }
 const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
-const jobs = new JobManager(store, config, () => models);
+const jobs = new CollectionJobManager(store, config, () => models);
 
 const models = new ModelGateway(config, store,(id,provider)=>extensionConfigurationService.resolve({extensionType:'model-provider',extensionId:id,manifest:modelProviderManifest(id,provider)}));
-const aiJobs = new AiJobManager(store, models, config);
+const aiJobs = new AiJobManager(store, models, config, {
+  batchLevelTypes: BATCH_LEVEL_AI_JOB_TYPES,
+  handlers: createAiJobHandlers({ store, gateway: models, config, log: (job, message) => aiJobs.log(job, message) }),
+  onFailure: ({ job, error }) => {
+    if (job.type === 'research' || (job.type === 'auto' && job.phase === 'research')) recordResearchFailure({ store, job, error });
+  },
+});
 const artifactRoots = [config.workspaceRoot, ...config.contentRoots];
 const publicRoot = path.join(root, 'public');
 const execFileAsync = promisify(execFile);

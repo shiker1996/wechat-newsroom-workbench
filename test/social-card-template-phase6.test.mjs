@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { getSocialCardTemplatePack } from '../lib/rendering/social-card-template-registry.mjs';
-import { createSocialCardStoryboardThemeSnapshot, resolveSocialCardStoryboardThemeState } from '../lib/rendering/social-card-template-resolver.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { getSocialCardTemplatePack } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { createSocialCardStoryboardThemeSnapshot, resolveSocialCardStoryboardThemeState } from '../server/shared/rendering/social-card-template-resolver.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 const BATCH_B_THEMES = [
   ['ice-blue', '冰川冷调'],
@@ -84,6 +84,18 @@ test('clean-v1 按语义构图结果关闭不均衡的强制双栏', () => {
   });
   assert.match(html, /skeleton-editorial-split[^\"]*comp-cols-single/);
   assert.match(html, /skeleton-editorial-split\.comp-cols-split-even/);
+});
+
+test('clean-v1 stacked 骨架将双列构图交给内容块容器承接', () => {
+  const html = renderStoryboardHtml({
+    topic: '堆叠骨架双列适配', visualStyle: 'ice-blue', compositionMode: 'smart',
+    pages: [{ kind: 'capability', role: 'feature', title: '两种路径', composition: { id: 'feature-stack', columns: 'split-even', flow: 'alternate' }, content_blocks: [
+      { type: 'text', title: '云端', content: '托管代理运行在云端。' },
+      { type: 'text', title: '本地', content: '本地代理保留密钥控制权。' },
+    ] }],
+  });
+  assert.match(html, /skeleton-stacked[^\"]*comp-cols-split-even/);
+  assert.match(html, /skeleton-stacked\.composition-smart[^}]*\.clean-block-stack\{grid-column:1\/-1;grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
 });
 
 test('Phase 6 批次 B 仍只作用于 social 主题', () => {

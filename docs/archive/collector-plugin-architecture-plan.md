@@ -13,7 +13,7 @@
 - RSSHub 与直连 Feed：`plugins/rsshub/collector.mjs` 读取统一采集源与 Collector 配置。
 - GitHub：Trending 通过 RSSHub，增长发现和兴趣查询通过 GitHub API 与现有发现逻辑完成。
 
-批次采集由 `lib/jobs/job-manager.mjs` 直接导入并调用具体采集器。订阅源页面目前只管理 RSSHub、X、直连 Feed 和只读 GitHub 入口，Reddit 分区尚未纳入统一管理。
+批次采集由 `server/platform/jobs/job-manager.mjs` 直接导入并调用具体采集器。订阅源页面目前只管理 RSSHub、X、直连 Feed 和只读 GitHub 入口，Reddit 分区尚未纳入统一管理。
 
 这种实现对少量固定来源很直接，但每新增一种采集方式，通常需要同时修改：
 

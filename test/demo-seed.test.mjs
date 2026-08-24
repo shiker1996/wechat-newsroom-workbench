@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { seedDemoData } from '../lib/demo/seed.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { seedDemoData } from '../server/platform/demo/seed.mjs';
 
 function setup() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-demo-seed-'));

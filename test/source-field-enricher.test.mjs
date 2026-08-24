@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enrichSourceCandidateFields } from '../lib/llm/source-field-enricher.mjs';
+import { enrichSourceCandidateFields } from '../server/features/collection/llm/source-field-enricher.mjs';
 
 const candidate={name:'新闻',config:{itemSelector:'article',titleSelector:'h2',linkSelector:'a'},preview:[],enrichmentOptions:[{selector:'p.summary',tag:'p',coverage:1,samples:['摘要一','摘要二']},{selector:'time',tag:'time',attribute:'datetime',coverage:1,samples:['2026-01-01','2026-01-02']}]};
 

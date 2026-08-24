@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveEventShadow, structuredMatch, buildEventTitle } from '../lib/domain/event-resolution-shadow.mjs';
+import { resolveEventShadow, structuredMatch, buildEventTitle } from '../server/features/research/index.mjs';
 
 function hotspot(id, title, { who, what, actionType = '争议回应', object = '', keywords = [], date = '2026-08-23' } = {}) {
   const eventKey = `${who}|${what}`;

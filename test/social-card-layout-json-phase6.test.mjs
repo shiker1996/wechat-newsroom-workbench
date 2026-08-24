@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanCardPlanJson } from '../lib/llm/social-card-pipeline.mjs';
+import { cleanCardPlanJson } from '../server/features/social-cards/application/social-card-pipeline.mjs';
 
 test('布局修复 JSON 清洗支持代码围栏、尾逗号和字符串内真实换行', () => {
   const value = cleanCardPlanJson('```json\n[{"kind":"content","content_blocks":[{"type":"text","content":"第一行\n第二行",},],}]\n```');

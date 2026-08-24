@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider } from '../lib/integrations/model-provider-settings.mjs';
+import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider } from '../server/platform/integrations/model-provider-settings.mjs';
 
 test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   const result=normalizeProviderInput({label:'自定义',baseUrl:'https://api.example.com/v1/',model:'model-a'});
@@ -32,7 +32,7 @@ test('模型配置分别持久化非敏感参数和 API Key，并即时更新运
 });
 
 test('网关接受 Base URL 或完整 chat completions 地址',()=>{
-  const source=fs.readFileSync(new URL('../lib/llm/gateway.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../server/platform/llm/gateway.mjs',import.meta.url),'utf8');
   assert.ok(source.includes('/\\/chat\\/completions$/i.test(value)'));
 });
 
@@ -56,9 +56,9 @@ test('模型统一接入统一配置资源，模型运行只负责诊断与观�
   const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
   const modelsView=fs.readFileSync(new URL('../public/src/views/models.js',import.meta.url),'utf8');
   const systemView=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
-  const modelRoutes=fs.readFileSync(new URL('../lib/http/routes/model-routes.mjs',import.meta.url),'utf8');
-  const systemRoutes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
-  const settingsModule=fs.readFileSync(new URL('../lib/integrations/model-provider-settings.mjs',import.meta.url),'utf8');
+  const modelRoutes=fs.readFileSync(new URL('../server/platform/http/routes/model-routes.mjs',import.meta.url),'utf8');
+  const systemRoutes=fs.readFileSync(new URL('../server/platform/http/routes/system-routes.mjs',import.meta.url),'utf8');
+  const settingsModule=fs.readFileSync(new URL('../server/platform/integrations/model-provider-settings.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(html,/id="model-base-url"|id="model-config-form"/);
   assert.match(html,/id="add-model-provider"/);
   assert.doesNotMatch(html,/data-config-tab="models"/);

@@ -6,7 +6,7 @@ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
 const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8');
 const daily=fs.readFileSync(new URL('../public/src/views/daily.js',import.meta.url),'utf8');
-const server=`${fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8')}\n${fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs',import.meta.url),'utf8')}`;
+const server=`${fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8')}\n${fs.readFileSync(new URL('../server/platform/http/routes/task-routes.mjs',import.meta.url),'utf8')}`;
 
 test('article creation entries expose and submit compatible writer selections',()=>{
   assert.match(html,/id="editorial-writer-skill"/);
@@ -57,7 +57,7 @@ test('批次早报展示最近生成记录，失败可重试、执行中可续�
   assert.match(daily,/find\(\(job\)=>job\.status==="running"\)/);
   assert.match(daily,/catch\(error\)\{dailyGenerating=false;setDailyStage\(2\);await refreshJobs\(\);throw error;\}/);
   // 任务创建时持久化 focuses，重试可从记录恢复选择
-  const manager=fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs',import.meta.url),'utf8');
+  const manager=fs.readFileSync(new URL('../server/platform/jobs/ai-job-manager.mjs',import.meta.url),'utf8');
   assert.match(manager,/type==='daily'&&Array\.isArray\(focuses\)&&focuses\.length[\s\S]*?result_json:JSON\.stringify\(\{focuses\}\)/);
   assert.match(daily,/job\?\.focuses/);
 });

@@ -327,7 +327,7 @@ Agent、模型及工具内部对 AbortSignal 的逐层强制取消继续归入 R
 - 更新技能数、插件数和开放源码状态；
 - release 前清理旧 dist；
 - SHA256SUMS 覆盖本次全部发布物；
-- 构建脚本扫描真实的 `lib/collectors` 与 `plugins`。
+- 构建脚本扫描真实的 `server/collectors` 与 `plugins`。
 
 验收：发布包、HEAD、版本号、校验和和文档描述一致。
 

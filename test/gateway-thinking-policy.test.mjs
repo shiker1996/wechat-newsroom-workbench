@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ModelGateway, thinkingEnabledFor } from '../lib/llm/gateway.mjs';
+import { ModelGateway, thinkingEnabledFor } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 test('thinkingEnabledFor 按用途裁决：结构化抽取关闭，对话/写作/研判开启', () => {
   for (const purpose of [
@@ -43,7 +44,7 @@ function makeGateway(calls) {
         },
       },
     },
-  }, { recordModelCall() { return 1; } });
+  }, { recordModelCall() { return 1; } }, testConfigurationResolver);
   gateway.rawComplete = async (input) => {
     calls.push(input);
     return { content: '{}', usage: { prompt_tokens: 10, completion_tokens: 5 }, finishReason: 'stop' };
@@ -95,7 +96,7 @@ test('rawComplete 按 thinking 状态下发 thinking 参数，推理强度同时
         plain: { label: 'Plain', baseUrl: 'http://unused.test/v1', model: 'mock', apiKeyEnv: 'TEST_THINKING_KEY', contextWindow: 32000, maxOutputTokens: 12000 },
       },
     },
-  }, { recordModelCall() { return 1; } });
+  }, { recordModelCall() { return 1; } }, testConfigurationResolver);
   try {
     const { providerName, provider, apiKey } = gateway.resolve('test');
     await gateway.rawComplete({ providerName, provider, apiKey, thinking: false, messages: [{ role: 'user', content: 'x' }] });

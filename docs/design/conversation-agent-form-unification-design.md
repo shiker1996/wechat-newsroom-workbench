@@ -76,14 +76,14 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 
 | 位置 | 改动 |
 |---|---|
-| `lib/domain/` 新增 | `evaluateEditorialReadiness` |
-| `lib/llm/editorial-room.mjs` | SYSTEM prompt 改 briefUpdates；reconcile 删 open_questions 管理；applyEditorialResult 删状态机；buildEditorialMessages 回喂 missing[] |
-| `lib/agent/editorial-adapter.mjs` | 信封指令、json-repair 模板、决策补写器 prompt 与合并逻辑 |
-| `lib/llm/tutorial-chat.mjs` / `custom-social-chat.mjs` | prompt 改 briefUpdates、删 ready |
-| `lib/agent/tutorial-adapter.mjs` / `custom-social-adapter.mjs` | 读 briefUpdates；删模型 ready 消费（代码复核保留） |
-| `lib/http/routes/article-routes.mjs` | 锁简报门禁换 readiness |
-| `lib/llm/article-pipeline.mjs` | 成稿门禁换 readiness |
-| `lib/application/candidate-selection-service.mjs` | 预置首问改开场注入 |
+| `server/domain/` 新增 | `evaluateEditorialReadiness` |
+| `server/features/articles/llm/editorial-room.mjs` | SYSTEM prompt 改 briefUpdates；reconcile 删 open_questions 管理；applyEditorialResult 删状态机；buildEditorialMessages 回喂 missing[] |
+| `server/platform/agent/editorial-adapter.mjs` | 信封指令、json-repair 模板、决策补写器 prompt 与合并逻辑 |
+| `server/features/articles/llm/tutorial-chat.mjs` / `server/features/social-cards/llm/custom-social-chat.mjs` | prompt 改 briefUpdates、删 ready |
+| `server/platform/agent/tutorial-adapter.mjs` / `custom-social-adapter.mjs` | 读 briefUpdates；删模型 ready 消费（代码复核保留） |
+| `server/platform/http/routes/article-routes.mjs` | 锁简报门禁换 readiness |
+| `server/features/articles/application/article-pipeline.mjs` | 成稿门禁换 readiness |
+| `server/application/candidate-selection-service.mjs` | 预置首问改开场注入 |
 | `public/src/views/editorial.js` | 成稿门五项检查换 missing[] 驱动；问题展示区改派生 |
 | `skills/editorial-room/SKILL.md` | prompt 同步 |
 | DB | 不动（列保留兼容） |

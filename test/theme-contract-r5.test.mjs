@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
-import { compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { auditThemeForPublish } from '../lib/themes/theme-publish-gate.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { articleThemeDefinition } from '../server/shared/themes/article-theme-compiler.mjs';
+import { compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
+import { compileSocialTheme, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { auditThemeForPublish } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 function editable(definition,id){const value=structuredClone(definition);delete value.hash;delete value.file;value.id=id;value.source='user';value.status='draft';return value;}
 

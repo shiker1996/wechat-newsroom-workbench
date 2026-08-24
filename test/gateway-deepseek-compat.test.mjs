@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { ModelGateway, runWithThinkingSink } from '../lib/llm/gateway.mjs';
+import { ModelGateway, runWithThinkingSink } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 function makeGateway(port, extraProvider = {}) {
   process.env.TEST_COMPAT_KEY = 'secret';
@@ -24,7 +25,7 @@ function makeGateway(port, extraProvider = {}) {
         },
       },
     },
-  }, { recordModelCall() { return 1; } });
+  }, { recordModelCall() { return 1; } }, testConfigurationResolver);
 }
 
 async function withServer(handler, fn) {

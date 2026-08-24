@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLocalSecurity } from '../lib/http/local-security.mjs';
+import { createLocalSecurity } from '../server/platform/http/local-security.mjs';
 
 const request=(method='GET',headers={})=>({method,headers:{host:'127.0.0.1:3000',...headers}});
 

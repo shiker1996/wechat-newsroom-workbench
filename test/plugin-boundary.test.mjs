@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { auditPluginBoundaries, scanPluginBoundaries } from '../lib/plugins/boundary-audit.mjs';
+import { auditPluginBoundaries, scanPluginBoundaries } from '../server/platform/plugins/boundary-audit.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 
@@ -17,7 +17,7 @@ test('插件边界扫描覆盖全部违规类型且不依赖仓库保留违规',
   const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'plugin-boundary-'));
   try{
     for(const name of ['alpha','beta','shared'])fs.mkdirSync(path.join(fixture,'plugins',name),{recursive:true});
-    fs.writeFileSync(path.join(fixture,'plugins','alpha','index.mjs'),`import '../beta/index.mjs';\nimport '../shared/result.mjs';\nimport '../../../lib/host.mjs';\nconst a=path.join(root,'scripts','job.py');\nconst b=process.env.USERPROFILE;`);
+    fs.writeFileSync(path.join(fixture,'plugins','alpha','index.mjs'),`import '../beta/index.mjs';\nimport '../shared/result.mjs';\nimport '../../../server/host.mjs';\nconst a=path.join(root,'scripts','job.py');\nconst b=process.env.USERPROFILE;`);
     fs.writeFileSync(path.join(fixture,'plugins','beta','index.mjs'),'export default 1;');
     fs.writeFileSync(path.join(fixture,'plugins','shared','result.mjs'),'export default 1;');
     const types=new Set(scanPluginBoundaries(fixture).map((item)=>item.type));

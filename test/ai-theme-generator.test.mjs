@@ -4,12 +4,12 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
-import { AiThemeCandidateStore, AiThemeRateLimiter } from '../lib/themes/ai-theme-candidate-store.mjs';
-import { generateAiThemeCandidate, normalizeAiThemeCandidate, AI_THEME_PROMPT_VERSION } from '../lib/themes/ai-theme-generator.mjs';
-import { AI_THEME_ERROR_CODES } from '../lib/themes/ai-theme-contract.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
+import { AiThemeCandidateStore, AiThemeRateLimiter } from '../server/shared/themes/ai-theme-candidate-store.mjs';
+import { generateAiThemeCandidate, normalizeAiThemeCandidate, AI_THEME_PROMPT_VERSION } from '../server/platform/application/themes/ai-theme-generator.mjs';
+import { AI_THEME_ERROR_CODES } from '../server/shared/themes/ai-theme-contract.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 
 const registry=getBuiltinThemeRegistry();
 function candidateFrom(id){const definition=registry.get(id),target=definition.targets[0];return {label:definition.label,description:definition.description,tags:definition.tags,tokens:structuredClone(definition.tokens),targetConfig:structuredClone(definition[target]),designSummary:[{title:'视觉方向',description:'使用受控配色和组件配方建立清晰稳定的阅读层级'}]};}

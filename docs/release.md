@@ -1,6 +1,6 @@
 # 发布流程
 
-本项目以源码仓库分发（不发布 npm 包），发布物为带校验和的源码归档。版本号唯一来源是 `package.json` 的 `version`（`lib/version.mjs` 统一读取），遵循语义化版本，兼容政策见 [CHANGELOG.md](../CHANGELOG.md)「兼容政策」一节。
+本项目以源码仓库分发（不发布 npm 包），发布物为带校验和的源码归档。版本号唯一来源是 `package.json` 的 `version`（`server/version.mjs` 统一读取），遵循语义化版本，兼容政策见 [CHANGELOG.md](../CHANGELOG.md)「兼容政策」一节。
 
 ## 发布新版本
 
@@ -12,7 +12,7 @@
 6. 生成发布包与校验和：
 
    ```powershell
-   node scripts/release.mjs
+   node scripts/release/release.mjs
    ```
 
    产物在 `dist/`：`<name>-<version>.zip`（`git archive HEAD` 生成）与 `SHA256SUMS.txt`。脚本会先精确清空项目根目录下的旧 `dist/` 内容，拒绝工作区与 HEAD 版本号不一致，并为本次目录中的全部发布物生成 SHA-256；工作区有其他未提交改动时仍会明确警告，因为归档只包含 HEAD。

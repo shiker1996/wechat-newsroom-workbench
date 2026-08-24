@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertSafeRemoteUrl, createRemoteAdapter } from '../lib/tools/remote-adapter.mjs';
-import { setRemoteCredential } from '../lib/tools/remote-credentials.mjs';
+import { assertSafeRemoteUrl, createRemoteAdapter } from '../server/platform/tools/remote-adapter.mjs';
+import { setRemoteCredential } from '../server/platform/tools/remote-credentials.mjs';
 import {
   installRemotePlugin, readRemotePluginCatalog, setRemotePluginStatus, uninstallRemotePlugin,
   validateRemotePluginManifest,
-} from '../lib/tools/remote-package-manager.mjs';
+} from '../server/platform/tools/remote-package-manager.mjs';
 
 function manifest(overrides={}){
   return {

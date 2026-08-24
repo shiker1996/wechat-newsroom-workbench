@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeEventAnalysis } from '../lib/domain/event-fact-base.mjs';
-import { evaluateEventCardGate } from '../lib/domain/social-card-gate.mjs';
+import { synthesizeEventAnalysis } from '../server/features/research/index.mjs';
+import { evaluateEventCardGate } from '../server/features/social-cards/index.mjs';
 
 const groups = [
   {

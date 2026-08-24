@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { outputBudgetFor } from '../lib/llm/output-budget.mjs';
+import { outputBudgetFor } from '../server/platform/llm/output-budget.mjs';
 
 test('output budget uses stage profile and provider capability ceiling', () => {
   assert.deepEqual(

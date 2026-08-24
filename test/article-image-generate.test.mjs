@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { applyImagePlan, parseImagePlaceholders } from '../lib/llm/image-workflow.mjs';
-import { buildGenerateImageHtml, generateArticleImage } from '../lib/llm/article-image-generator.mjs';
+import { applyImagePlan, parseImagePlaceholders } from '../server/features/articles/application/image-workflow.mjs';
+import { buildGenerateImageHtml, generateArticleImage } from '../server/features/articles/application/article-image-generator.mjs';
 
 const base = '第一段话在这里结束。\n\n第二段。';
 const timeline = { kind:'timeline', title:'发布节奏', items:[{ label:'3 月', value:'v1 发布' }, { label:'6 月', value:'v2 发布' }] };
@@ -39,7 +39,7 @@ test('generated html escapes content and honors ratio sizes', () => {
 });
 
 test('generate endpoint and workbench button are wired', () => {
-  const routes = fs.readFileSync('lib/http/routes/media-routes.mjs', 'utf8');
+  const routes = fs.readFileSync('server/platform/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('/generate$'));
   assert.ok(routes.includes('dailyImageGenerateMatch'));
   assert.match(routes, /daily\\\/images[\s\S]*dailyImageGenerateMatch/);

@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
 import {
   getSocialCardTemplatePack,
   listSocialCardTemplatePacks,
-} from '../lib/rendering/social-card-template-registry.mjs';
+} from '../server/shared/rendering/social-card-template-registry.mjs';
 import {
   createSocialCardStoryboardThemeSnapshot,
   getSocialCardTemplateCapabilities,
-} from '../lib/rendering/social-card-template-resolver.mjs';
-import { resolveSocialCardCapacityProfile } from '../lib/rendering/social-card-capacity.mjs';
+} from '../server/shared/rendering/social-card-template-resolver.mjs';
+import { resolveSocialCardCapacityProfile } from '../server/shared/rendering/social-card-capacity.mjs';
 
 test('阶段 1 五套模板包的十个角色均声明容量 profile', () => {
   const roles = ['cover', 'concept', 'feature', 'steps', 'data', 'compare', 'evidence', 'timeline', 'risk', 'ending'];

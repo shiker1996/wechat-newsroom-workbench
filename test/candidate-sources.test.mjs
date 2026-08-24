@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { batchTopicsDir } from '../server/platform/core/workspace-paths.mjs';
 import { fetchCandidateSourceImplementation } from '../plugins/url-fetch/implementation.mjs';
-import { eventGroupsForCandidate } from '../lib/domain/event-fact-base.mjs';
+import { eventGroupsForCandidate } from '../server/features/research/index.mjs';
 
 function createStore() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'candidate-sources-'));
@@ -111,4 +112,27 @@ test('无补充来源时事实基座不注入分组', () => {
   const candidate = store.addCandidates(batch.id, [store.getBatch(batch.id).hotspots[0].id])[0];
   const groups = eventGroupsForCandidate({ store, workspaceRoot: root, candidate: store.getCandidate(candidate.id) });
   assert.equal(groups.find((g) => g.event_id === 'user-supplied'), undefined);
+});
+
+test('编辑事实基座直接消费稳定事件卡', () => {
+  const { root, store } = createStore();
+  const batch = store.createBatch({ date: '2026-08-24', title: '稳定事件卡兼容' });
+  store.addHotspots(batch.id, 'rsshub', [{
+    title: 'OpenAI Codex', url: 'https://example.com/codex', category: '🤖 AI/技术动态', marketScope: '全球性',
+    aiTags: { eventKey: 'OpenAI|Codex额度', keywords: ['Codex'] },
+  }]);
+  const hotspot = store.getBatch(batch.id).hotspots[0];
+  const candidate = store.addCandidates(batch.id, [hotspot.id])[0];
+  const sourcesDir = path.join(batchTopicsDir(root, store.getBatch(batch.id)), 'sources');
+  fs.mkdirSync(sourcesDir, { recursive: true });
+  fs.writeFileSync(path.join(sourcesDir, 'event-clusters.json'), JSON.stringify({ events: [{
+    event_id: 'S-STABLE', hotspot_ids: [hotspot.id], articles: [{ hotspot_id: hotspot.id }],
+  }] }));
+  fs.writeFileSync(path.join(sourcesDir, 'event-cards.json'), JSON.stringify({ items: [{
+    event_id: 'S-STABLE', conclusion: '稳定事件卡结论', confirmed_facts: [], source_increment: [], disagreements: [], unverified: [],
+  }] }));
+
+  const [group] = eventGroupsForCandidate({ store, workspaceRoot: root, candidate: store.getCandidate(candidate.id) });
+  assert.equal(group.event_id, 'S-STABLE');
+  assert.equal(group.card.conclusion, '稳定事件卡结论');
 });

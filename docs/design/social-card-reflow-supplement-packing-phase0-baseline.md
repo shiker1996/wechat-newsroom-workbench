@@ -58,10 +58,10 @@ P5/P6 的核心内容为：
 
 | 关注点 | 当前实现 | 阶段 0 结论 |
 |---|---|---|
-| 页面拆分 | `lib/rendering/social-card-reflow.mjs` | 以完整页面估算溢出，按内容顺序拆分可拆语义单元 |
+| 页面拆分 | `server/shared/rendering/social-card-reflow.mjs` | 以完整页面估算溢出，按内容顺序拆分可拆语义单元 |
 | 页面容量 | `estimateSocialCardPageLoad` 与模板 `capacityProfile` | 与浏览器审计存在偏差，需要统一口径 |
-| 补充候选 | `lib/rendering/social-card-content-components.mjs` | 从事实索引生成候选，页面级过滤过于保守 |
-| AI 计划 | `lib/rendering/social-card-content-planner.mjs` | `add_component` 只能引用目标页候选，不填写 `slot_id` |
+| 补充候选 | `server/shared/rendering/social-card-content-components.mjs` | 从事实索引生成候选，页面级过滤过于保守 |
+| AI 计划 | `server/features/social-cards/application/social-card-content-planner.mjs` | `add_component` 只能引用目标页候选，不填写 `slot_id` |
 | 最终门禁 | `layout-report.json` | 浏览器审计应继续作为最终权威 |
 
 ## 5. 下一阶段改造边界
@@ -74,4 +74,3 @@ P5/P6 的核心内容为：
 - 模板视觉样式；
 - 历史图文兼容渲染；
 - AI 模型供应商配置。
-

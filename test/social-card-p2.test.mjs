@@ -6,11 +6,11 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { loadSkillBundle, selectSkillPromptReferences } from '../lib/llm/skill-runtime.mjs';
-import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, acceptSoftDensityOnlyLayoutReport, adaptiveContentPageIndexes, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../lib/llm/social-card-pipeline.mjs';
-import { createZip } from '../lib/artifacts/zip-bundle.mjs';
+import { loadSkillBundle, selectSkillPromptReferences } from '../server/platform/llm/skill-runtime.mjs';
+import { SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_LAYOUTS, SOCIAL_CARD_STAGE_CONTRACT, acceptSoftDensityOnlyLayoutReport, adaptiveContentPageIndexes, cardPageDensity, cardPlanRepairStructureIssues, describeCardLayouts, inferCardPageRole, normalizeCardComposition, renderStoryboardHtml as renderStoryboardHtmlBase, resolveCardCompositionDecision, resolveCardLayout, resolveCardLayoutDecision, softDensityPageIndexes, stableCardCompositionSeed, underfilledDensityTier, underfilledPageIndexes, layoutAuditFailureMessage } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { createZip } from '../server/platform/artifacts/zip-bundle.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -29,13 +29,13 @@ function renderStoryboardHtml(options={}){
 }
 
 test('图文管线在内部使用版式白名单时建立本地 ESM 绑定', () => {
-  const pipeline = fs.readFileSync(path.join(root, 'lib', 'llm', 'social-card-pipeline.mjs'), 'utf8');
-  assert.match(pipeline, /import \{ SOCIAL_CARD_LAYOUTS \} from '\.\.\/rendering\/social-card-layout\.mjs';/);
+  const pipeline = fs.readFileSync(path.join(root, 'server', 'features', 'social-cards', 'application', 'social-card-pipeline.mjs'), 'utf8');
+  assert.match(pipeline, /import \{ SOCIAL_CARD_LAYOUTS \} from '\.\.\/\.\.\/\.\.\/shared\/rendering\/social-card-layout\.mjs';/);
   assert.match(pipeline, /layout_style:SOCIAL_CARD_LAYOUTS\.includes/);
 });
 
 test('结构修复先退化稳定构图，再执行模板感知重排',()=>{
-  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const pipeline=fs.readFileSync(path.join(root,'server','features','social-cards','application','social-card-pipeline.mjs'),'utf8');
   const degrade=pipeline.indexOf('结构修复先退化稳定构图');
   const reflow=pipeline.indexOf("action:'template-aware-reflow'",degrade);
   assert.ok(degrade>=0&&reflow>degrade,'构图退化必须位于模板重排之前');
@@ -44,7 +44,7 @@ test('结构修复先退化稳定构图，再执行模板感知重排',()=>{
 });
 
 test('软密度放行位于续页重排、组件装箱和容器调整之后',()=>{
-  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const pipeline=fs.readFileSync(path.join(root,'server','features','social-cards','application','social-card-pipeline.mjs'),'utf8');
   const continuation=pipeline.indexOf("action:'continuation-repack-core-blocks'");
   const packing=pipeline.indexOf("phase:'content-plan',action:'apply-plan-operations'");
   const fit=pipeline.indexOf("action:'fit-content-center'");
@@ -54,14 +54,14 @@ test('软密度放行位于续页重排、组件装箱和容器调整之后',()=
 });
 
 test('重复修复状态只记录诊断，不在固定轮数前提前阻断',()=>{
-  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const pipeline=fs.readFileSync(path.join(root,'server','features','social-cards','application','social-card-pipeline.mjs'),'utf8');
   assert.doesNotMatch(pipeline,/failStrictLayout\(`布局修复无进展/);
   assert.doesNotMatch(pipeline,/shouldStopRepeatedRepairState/);
   assert.match(pipeline,/noProgressStateSignatures\.set\(repairStateSignature,attempt \+ 1\)/);
 });
 
 test('内容补充候选由下一轮浏览器审计提交，真实溢出时回滚',()=>{
-  const pipeline=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const pipeline=fs.readFileSync(path.join(root,'server','features','social-cards','application','social-card-pipeline.mjs'),'utf8');
   const audit=pipeline.indexOf("action:'browser-layout-audit'");
   const rollback=pipeline.indexOf("action:'browser-candidate-rollback'",audit);
   const apply=pipeline.indexOf('pendingBrowserCandidate={beforePages:beforeBrowserCandidatePages,round:plannerRound}',rollback);
@@ -262,8 +262,8 @@ test('图文编辑室可以独立选择版式和视觉主题',()=>{
 });
 
 test('服务端支持保存故事板单页内容而不触发单图重绘',()=>{
-  const source=fs.readFileSync(path.join(root,'lib/http/routes/social-card-routes.mjs'),'utf8');
-  const storyboardPrompt=fs.readFileSync(path.join(root,'lib','domain','social-card-prompts','channel-xiaohongshu.md'),'utf8');
+  const source=fs.readFileSync(path.join(root,'server/platform/http/routes/social-card-routes.mjs'),'utf8');
+  const storyboardPrompt=fs.readFileSync(path.join(root,'server','features','social-cards','prompts','channel-xiaohongshu.md'),'utf8');
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)$/)"));
   assert.ok(source.includes("pathname.match(/^\\/api\\/candidates\\/(\\d+)\\/card-pages\\/(\\d+)\\/ai$/)"));
   assert.match(source,/每页至少保留一个内容块/);
@@ -305,7 +305,7 @@ test('图文执行器严格声明六阶段技能契约', () => {
 });
 
 test('图文文案由模型生成，HTML 根据故事板确定性组装', () => {
-  const source = fs.readFileSync(path.join(root, 'lib', 'llm', 'social-card-pipeline.mjs'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'server', 'features', 'social-cards', 'application', 'social-card-pipeline.mjs'), 'utf8');
   assert.match(source, /purpose:'social-card-copy'/);
   assert.doesNotMatch(source, /purpose:'social-card-html'/);
   assert.doesNotMatch(source, /purpose:'social-card-generation'/);
@@ -562,7 +562,7 @@ test('布局审计以真实内容边界测量，稀疏内容页标记 underfille
 });
 
 test('copy stage requires topic tags on both channels and delivery validation flags missing tags', () => {
-  const source = fs.readFileSync(path.join(process.cwd(), 'lib/llm/social-card-pipeline.mjs'), 'utf8');
+  const source = fs.readFileSync(path.join(process.cwd(), 'server/features/social-cards/application/social-card-pipeline.mjs'), 'utf8');
   assert.ok(source.includes('末尾带 6–8 个话题标签'), 'xiaohongshu channel should require tags');
   assert.ok(source.includes('末尾带 6–8 个准确话题标签'), 'wechat channel should require tags');
   assert.ok(!source.includes('不使用话题标签'), 'wechat channel must not forbid tags');
@@ -754,4 +754,13 @@ test('只有 underfilled 的页面启用内容自适应后按软门禁通过',()
 test('内容页默认自适应容器可承接纯 underfilled 软门禁',()=>{
   const indexes=adaptiveContentPageIndexes([{kind:'cover'},{kind:'problem'},{kind:'content'},{kind:'ending'}],[]);
   assert.deepEqual([...indexes],[1,2]);
+});
+
+test('密度校准可以读取纯 underfilled 页面索引',()=>{
+  const indexes=softDensityPageIndexes({pages:[
+    {page:1,kind:'cover',issues:['underfilled']},
+    {page:2,kind:'content',issues:['underfilled']},
+    {page:3,kind:'content',issues:['underfilled','overflow']},
+  ]});
+  assert.deepEqual(indexes,[1]);
 });

@@ -4,9 +4,9 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { createThemeRegistry, getBuiltinThemeRegistry, normalizedThemeJson, themeHash } from '../lib/themes/theme-registry.mjs';
-import { loadThemeDirectory } from '../lib/themes/theme-loader.mjs';
-import { colorContrast, ThemeValidationError, validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { createThemeRegistry, getBuiltinThemeRegistry, normalizedThemeJson, themeHash } from '../server/shared/themes/theme-registry.mjs';
+import { loadThemeDirectory } from '../server/shared/themes/theme-loader.mjs';
+import { colorContrast, ThemeValidationError, validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(here,'..');

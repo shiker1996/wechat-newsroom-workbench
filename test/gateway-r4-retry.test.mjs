@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ModelGateway } from '../lib/llm/gateway.mjs';
+import { ModelGateway } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
-function gateway(){process.env.TEST_R4_KEY='secret';return new ModelGateway({llm:{defaultProvider:'test',requestTimeoutMs:2000,safetyReserveTokens:32,recentMessageCount:8,providers:{test:{label:'Test',baseUrl:'http://unused.test/v1',model:'mock',apiKeyEnv:'TEST_R4_KEY',contextWindow:32000,maxOutputTokens:12000}}}},{recordModelCall(){return 1;}});}
+function gateway(){process.env.TEST_R4_KEY='secret';return new ModelGateway({llm:{defaultProvider:'test',requestTimeoutMs:2000,safetyReserveTokens:32,recentMessageCount:8,providers:{test:{label:'Test',baseUrl:'http://unused.test/v1',model:'mock',apiKeyEnv:'TEST_R4_KEY',contextWindow:32000,maxOutputTokens:12000}}}},{recordModelCall(){return 1;}},testConfigurationResolver);}
 
 test('streamComplete 对截断结果执行一次扩容重试且不向客户端拼接残稿',async()=>{
   const model=gateway();const calls=[];const deltas=[];

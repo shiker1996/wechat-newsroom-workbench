@@ -449,10 +449,10 @@
       "name": "资料检索与事实补充",
       "type": "feature",
       "sourceFiles": [
-        "lib/integrations/information-search.mjs",
-        "lib/integrations/local-project-reader.mjs",
-        "lib/integrations/repository-inspector.mjs",
-        "lib/integrations/source-fetcher.mjs"
+        "server/platform/integrations/information-search.mjs",
+        "server/platform/integrations/local-project-reader.mjs",
+        "server/platform/integrations/repository-inspector.mjs",
+        "server/platform/integrations/source-fetcher.mjs"
       ],
       "dependencies": [
         {
@@ -511,7 +511,7 @@
       "name": "文章段落检索",
       "type": "feature",
       "sourceFiles": [
-        "lib/http/routes/article-routes.mjs"
+        "server/platform/http/routes/article-routes.mjs"
       ],
       "dependencies": [
         {
@@ -530,8 +530,8 @@
       "name": "公众号文章排版",
       "type": "feature",
       "sourceFiles": [
-        "lib/llm/typeset-pipeline.mjs",
-        "lib/llm/image-workflow.mjs"
+        "server/features/articles/application/typeset-pipeline.mjs",
+        "server/features/articles/application/image-workflow.mjs"
       ],
       "dependencies": [
         {
@@ -566,7 +566,7 @@
       "name": "图表预览",
       "type": "feature",
       "sourceFiles": [
-        "lib/http/routes/media-routes.mjs"
+        "server/platform/http/routes/media-routes.mjs"
       ],
       "dependencies": [
         {
@@ -591,20 +591,33 @@
   ],
   "codeCalls": [
     {
-      "sourceFile": "lib/http/routes/article-routes.mjs",
+      "sourceFile": "server/features/articles/application/image-workflow.mjs",
       "capabilities": [
-        "content.passage.retrieve"
+        "image.cdn.upload"
       ]
     },
     {
-      "sourceFile": "lib/http/routes/media-routes.mjs",
+      "sourceFile": "server/features/articles/application/typeset-pipeline.mjs",
       "capabilities": [
         "diagram.echarts.render",
         "diagram.mermaid.render"
       ]
     },
     {
-      "sourceFile": "lib/integrations/information-search.mjs",
+      "sourceFile": "server/platform/http/routes/article-routes.mjs",
+      "capabilities": [
+        "content.passage.retrieve"
+      ]
+    },
+    {
+      "sourceFile": "server/platform/http/routes/media-routes.mjs",
+      "capabilities": [
+        "diagram.echarts.render",
+        "diagram.mermaid.render"
+      ]
+    },
+    {
+      "sourceFile": "server/platform/integrations/information-search.mjs",
       "capabilities": [
         "content.document.search",
         "content.news.search",
@@ -612,34 +625,21 @@
       ]
     },
     {
-      "sourceFile": "lib/integrations/local-project-reader.mjs",
+      "sourceFile": "server/platform/integrations/local-project-reader.mjs",
       "capabilities": [
         "filesystem.project.read"
       ]
     },
     {
-      "sourceFile": "lib/integrations/repository-inspector.mjs",
+      "sourceFile": "server/platform/integrations/repository-inspector.mjs",
       "capabilities": [
         "content.repository.inspect"
       ]
     },
     {
-      "sourceFile": "lib/integrations/source-fetcher.mjs",
+      "sourceFile": "server/platform/integrations/source-fetcher.mjs",
       "capabilities": [
         "content.url.fetch"
-      ]
-    },
-    {
-      "sourceFile": "lib/llm/image-workflow.mjs",
-      "capabilities": [
-        "image.cdn.upload"
-      ]
-    },
-    {
-      "sourceFile": "lib/llm/typeset-pipeline.mjs",
-      "capabilities": [
-        "diagram.echarts.render",
-        "diagram.mermaid.render"
       ]
     }
   ],

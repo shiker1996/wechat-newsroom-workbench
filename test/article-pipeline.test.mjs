@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../lib/llm/article-pipeline.mjs';
-import { inspectArticleQuality } from '../lib/llm/article-quality.mjs';
-import { loadArticleSkillBundle, loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
+import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
+import { inspectArticleQuality } from '../server/features/articles/domain/article-quality.mjs';
+import { loadArticleSkillBundle, loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 
 test('成稿规划兼容模型把数组字段返回为字符串', () => {
   const plan=normalizePlanningResult({distribution_lane:'通知池',reader_stake:'影响开发者成本',expectedAction:'收藏、分享',coreKeywords:'AI；编程工具',remainingRisks:'none',titleCandidates:'一个可用标题'});
@@ -61,7 +61,7 @@ test('综合候选汇总全部已抓取来源，写作简报移除来源原文',
 });
 
 test('质量门禁只授权 verified 事实并区分观点与亲测', () => {
-  const source=fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs',import.meta.url),'utf8');
   assert.match(source,/正文事实只能来自事实基座中的 verified 项/);
   assert.match(source,/第一人称作者判断或阅读动作/);
   assert.match(source,/不得用新的数字、案例、榜单、硬件配置或模型常识替换/);
@@ -102,7 +102,7 @@ test('综合选题写作规则来自项目子技能而非执行器内置提示�
   const composite = loadSkillBundle({ workspaceRoot:process.cwd(), skillName:'wechat-mp-composite' });
   assert.equal(composite.fallback, false);
   assert.match(composite.prompt, /多个已核验热点/);
-  const source = fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /composeSkillPrompts|const compositeSkill|你是事实编辑/);
 });
 
@@ -126,7 +126,7 @@ test('热点文章契约明确拒绝伪装教程、工具清单和纯快讯',()=
 });
 
 test('成稿执行器将分发池和读者利益写入规划、标题与锁定简报',()=>{
-  const pipeline=fs.readFileSync(new URL('../lib/llm/article-pipeline.mjs',import.meta.url),'utf8');
+  const pipeline=fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs',import.meta.url),'utf8');
   const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
   assert.match(pipeline,/distribution_lane:\$\{brief\.distributionLane\}/);
   assert.match(pipeline,/reader_stake:\$\{brief\.readerStake/);

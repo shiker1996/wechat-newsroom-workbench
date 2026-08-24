@@ -162,7 +162,7 @@ AI 返回 semantic_intent=run
 
 #### 阶段 0 执行记录（已完成）
 
-- 新增 `lib/rendering/social-card-page-component-contract.mjs`，冻结页面组件契约版本、核心/补充组件类型和页面语义映射；
+- 新增 `server/shared/rendering/social-card-page-component-contract.mjs`，冻结页面组件契约版本、核心/补充组件类型和页面语义映射；
 - 核心组件和补充组件统一增加 `schemaVersion`、`componentId`、`kind`、`page`、`role`、`semanticIntent`、`semanticIntentCandidates`、`displayLabel` 等阶段 0 字段；
 - 事实索引和组件装箱改为共享同一份 `SOCIAL_CARD_SLOT_SEMANTIC_TAGS`，消除两套槽位语义映射的漂移；
 - 保留现有 `id`、`content.title` 和 `slot_id` 读写行为，生产装箱逻辑未在阶段 0 切换；

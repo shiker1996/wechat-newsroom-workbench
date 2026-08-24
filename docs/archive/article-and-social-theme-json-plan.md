@@ -9,8 +9,8 @@
 
 目前两套主题系统都属于“样式规则写在 JavaScript 中”：
 
-- 文章排版主题在 `lib/llm/typeset-pipeline.mjs` 的 `TYPESET_THEMES` 和 `buildInlineStyles()` 中维护。主题配置、主题判断和 HTML 内联样式生成耦合在同一模块。
-- 图文视觉主题在 `lib/llm/social-card-pipeline.mjs` 中维护。主题白名单及大段 `.theme-*` CSS 都嵌入 HTML 模板字符串。
+- 文章排版主题在 `server/platform/llm/typeset-pipeline.mjs` 的 `TYPESET_THEMES` 和 `buildInlineStyles()` 中维护。主题配置、主题判断和 HTML 内联样式生成耦合在同一模块。
+- 图文视觉主题在 `server/platform/llm/social-card-pipeline.mjs` 中维护。主题白名单及大段 `.theme-*` CSS 都嵌入 HTML 模板字符串。
 - 前端选择器在 `public/index.html` 再维护一份固定选项，容易与后端支持范围不一致。
 - 新增主题需要同时修改前端、渲染器、白名单和测试，普通用户无法复制或调整现有主题。
 
@@ -120,7 +120,7 @@ themes/
 运行时代码建议新增：
 
 ```text
-lib/themes/
+server/shared/themes/
   theme-loader.mjs
   theme-registry.mjs
   theme-validator.mjs
@@ -578,7 +578,7 @@ theme_versions
 
 ### 阶段 1：Schema、加载器与注册中心（2–3 人日）
 
-实施状态：已完成（2026-08-01）。已建立 `themes/schema/theme.schema.json`、20 个只读内置主题 JSON、`lib/themes/` 加载与校验模块、稳定哈希及构建门禁；生产渲染器尚未切换到注册中心。
+实施状态：已完成（2026-08-01）。已建立 `themes/schema/theme.schema.json`、20 个只读内置主题 JSON、`server/shared/themes/` 加载与校验模块、稳定哈希及构建门禁；生产渲染器尚未切换到注册中心。
 
 1. 新增统一 `theme.schema.json`。
 2. 实现 loader、validator、registry 和规范化哈希。

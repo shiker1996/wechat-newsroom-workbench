@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { Store } from '../lib/core/store.mjs';
+import { Store } from '../server/platform/core/store.mjs';
 import {
   dryRunSkillConfig, normalizeSkillConfig, readActiveSkillConfig, validateSkillConfig, writeActiveSkillConfig,
-} from '../lib/skills/configuration.mjs';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
-import { prepareSkillRun, resolveSkillToolPolicy } from '../lib/skills/pipeline-runtime.mjs';
+} from '../server/platform/skills/configuration.mjs';
+import { loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
+import { prepareSkillRun, resolveSkillToolPolicy } from '../server/platform/skills/pipeline-runtime.mjs';
 
 test('技能配置拒绝未知工具、非法字数和 Prompt/门禁冲突', () => {
   const config=normalizeSkillConfig({
@@ -101,7 +101,7 @@ test('统一创作运行时应用默认模型、工具白名单并冻结配置�
 });
 
 test('配置门禁实际检查事实来源、体验和返工开关', async () => {
-  const {evaluateConfiguredGates,configuredRepairAttempts}=await import('../lib/skills/configuration.mjs');
+  const {evaluateConfiguredGates,configuredRepairAttempts}=await import('../server/platform/skills/configuration.mjs');
   const config=normalizeSkillConfig({prompt:'规则',gates:{repair:{enabled:false,maxAttempts:3}}});
   const result=evaluateConfiguredGates(config,{factBase:{claims:[{claim:'未经核实',verified:false,source_level:'model_suggestion'}]},output:'我亲测效果很好',visibleChars:1000});
   assert.equal(result.pass,false);
@@ -149,7 +149,7 @@ test('历史快照中的显式空白名单冻结为全部禁止', async () => {
 });
 
 test('模型调用通过绑定网关精确携带 generation snapshot', async () => {
-  const {bindGenerationSnapshot}=await import('../lib/skills/pipeline-runtime.mjs');
+  const {bindGenerationSnapshot}=await import('../server/platform/skills/pipeline-runtime.mjs');
   const calls=[];
   const gateway={
     complete:async(input)=>{calls.push(input);return input;},

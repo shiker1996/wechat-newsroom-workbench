@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { AiJobManager } from '../lib/llm/ai-job-manager.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { AiJobManager } from '../server/platform/jobs/ai-job-manager.mjs';
 
 const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -16,6 +16,9 @@ function setup() {
     aiJobs: { maxConcurrent },
     rsshub: { maxAgeHours: 168 },
     workspaceRoot: tempRoot,
+  }, {
+    handlers: new Map(['tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','cover-image','auto'].map((type) => [type, async () => ({})])),
+    batchLevelTypes: new Set(['tag','retag','event-cards','research','breaking-analysis','auto','daily']),
   });
   return { tempRoot, store, manager };
 }

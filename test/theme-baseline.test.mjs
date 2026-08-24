@@ -3,9 +3,9 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { TYPESET_THEMES, defaultTypesetTheme, markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { themeCatalog } from '../lib/http/routes/theme-routes.mjs';
+import { TYPESET_THEMES, defaultTypesetTheme, markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { themeCatalog } from '../server/platform/http/routes/theme-routes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const baseline = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'theme-baseline.json'), 'utf8'));

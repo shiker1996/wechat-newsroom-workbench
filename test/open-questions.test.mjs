@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeOpenQuestions, hasOpenQuestions } from '../lib/domain/open-questions.mjs';
+import { normalizeOpenQuestions, hasOpenQuestions } from '../server/shared/domain/open-questions.mjs';
 
 test('open_questions 无问题表述归一为空串', () => {
   for (const value of ['', '  ', '无', '无。', '无.', '没有了', '暂无', '无未决问题', 'none', 'N/A',

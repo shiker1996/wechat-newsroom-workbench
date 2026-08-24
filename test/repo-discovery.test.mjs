@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { sanitizeQueries, loadCachedQueries, planRepoDiscoveryQueries, filterRepositoriesByInterest } from '../lib/llm/repo-discovery.mjs';
+import { sanitizeQueries, loadCachedQueries, planRepoDiscoveryQueries, filterRepositoriesByInterest } from '../server/features/collection/llm/repo-discovery.mjs';
 import { discoverGitHubRepositories, expandAiQueryKeywords } from '../plugins/github-discovery/collector.mjs';
 
 function tmpRoot() {

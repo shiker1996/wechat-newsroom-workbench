@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { Store } from '../lib/core/store.mjs';
-import { SkillRegistry, createGenerationSnapshot } from '../lib/skills/registry.mjs';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
-import { writeActiveSkillConfig } from '../lib/skills/configuration.mjs';
-import { readSkillManifest, validateSkillManifest } from '../lib/skills/manifest.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { SkillRegistry, createGenerationSnapshot } from '../server/platform/skills/registry.mjs';
+import { loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
+import { writeActiveSkillConfig } from '../server/platform/skills/configuration.mjs';
+import { readSkillManifest, validateSkillManifest } from '../server/platform/skills/manifest.mjs';
 
 test('技能注册中心发现项目技能并生成稳定 Prompt 哈希', () => {
   const workspaceRoot = process.cwd();

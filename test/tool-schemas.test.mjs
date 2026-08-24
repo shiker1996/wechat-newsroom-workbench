@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateInput } from '../lib/tools/schemas.mjs';
+import { validateInput } from '../server/platform/tools/schemas.mjs';
 
 test('可选对象字段显式传 undefined 视为缺省，不触发类型校验', () => {
   const schema = { type: 'object', required: ['targetUrl'], properties: { targetUrl: { type: 'string' }, sourceFetch: { type: 'object' } } };

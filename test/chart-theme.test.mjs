@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { echartsOptionWithTheme, mermaidConfigForTheme, mermaidSourceWithTheme } from '../lib/llm/chart-theme.mjs';
+import { echartsOptionWithTheme, mermaidConfigForTheme, mermaidSourceWithTheme } from '../server/features/articles/rendering/chart-theme.mjs';
 
 test('Mermaid receives article design colors without replacing explicit init', () => {
   const themed = mermaidSourceWithTheme('flowchart TB\nA-->B', { colors:{ accent:'#123456', background:'#FAFAFA' } });

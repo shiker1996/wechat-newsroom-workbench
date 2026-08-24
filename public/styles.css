@@ -41,6 +41,7 @@ img { display:block; max-inline-size:100%; block-size:auto; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .paper-noise { position: fixed; inset: 0; pointer-events: none; opacity: .28; z-index: var(--z-noise); background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.09'/%3E%3C/svg%3E"); }
+
 .rail { position: fixed; inset: 0 auto 0 0; width: var(--rail-width); padding: 24px 22px 16px; background: var(--ink); color: var(--white); display: flex; flex-direction: column; z-index: var(--z-rail); overflow: hidden; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 32px; border-bottom: 1px solid rgba(255,255,255,.16); }
 .brand-seal { width: 42px; height: 42px; display: grid; place-items: center; font: 700 24px var(--display); color: var(--white); background: var(--red); transform: rotate(-2deg); }
@@ -176,6 +177,7 @@ nav { flex:1;min-height:0;padding-top: 18px; display: grid; align-content:start;
 .top-actions { display: flex; align-items: center; gap: 12px; }
 .batch-switcher { display:none; max-width: 210px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); padding: 9px 5px; }.batch-switcher.visible { display:block; }
 .top-actions time { margin-right: 10px; color: var(--muted); font: italic 13px var(--display); }
+
 @media (min-width:761px) and (max-width:1280px) {
   .topbar { align-items:flex-start;flex-wrap:wrap;gap:14px 24px; }
   .topbar>div:first-child { flex:1 1 100%; }
@@ -800,6 +802,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 
 /* Keep accessibility sizing last so legacy component rules cannot shrink targets. */
+
 .close-button { min-width:44px; min-height:44px; }
 .source-remove { width:40px; height:40px; }
 .candidate-tab-strip { grid-template-columns:44px minmax(0,1fr) 44px; }

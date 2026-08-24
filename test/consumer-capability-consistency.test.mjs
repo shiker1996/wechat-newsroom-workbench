@@ -3,13 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { EDITORIAL_AGENT_CAPABILITIES } from '../lib/agent/editorial-adapter.mjs';
-import { TUTORIAL_AGENT_CAPABILITIES } from '../lib/agent/tutorial-adapter.mjs';
-import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../lib/agent/custom-social-adapter.mjs';
-import { CONVERSATION_AGENT_ENTRY_POINTS } from '../lib/agent/contracts.mjs';
-import { readCapabilityCatalog } from '../lib/tools/capability-catalog.mjs';
-import { isResourceAdaptedCapability } from '../lib/agent/resource-adaptation.mjs';
-import { auditCapabilityConsumers, auditSkillCapabilityReferences, readAgentConsumers, readCapabilityConsumers } from '../lib/tools/dependency-baseline.mjs';
+import { EDITORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/editorial-adapter.mjs';
+import { TUTORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/tutorial-adapter.mjs';
+import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../server/features/social-cards/application/agent/custom-social-adapter.mjs';
+import { CONVERSATION_AGENT_ENTRY_POINTS } from '../server/platform/agent/contracts.mjs';
+import { readCapabilityCatalog } from '../server/platform/tools/capability-catalog.mjs';
+import { isResourceAdaptedCapability } from '../server/platform/agent/resource-adaptation.mjs';
+import { auditCapabilityConsumers, auditSkillCapabilityReferences, readAgentConsumers, readCapabilityConsumers } from '../server/platform/tools/dependency-baseline.mjs';
 
 // 阶段 0 依赖一致性：Adapter 能力常量、功能消费者登记、技能 Manifest 引用的能力
 // 都必须存在于 config/capabilities.json 目录中，不得出现悬空引用。

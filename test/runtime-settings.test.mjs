@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getRuntimeSettings, updateRuntimeSettings } from '../lib/integrations/runtime-settings.mjs';
+import { getRuntimeSettings, updateRuntimeSettings } from '../server/platform/integrations/runtime-settings.mjs';
 
 test('运行设置不再读取或写入项目根 .env',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'runtime-settings-'));const rsshubRoot=path.join(root,'RSSHub');fs.mkdirSync(rsshubRoot,{recursive:true});

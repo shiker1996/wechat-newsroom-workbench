@@ -329,7 +329,7 @@ http://127.0.0.1:1200/github/trending/daily/any
 
 ### 8.4 选中后的事实增强（第一阶段）
 
-新增 `lib/integrations/repository-inspector.mjs`，对 GitHub 或其他公开仓库建立可审计事实基座。
+新增 `server/platform/integrations/repository-inspector.mjs`，对 GitHub 或其他公开仓库建立可审计事实基座。
 
 建议产物：
 
@@ -421,7 +421,7 @@ fact-sheet.md
 新增：
 
 ```text
-lib/llm/social-card-pipeline.mjs
+server/platform/llm/social-card-pipeline.mjs
 ```
 
 建议阶段契约：

@@ -3,9 +3,9 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { TYPESET_THEMES, markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
-import { articleThemeDefinition, compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
+import { TYPESET_THEMES, markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
+import { articleThemeDefinition, compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 
@@ -34,11 +34,11 @@ test('阶段 2 文章配方由 JSON 编译为确定性渲染契约', () => {
 });
 
 test('阶段 2 生产渲染模块不再内置主题色或按主题 ID 分支样式', () => {
-  const source=fs.readFileSync(path.join(root,'lib','llm','typeset-pipeline.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'server','features','articles','application','typeset-pipeline.mjs'),'utf8');
   assert.doesNotMatch(source,/const LEGACY_TYPESET_THEMES/);
   assert.doesNotMatch(source,/themeName\s*===/);
   for(const color of ['#F5EFE3','#FF6B35','#0D1117','#0F2B4C','#F6EFDF','#D61F26'])assert.doesNotMatch(source,new RegExp(color,'i'));
-  const chartSource=fs.readFileSync(path.join(root,'lib','llm','chart-theme.mjs'),'utf8');
+  const chartSource=fs.readFileSync(path.join(root,'server','features','articles','rendering','chart-theme.mjs'),'utf8');
   assert.doesNotMatch(chartSource,/const surfaces\s*=/);
   assert.doesNotMatch(chartSource,/'(?:gossip-card|news-digest|tech-wire|research-report|career-essay|magazine-warm)'\s*:/);
 });

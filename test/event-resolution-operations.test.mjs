@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { batchTopicsDir } from '../lib/core/workspace-paths.mjs';
-import { buildEventResolutionOperationsMetrics, readEventResolutionReview } from '../lib/domain/event-resolution-operations.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { batchTopicsDir } from '../server/platform/core/workspace-paths.mjs';
+import { buildEventResolutionOperationsMetrics, readEventResolutionReview } from '../server/features/research/index.mjs';
 
 function writeDiff(root, batch, diff) {
   const file = path.join(batchTopicsDir(root, batch), 'sources', 'event-resolution-shadow-diff.json');

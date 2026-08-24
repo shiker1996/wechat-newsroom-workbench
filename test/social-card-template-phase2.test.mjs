@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { getSocialCardTemplatePack, listSocialCardTemplatePacks } from '../lib/rendering/social-card-template-registry.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { getSocialCardTemplatePack, listSocialCardTemplatePacks } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 function legacyTheme(id='peach') {
   const theme=structuredClone(socialThemeDefinition(id));
@@ -73,7 +73,7 @@ test('Phase 2 standard-v1 渲染路径保持旧页面骨架', () => {
 });
 
 test('Phase 2 严格模板模式不再自动回退 standard-v1', () => {
-  const source = fs.readFileSync(new URL('../lib/llm/social-card-pipeline.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../server/features/social-cards/application/social-card-pipeline.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /templateFallbackApplied/);
   assert.doesNotMatch(source, /templatePackOverride = 'standard-v1'/);
   assert.match(source, /严格渲染未通过，未自动回退到 standard-v1/);

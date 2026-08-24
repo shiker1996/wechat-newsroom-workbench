@@ -70,12 +70,12 @@
 
 ### 新增/改动文件
 
-1. `lib/themes/cover-components.mjs`（新）：组件目录定义——每个组件一个渲染函数（HTML 片段 + CSS），位置/形态变体、字号标定、边界保护（标题不压色块）；
-2. `lib/themes/cover-theme-compiler.mjs`（新）：封面主题编译——token → CSS 变量 + 组件 CSS，产出完整 900×383 页面 HTML；对比度校验与修正；
-3. `lib/themes/theme-registry.mjs`：注册 `target: 'cover'` 的内置封面主题（一期 4~6 套：藏青金、米白砖红、墨绿米白、深灰荧光绿等，纯 token 组合）；
-4. `lib/themes/theme-validator.mjs` / `theme-numeric-limits.mjs`：cover target 的 schema 与数值范围声明；
-5. `lib/llm/cover-image-generator.mjs`（新）：主流程——取文章标题/摘要/账号上下文 → LLM 出规格 JSON（prompt 附组件目录与约束）→ 校验/回退 → 编译渲染 → `html-pages-to-images` 截图（900×383，deviceScaleFactor 2）→ 落 artifacts（`kind='cover-image'`）；标题断行优先复用 social-card 已验证的语义断行思路（`social-card-pipeline.mjs:705-723`）；
-6. `lib/themes/theme-preview.mjs`：封面主题 900×383 预览样张（用示例标题渲染）；
+1. `server/shared/themes/cover-components.mjs`（新）：组件目录定义——每个组件一个渲染函数（HTML 片段 + CSS），位置/形态变体、字号标定、边界保护（标题不压色块）；
+2. `server/shared/themes/cover-theme-compiler.mjs`（新）：封面主题编译——token → CSS 变量 + 组件 CSS，产出完整 900×383 页面 HTML；对比度校验与修正；
+3. `server/shared/themes/theme-registry.mjs`：注册 `target: 'cover'` 的内置封面主题（一期 4~6 套：藏青金、米白砖红、墨绿米白、深灰荧光绿等，纯 token 组合）；
+4. `server/shared/themes/theme-validator.mjs` / `theme-numeric-limits.mjs`：cover target 的 schema 与数值范围声明；
+5. `server/platform/llm/cover-image-generator.mjs`（新）：主流程——取文章标题/摘要/账号上下文 → LLM 出规格 JSON（prompt 附组件目录与约束）→ 校验/回退 → 编译渲染 → `html-pages-to-images` 截图（900×383，deviceScaleFactor 2）→ 落 artifacts（`kind='cover-image'`）；标题断行优先复用 social-card 已验证的语义断行思路（`social-card-pipeline.mjs:705-723`）；
+6. `server/shared/themes/theme-preview.mjs`：封面主题 900×383 预览样张（用示例标题渲染）；
 7. API：`POST /api/candidates/:id/cover/generate`（挂 `media-routes.mjs`），产物走现有 artifacts 内容路由；`API.md` 同步；
 8. 前端：成稿工作台加「生成封面图」按钮（参照 `generate-social-card` 的 job/watcher 模式，注意按候选追踪进度——沿用 `socialJobs` Map 的教训）；主题中心加「封面」分类页签；
 9. job 注册进 `AiJobManager`；`CHANGELOG.md`、`docs/` 同步。
@@ -114,7 +114,7 @@
 - **颜色决策 `pick()`**：每个文本角色从候选色中选与所在底色对比度最高且达标的，全不达标时向黑/白混合修正；badge 底色会避开与整版 accent 色块同色。
 - **信息行定位**：`.cover-meta` 绝对定位，左缘对齐内容区（`main.left + 48`），避免压到左侧色块。
 - **主题中心页签未做**：封面主题选择在封面页内的主题下拉完成（`GET /api/themes?target=cover` 已可用）；AI 生成封面主题、上传公众号素材、规格微调 UI 均留二期。
-- **验证结果**：20 张内置主题样张人工验收通过（`scripts/render-cover-samples.mjs` → `output/cover-samples/`）；`test/cover-image-generate.test.mjs` 7 项；`npm run test:fast` 691 项全绿。
+- **验证结果**：20 张内置主题样张人工验收通过（`scripts/media/render-cover-samples.mjs` → `output/cover-samples/`）；`test/cover-image-generate.test.mjs` 7 项；`npm run test:fast` 691 项全绿。
 
 ## 二期
 

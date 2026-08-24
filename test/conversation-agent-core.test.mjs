@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runConversationAgent } from '../lib/agent/conversation-agent.mjs';
-import { buildConversationToolCatalog } from '../lib/agent/tool-catalog.mjs';
-import { AgentContractError, validateAgentEnvelope } from '../lib/agent/tool-protocol.mjs';
-import { ToolRegistry } from '../lib/tools/registry.mjs';
-import { Store } from '../lib/core/store.mjs';
+import { runConversationAgent } from '../server/platform/agent/conversation-agent.mjs';
+import { buildConversationToolCatalog } from '../server/platform/agent/tool-catalog.mjs';
+import { AgentContractError, validateAgentEnvelope } from '../server/platform/agent/tool-protocol.mjs';
+import { ToolRegistry } from '../server/platform/tools/registry.mjs';
+import { Store } from '../server/platform/core/store.mjs';
 
 function registry(){
   const value=new ToolRegistry();

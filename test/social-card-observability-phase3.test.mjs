@@ -6,8 +6,8 @@ import { cardBlockEditorHtml } from '../public/src/views/social-editor-model.js'
 const read = (file) => fs.readFileSync(new URL(file, import.meta.url), 'utf8');
 
 test('第三步持久化事实候选索引并通过图文接口暴露', () => {
-  const pipeline = read('../lib/llm/social-card-pipeline.mjs');
-  const route = read('../lib/http/routes/social-card-routes.mjs');
+  const pipeline = read('../server/features/social-cards/application/social-card-pipeline.mjs');
+  const route = read('../server/platform/http/routes/social-card-routes.mjs');
   assert.match(pipeline, /social-card-fact-index\.json/);
   assert.match(pipeline, /deterministic-fact-supplement/);
   assert.match(route, /factIndex:parse\('social-card-fact-index\.json'/);

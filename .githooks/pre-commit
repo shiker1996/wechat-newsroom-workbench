@@ -1,4 +1,4 @@
 #!/bin/sh
 # 提交前秘密扫描：命中高危密钥模式则阻止提交。
 # 启用方式：git config core.hooksPath .githooks
-exec node scripts/secret-scan.mjs
+exec node scripts/quality/secret-scan.mjs

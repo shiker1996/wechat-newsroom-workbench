@@ -223,10 +223,10 @@ Content-Type: application/json
 
 新增：
 
-- `lib/collectors/source-assistant-service.mjs`：编排探测、AI、验证和候选排序；
-- `lib/collectors/page-structure-analyzer.mjs`：DOM 裁剪、重复结构分析和规则候选；
-- `lib/llm/source-configuration-assistant.mjs`：模型提示词、JSON 解析和字段白名单；
-- `lib/http/routes/source-assistant-routes.mjs`，或将端点接入现有来源路由；
+- `server/platform/collectors/source-assistant-service.mjs`：编排探测、AI、验证和候选排序；
+- `server/platform/collectors/page-structure-analyzer.mjs`：DOM 裁剪、重复结构分析和规则候选；
+- `server/platform/llm/source-configuration-assistant.mjs`：模型提示词、JSON 解析和字段白名单；
+- `server/platform/http/routes/source-assistant-routes.mjs`，或将端点接入现有来源路由；
 - 对应单元测试与路由测试。
 
 复用：

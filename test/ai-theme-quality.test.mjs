@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
-import { compareAiThemeCandidate, compactThemeSignatures, themeVisualSimilarity } from '../lib/themes/ai-theme-quality.mjs';
-import { buildAiThemeMessages } from '../lib/themes/ai-theme-generator.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
+import { compareAiThemeCandidate, compactThemeSignatures, themeVisualSimilarity } from '../server/shared/themes/ai-theme-quality.mjs';
+import { buildAiThemeMessages } from '../server/platform/application/themes/ai-theme-generator.mjs';
 
 const registry=getBuiltinThemeRegistry(),warm=registry.get('magazine-warm'),tech=registry.get('tech-wire'),ice=registry.get('ice-blue');
 

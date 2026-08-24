@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { ModelGateway } from '../lib/llm/gateway.mjs';
+import { ModelGateway } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 // 回归：AbortController 超时曾被 response.json() 兜底吞掉，误报「未返回文本内容」。
 // 现在必须抛出明确的超时错误，并提示如何调大 requestTimeoutMs。
@@ -30,7 +31,7 @@ test('request timeout surfaces a clear timeout error instead of a misleading emp
         },
       },
     },
-  }, { recordModelCall() { return 1; } });
+  }, { recordModelCall() { return 1; } }, testConfigurationResolver);
   try {
     await assert.rejects(
       gateway.complete({ purpose: 'daily-review', messages: [{ role: 'user', content: 'hi' }] }),

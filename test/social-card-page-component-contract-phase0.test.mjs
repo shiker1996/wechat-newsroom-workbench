@@ -6,9 +6,9 @@ import {
   displayLabelForSocialCardFact,
   normalizeSocialCardPageComponent,
   semanticIntentCandidatesForTags,
-} from '../lib/rendering/social-card-page-component-contract.mjs';
-import { buildSocialCardContentComponents } from '../lib/rendering/social-card-content-components.mjs';
-import { selectSocialCardFactCandidates } from '../lib/rendering/social-card-fact-index.mjs';
+} from '../server/shared/rendering/social-card-page-component-contract.mjs';
+import { buildSocialCardContentComponents } from '../server/shared/rendering/social-card-content-components.mjs';
+import { selectSocialCardFactCandidates } from '../server/shared/rendering/social-card-fact-index.mjs';
 
 test('阶段 0 页面组件契约冻结核心/补充字段，并不改变旧 id', () => {
   const snapshot = buildSocialCardContentComponents({

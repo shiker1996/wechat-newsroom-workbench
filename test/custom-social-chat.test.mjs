@@ -4,7 +4,7 @@ import {
   parseResult,
   sanitizeFormUpdates,
   requestMessages,
-} from '../lib/llm/custom-social-chat.mjs';
+} from '../server/features/social-cards/llm/custom-social-chat.mjs';
 
 test('parseResult 解析合法 JSON 与围栏 JSON', () => {
   const plain = parseResult({ content: '{"assistantReply":"好","ready":false}', finishReason: 'stop' });

@@ -4,9 +4,9 @@
 
 ## 已知问题
 
-1. ~~智能构图问题~~（已修复 2026-07-31）：P-03 页面 text-block 中长 URL 未折行，溢出所在列被相邻列 list-block 遮盖。根因是生成 CSS 中 `.content-block p/h2` 缺少 `overflow-wrap:anywhere` 且网格项缺 `min-width:0`（`lib/llm/social-card-pipeline.mjs`）；grid-column 分配本身无误。同时给 `skills/xiaohongshu-article-generator/scripts/layout-audit.mjs` 增加 `horizontal_overflow` 横向溢出检测，堵住审计盲区。
-2. ~~稳定构图生成失败~~（已修复 2026-07-31）：首次生成时技能未配置白名单，快照却写入 `allowedTools:[]`；重新生成走快照复用路径时空数组被当作已配置白名单，与冻结工具数不一致而报错（`lib/skills/pipeline-runtime.mjs`）。已统一"空白名单=未配置"语义并补回归测试。
-3. ~~代码下线：lib/domain/social-card-prompts~~（已评估 2026-07-31，不予下线）：该目录为在用代码，每次故事板规划经 `buildSocialCardStoryboardSystemPrompt()` 读取（`lib/domain/social-card-storyboard-contracts.mjs:76`，调用点 `lib/http/routes/social-card-routes.mjs:158`）。4 个文件是输出 Schema、渠道边界、构图 DSL 白名单三类固定契约，对内置和第三方故事板技能统一注入，属于不可替换的运行契约（见 social-card-storyboard-skill-extension-plan.md:469 的刻意设计），技能化会破坏第三方技能约束闭环。可选整理仅为目录改名（如 `lib/domain/social-card-contracts/`），开源整理时顺手做即可。
+1. ~~智能构图问题~~（已修复 2026-07-31）：P-03 页面 text-block 中长 URL 未折行，溢出所在列被相邻列 list-block 遮盖。根因是生成 CSS 中 `.content-block p/h2` 缺少 `overflow-wrap:anywhere` 且网格项缺 `min-width:0`（`server/platform/llm/social-card-pipeline.mjs`）；grid-column 分配本身无误。同时给 `skills/xiaohongshu-article-generator/scripts/layout-audit.mjs` 增加 `horizontal_overflow` 横向溢出检测，堵住审计盲区。
+2. ~~稳定构图生成失败~~（已修复 2026-07-31）：首次生成时技能未配置白名单，快照却写入 `allowedTools:[]`；重新生成走快照复用路径时空数组被当作已配置白名单，与冻结工具数不一致而报错（`server/platform/skills/pipeline-runtime.mjs`）。已统一"空白名单=未配置"语义并补回归测试。
+3. ~~代码下线：server/domain/social-card-prompts~~（已评估 2026-07-31，不予下线）：该目录为在用代码，每次故事板规划经 `buildSocialCardStoryboardSystemPrompt()` 读取（`server/domain/social-card-storyboard-contracts.mjs:76`，调用点 `server/platform/http/routes/social-card-routes.mjs:158`）。4 个文件是输出 Schema、渠道边界、构图 DSL 白名单三类固定契约，对内置和第三方故事板技能统一注入，属于不可替换的运行契约（见 social-card-storyboard-skill-extension-plan.md:469 的刻意设计），技能化会破坏第三方技能约束闭环。可选整理仅为目录改名（如 `server/domain/social-card-contracts/`），开源整理时顺手做即可。
 
 ## 开源前置工作
 
@@ -138,9 +138,9 @@
 
 实际落地（与建议步骤略有出入，以代码为准）：
 
-1. 占位格式扩展：`lib/llm/image-workflow.mjs` 新增 `IMG-DATA` 注释（`<!-- IMG-DATA:id {json} -->`），`generate` 字段支持 `timeline` / `datacard` 两类；白名单校验（items 2–8 条、label ≤ 40 / value ≤ 80 字符、拒绝 `-->` 注入），数据必须逐字来自正文。
+1. 占位格式扩展：`server/platform/llm/image-workflow.mjs` 新增 `IMG-DATA` 注释（`<!-- IMG-DATA:id {json} -->`），`generate` 字段支持 `timeline` / `datacard` 两类；白名单校验（items 2–8 条、label ≤ 40 / value ≤ 80 字符、拒绝 `-->` 注入），数据必须逐字来自正文。
 2. 规划提示词：`IMAGE_PLAN_SYSTEM` 允许模型对事件线 / 数据卡类需求附 `generate` 字段，其余来源图 / 实拍图 / 版权图仍走手动供图，缺失阻断纪律不变。
-3. 单图生成薄管线：`lib/llm/article-image-generator.mjs` 固定浅色模板渲染 HTML + `html-pages-to-images` 截图（deviceScaleFactor 2）产出本地 PNG；端点 `POST /api/candidates/:id/images/:imageId/generate`；排版页配图工作台对「可生成」占位显示「生成图片」按钮。上传 CDN 仍需用户显式操作，不自动传。
+3. 单图生成薄管线：`server/platform/llm/article-image-generator.mjs` 固定浅色模板渲染 HTML + `html-pages-to-images` 截图（deviceScaleFactor 2）产出本地 PNG；端点 `POST /api/candidates/:id/images/:imageId/generate`；排版页配图工作台对「可生成」占位显示「生成图片」按钮。上传 CDN 仍需用户显式操作，不自动传。
 4. 回归测试：`test/article-image-generate.test.mjs` 4 项（解析校验、注入拒绝、模板渲染、生成落盘），全套 476 通过。
 
 ## 2026-08-01 新增待办
@@ -151,7 +151,7 @@
 
 实际落地：
 
-1. `scripts/setup.mjs`（`npm run setup`）交互式向导：逐项检测 → 给出修复动作 → 用户确认后执行；覆盖依赖安装（`npm install`）、`config.example.json` → `config.local.json`、`.env.example` → `.env` 并逐项引导填入 LLM Key（格式校验、可跳过）、RSSHub 缺失提示（无法自动恢复时指向 README）。
+1. `scripts/runtime/setup.mjs`（`npm run setup`）交互式向导：逐项检测 → 给出修复动作 → 用户确认后执行；覆盖依赖安装（`npm install`）、`config.example.json` → `config.local.json`、`.env.example` → `.env` 并逐项引导填入 LLM Key（格式校验、可跳过）、RSSHub 缺失提示（无法自动恢复时指向 README）。
 2. 幂等可重跑：已完成项自动跳过；`--yes` 非交互模式全按默认处理；结束时自动调用 `check-env.mjs` 输出最终状态。
 3. 纯函数（`buildEnvContent` / `isValidApiKey` / `inspectSetup` / `readEnvFile`）导出供测试，`test/setup.test.mjs` 6 项覆盖。
 4. README 启动段落已改为以 setup 向导为首次入口。

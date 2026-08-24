@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compileThemePreview, ARTICLE_THEME_SPECIMEN, SOCIAL_THEME_SPECIMEN } from '../lib/themes/theme-preview.mjs';
-import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { compileThemePreview, ARTICLE_THEME_SPECIMEN, SOCIAL_THEME_SPECIMEN } from '../server/platform/application/themes/theme-preview.mjs';
+import { articleThemeDefinition } from '../server/shared/themes/article-theme-compiler.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 
 test('阶段 2 文章固定样稿直接包含正式排版编译结果',()=>{
   const definition=articleThemeDefinition('magazine-warm');

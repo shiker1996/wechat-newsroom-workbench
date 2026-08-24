@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { EDITORIAL_AGENT_CAPABILITIES } from '../lib/agent/editorial-adapter.mjs';
-import { TUTORIAL_AGENT_CAPABILITIES } from '../lib/agent/tutorial-adapter.mjs';
-import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../lib/agent/custom-social-adapter.mjs';
-import { buildConversationToolCatalog } from '../lib/agent/tool-catalog.mjs';
-import { deriveAgentEntryCapabilities } from '../lib/agent/entry-capabilities.mjs';
-import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
-import { getToolRegistry } from '../lib/tools/index.mjs';
-import { buildConsumerCapabilityBaseline } from '../scripts/snapshot-consumer-capability-baseline.mjs';
+import { EDITORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/editorial-adapter.mjs';
+import { TUTORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/tutorial-adapter.mjs';
+import { CUSTOM_SOCIAL_AGENT_CAPABILITIES } from '../server/features/social-cards/application/agent/custom-social-adapter.mjs';
+import { buildConversationToolCatalog } from '../server/platform/agent/tool-catalog.mjs';
+import { deriveAgentEntryCapabilities } from '../server/platform/agent/entry-capabilities.mjs';
+import { buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
+import { getToolRegistry } from '../server/platform/tools/index.mjs';
+import { buildConsumerCapabilityBaseline } from '../scripts/quality/snapshot-consumer-capability-baseline.mjs';
 
 // 阶段 0 冻结基线：固化三个 Agent 当前的能力可见性行为与图谱现状。
 // 任何修改 Adapter 能力常量、目录过滤规则或实现启停状态的变更都必须显式更新本快照。
@@ -102,5 +102,5 @@ test('capability-graph 对三个 Agent 能力的现状快照',async ()=>{
 test('消费者—能力—实现基线与仓库现状保持同步',async ()=>{
   const expected=await buildConsumerCapabilityBaseline(root);
   const saved=JSON.parse(fs.readFileSync(path.join(root,'test','fixtures','capability-consumer-baseline.json'),'utf8'));
-  assert.deepEqual(saved,expected,'基线已过期，请运行 npm run capability:consumer-baseline 或 node scripts/snapshot-consumer-capability-baseline.mjs');
+  assert.deepEqual(saved,expected,'基线已过期，请运行 npm run capability:consumer-baseline 或 node scripts/quality/snapshot-consumer-capability-baseline.mjs');
 });

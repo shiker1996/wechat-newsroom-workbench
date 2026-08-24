@@ -6,8 +6,8 @@ import test from 'node:test';
 import {
   listArticleStageSkillSlots, listEntryWriterSkills, listSocialCardStageSkillSlots,
   resolveArticleStageSkills, resolveEntryWriterSkill, resolveSocialCardStageSkills,
-} from '../lib/skills/entry-routing.mjs';
-import { createGenerationSnapshot } from '../lib/skills/registry.mjs';
+} from '../server/platform/skills/entry-routing.mjs';
+import { createGenerationSnapshot } from '../server/platform/skills/registry.mjs';
 
 function writeSkill(root,{id,name=id,entryPoints,contentTypes,inputContract,requiredCapabilities=[],
   kind='writer',outputContract='wechat_markdown'}) {

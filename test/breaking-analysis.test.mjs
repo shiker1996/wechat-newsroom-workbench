@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { mapBreakingArticleScore, normalizeScore, routeBreakingAnalysis } from '../lib/llm/breaking-analysis-pipeline.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { mapBreakingArticleScore, normalizeScore, routeBreakingAnalysis } from '../server/features/articles/llm/breaking-analysis-pipeline.mjs';
 
 function createStore(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'breaking-analysis-'));

@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildAdaptation, loadAdaptationMessages, loadAgentAdaptation } from '../lib/agent/resource-adaptation.mjs';
+import { buildAdaptation, loadAdaptationMessages, loadAgentAdaptation, requireAgentAdaptation } from '../server/platform/agent/resource-adaptation.mjs';
 
-// 阶段 4（docs/design/agent-adapter-configurability-design.md）：Agent 适配声明挪到 capability-consumers.json 的
-// adaptation 字段，config 为权威来源；config 缺失/无字段时 Adapter 回退内联声明，行为一致。
+// Agent 适配声明挪到 capability-consumers.json 的 adaptation 字段，config 是运行时唯一事实来源。
 
 const projectRoot=path.resolve(import.meta.dirname,'..');
 
@@ -40,12 +39,14 @@ test('config 驱动与内联声明的 buildAdaptation 行为一致（资源目�
   assert.deepEqual(fromConfig.resolveArguments({resourceId:'material:1'},request),inline.resolveArguments({resourceId:'material:1'},request));
 });
 
-test('config 缺失或无 adaptation 字段时 loadAgentAdaptation 返回 null（Adapter 回退内联声明）',(t)=>{
+test('config 缺失或无 adaptation 字段时读取器返回 null，运行时要求显式配置',(t)=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'agent-adaptation-empty-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   assert.equal(loadAgentAdaptation(dir,'agent.editorial'),null,'登记文件缺失回退 null');
   const root=makeRoot(t,(consumers)=>{delete consumers.consumers.find((item)=>item.id==='agent.editorial').adaptation;});
   assert.equal(loadAgentAdaptation(root,'agent.editorial'),null,'条目无 adaptation 字段回退 null');
+  assert.throws(()=>requireAgentAdaptation(dir,'agent.editorial'),/缺少统一 adaptation 配置/);
+  assert.throws(()=>requireAgentAdaptation(root,'agent.editorial'),/缺少统一 adaptation 配置/);
 });
 
 test('非法 source / handler 名在读取处报错',(t)=>{

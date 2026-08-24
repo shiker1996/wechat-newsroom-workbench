@@ -3,15 +3,22 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { attachInformationSearch } from '../lib/integrations/information-search.mjs';
+import { attachInformationSearch } from '../server/platform/integrations/information-search.mjs';
+import { reloadToolRegistry, setToolConfigurationResolver } from '../server/platform/tools/index.mjs';
+
+setToolConfigurationResolver((manifest) => manifest.id === 'tavily-search'
+  ? { configured: true, status: 'test-unified', values: { apiKey: process.env.TAVILY_API_KEY || '', enabled: true, maxResults: 5 }, snapshot: { status: 'test-unified' } }
+  : { configured: true, status: 'test-unified', values: {}, snapshot: { status: 'test-unified' } });
 
 function withKey(value, run) {
   const original = process.env.TAVILY_API_KEY;
   if (value === undefined) delete process.env.TAVILY_API_KEY; else process.env.TAVILY_API_KEY = value;
+  reloadToolRegistry();
   return Promise.resolve()
     .then(run)
     .finally(() => {
       if (original === undefined) delete process.env.TAVILY_API_KEY; else process.env.TAVILY_API_KEY = original;
+      reloadToolRegistry();
     });
 }
 
@@ -87,7 +94,7 @@ test('news search requests news topic and keeps provider warnings', async () => 
 });
 
 test('creation chains wire search flags into both autonomous writing and custom cards', () => {
-  const server = `${fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs', import.meta.url), 'utf8')}\n${fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8')}`;
+  const server = `${fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs', import.meta.url), 'utf8')}\n${fs.readFileSync(new URL('../server/platform/http/routes/task-routes.mjs', import.meta.url), 'utf8')}`;
   const occurrences = server.match(/attachInformationSearch\(\{ ?fact, ?input/g) || [];
   assert.equal(occurrences.length, 2);
   assert.match(server, /skillId: 'custom-card-storyboard'/);

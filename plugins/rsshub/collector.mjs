@@ -2,6 +2,23 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import path from 'node:path';
+
+export function normalizeRssHubLifecycleConfig(config = {}) {
+  const normalizeScript = (value) => {
+    const text = String(value ?? '').trim().replace(/(?:&#x20;|\s)+$/gi, '');
+    const file = path.win32.basename(text);
+    const directory = path.win32.dirname(text);
+    if (!['rsshub-start.ps1', 'rsshub-stop.ps1'].includes(file.toLowerCase())
+      || path.win32.basename(directory).toLowerCase() !== 'scripts') return text;
+    return path.win32.join(directory, 'runtime', file);
+  };
+  return {
+    ...config,
+    startScript: normalizeScript(config.startScript),
+    stopScript: normalizeScript(config.stopScript),
+  };
+}
 function privateIp(address){if(net.isIPv4(address)){const [a,b]=address.split('.').map(Number);return a===10||a===127||a===0||(a===100&&b>=64&&b<=127)||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&[0,2,168].includes(b))||(a===198&&(b===18||b===19||b===51))||(a===203&&b===0)||a>=224;}const value=address.toLowerCase();return !/^[23][0-9a-f]{0,3}:/.test(value)||value.startsWith('2001:db8:');}
 
 function decodeXml(value = '') {
@@ -141,6 +158,7 @@ function runPowerShell(scriptPath, args = [], timeoutMs = 190000) {
 }
 
 export async function ensureStarted(config, onProgress) {
+  config = normalizeRssHubLifecycleConfig(config);
   if (await probe(config.baseUrl)) return false;
   onProgress('RSSHub 未运行，正在启动本地服务');
   const port=String(new URL(config.baseUrl).port||1200);
@@ -155,6 +173,7 @@ export async function ensureStarted(config, onProgress) {
 }
 
 export async function stopRssHub(config) {
+  config = normalizeRssHubLifecycleConfig(config);
   const port = String(new URL(config.baseUrl).port || 1200);
   return runPowerShell(config.stopScript, ['-PidFile', config.pidFile, '-Port', port], 30000);
 }
@@ -182,6 +201,7 @@ async function mapConcurrent(items, limit, worker) {
 }
 
 export async function collectRssHub(config, onProgress = () => {}, onSourceResult = () => {}) {
+  config = normalizeRssHubLifecycleConfig(config);
   let startedHere = false;
   try {
     const disabled = new Set(config.disabledRoutes ?? []);

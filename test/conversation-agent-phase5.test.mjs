@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {Store} from '../lib/core/store.mjs';
+import {Store} from '../server/platform/core/store.mjs';
 
 test('阶段 5 运行概览关联同一次 Agent run 与工具调用并聚合健康指标',(t)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'agent-overview-')),store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
@@ -18,8 +18,8 @@ test('阶段 5 运行概览关联同一次 Agent run 与工具调用并聚合健
 
 test('阶段 5 三入口共享工具卡协议且新编辑室不再转换 fetchEvents',()=>{
   const renderer=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');
-  const adapter=fs.readFileSync(new URL('../lib/agent/editorial-adapter.mjs',import.meta.url),'utf8');
-  const routes=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+  const adapter=fs.readFileSync(new URL('../server/features/articles/application/agent/editorial-adapter.mjs',import.meta.url),'utf8');
+  const routes=fs.readFileSync(new URL('../server/platform/http/routes/system-routes.mjs',import.meta.url),'utf8');
   assert.match(renderer,/tool\.requested/);assert.match(renderer,/assistant\.thinking/);assert.match(renderer,/agent\.limit/);
   assert.doesNotMatch(adapter,/compatibilityRequests/);assert.doesNotMatch(adapter,/tr_legacy_/);
   assert.match(routes,/conversation-agent-runs/);

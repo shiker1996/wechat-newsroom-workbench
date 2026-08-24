@@ -9,7 +9,7 @@ import {
   listInformationCapabilitySlots,
   preferredPluginForCapability,
   setInformationCapabilitySlot,
-} from '../lib/tools/capability-slots.mjs';
+} from '../server/platform/tools/capability-slots.mjs';
 
 test('information slots expose stable writing-oriented capability contracts',()=>{
   assert.deepEqual(INFORMATION_CAPABILITY_SLOTS.map((item)=>item.id),[
@@ -43,9 +43,9 @@ test('slot implementation preference is validated and persisted',async()=>{
 });
 
 test('external information flows call slots instead of binding plugin implementations',()=>{
-  const source=fs.readFileSync(new URL('../lib/integrations/source-fetcher.mjs',import.meta.url),'utf8');
-  const project=fs.readFileSync(new URL('../lib/integrations/local-project-reader.mjs',import.meta.url),'utf8');
-  const repository=fs.readFileSync(new URL('../lib/integrations/repository-inspector.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../server/platform/integrations/source-fetcher.mjs',import.meta.url),'utf8');
+  const project=fs.readFileSync(new URL('../server/platform/integrations/local-project-reader.mjs',import.meta.url),'utf8');
+  const repository=fs.readFileSync(new URL('../server/platform/integrations/repository-inspector.mjs',import.meta.url),'utf8');
   assert.match(source,/executeInformationCapabilitySlot\('web-page'/);
   assert.match(project,/executeInformationCapabilitySlot\('local-project'/);
   assert.match(repository,/executeInformationCapabilitySlot\('repository'/);

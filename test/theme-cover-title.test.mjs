@@ -6,11 +6,11 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { buildAiThemeMessages, normalizeAiThemeCandidate } from '../lib/themes/ai-theme-generator.mjs';
-import { compileSocialTheme, resolveSocialCoverTitleShadowRole, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { renderStoryboardHtml, deterministicCoverTitleLines, normalizeCoverTitleLines } from '../lib/llm/social-card-pipeline.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { buildAiThemeMessages, normalizeAiThemeCandidate } from '../server/platform/application/themes/ai-theme-generator.mjs';
+import { compileSocialTheme, resolveSocialCoverTitleShadowRole, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { renderStoryboardHtml, deterministicCoverTitleLines, normalizeCoverTitleLines } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
 const recipes=['classic','editorial','poster','highlight-block'];

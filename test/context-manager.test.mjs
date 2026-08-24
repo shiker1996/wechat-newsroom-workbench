@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compactMessages, contextBudget, estimateTokens } from '../lib/llm/context-manager.mjs';
+import { compactMessages, contextBudget, estimateTokens } from '../server/platform/llm/context-manager.mjs';
 
 test('short context is left unchanged', async () => {
   const messages = [{ role: 'user', content: '你好' }];

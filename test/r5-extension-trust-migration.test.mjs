@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Store } from '../lib/core/store.mjs';
-import { applyLegacyConfigurationMigration, planLegacyConfigurationMigration } from '../lib/extensions/legacy-configuration-migrator.mjs';
-import { installRemotePlugin, readRemotePluginCatalog, setRemotePluginStatus } from '../lib/tools/remote-package-manager.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { applyLegacyConfigurationMigration, planLegacyConfigurationMigration } from '../server/platform/extensions/legacy-configuration-migrator.mjs';
+import { installRemotePlugin, readRemotePluginCatalog, setRemotePluginStatus } from '../server/platform/tools/remote-package-manager.mjs';
 
 const schema={type:'object',additionalProperties:false,properties:{endpoint:{type:'string'},apiKey:{type:'string',secret:true}},required:['endpoint','apiKey']};
 const resource={type:'tool',id:'sample',name:'Sample',manifest:{id:'sample',configuration:schema}};
@@ -37,7 +37,7 @@ test('R5.2 legacy 跳过迁移前报告字段差异且秘密值改变配置摘�
 });
 
 test('R5.2 扩展变更路由统一要求 plugin-admin 确认并声明 fallback 下线版本',()=>{
-  const source=fs.readFileSync(new URL('../lib/http/routes/system-routes.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../server/platform/http/routes/system-routes.mjs',import.meta.url),'utf8');
   for(const marker of ['remoteStatusMatch','remoteFirstRunMatch','collectorConfirmMatch']){
     const start=source.indexOf(marker),segment=source.slice(start,start+900);assert.match(segment,/requirePluginAdmin\(request\)/,marker);
   }

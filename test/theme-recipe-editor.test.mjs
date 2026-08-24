@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARTICLE_THEME_RECIPES, SOCIAL_THEME_RECIPES, themeRecipeEditorCatalog } from '../lib/themes/recipe-catalog.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { ARTICLE_THEME_RECIPES, SOCIAL_THEME_RECIPES, themeRecipeEditorCatalog } from '../server/shared/themes/recipe-catalog.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { articleThemeDefinition } from '../server/shared/themes/article-theme-compiler.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
 const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');

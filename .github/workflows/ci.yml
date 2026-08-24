@@ -48,14 +48,14 @@ jobs:
 
       - name: 校验示例技能包与工具插件
         run: |
-          node scripts/validate-skill-package.mjs docs/examples/skill-package
-          node scripts/validate-tool-plugin.mjs docs/examples/tool-plugin
+          node scripts/quality/validate-skill-package.mjs docs/examples/skill-package
+          node scripts/quality/validate-tool-plugin.mjs docs/examples/tool-plugin
 
       - name: 依赖漏洞扫描
         run: npm audit --audit-level=high --omit=dev
 
       - name: 许可证扫描
-        run: node scripts/license-scan.mjs
+        run: node scripts/quality/license-scan.mjs
 
       - name: 秘密扫描
-        run: node scripts/secret-scan.mjs
+        run: node scripts/quality/secret-scan.mjs

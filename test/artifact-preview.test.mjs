@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from '../lib/artifacts/artifact-preview.mjs';
+import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from '../server/platform/artifacts/artifact-preview.mjs';
 
 test('手机预览为文章图片注入响应式覆盖且不修改原文件', () => {
   const source = '<!doctype html><html><head></head><body><img src="a.png" style="object-fit:fill"></body></html>';

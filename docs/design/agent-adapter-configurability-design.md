@@ -17,7 +17,7 @@ Agent 接入资源类能力目前要走六件清单，其中三件是 Adapter �
 
 ## 2. 目标模型
 
-### 通用层（一次写好，`lib/agent/resource-adaptation.mjs` 扩展）
+### 通用层（一次写好，`server/platform/agent/resource-adaptation.mjs` 扩展）
 
 - **resourceKind 档案表**：每种 resourceKind（path / url / root / content 列表…）定义参数改写、输入 Schema、校验规则（可选约束如 URL 模式白名单）。替代 `resolveResourceArguments` 的 switch 成为默认实现；现有五能力的分支降级为具名特化。
 - **资源注册器表**：具名注册器（`materials` / `documentRoots` / `project` / `hotspotSources`…），各带参数（如素材上限）。

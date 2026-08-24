@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { AI_JOB_TYPES } from '../lib/jobs/ai-job-handlers.mjs';
+import { AI_JOB_TYPES } from '../server/features/batches/application/ai-job-handlers.mjs';
 
 test('自动任务类型串联打标、事件卡与事件研判', () => {
-  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
-  const handlers = fs.readFileSync(new URL('../lib/jobs/ai-job-handlers.mjs', import.meta.url), 'utf8');
-  const autoBranch = fs.readFileSync(new URL('../lib/jobs/auto-pipeline.mjs', import.meta.url), 'utf8');
+  const manager = fs.readFileSync(new URL('../server/platform/jobs/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const handlers = fs.readFileSync(new URL('../server/features/batches/application/ai-job-handlers.mjs', import.meta.url), 'utf8');
+  const autoBranch = fs.readFileSync(new URL('../server/features/batches/application/auto-pipeline.mjs', import.meta.url), 'utf8');
   assert.deepEqual(AI_JOB_TYPES, ['tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','cover-image','auto']);
-  assert.match(manager, /createAiJobHandlers/);
+  assert.doesNotMatch(manager, /createAiJobHandlers/);
   assert.match(handlers, /\['auto'/);
   assert.match(autoBranch, /runBreakingAnalysisPipeline/);
   const tagAt = autoBranch.indexOf('tagBatch');
@@ -18,15 +18,15 @@ test('自动任务类型串联打标、事件卡与事件研判', () => {
 });
 
 test('事件卡是独立环节：单独任务类型，打标不再顺带生成', () => {
-  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
-  const handlers = fs.readFileSync(new URL('../lib/jobs/ai-job-handlers.mjs', import.meta.url), 'utf8');
+  const manager = fs.readFileSync(new URL('../server/platform/jobs/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const handlers = fs.readFileSync(new URL('../server/features/batches/application/ai-job-handlers.mjs', import.meta.url), 'utf8');
   const tagBranch = handlers.slice(handlers.indexOf("['tag'"), handlers.indexOf("['event-cards'"));
   assert.doesNotMatch(tagBranch, /ensureBatchEventCards/);
   const cardsBranch = handlers.slice(handlers.indexOf("['event-cards'"));
   assert.match(cardsBranch, /ensureBatchEventCards/);
   assert.match(cardsBranch, /regenerate: Boolean\(options\.force\)/);
-  const server = fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8');
-  const batchRoutes = fs.readFileSync(new URL('../lib/http/routes/batch-routes.mjs', import.meta.url), 'utf8');
+  const server = fs.readFileSync(new URL('../server/platform/http/routes/task-routes.mjs', import.meta.url), 'utf8');
+  const batchRoutes = fs.readFileSync(new URL('../server/platform/http/routes/batch-routes.mjs', import.meta.url), 'utf8');
   assert.ok(server.includes('/api\\/batches\\/([^/]+)\\/ai\\/event-cards'), 'server.mjs 缺少 /ai/event-cards 路由');
   assert.match(batchRoutes, /batch\.event_cards = \{ count: cardTotal \? Math\.min\(cardCount, cardTotal\) : 0/);
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
@@ -35,7 +35,7 @@ test('事件卡是独立环节：单独任务类型，打标不再顺带生成',
 });
 
 test('批次一键自动化路由与手动重试入口并存', () => {
-  const server = fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8');
+  const server = fs.readFileSync(new URL('../server/platform/http/routes/task-routes.mjs', import.meta.url), 'utf8');
   assert.ok(server.includes('/api\\/batches\\/([^/]+)\\/ai\\/auto'), 'server.mjs 缺少 /ai/auto 路由');
   assert.match(server, /type:\s*'auto'/);
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
@@ -47,7 +47,7 @@ test('批次一键自动化路由与手动重试入口并存', () => {
 });
 
 test('采集失败未处理时中断打标及全部下游流程', () => {
-  const routes = fs.readFileSync(new URL('../lib/http/routes/task-routes.mjs', import.meta.url), 'utf8');
+  const routes = fs.readFileSync(new URL('../server/platform/http/routes/task-routes.mjs', import.meta.url), 'utf8');
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
   assert.match(routes, /PIPELINE_FAILURES_PENDING/);
   assert.match(routes, /pipelineFailureGate\(batchId,\['collect'\],'打标'\)/);
@@ -59,14 +59,14 @@ test('采集失败未处理时中断打标及全部下游流程', () => {
 });
 
 test('自动流程在打标或事件卡存在待处理失败时中断后续环节', () => {
-  const auto = fs.readFileSync(new URL('../lib/jobs/auto-pipeline.mjs', import.meta.url), 'utf8');
-  assert.match(auto, /stages:\['tag'\][\s\S]*流程已暂停/);
-  assert.match(auto, /stages:\['event-card'\][\s\S]*流程已暂停/);
+  const auto = fs.readFileSync(new URL('../server/features/batches/application/auto-pipeline.mjs', import.meta.url), 'utf8');
+  assert.match(auto, /stages:\s*\[\s*['"]tag['"]\s*\][\s\S]*流程已暂停/);
+  assert.match(auto, /stages:\s*\[\s*['"]event-card['"]\s*\][\s\S]*流程已暂停/);
   assert.doesNotMatch(auto, /事件卡生成失败（不阻塞自动流程）/);
 });
 
 test('一键流程实时刷新四步进度并把 auto 视为研判任务', () => {
-  const batchQueries = fs.readFileSync(new URL('../lib/persistence/queries/batch-query-service.mjs', import.meta.url), 'utf8');
+  const batchQueries = fs.readFileSync(new URL('../server/platform/persistence/queries/batch-query-service.mjs', import.meta.url), 'utf8');
   assert.match(batchQueries, /type IN \('research','auto'\)/);
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
   assert.match(ui, /data-pipeline-step="collect"/);
@@ -77,8 +77,8 @@ test('一键流程实时刷新四步进度并把 auto 视为研判任务', () =>
 });
 
 test('一键流程按实际阶段点亮步骤，不被批次旧结果提前点亮', () => {
-  const manager = fs.readFileSync(new URL('../lib/llm/ai-job-manager.mjs', import.meta.url), 'utf8');
-  const auto = fs.readFileSync(new URL('../lib/jobs/auto-pipeline.mjs', import.meta.url), 'utf8');
+  const manager = fs.readFileSync(new URL('../server/platform/jobs/ai-job-manager.mjs', import.meta.url), 'utf8');
+  const auto = fs.readFileSync(new URL('../server/features/batches/application/auto-pipeline.mjs', import.meta.url), 'utf8');
   const ui = fs.readFileSync(new URL('../public/src/views/batch-drawer.js', import.meta.url), 'utf8');
   assert.doesNotMatch(manager, /if \(job\.type ===/);
   assert.match(auto, /job\.phase = 'tag'[\s\S]*job\.phase = 'event-cards'[\s\S]*job\.phase = 'research'/);

@@ -23,7 +23,7 @@ test('server 不再注入 Phase 5 前的编辑室私有执行器',()=>{
 });
 
 test('server 所有路由共享同一个已导入的 writeUtf8 绑定',()=>{
-  assert.match(source,/import \{ createRouteHelpers, writeUtf8 \} from '\.\/lib\/http\/route-helpers\.mjs'/);
+  assert.match(source,/import \{ createRouteHelpers, writeUtf8 \} from '\.\/server\/platform\/http\/route-helpers\.mjs'/);
   assert.doesNotMatch(source,/routeWriteUtf8/);
   assert.match(source,/handleMediaRoutes\(\{[^;]+writeUtf8/s);
   assert.match(source,/handleCandidateRoutes\(\{[^;]+writeUtf8/s);

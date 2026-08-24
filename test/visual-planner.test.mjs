@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeVisualComplexity, normalizeVisualPlan, planArticleVisuals } from '../lib/llm/visual-planner.mjs';
+import { analyzeVisualComplexity, normalizeVisualPlan, planArticleVisuals } from '../server/features/articles/llm/visual-planner.mjs';
 import fs from 'node:fs';
 
 test('visual plan keeps supported diagrams at existing headings', () => {

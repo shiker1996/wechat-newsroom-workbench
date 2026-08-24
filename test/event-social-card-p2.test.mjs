@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { evaluateEventCardGate } from '../lib/domain/social-card-gate.mjs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { Store } from '../lib/core/store.mjs';
-import { routeBreakingAnalysis } from '../lib/llm/breaking-analysis-pipeline.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
+import { evaluateEventCardGate } from '../server/features/social-cards/index.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { routeBreakingAnalysis } from '../server/features/articles/llm/breaking-analysis-pipeline.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
 
 test('事件图文门禁要求事实边界、来源审计和故事板',()=>{
   const analysis={eventSummary:'事件摘要',sources:[{status:'ok'}],factBase:{confirmedFacts:[{claim:'事实'}],claims:[]},sourceAudit:{issues:[]}};

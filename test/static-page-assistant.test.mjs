@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeStaticPage, assistStaticPage } from '../lib/collectors/static-page-assistant.mjs';
+import { analyzeStaticPage, assistStaticPage } from '../server/features/collection/application/static-page-assistant.mjs';
 
 const html=`<!doctype html><html><body><main>
   <article class="news-entry"><h2><a href="/one">第一条新闻</a></h2><p class="summary">摘要一</p><time datetime="2026-01-01">一月一日</time></article>

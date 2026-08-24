@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { Store } from '../lib/core/store.mjs';
-import { selectConversationSearchAttachments } from '../lib/agent/fact-attachments.mjs';
-import { attachInformationSearch } from '../lib/integrations/information-search.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { selectConversationSearchAttachments } from '../server/platform/agent/fact-attachments.mjs';
+import { attachInformationSearch } from '../server/platform/integrations/information-search.mjs';
 
 const attachment = (capability, query, updatedAt, data = {}) => ({
   capability,

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const server=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
+const server=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8');
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');

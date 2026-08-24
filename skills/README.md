@@ -10,7 +10,7 @@
 - `hotspot-synthesis`：热点综合研判与竞争修正（选题链复排阶段）
 - `editorial-room-chat`：公众号编辑会主持人，锁定简报前的对话式决策（选题链编辑会阶段）
 
-以上 5 个为选题阶段技能：前 4 个由代码经 `lib/llm/selection-prompts.mjs` 按名固定加载并保留内联 prompt 作为技能缺失时的 fallback，不进入创作入口路由。
+以上 5 个为选题阶段技能：前 4 个由代码经 `server/platform/llm/selection-prompts.mjs` 按名固定加载并保留内联 prompt 作为技能缺失时的 fallback，不进入创作入口路由。
 
 对话 agent 技能（prompt 唯一事实源，技能缺失时加载直接报错，代码不再内联 prompt）：
 

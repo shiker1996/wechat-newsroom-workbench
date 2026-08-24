@@ -7,9 +7,9 @@ import {
   installSkillPackage, listSkillInstallEvents, readSkillPackageCatalog,
   setInstalledSkillStatus, setSkillEntryDefault, setSkillStageDefault, uninstallSkillPackage,
   validateSkillPackageDirectory,
-} from '../lib/skills/package-manager.mjs';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
-import { SkillRegistry } from '../lib/skills/registry.mjs';
+} from '../server/platform/skills/package-manager.mjs';
+import { loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
+import { SkillRegistry } from '../server/platform/skills/registry.mjs';
 
 function fixture(root,{id='third-party-demo',version='1.0.0'}={}){
   const directory=path.join(root,`source-${version}`);

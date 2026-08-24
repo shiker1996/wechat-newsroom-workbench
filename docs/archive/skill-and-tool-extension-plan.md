@@ -441,7 +441,7 @@ PUT    /api/system/tool-plugins/:id/credentials
 4. 增加 ID、版本、引用路径、能力和 App 兼容性校验。
 5. 技能页面展示角色、入口、契约和工具需求。
 
-交付结果：28 个内置技能已从“文件目录”升级为可被程序理解的内容包，但尚不开放安装。Schema 位于 `lib/skills/skill-manifest.schema.json`，确定性校验器位于 `lib/skills/manifest.mjs`。
+交付结果：28 个内置技能已从“文件目录”升级为可被程序理解的内容包，但尚不开放安装。Schema 位于 `server/platform/skills/skill-manifest.schema.json`，确定性校验器位于 `server/platform/skills/manifest.mjs`。
 
 ### P1：创作入口选择技能
 

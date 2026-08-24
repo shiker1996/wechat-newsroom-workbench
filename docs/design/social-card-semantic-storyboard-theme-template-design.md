@@ -185,7 +185,7 @@ ending + note/list        → closing-cta
 
 ### 6.1 模板注册表
 
-新增 `lib/rendering/social-card-template-registry.mjs`，维护：
+新增 `server/shared/rendering/social-card-template-registry.mjs`，维护：
 
 - 模板 ID、版本和显示名称。
 - 支持的页面角色。
@@ -196,7 +196,7 @@ ending + note/list        → closing-cta
 
 ### 6.2 模板解析器
 
-新增 `lib/rendering/social-card-template-resolver.mjs`，输入页面、主题、角色、内容块和密度，输出：
+新增 `server/shared/rendering/social-card-template-resolver.mjs`，输入页面、主题、角色、内容块和密度，输出：
 
 ```js
 {
@@ -394,19 +394,19 @@ social 主题编辑器新增“视觉模板”配置：
 ### 需要改造的 social 相关文件
 
 ```text
-lib/themes/social-theme-compiler.mjs
-lib/themes/theme-validator.mjs
-lib/themes/theme-preview.mjs
-lib/themes/theme-publish-gate.mjs
-lib/themes/theme-registry.mjs
-lib/themes/user-theme-service.mjs
-lib/http/routes/theme-routes.mjs
+server/shared/themes/social-theme-compiler.mjs
+server/shared/themes/theme-validator.mjs
+server/platform/application/themes/theme-preview.mjs
+server/platform/application/themes/theme-publish-gate.mjs
+server/shared/themes/theme-registry.mjs
+server/platform/application/themes/user-theme-service.mjs
+server/platform/http/routes/theme-routes.mjs
 
-lib/rendering/storyboard-page-renderer.mjs
-lib/rendering/storyboard-document-renderer.mjs
-lib/rendering/social-card-composition.mjs
-lib/rendering/social-card-layout.mjs
-lib/llm/social-card-pipeline.mjs
+server/shared/rendering/storyboard-page-renderer.mjs
+server/shared/rendering/storyboard-document-renderer.mjs
+server/shared/rendering/social-card-composition.mjs
+server/shared/rendering/social-card-layout.mjs
+server/features/social-cards/application/social-card-pipeline.mjs
 
 public/src/views/theme-manager.js
 public/src/views/theme-manager-fields.js
@@ -416,10 +416,10 @@ themes/social/*.json
 ### 建议新增
 
 ```text
-lib/rendering/social-card-template-registry.mjs
-lib/rendering/social-card-template-resolver.mjs
-lib/rendering/social-template-components.mjs
-lib/rendering/templates/social/neon-v1.mjs
+server/shared/rendering/social-card-template-registry.mjs
+server/shared/rendering/social-card-template-resolver.mjs
+server/shared/rendering/social-template-components.mjs
+server/shared/rendering/templates/social/neon-v1.mjs
 ```
 
 ### 明确不改
@@ -463,7 +463,7 @@ lib/rendering/templates/social/neon-v1.mjs
 当前实现补充：
 
 - 这是 Phase 2 的历史基线：当时仅 `neon`/`brutalist` 绑定专用模板，其余 social 主题仍默认 `standard-v1`；后续 Phase 5/6 已按批次完成迁移。
-- `lib/rendering/templates/social/neon-v1.mjs` 提供封面、问题、功能、步骤、数据、对比、证据、时间线、风险和结尾角色的受控页面组件与 CSS；内容块仍复用白名单渲染器，未开放任意 HTML/CSS。
+- `server/shared/rendering/templates/social/neon-v1.mjs` 提供封面、问题、功能、步骤、数据、对比、证据、时间线、风险和结尾角色的受控页面组件与 CSS；内容块仍复用白名单渲染器，未开放任意 HTML/CSS。
 - `storyboard-document-renderer` 只在 `neon-v1` 路径追加模板 CSS，并在 body、section 上写入模板元数据；文章主题和封面主题未接入该路径。
 - 布局审计失败时，生成循环先记录一次模板回退并重新使用 `standard-v1` 渲染；模板包不可用时仍由 resolver 安全回退。
 - 固定样稿归档于 `docs/archive/audits/social-card-phase2-2026-08-20/`，6 页真实浏览器审计通过，截图输出在 `neon-v1-png/`。

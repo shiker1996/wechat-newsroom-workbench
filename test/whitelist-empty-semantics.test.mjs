@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeSkillConfig, readActiveSkillConfig } from '../lib/skills/configuration.mjs';
-import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
-import { resolveSkillToolPolicy } from '../lib/skills/pipeline-runtime.mjs';
+import { normalizeSkillConfig, readActiveSkillConfig } from '../server/platform/skills/configuration.mjs';
+import { buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
+import { resolveSkillToolPolicy } from '../server/platform/skills/pipeline-runtime.mjs';
 
 // 遗留 4：空白名单语义——显式空数组 = 全部禁止（SKILL_NOT_ALLOWED）；null/无字段 = 全放行（既有默认）。
 

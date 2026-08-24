@@ -426,7 +426,7 @@ POST /api/candidates/:id/ai/social-card
 
 实施记录（2026-07-29）：
 
-- 新增 `lib/domain/social-card-storyboard-contracts.mjs`，统一事实信封、旧输入兼容适配和阶段 Prompt 组装均由该模块负责。
+- 新增 `server/domain/social-card-storyboard-contracts.mjs`，统一事实信封、旧输入兼容适配和阶段 Prompt 组装均由该模块负责。
 - 新增 `social_card_fact_base`、`social_card_storyboard`、`social_card_layout_report` 三项 JSON Schema。
 - P0 首次迁移时上述规则位于 `xiaohongshu-article-generator/references/storyboard/`；P1 后已进一步按入口迁入三个独立故事板技能。
 - `social-card-routes.mjs` 不再保存完整故事板方法正文，只注入当前内容、渠道和事实输入。
@@ -466,7 +466,7 @@ P1 后拆分记录（2026-07-29）：
 
 - 新增 `repository-card-storyboard`、`event-card-storyboard` 和 `custom-card-storyboard`，分别只服务一个图文入口。
 - 仓库、事件和自定义故事线规则分别进入各自技能；任何一个内置技能都不再同时持有三类故事线。
-- 公众号、小红书、Schema、字段长度与构图 DSL 等共性约束下沉到 `lib/domain/social-card-prompts/`，由固定运行时统一注入，不作为可替换的业务技能。
+- 公众号、小红书、Schema、字段长度与构图 DSL 等共性约束下沉到 `server/domain/social-card-prompts/`，由固定运行时统一注入，不作为可替换的业务技能。
 - `xiaohongshu-article-generator` 收窄为“图文生成与交付”，输入改为 `social_card_storyboard`，不再承担首次故事线规划。
 - 第三方故事板使用自身 `SKILL.md` 方法，只叠加固定运行 Schema、渠道安全边界和受控构图契约，不再混入内置三类故事线方法。
 - 历史 `xiaohongshu-article-generator` ID 保留，旧 generation snapshot 仍可读取；新任务按入口回退对应的独立故事板技能。

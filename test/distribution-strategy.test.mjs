@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enforceNotificationQuota, isConcreteReaderStake, normalizeDistributionLane, resolveDistributionDecision, resolveNotificationPolicy } from '../lib/domain/distribution-strategy.mjs';
+import { enforceNotificationQuota, isConcreteReaderStake, normalizeDistributionLane, resolveDistributionDecision, resolveNotificationPolicy } from '../server/shared/domain/distribution-strategy.mjs';
 
 test('分发池只接受三个固定值', () => {
   assert.equal(normalizeDistributionLane('通知池'), '通知池');

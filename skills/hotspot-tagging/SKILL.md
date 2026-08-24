@@ -13,4 +13,4 @@ eventParts 把事件拆成名词化要素：who 为核心主体（公司、产�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/tasks.mjs` 的 `TAG_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback
+- 从 `server/features/research/llm/tasks.mjs` 的 `TAG_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback

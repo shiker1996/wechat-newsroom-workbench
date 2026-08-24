@@ -8,7 +8,7 @@ import {
   CONVERSATION_AGENT_ERROR_CODES,
   CONVERSATION_AGENT_SCHEMA_VERSION,
   CONVERSATION_AGENT_STREAM_EVENTS,
-} from '../lib/agent/contracts.mjs';
+} from '../server/platform/agent/contracts.mjs';
 
 const readJson=(relative)=>JSON.parse(fs.readFileSync(new URL(relative,import.meta.url),'utf8'));
 
@@ -31,9 +31,9 @@ test('Phase 0 固定 Agent 入口、错误码、流事件和安全预算',()=>{
 });
 
 test('Phase 0 三份 JSON Schema 禁止未知字段并区分工具请求、成功结果、错误结果和最终输出',()=>{
-  const request=readJson('../lib/agent/schemas/tool-request.schema.json');
-  const result=readJson('../lib/agent/schemas/tool-result.schema.json');
-  const envelope=readJson('../lib/agent/schemas/agent-envelope.schema.json');
+  const request=readJson('../server/platform/agent/schemas/tool-request.schema.json');
+  const result=readJson('../server/platform/agent/schemas/tool-result.schema.json');
+  const envelope=readJson('../server/platform/agent/schemas/agent-envelope.schema.json');
   assert.equal(request.additionalProperties,false);
   assert.deepEqual(request.required,['requestId','capability','arguments','reason']);
   assert.equal(request.properties.reason.maxLength,160);
@@ -66,8 +66,8 @@ test('Phase 0 基线冻结三入口当前触发方式、能力矩阵、门禁和
 });
 
 test('Phase 5 三个生产入口保留可扫描调用点并统一启用 Agent runtime',()=>{
-  const article=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8');
-  const candidate=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
+  const article=fs.readFileSync(new URL('../server/platform/http/routes/article-routes.mjs',import.meta.url),'utf8');
+  const candidate=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
   const baseline=readJson('./fixtures/conversation-agent-phase0-baseline.json');
   assert.match(article,new RegExp(baseline.callsiteMarkers.editorial));
   assert.match(candidate,new RegExp(baseline.callsiteMarkers['independent-writing']));
@@ -77,9 +77,9 @@ test('Phase 5 三个生产入口保留可扫描调用点并统一启用 Agent ru
 });
 
 test('Phase 5 收口后无旧私有协议、旧执行器或 provider 隐式搜索',()=>{
-  const article=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8');
-  const customChat=fs.readFileSync(new URL('../lib/llm/custom-social-chat.mjs',import.meta.url),'utf8');
-  const candidate=fs.readFileSync(new URL('../lib/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
+  const article=fs.readFileSync(new URL('../server/platform/http/routes/article-routes.mjs',import.meta.url),'utf8');
+  const customChat=fs.readFileSync(new URL('../server/features/social-cards/llm/custom-social-chat.mjs',import.meta.url),'utf8');
+  const candidate=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(article,/fetchEvents|autoFetchEditorialEvents|runEditorialTurnStream/);
   assert.doesNotMatch(candidate,/runTutorialChatStream|runCustomSocialChatStream/);
   assert.doesNotMatch(customChat,/webSearch:\s*true/);

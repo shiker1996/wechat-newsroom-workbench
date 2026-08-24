@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { themeCatalog } from '../lib/http/routes/theme-routes.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { auditThemeForPublish, assertThemePublishable } from '../lib/themes/theme-publish-gate.mjs';
-import { socialCardTemplateEditorCatalog } from '../lib/rendering/social-card-template-registry.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { themeCatalog } from '../server/platform/http/routes/theme-routes.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { auditThemeForPublish, assertThemePublishable } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { socialCardTemplateEditorCatalog } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 
 test('Phase 3 social 主题目录返回模板包与版式倾向', () => {
   const item = themeCatalog('social').items.find((theme) => theme.id === 'neon');

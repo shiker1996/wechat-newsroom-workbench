@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { articleThemeDefinition } from '../lib/themes/article-theme-compiler.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
+import { compileSocialTheme, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { articleThemeDefinition } from '../server/shared/themes/article-theme-compiler.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
 
 function socialPreview(id){
   const definition=structuredClone(socialThemeDefinition(id));

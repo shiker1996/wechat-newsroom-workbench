@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "source": "docs/design/consumer-capability-adaptation-design.md 阶段 0：冻结基线",
-  "generatedBy": "scripts/snapshot-consumer-capability-baseline.mjs",
+  "generatedBy": "scripts/quality/snapshot-consumer-capability-baseline.mjs",
   "routes": {},
   "consumers": [
     {
@@ -10,7 +10,7 @@
       "type": "agent",
       "entryPoint": "editorial",
       "entryPointRegistered": true,
-      "adapterModule": "lib/agent/editorial-adapter.mjs",
+      "adapterModule": "server/features/articles/application/agent/editorial-adapter.mjs",
       "capabilityConstant": "EDITORIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "editorial-room-chat"
@@ -210,7 +210,7 @@
       "type": "agent",
       "entryPoint": "independent-writing",
       "entryPointRegistered": true,
-      "adapterModule": "lib/agent/tutorial-adapter.mjs",
+      "adapterModule": "server/features/articles/application/agent/tutorial-adapter.mjs",
       "capabilityConstant": "TUTORIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "wechat-mp-tutorial",
@@ -443,7 +443,7 @@
       "type": "agent",
       "entryPoint": "custom-social",
       "entryPointRegistered": true,
-      "adapterModule": "lib/agent/custom-social-adapter.mjs",
+      "adapterModule": "server/features/social-cards/application/agent/custom-social-adapter.mjs",
       "capabilityConstant": "CUSTOM_SOCIAL_AGENT_CAPABILITIES",
       "runtimeSkillIds": [
         "custom-card-storyboard"

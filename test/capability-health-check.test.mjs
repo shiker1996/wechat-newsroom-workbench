@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
+import { buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
 import {
   capabilityHealthCacheSize, invalidateCapabilityHealthCache, prefetchCapabilityHealth,
-} from '../lib/tools/health-check.mjs';
+} from '../server/platform/tools/health-check.mjs';
 
 // 遗留 6：真实健康检查接入图谱——预取健康表（TTL 缓存 + 写后失效），'unknown' 回退代理并标注。
 

@@ -18,4 +18,4 @@ briefUpdates 只返回本轮新增或修改的字段。返回严格 JSON：
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/tutorial-chat.mjs` 的内联 system 常量原样提取为技能，本技能为 prompt 唯一事实源（技能缺失时加载直接报错）
+- 从 `server/features/articles/llm/tutorial-chat.mjs` 的内联 system 常量原样提取为技能，本技能为 prompt 唯一事实源（技能缺失时加载直接报错）

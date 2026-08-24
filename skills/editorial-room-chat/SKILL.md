@@ -75,7 +75,7 @@ events 是本选题关联的事件列表（选题与事件一对多；单热点�
 
 ### v1.5.0 变更
 
-- 本技能成为 prompt 唯一事实源：删除 `lib/llm/editorial-room.mjs` 的内联 fallback，技能缺失时加载直接报错
+- 本技能成为 prompt 唯一事实源：删除 `server/features/articles/llm/editorial-room.mjs` 的内联 fallback，技能缺失时加载直接报错
 
 ### v1.4.0 变更
 
@@ -102,5 +102,5 @@ events 是本选题关联的事件列表（选题与事件一对多；单热点�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/editorial-room.mjs` 的 `SYSTEM` 内联常量原样提取为技能
+- 从 `server/features/articles/llm/editorial-room.mjs` 的 `SYSTEM` 内联常量原样提取为技能
 - 账号上下文位置使用 `{{ACCOUNT_CONTEXT}}` 占位符，由代码在加载后替换为 `account-context.json` 的格式化内容

@@ -5,8 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   addCapabilityCatalogEntries, catalogDraftsForManifest, findUnregisteredCapabilities, readCapabilityCatalog,
-} from '../lib/tools/capability-catalog.mjs';
-import { checkConsumerCapabilityGates, checkConsumerCapabilityWarnings } from '../scripts/check-consumer-capability-gates.mjs';
+} from '../server/platform/tools/capability-catalog.mjs';
+import { checkConsumerCapabilityGates, checkConsumerCapabilityWarnings } from '../scripts/quality/check-consumer-capability-gates.mjs';
 
 // 阶段 1 顺序规则收口（docs/design/capability-onboarding-configurability-plan.md §7）：
 // R2 目录外能力的实现不得启用/不得设首选；R4 门禁 warning；R3 目录草案确认入库。
@@ -33,7 +33,7 @@ test('R2：findUnregisteredCapabilities 识别目录外能力',(t)=>{
 });
 
 test('R2：六个启用/首选写路径均带 CAPABILITY_NOT_REGISTERED 拦截',()=>{
-  const routes=fs.readFileSync(path.join(projectRoot,'lib','http','routes','system-routes.mjs'),'utf8');
+  const routes=fs.readFileSync(path.join(projectRoot,'server','platform','http','routes','system-routes.mjs'),'utf8');
   assert.match(routes,/code:'CAPABILITY_NOT_REGISTERED'/);
   // 路由首选 + 内置工具启用 + 第三方本地工具启用 + 远程插件启用 + 采集器运行启用 + 采集器状态启用
   assert.equal((routes.match(/rejectUnregistered\(/g)||[]).length,6);
@@ -63,7 +63,7 @@ test('R3：本地插件 Manifest 声明目录外能力时同样生成草案，�
 });
 
 test('R3：本地插件 validate/install 路由与远程路由一样附 catalogDrafts',()=>{
-  const routes=fs.readFileSync(path.join(projectRoot,'lib','http','routes','system-routes.mjs'),'utf8');
+  const routes=fs.readFileSync(path.join(projectRoot,'server','platform','http','routes','system-routes.mjs'),'utf8');
   assert.match(routes,/tool-plugin-packages\/validate[\s\S]*?catalogDrafts:catalogDraftsForManifest\(root,result\.manifest\)/);
 });
 

@@ -32,10 +32,10 @@ test('每个内置 Collector 目录都由 Manifest 自描述',()=>{
     assert.equal(manifest.kind,'collector');
     assert.equal(fs.existsSync(path.resolve(path.dirname(manifestFile),manifest.entry)),true,`${manifest.id} 入口不存在`);
   }
-  const registry=fs.readFileSync(path.join(root,'lib','collectors','builtin-registry.mjs'),'utf8');
+  const registry=fs.readFileSync(path.join(root,'server','platform','collectors','builtin-registry.mjs'),'utf8');
   assert.doesNotMatch(registry,/BUILTIN_COLLECTOR_MANIFESTS\s*=\s*Object\.freeze\(\[/);
   assert.match(registry,/discoverBuiltinCollectorManifests/);
   assert.match(registry,/manifest\.kind!==['"]collector['"]\)continue/);
-  const toolRegistry=fs.readFileSync(path.join(root,'lib','tools','index.mjs'),'utf8');
+  const toolRegistry=fs.readFileSync(path.join(root,'server','platform','tools','index.mjs'),'utf8');
   assert.match(toolRegistry,/\.kind===['"]tool['"]/);
 });

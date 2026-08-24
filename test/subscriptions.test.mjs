@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from '../lib/integrations/subscriptions.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { addSubscription, listSubscriptions, removeSubscription, subscriptionTestInput, updateSubscription } from '../server/features/collection/application/subscriptions.mjs';
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'write-assistant-subscriptions-'));

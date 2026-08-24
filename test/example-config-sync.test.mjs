@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../lib/core/config.mjs';
-import { APP_FIELDS } from '../lib/integrations/runtime-settings.mjs';
+import { loadConfig } from '../server/platform/core/config.mjs';
+import { APP_FIELDS } from '../server/platform/integrations/runtime-settings.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 

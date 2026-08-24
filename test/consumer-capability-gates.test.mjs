@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { checkConsumerCapabilityGates } from '../scripts/check-consumer-capability-gates.mjs';
+import { checkConsumerCapabilityGates } from '../scripts/quality/check-consumer-capability-gates.mjs';
 
 // 阶段 6 治理门禁（设计文档 §10 阶段 6）：真实仓库必须无违规；
 // 反向场景（声明无适配、适配未登记）必须被门禁捕获。

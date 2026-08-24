@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import adapter, { tokenize, chunkPassage, bm25TopChunks, buildExcerpt } from '../plugins/local-passage-retrieval/adapter.mjs';
-import { getToolRegistry } from '../lib/tools/index.mjs';
+import { getToolRegistry } from '../server/platform/tools/index.mjs';
 
 test('tokenize：英文按词、中文按 bigram', () => {
   const tokens = tokenize('DeepSeek 发布新模型');

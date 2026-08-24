@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { batchTopicsDir } from '../lib/core/workspace-paths.mjs';
-import { runEventResolutionBackfill, writeEventResolutionBackfillReport } from '../lib/domain/event-resolution-backfill.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { batchTopicsDir } from '../server/platform/core/workspace-paths.mjs';
+import { runEventResolutionBackfill, writeEventResolutionBackfillReport } from '../server/features/research/index.mjs';
 
 function tempWorkspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'event-resolution-backfill-'));

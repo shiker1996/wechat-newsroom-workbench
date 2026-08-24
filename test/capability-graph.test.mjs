@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
-import { analyzeImplementationImpact, buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
+import { analyzeImplementationImpact, buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const tool=(id,capabilities,priority=0)=>({id,name:id,version:'1.0.0',capabilities,riskLevel:'read-only',enabled:true,priority});

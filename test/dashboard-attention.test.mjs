@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
 const dashboard = fs.readFileSync(path.join(root, "public/src/views/dashboard.js"), "utf8");
-const workbenchQueries = fs.readFileSync(path.join(root, "lib/persistence/queries/workbench-query-service.mjs"), "utf8");
+const workbenchQueries = fs.readFileSync(path.join(root, "server/platform/persistence/queries/workbench-query-service.mjs"), "utf8");
 
 test("首页首屏提供五项可操作值班信号", () => {
   assert.match(html, /id="dashboard-attention"/);

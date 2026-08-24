@@ -9,8 +9,8 @@
 
 代码库中**没有公众号文章封面图功能**。与"图"相关的现有链路只有两条：
 
-- **文章配图**（IMG-DATA 占位图）：`public/src/views/preview.js` → `POST /api/candidates/:id/images/:slot/generate`（`lib/http/routes/media-routes.mjs:88-97`）→ `lib/llm/article-image-generator.mjs` → `skills/html-pages-to-images`（puppeteer 截图）。只支持 timeline/datacard 两种结构化图，非封面。
-- **图文卡片封面页**：`lib/llm/social-card-pipeline.mjs:705`（封面标题 AI 断行），属 social-card 体系，与公众号封面无关。
+- **文章配图**（IMG-DATA 占位图）：`public/src/views/preview.js` → `POST /api/candidates/:id/images/:slot/generate`（`server/platform/http/routes/media-routes.mjs:88-97`）→ `server/platform/llm/article-image-generator.mjs` → `skills/html-pages-to-images`（puppeteer 截图）。只支持 timeline/datacard 两种结构化图，非封面。
+- **图文卡片封面页**：`server/platform/llm/social-card-pipeline.mjs:705`（封面标题 AI 断行），属 social-card 体系，与公众号封面无关。
 - 未发现 WeChat 草稿 `thumb_media_id` 封面上传相关代码。
 
 **需求定义（用户确认）**：以公众号文章标题为基础，生成 900×383 的封面图；理想情况下可上传为公众号素材并挂到草稿 `thumb_media_id`。
@@ -21,15 +21,15 @@
   - Trending：`collectors/rsshub.mjs` 走 RSSHub `/github/trending/{daily,weekly,monthly}/any`；
   - 增长搜索：`collectors/github-discovery.mjs` 硬编码 `stars:>=1000 created:>=近30天 fork:false archived:false`；
   - 热点提及：从热点正文正则提取 github.com 链接。
-- `account-context.json` 有丰富兴趣信号（`contentPillars`、`readerProfile`、`scoring.categoryPreference`），但**没有任何环节把兴趣转成 GitHub 搜索查询**；LLM 只在下游（`lib/llm/research-pipeline.mjs` 写推荐理由、storyboard 规划）介入。
-- 缺口集中在"兴趣 → 查询 → 相关性筛选"一段；下游基础设施（`lib/integrations/github-api.mjs` 缓存、`mergeRepository` 去重、`lib/domain/repository-candidate.mjs` 候选入库、`skills/repository-card-storyboard/`）全部现成。
+- `account-context.json` 有丰富兴趣信号（`contentPillars`、`readerProfile`、`scoring.categoryPreference`），但**没有任何环节把兴趣转成 GitHub 搜索查询**；LLM 只在下游（`server/platform/llm/research-pipeline.mjs` 写推荐理由、storyboard 规划）介入。
+- 缺口集中在"兴趣 → 查询 → 相关性筛选"一段；下游基础设施（`server/platform/integrations/github-api.mjs` 缓存、`mergeRepository` 去重、`server/domain/repository-candidate.mjs` 候选入库、`skills/repository-card-storyboard/`）全部现成。
 - 缺 UI/配置入口：工具图文页（`public/src/views/social-editor.js`，`MODE_LAYOUT.tools`）只有"手动粘贴 URL"。
 
 ### C. 事实基座合规提示（Bug，直接阻塞热点创作）
 
-触发机制：editorial-room 技能的合规护栏（`skills/editorial-room/SKILL.md:14-17`、回退 `lib/llm/editorial-room.mjs:24-28`）要求用户引用的论据必须出现在"事件卡 confirmedFacts 或已抓取来源快照"（`lib/domain/event-fact-base.mjs:9-63`）中，否则要求"明确具体内容与引用边界"。
+触发机制：editorial-room 技能的合规护栏（`skills/editorial-room/SKILL.md:14-17`、回退 `server/platform/llm/editorial-room.mjs:24-28`）要求用户引用的论据必须出现在"事件卡 confirmedFacts 或已抓取来源快照"（`server/domain/event-fact-base.mjs:9-63`）中，否则要求"明确具体内容与引用边界"。
 
-已有入库通道：编辑会对话中粘贴 URL 会被正则提取并抓取入库（`lib/http/routes/article-routes.mjs:99-105` 普通 / `:111-121` 流式；`lib/integrations/source-fetcher-core.mjs:115-126` override 缓存 + `store.saveHotspotSource` 落库）。
+已有入库通道：编辑会对话中粘贴 URL 会被正则提取并抓取入库（`server/platform/http/routes/article-routes.mjs:99-105` 普通 / `:111-121` 流式；`server/platform/integrations/source-fetcher-core.mjs:115-126` override 缓存 + `store.saveHotspotSource` 落库）。
 
 **实际 Bug（本次提示"朝夕光年/沐瞳科技无出处支撑"的成因）**：
 
@@ -50,7 +50,7 @@
 
 ### P0 — 事项 C：编辑会外部链接入库修复（✅ 已完成，2026-08-07）
 
-涉及文件：`lib/core/store.mjs`、`lib/integrations/source-fetcher-core.mjs`、`lib/domain/event-fact-base.mjs`、`lib/http/routes/article-routes.mjs`、`skills/editorial-room/SKILL.md`、`public/src/views/editorial.js`。
+涉及文件：`server/platform/core/store.mjs`、`server/platform/integrations/source-fetcher-core.mjs`、`server/domain/event-fact-base.mjs`、`server/platform/http/routes/article-routes.mjs`、`skills/editorial-room/SKILL.md`、`public/src/views/editorial.js`。
 
 实际实现（与原规格略有调整——override 统一改走新建的候选级存储，而非修复 hotspot_id=0 回读）：
 
@@ -79,11 +79,11 @@
 
 分三步，每步可独立交付：
 
-1. **兴趣 → 查询**：✅ 新增 `lib/llm/repo-discovery.mjs` 的 `planRepoDiscoveryQueries`，读 `account-context.json` 的 `contentPillars`/`readerProfile`，用 LLM 产出 GitHub Search 查询组（label/关键词/language/时间窗/minStars），消毒后落缓存 `data/repo-discovery-queries.json`（`refreshDays` 内复用，可手工编辑），失败回退缓存或空数组；
-2. **相关性筛选**：✅ `collectors/github-discovery.mjs` 支持 `aiQueries` 查询组（新通道 `ai-search`，优先级介于 trending 与 search 之间，逐组独立搜索、单组失败不影响其余）；采集编排层（`lib/jobs/job-manager.mjs`）对 `ai-search` 结果调 `filterRepositoriesByInterest` 做 LLM 兴趣打分（≥6 保留，分数/理由随 `raw_json` 入库），同时被规则通道发现的仓库仅降回规则身份不丢弃，过滤失败 fail-open 放行；
+1. **兴趣 → 查询**：✅ 新增 `server/platform/llm/repo-discovery.mjs` 的 `planRepoDiscoveryQueries`，读 `account-context.json` 的 `contentPillars`/`readerProfile`，用 LLM 产出 GitHub Search 查询组（label/关键词/language/时间窗/minStars），消毒后落缓存 `data/repo-discovery-queries.json`（`refreshDays` 内复用，可手工编辑），失败回退缓存或空数组；
+2. **相关性筛选**：✅ `collectors/github-discovery.mjs` 支持 `aiQueries` 查询组（新通道 `ai-search`，优先级介于 trending 与 search 之间，逐组独立搜索、单组失败不影响其余）；采集编排层（`server/platform/jobs/job-manager.mjs`）对 `ai-search` 结果调 `filterRepositoriesByInterest` 做 LLM 兴趣打分（≥6 保留，分数/理由随 `raw_json` 入库），同时被规则通道发现的仓库仅降回规则身份不丢弃，过滤失败 fail-open 放行；
 3. **入口**：✅ 仅批次出口——过滤后的仓库作为 github 组热点（`sourceType='ai-search'`、`sourceName='AI 兴趣发现 · {label}'`）随采集入批次，经研判评分自然流入工具图文池；工具图文页"AI 推荐仓库"直达出口按用户决定不做。
 
-配置：`githubDiscovery.aiQueries`（`enabled/refreshDays/maxQueries/perQueryLimit/relevanceFilter/minInterestScore`，默认值见 `lib/core/config.mjs` 与 `config.example.json`）。
+配置：`githubDiscovery.aiQueries`（`enabled/refreshDays/maxQueries/perQueryLimit/relevanceFilter/minInterestScore`，默认值见 `server/platform/core/config.mjs` 与 `config.example.json`）。
 
 验证：新增 `test/repo-discovery.test.mjs`（查询组消毒/缓存/降级、相关性过滤阈值与 fail-open、采集归并与通道优先级）；`npm run test:fast` 672 通过、0 失败。
 

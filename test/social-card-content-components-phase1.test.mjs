@@ -13,8 +13,8 @@ import {
   sanitizeSocialCardPlanFactBindings,
   selectBestSocialCardJointPackingOperations,
   validateSocialCardContentComponents,
-} from '../lib/rendering/social-card-content-components.mjs';
-import { validateSocialCardRestructureOperations } from '../lib/rendering/social-card-repair-policy.mjs';
+} from '../server/shared/rendering/social-card-content-components.mjs';
+import { validateSocialCardRestructureOperations } from '../server/shared/rendering/social-card-repair-policy.mjs';
 
 const capacity = {
   structural: { maxBlocks: 4, maxItems: 9 },

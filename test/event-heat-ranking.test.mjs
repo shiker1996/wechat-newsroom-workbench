@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreEventHeat, buildEventHeatRanking } from '../lib/domain/event-heat-ranking.mjs';
+import { scoreEventHeat, buildEventHeatRanking } from '../server/features/research/index.mjs';
 
 const asOf = Date.parse('2026-08-23T12:00:00Z');
 

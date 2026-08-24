@@ -4,14 +4,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSkillBundle } from '../lib/llm/skill-runtime.mjs';
+import { loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 import {
   SOCIAL_CARD_STORYBOARD_CONTRACTS,
   buildSocialCardFactEnvelope,
   buildSocialCardStoryboardSystemPrompt,
   toLegacySocialCardPromptInput,
-} from '../lib/domain/social-card-storyboard-contracts.mjs';
-import { continuationBadge, renderStoryboardBlock, renderTechnicalText } from '../lib/rendering/storyboard-html-content.mjs';
+} from '../server/features/social-cards/index.mjs';
+import { continuationBadge, renderStoryboardBlock, renderTechnicalText } from '../server/shared/rendering/storyboard-html-content.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sha256=(value)=>crypto.createHash('sha256').update(value).digest('hex');
@@ -51,7 +51,7 @@ test('P0 固化图文故事板三项 JSON Schema 契约',()=>{
     ['social-card-storyboard.schema.json','social_card_storyboard'],
     ['social-card-layout-report.schema.json','social_card_layout_report'],
   ]){
-    const schema=JSON.parse(fs.readFileSync(path.join(root,'lib','domain','schemas',file),'utf8'));
+    const schema=JSON.parse(fs.readFileSync(path.join(root,'server','shared','domain','schemas',file),'utf8'));
     assert.equal(schema.$id,id);
     assert.equal(schema.$schema,'https://json-schema.org/draft/2020-12/schema');
   }
@@ -106,7 +106,7 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
 });
 
 test('路由只负责注入阶段输入，不再内嵌完整故事板方法正文',()=>{
-  const source=fs.readFileSync(path.join(root,'lib','http','routes','social-card-routes.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'server','platform','http','routes','social-card-routes.mjs'),'utf8');
   assert.match(source,/buildSocialCardStoryboardSystemPrompt/);
   assert.match(source,/buildSocialCardFactEnvelope/);
   assert.doesNotMatch(source,/README 到卡片故事板/);
@@ -114,7 +114,7 @@ test('路由只负责注入阶段输入，不再内嵌完整故事板方法正�
 });
 
 test('P1 card-editorial 接收故事板技能并冻结阶段选择',()=>{
-  const source=fs.readFileSync(path.join(root,'lib','http','routes','social-card-routes.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'server','platform','http','routes','social-card-routes.mjs'),'utf8');
   assert.match(source,/social-card-stage-skills/);
   assert.match(source,/input\.stageSkills/);
   assert.match(source,/resolveSocialCardStageSkills/);

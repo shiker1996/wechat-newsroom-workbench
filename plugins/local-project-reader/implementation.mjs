@@ -22,7 +22,7 @@ function priority(relativePath) {
   const name = path.basename(relativePath);
   if (/^readme/i.test(name)) return 0;
   if (/^(package\.json|pyproject\.toml|cargo\.toml|go\.mod|dockerfile)$/i.test(name)) return 1;
-  if (/(config|src|app|lib|docs?)[\\/]/i.test(relativePath)) return 2;
+  if (/(config|src|app|server|docs?)[\\/]/i.test(relativePath)) return 2;
   return 3;
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MODEL_JSON_ERROR_CODES, locateJsonValue, parseModelJson, parseModelJsonWithRepair } from '../lib/llm/model-json.mjs';
+import { MODEL_JSON_ERROR_CODES, locateJsonValue, parseModelJson, parseModelJsonWithRepair } from '../server/platform/llm/model-json.mjs';
 
 test('统一 JSON 解析剥离围栏并定位说明文字中的主对象',()=>{assert.deepEqual(parseModelJson({content:'说明如下：\n```json\n{"ok":true,"text":"} 不结束"}\n```'}),{ok:true,text:'} 不结束'});assert.equal(locateJsonValue('prefix [1,2] suffix').text,'[1,2]');});
 test('length 和未闭合结构统一分类为稳定截断错误码',()=>{for(const result of [{content:'{"x":',finishReason:'stop'},{content:'{"x":1}',finishReason:'length'}])assert.throws(()=>parseModelJson(result),(error)=>error.code===MODEL_JSON_ERROR_CODES.TRUNCATED);});

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSocialCardPageTitle } from '../lib/rendering/social-card-title.mjs';
+import { normalizeSocialCardPageTitle } from '../server/shared/rendering/social-card-title.mjs';
 
 test('内容页标题去掉冒号后的解释句', () => {
   assert.equal(normalizeSocialCardPageTitle('三步上手：安装、打开、发送反馈'), '三步上手');

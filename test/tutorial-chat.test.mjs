@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateTutorialChatReadiness, sanitizeTutorialUpdates, tutorialChatMessages } from '../lib/llm/tutorial-chat.mjs';
+import { evaluateTutorialChatReadiness, sanitizeTutorialUpdates, tutorialChatMessages } from '../server/features/articles/llm/tutorial-chat.mjs';
 
 test('教程对话只接受表单字段并过滤非 HTTP 素材链接', () => {
   assert.deepEqual(sanitizeTutorialUpdates({

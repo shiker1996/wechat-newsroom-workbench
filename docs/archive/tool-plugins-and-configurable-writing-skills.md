@@ -252,7 +252,7 @@ export async function execute(input, context) {
 建议新增：
 
 ```text
-lib/tools/
+server/platform/tools/
   registry.mjs
   manifest-loader.mjs
   policy.mjs

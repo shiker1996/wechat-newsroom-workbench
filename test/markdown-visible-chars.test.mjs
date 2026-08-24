@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownVisibleChars } from '../lib/domain/markdown-visible-chars.mjs';
+import { markdownVisibleChars } from '../server/shared/domain/markdown-visible-chars.mjs';
 
 test('visual directive fences do not count toward article length', () => {
   const markdown = `# 标题

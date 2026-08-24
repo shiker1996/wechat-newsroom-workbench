@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectStableEvents } from '../lib/domain/event-resolution-cluster-projection.mjs';
+import { projectStableEvents } from '../server/features/research/index.mjs';
 
 test('文章研判消费稳定事件 ID，同时保留原事件卡与报道成员', () => {
   const hotspots = [

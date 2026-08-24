@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APP_FIELDS } from '../lib/integrations/runtime-settings.mjs';
+import { APP_FIELDS } from '../server/platform/integrations/runtime-settings.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const inventory=JSON.parse(fs.readFileSync(path.join(root,'test','fixtures','configuration-migration-inventory.json'),'utf8'));
@@ -32,7 +32,7 @@ test('阶段 0 每项配置都有目标、秘密属性和可验证消费点',()=
 });
 
 test('脱敏快照生成器不会输出秘密原值',()=>{
-  const source=fs.readFileSync(path.join(root,'scripts','snapshot-legacy-configuration.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'scripts','quality','snapshot-legacy-configuration.mjs'),'utf8');
   assert.match(source,/item\.secret\?\{\}:\{value:/);
   assert.match(source,/valueHash:digest/);
   assert.doesNotMatch(source,/secretValue|plaintext/);

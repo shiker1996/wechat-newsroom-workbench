@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { composeAiThemeDefinition } from '../lib/themes/ai-theme-contract.mjs';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
-import { matchSocialTemplate } from '../lib/themes/social-template-matcher.mjs';
-import { cloneTheme, importThemeDraft, saveThemeDraft } from '../lib/themes/user-theme-service.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { composeAiThemeDefinition } from '../server/shared/themes/ai-theme-contract.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
+import { matchSocialTemplate } from '../server/shared/themes/social-template-matcher.mjs';
+import { cloneTheme, importThemeDraft, saveThemeDraft } from '../server/platform/application/themes/user-theme-service.mjs';
 
 const registry = getBuiltinThemeRegistry();
 

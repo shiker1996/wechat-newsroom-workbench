@@ -4,7 +4,7 @@ import {
   buildSocialCardContentComponents,
   buildSocialCardPageComponentCandidates,
   buildSocialCardComponentPackingOperations,
-} from '../lib/rendering/social-card-content-components.mjs';
+} from '../server/shared/rendering/social-card-content-components.mjs';
 
 const capacity = {
   structural: { maxBlocks: 4, maxItems: 9 },

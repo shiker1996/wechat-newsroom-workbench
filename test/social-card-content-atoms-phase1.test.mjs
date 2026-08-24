@@ -5,7 +5,7 @@ import {
   buildSocialCardContentAtomSnapshot,
   compareSocialCardContentAtomConservation,
   validateSocialCardContentAtoms,
-} from '../lib/rendering/social-card-content-atoms.mjs';
+} from '../server/shared/rendering/social-card-content-atoms.mjs';
 
 test('阶段 1 旧故事板可生成兼容内容原子和稳定兜底来源', () => {
   const plan = [{ kind: 'capability', role: 'feature', title: '能力', evidence: ['README:Features'], content_blocks: [

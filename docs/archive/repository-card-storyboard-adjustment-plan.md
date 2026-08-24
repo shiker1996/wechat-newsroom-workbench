@@ -79,8 +79,8 @@
 ## 4. 明确不改
 
 - 不修改 `skills/repository-card-storyboard/SKILL.md`。
-- 不修改 `lib/domain/social-card-gate.mjs`，保留原有 10 项 CARD GATE。
-- 不修改 `lib/domain/social-card-storyboard-contracts.mjs`。
+- 不修改 `server/domain/social-card-gate.mjs`，保留原有 10 项 CARD GATE。
+- 不修改 `server/domain/social-card-storyboard-contracts.mjs`。
 - 不修改图文生成按钮或页面状态。
 - 不修改账号上下文、数据库、评分、渲染、构图、布局审计和交付流程。
 - 不自动重写已有故事板。

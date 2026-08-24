@@ -1,6 +1,6 @@
 # 消费者—能力—工具实现统一治理方案
 
-状态：已实施完成（2026-08-14，阶段 0-6 全部落地；阶段 6 交付：治理门禁 `scripts/check-consumer-capability-gates.mjs` + CI 步骤、`social-custom` 别名保留兼容并标记弃用、威胁模型 §1.8、工具调用链基线重生成）  
+状态：已实施完成（2026-08-14，阶段 0-6 全部落地；阶段 6 交付：治理门禁 `scripts/quality/check-consumer-capability-gates.mjs` + CI 步骤、`social-custom` 别名保留兼容并标记弃用、威胁模型 §1.8、工具调用链基线重生成）
 日期：2026-08-14  
 适用范围：编辑室 Agent、自主写作 Agent、自定义图文 Agent，以及后续接入统一能力体系的流水线消费者  
 现状汇总：能力拓展的操作视图见 [capability-expansion-guide.md](./capability-expansion-guide.md)（2026-08-15）
@@ -31,12 +31,12 @@ capability
   → capability
 ```
 
-这些信息现在分散在 Agent Adapter 常量（`lib/agent/editorial-adapter.mjs`、`tutorial-adapter.mjs`、`custom-social-adapter.mjs`）、技能 Manifest（`requiredCapabilities`/`optionalCapabilities`）、活动技能配置（`writing-skills/<skillId>/active.json`）、路由授权逻辑、资源映射代码及确定性 ToolCall 触发逻辑中。
+这些信息现在分散在 Agent Adapter 常量（`server/platform/agent/editorial-adapter.mjs`、`tutorial-adapter.mjs`、`custom-social-adapter.mjs`）、技能 Manifest（`requiredCapabilities`/`optionalCapabilities`）、活动技能配置（`writing-skills/<skillId>/active.json`）、路由授权逻辑、资源映射代码及确定性 ToolCall 触发逻辑中。
 
 需要明确指出的现状基座：
 
-- `lib/tools/capability-graph.mjs` 已实现目录、消费者、实现、路由的聚合，并计算 `ready/degraded/blocked/unused` 状态及停用影响分析（`analyzeImplementationImpact`），通过 `GET /api/system/capability-graph` 对外暴露；
-- `config/capability-consumers.json` 已有 4 条 feature 消费者登记（capability、requirement、failurePolicy），由 `lib/tools/dependency-baseline.mjs` 读取并入图谱；技能消费者目前由运行时从 SkillRegistry 动态聚合，三个 Agent Adapter 尚未纳入；
+- `server/platform/tools/capability-graph.mjs` 已实现目录、消费者、实现、路由的聚合，并计算 `ready/degraded/blocked/unused` 状态及停用影响分析（`analyzeImplementationImpact`），通过 `GET /api/system/capability-graph` 对外暴露；
+- `config/capability-consumers.json` 已有 4 条 feature 消费者登记（capability、requirement、failurePolicy），由 `server/platform/tools/dependency-baseline.mjs` 读取并入图谱；技能消费者目前由运行时从 SkillRegistry 动态聚合，三个 Agent Adapter 尚未纳入；
 - 三个 Adapter 各自重复维护资源发现、resourceId 映射、`allowedRoots` 组装与授权检查，公共收敛点仅有 `tool-executor.mjs` 的 `CAPABILITY_NOT_VISIBLE` 校验。
 
 因此本方案是**在上述图谱与消费者登记基座上扩展“消费者→能力”维度**，而非新建独立的第二套状态计算与登记体系。运行时虽然能够工作，但配置中心无法完整回答：
@@ -142,7 +142,7 @@ capability
 
 ## 5. 最终可用状态计算
 
-消费者某项能力的运行可用状态应由服务端统一计算。**该计算必须实现为 `lib/tools/capability-graph.mjs` 现有状态聚合的扩展**（在其消费者维度上增加声明、适配、技能授权三个因子），页面与运行时读取同一份计算结果，不得另建平行状态机：
+消费者某项能力的运行可用状态应由服务端统一计算。**该计算必须实现为 `server/platform/tools/capability-graph.mjs` 现有状态聚合的扩展**（在其消费者维度上增加声明、适配、技能授权三个因子），页面与运行时读取同一份计算结果，不得另建平行状态机：
 
 ```text
 available =
@@ -363,7 +363,7 @@ Adapter 最终只保留：
 ### 阶段 1：消费者登记中心
 
 - 扩展 `config/capability-consumers.json` schema，增加 `declaration`、`adapterStatus`、`resourceKinds`、`triggerPolicy`、`authorizationAction`、`resultPolicy` 字段；
-- 将三个 Agent 的能力常量（`lib/agent/*-adapter.mjs` 中的 `*_AGENT_CAPABILITIES`）迁入登记，Adapter 改为读取登记或仅做一致性校验；
+- 将三个 Agent 的能力常量（`server/platform/agent/*-adapter.mjs` 中的 `*_AGENT_CAPABILITIES`）迁入登记，Adapter 改为读取登记或仅做一致性校验；
 - 落实权威源裁定：技能 Manifest 的 capability 声明加载时与登记校验，声明了未登记能力即报错；
 - 技能消费者保持运行时聚合，与文件登记合并入 `dependency-baseline.mjs`；
 - 增加 Schema 校验和重复登记检查。
@@ -450,7 +450,7 @@ Adapter 最终只保留：
 阶段 0-6 已于 2026-08-14 全部实施完成。已知遗留（记录在案，不在本期实施）：
 
 - ~~tutorial/custom-social 的资源目录不含已抓取正文（无 `content` 字段），passage.retrieve 的 resourceIds 严格分支在这两个入口会拒绝，实际走插件原生 documents 透传~~ 已实施回填（2026-08-16）：`fact-attachment` 结果处理器把 url.fetch 正文写回资源目录条目，严格分支随之可用；无 resourceIds 时的透传回退保留；
-- `social-custom` 历史入口名仅保留读取兼容（`lib/skills/entry-routing.mjs` 别名 + API.md 弃用标注），不删除。
+- `social-custom` 历史入口名仅保留读取兼容（`server/platform/skills/entry-routing.mjs` 别名 + API.md 弃用标注），不删除。
 - `expectedVersion` 已改为强制必传（阶段 6，`saveSkillAuthorization` 服务端校验，缺失返回 400）；前端与既有调用方均已总传，无兼容面。
 
 登记载体的开放问题已裁定：采用**扩展 `config/capability-consumers.json`** 作为唯一权威源（见 4.4），不采用独立 Manifest、不扩展技能包契约、不新建代码注册表。理由：该文件已被 `dependency-baseline.mjs` 和 `capability-graph.mjs` 消费，扩展它可以在不新增平行体系的前提下完成登记；技能 Manifest 保持引用声明角色并接受一致性校验。

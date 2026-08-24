@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { echartsOptionWithTheme } from '../../../lib/llm/chart-theme.mjs';
+import { echartsOptionWithTheme } from '../../../server/features/articles/rendering/chart-theme.mjs';
 
 const args = process.argv.slice(2);
 if (args.includes('--help') || args.includes('-h')) {

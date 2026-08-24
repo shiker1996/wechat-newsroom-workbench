@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifactRelativeAsset } from '../lib/artifacts/artifact-indexer.mjs';
+import { resolveArtifactRelativeAsset } from '../server/platform/artifacts/artifact-indexer.mjs';
 
 test('artifact relative assets resolve inside the artifact directory only', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'artifact-assets-'));

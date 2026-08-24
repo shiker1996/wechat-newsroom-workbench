@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARTICLE_COMPONENT_CATALOG, articleComponentDefaults, resolveArticleComponents } from '../lib/themes/component-catalog.mjs';
-import { articleThemeDefinition, compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
-import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../lib/themes/ai-theme-generator.mjs';
-import { markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { auditThemeForPublish } from '../lib/themes/theme-publish-gate.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { ARTICLE_COMPONENT_CATALOG, articleComponentDefaults, resolveArticleComponents } from '../server/shared/themes/component-catalog.mjs';
+import { articleThemeDefinition, compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
+import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../server/platform/application/themes/ai-theme-generator.mjs';
+import { markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { auditThemeForPublish } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 function articleTheme(){const value=structuredClone(articleThemeDefinition('magazine-warm'));delete value.hash;delete value.file;value.id='article-components';value.source='user';value.status='draft';value.article.components=articleComponentDefaults(value.article.recipes);return value;}
 

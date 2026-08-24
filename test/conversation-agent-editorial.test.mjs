@@ -3,13 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {Store} from '../lib/core/store.mjs';
-import {ToolRegistry} from '../lib/tools/registry.mjs';
-import {runEditorialAgentTurn} from '../lib/agent/editorial-adapter.mjs';
-import {reconcileEditorialAnswer} from '../lib/llm/editorial-room.mjs';
+import {Store} from '../server/platform/core/store.mjs';
+import {ToolRegistry} from '../server/platform/tools/registry.mjs';
+import {runEditorialAgentTurn} from '../server/features/articles/application/agent/editorial-adapter.mjs';
+import {reconcileEditorialAnswer} from '../server/features/articles/llm/editorial-room.mjs';
 
 function registry(){const value=new ToolRegistry();value.register({manifest:{id:'mock-url',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',pathInputs:['root'],inputSchema:{type:'object',required:['targetUrl','root'],properties:{targetUrl:{type:'string'},title:{type:'string'},root:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,title:input.title,content:'原文证据：产品实测数据为 42。'},artifacts:[],warnings:[],provenance:{requestedUrl:input.targetUrl,finalUrl:input.targetUrl}};}}});value.register({manifest:{id:'mock-project',name:'本地项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',pathInputs:['path'],inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'},options:{type:'object'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{summary:'读取 1 个文件',files:[{path:'体验.md',size:20,excerpt:'本人安装运行后感觉交互一般',truncated:false}],totalFiles:1,totalChars:15,truncated:false,skipped:{}},artifacts:[],warnings:[],provenance:{root:input.path}};}}});return value;}
-function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'editorial-agent-')),store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});const batch=store.createBatch({date:'2026-08-14',title:'Agent 试点'});store.addHotspots(batch.id,'manual',[{title:'测试事件',url:'https://example.com/source'}]);const hotspot=store.getBatch(batch.id).hotspots[0],candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];return {root,store,hotspot,candidate};}
+function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'editorial-agent-'));fs.mkdirSync(path.join(root,'config'),{recursive:true});fs.copyFileSync(path.join(process.cwd(),'config','capability-consumers.json'),path.join(root,'config','capability-consumers.json'));const store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});const batch=store.createBatch({date:'2026-08-14',title:'Agent 试点'});store.addHotspots(batch.id,'manual',[{title:'测试事件',url:'https://example.com/source'}]);const hotspot=store.getBatch(batch.id).hotspots[0],candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];return {root,store,hotspot,candidate};}
 // 填满就绪判定要求的全部字段（角度/命题/分发池/读者利益/事实基座/作者观点/命题边界）
 function completeBrief(store,candidate){store.updateCandidate(candidate.id,{angle:'实测角度',thesis:'工具链需要产品验证',distribution_lane:'实验池',reader_stake:'开发者在选型时需要评估实测数据，否则会采信夸大宣传'});store.saveEditorial(candidate.id,{confirmed_facts:'来源显示实测数据为 42',author_opinions:'作者主张实测优先',forbidden_claims:'不扩大样本',experience_required:0,brief_status:'WRITE_NOW'});}
 
@@ -77,7 +77,7 @@ test('编辑室业务 Prompt 定义打平的 final 信封（业务字段平铺�
   const skillSource=fs.readFileSync(new URL('../skills/editorial-room-chat/SKILL.md',import.meta.url),'utf8');
   assert.match(skillSource,/平铺在 final 信封顶层/);assert.match(skillSource,/不要再套 output 层/);
   assert.doesNotMatch(skillSource,/读取当前决策和对话后返回严格JSON/);
-  const codeSource=fs.readFileSync(new URL('../lib/llm/editorial-room.mjs',import.meta.url),'utf8');
+  const codeSource=fs.readFileSync(new URL('../server/features/articles/llm/editorial-room.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(codeSource,/你是公众号编辑会主持人/,'编辑室 prompt 应只从技能加载，代码不再内联');
 });
 
@@ -164,7 +164,7 @@ test('底稿字段不齐时保持 DISCUSS，缺失项由代码推导写入 open_
 });
 
 test('已有对话时留空作答不再触发开场分支，而是继续推进',async(t)=>{
-  const {buildEditorialMessages}=await import('../lib/llm/editorial-room.mjs');
+  const {buildEditorialMessages}=await import('../server/features/articles/llm/editorial-room.mjs');
   const fresh=await buildEditorialMessages({editorial:{},messages:[]},'',[],null,'');
   assert.match(fresh.at(-1).content,/编辑会刚开始/);
   const ongoing=await buildEditorialMessages({editorial:{},messages:[{role:'user',content:'上轮回答'}]},'',[],null,'');
@@ -184,10 +184,10 @@ test('作者收窄事件范围只落表单字段（excluded_events 机制已回�
   assert.equal(result.editorial.excluded_events,'[]','不再写入结构化舍弃字段');
 });
 
-test('编辑室生产路由只使用统一 Agent 与共享工具事件渲染器',()=>{const source=fs.readFileSync(new URL('../lib/http/routes/article-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/core/stream-chat.js',import.meta.url),'utf8'),events=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');assert.match(source,/runEditorialAgentTurn/);assert.doesNotMatch(source,/runEditorialTurnStream/);assert.match(source,/onEvent:send/);assert.match(client,/consumeAgentEvent/);assert.match(events,/tool\.requested/);assert.match(events,/assistant\.delta/);});
+test('编辑室生产路由只使用统一 Agent 与共享工具事件渲染器',()=>{const source=fs.readFileSync(new URL('../server/platform/http/routes/article-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/core/stream-chat.js',import.meta.url),'utf8'),events=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');assert.match(source,/runEditorialAgentTurn/);assert.doesNotMatch(source,/runEditorialTurnStream/);assert.match(source,/onEvent:send/);assert.match(client,/consumeAgentEvent/);assert.match(events,/tool\.requested/);assert.match(events,/assistant\.delta/);});
 
 test('就绪判定：长文本中的事实状态描述（尚未完成）不被误判为占位符',async()=>{
-  const {evaluateEditorialReadiness,substantiveDecision}=await import('../lib/domain/editorial-readiness.mjs');
+  const {evaluateEditorialReadiness,substantiveDecision}=await import('../server/features/articles/index.mjs');
   assert.equal(substantiveDecision('待定'),false,'纯占位符仍判不合格');
   assert.equal(substantiveDecision('暂无（尚未征询）'),false,'短搪塞值仍判不合格');
   assert.equal(substantiveDecision('【Anthropic拟收购Decart】据虎嗅报道：Anthropic 拟以 60 亿美元收购 Decart（尚未完成）。'),true,'长文本中的"尚未完成"是事实状态，不是占位符');

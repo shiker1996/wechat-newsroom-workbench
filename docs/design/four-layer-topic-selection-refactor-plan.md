@@ -32,12 +32,12 @@
 
 | 能力 | 当前实现 | 主要位置 |
 |---|---|---|
-| 稳定事件归并 | 事件影子归并、稳定事件投影、报道归属和历史重复基础 | `lib/domain/event-resolution-shadow.mjs`、`lib/domain/event-resolution-cluster-projection.mjs` |
-| 事件热榜 | 按稳定事件生成热度、增量、来源扩散、动量、新鲜度和历史衰减排名 | `lib/domain/event-heat-ranking.mjs` |
+| 稳定事件归并 | 事件影子归并、稳定事件投影、报道归属和历史重复基础 | `server/domain/event-resolution-shadow.mjs`、`server/domain/event-resolution-cluster-projection.mjs` |
+| 事件热榜 | 按稳定事件生成热度、增量、来源扩散、动量、新鲜度和历史衰减排名 | `server/domain/event-heat-ranking.mjs` |
 | 热榜 UI | 热点全景拆分为事件热榜与事件全景两个 Tab，默认展示有限数量 | `public/index.html`、`public/src/views/hotspots.js` |
-| 事件标题 | 优先使用主体、动作、对象和事件描述生成语义标题，不直接使用报道标题 | `lib/domain/event-heat-ranking.mjs`、事件卡相关逻辑 |
-| 文章池事件优先 | 常规文章池以单事件为主，维度组转到早报/行业盘点候选 | `lib/llm/research-pipeline.mjs` 的 `selectArticlePool()` / `selectBriefPool()` |
-| T 预选分 | 已有 `topicValue`，用于从事件热榜候选宇宙中预选核心 8 条和黑马 2 条 | `lib/llm/research-pipeline.mjs`、`topic_value` 字段 |
+| 事件标题 | 优先使用主体、动作、对象和事件描述生成语义标题，不直接使用报道标题 | `server/domain/event-heat-ranking.mjs`、事件卡相关逻辑 |
+| 文章池事件优先 | 常规文章池以单事件为主，维度组转到早报/行业盘点候选 | `server/features/research/application/research-pipeline.mjs` 的 `selectArticlePool()` / `selectBriefPool()` |
+| T 预选分 | 已有 `topicValue`，用于从事件热榜候选宇宙中预选核心 8 条和黑马 2 条 | `server/features/research/application/research-pipeline.mjs`、`topic_value` 字段 |
 | 读者利益展示 | 已生成 `readerStake` 文案，并展示结构化受众分；通知池仍用具体性硬门槛判断 | `scoreCards()`、`distribution-strategy.mjs`、选题页面 |
 | F 成稿门槛 | 已有 H/B/P/S/D/F 计算和 `F < 55` 默认不进文章池 | `scoreCards()`、`candidate-selection-service.mjs` |
 | 候选清理与重跑 | 重新研判前清理上一轮自动文章候选，保留人工锁定和成稿中候选 | `CandidateSelectionService` |
@@ -249,15 +249,15 @@ T 只进入 F 一次，默认权重 30%，可在 25%–40% 之间回放校准。
 
 | 文件/模块 | 改造内容 | 阶段 |
 |---|---|---|
-| `lib/domain/event-heat-ranking.mjs` | 增加 `eventValue/T` 兼容字段，明确事件价值唯一来源 | 1 |
-| `lib/llm/research-pipeline.mjs` | 统一 T、拆出 A、接入 T 权重、合并 accountFit/P、接入 readerStakeScore | 2–5 |
-| `lib/persistence/migrations.mjs` | 增加 `event_value`、`article_value` 评分字段并升级 Schema v15 | 5 |
-| `lib/persistence/repositories/candidate-repository.mjs` | 持久化 T/A/F、账号契合和读者利益审计信息 | 3–5 |
-| `lib/application/candidate-selection-service.mjs` | 保存新评分字段，保持重跑清理和人工候选保护 | 4–5 |
+| `server/domain/event-heat-ranking.mjs` | 增加 `eventValue/T` 兼容字段，明确事件价值唯一来源 | 1 |
+| `server/features/research/application/research-pipeline.mjs` | 统一 T、拆出 A、接入 T 权重、合并 accountFit/P、接入 readerStakeScore | 2–5 |
+| `server/platform/persistence/migrations.mjs` | 增加 `event_value`、`article_value` 评分字段并升级 Schema v15 | 5 |
+| `server/platform/persistence/repositories/candidate-repository.mjs` | 持久化 T/A/F、账号契合和读者利益审计信息 | 3–5 |
+| `server/application/candidate-selection-service.mjs` | 保存新评分字段，保持重跑清理和人工候选保护 | 4–5 |
 | `public/index.html` | 更新评分说明和公式 | 3–5 |
 | `public/src/views/topics.js` | 展示 T、A、F 及分层状态 | 5 |
 | `sources/score-dual-run.json`、`score-dual-run.md` | 每批次留存新旧公式分差、四类回放样本与入池/排名变化 | 6 |
-| `lib/domain/topic-score-operations.mjs` | 聚合多个批次双跑结果并输出校准状态 | 7 |
+| `server/domain/topic-score-operations.mjs` | 聚合多个批次双跑结果并输出校准状态 | 7 |
 | `GET /api/topic-score-metrics` | 向选题池和运营校准页提供只读指标 | 7 |
 | `test/research-pipeline.test.mjs` | 增加四类回放和新旧公式对照测试 | 1–6 |
 

@@ -151,7 +151,7 @@ consumable（可消费，按消费者逐个计算）
 关键落点：
 
 - 顺序收口：`registered:false` 实现的六条启用/路由写路径统一 `CAPABILITY_NOT_REGISTERED` 拦截（system-routes.mjs `rejectUnregistered`）；R4 warning 进门禁；能力页签"未登记 · 仅调试"分区；远程 Manifest 草案 + `POST /api/system/capability-catalog` 确认入库。
-- 登记驱动：Agent 目录从登记派生（`lib/agent/entry-capabilities.mjs`，直读登记文件、无依赖环）；常量降级为适配代码上界锚点；资源类/纯参数判定以 `resolveResourceArguments` 分支为准（资源类五能力清单见 `RESOURCE_ADAPTED_CAPABILITIES`）。
+- 登记驱动：Agent 目录从登记派生（`server/platform/agent/entry-capabilities.mjs`，直读登记文件、无依赖环）；常量降级为适配代码上界锚点；资源类/纯参数判定以 `resolveResourceArguments` 分支为准（资源类五能力清单见 `RESOURCE_ADAPTED_CAPABILITIES`）。
 - 页面添加：~~`POST /api/system/capability-consumers/:consumerId/capabilities`~~（2026-08-15 已下线：候选只剩少数纯参数能力，实际价值不足；Agent 接入能力回归改登记文件的路径）。
 
 遗留（沿用 §9 + 新增）：

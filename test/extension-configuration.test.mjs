@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { ExtensionConfigurationService } from '../lib/extensions/configuration-service.mjs';
-import { validateConfigurationSchema, validateConfigurationValue } from '../lib/extensions/configuration-schema.mjs';
-import { ToolRegistry } from '../lib/tools/registry.mjs';
-import { ok } from '../lib/tools/schemas.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { ExtensionConfigurationService } from '../server/platform/extensions/configuration-service.mjs';
+import { validateConfigurationSchema, validateConfigurationValue } from '../server/platform/extensions/configuration-schema.mjs';
+import { ToolRegistry } from '../server/platform/tools/registry.mjs';
+import { ok } from '../server/platform/tools/schemas.mjs';
 
 const schema={type:'object',additionalProperties:false,required:['endpoint','apiKey'],properties:{
   endpoint:{type:'string',title:'服务地址',format:'url'},
@@ -39,7 +39,7 @@ test('扩展配置与多字段秘密分离保存且公开结果不回读秘密',
 });
 
 test('技能 Manifest 可以声明动态 configuration',async()=>{
-  const {validateSkillManifest}=await import('../lib/skills/manifest.mjs');
+  const {validateSkillManifest}=await import('../server/platform/skills/manifest.mjs');
   const manifest={schemaVersion:1,id:'configurable-skill',name:'配置技能',version:'1.0.0',kind:'stage',entryPoints:[],contentTypes:[],
     inputContract:'demo_input',outputContract:'demo_output',requiredCapabilities:[],optionalCapabilities:[],compatibleApp:'>=0.1.0',source:{type:'builtin',url:''},configuration:schema};
   assert.deepEqual(validateSkillManifest(manifest),[]);

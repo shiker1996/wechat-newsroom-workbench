@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSocialTemplateProposalMessages, generateSocialTemplateProposal, sanitizeSocialTemplateProposal, validateSocialTemplateProposal, validateSocialTemplateProposalRequest, SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES, SocialTemplateProposalError } from '../lib/themes/social-template-proposal.mjs';
-import { SocialTemplateProposalStore } from '../lib/themes/social-template-proposal-store.mjs';
-import { getSocialCardTemplatePack } from '../lib/rendering/social-card-template-registry.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { buildSocialTemplateProposalMessages, generateSocialTemplateProposal, sanitizeSocialTemplateProposal, validateSocialTemplateProposal, validateSocialTemplateProposalRequest, SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES, SocialTemplateProposalError } from '../server/shared/themes/social-template-proposal.mjs';
+import { SocialTemplateProposalStore } from '../server/shared/themes/social-template-proposal-store.mjs';
+import { getSocialCardTemplatePack } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 import fs from 'node:fs';
 
 function candidate(overrides={}){

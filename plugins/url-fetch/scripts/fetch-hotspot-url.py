@@ -31,7 +31,7 @@ def clean(value: str) -> str:
 def validate_url(value: str) -> str:
     parsed = urllib.parse.urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-        raise ValueError("鍙厑璁镐笉鍚处鍙蜂俊鎭殑 HTTP/HTTPS URL")
+        raise ValueError("只允许不含账号信息的 HTTP/HTTPS URL")
     try:
         addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
     except socket.gaierror as error:
@@ -39,7 +39,7 @@ def validate_url(value: str) -> str:
     for address in addresses:
         ip = ipaddress.ip_address(address[4][0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
-            raise ValueError("鎷掔粷璁块棶鏈満銆佸唴缃戞垨淇濈暀鍦板潃")
+            raise ValueError("拒绝访问本机、内网或保留地址")
     return value
 
 
@@ -119,7 +119,7 @@ class ArticleParser(HTMLParser):
                     if isinstance(author, dict) and author.get("name"): structured.setdefault("author", clean(str(author["name"])))
                     elif isinstance(author, list):
                         names = [clean(str(item.get("name", ""))) for item in author if isinstance(item, dict)]
-                        if any(names): structured.setdefault("author", "銆?.join(filter(None, names)))
+                        if any(names): structured.setdefault("author", "、".join(filter(None, names)))
                 for child in node.values():
                     if isinstance(child, (dict, list)): visit(child)
 
@@ -164,13 +164,13 @@ def fetch(url: str, timeout: float, max_chars: int) -> dict:
         content_type = response.headers.get("Content-Type", "")
         if "html" not in content_type.lower(): raise ValueError(f"不支持的内容类型：{content_type or '未知'}")
         payload = response.read(MAX_BYTES + 1)
-        if len(payload) > MAX_BYTES: raise ValueError(f"椤甸潰瓒呰繃 {MAX_BYTES} 瀛楄妭闄愬埗")
+        if len(payload) > MAX_BYTES: raise ValueError(f"页面超过 {MAX_BYTES} 字节限制")
     parser = ArticleParser(); parser.feed(decode_body(payload, content_type)); result = parser.result()
     result["content"] = result["content"][:max_chars]
     chars = len(result["content"])
     status = "ok" if chars >= 200 else "partial"
     return {"status": status, "url": url, "final_url": final_url, **result, "content_chars": chars,
-            "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(), "error": "" if status == "ok" else "姝ｆ枃涓嶈冻 200 瀛楋紝鍙兘瀛樺湪 JS 娓叉煋銆佺櫥褰曟垨浠樿垂澧?}
+            "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(), "error": "" if status == "ok" else "正文不足 200 字，可能存在 JS 渲染、登录或付费墙"}
 
 
 def main() -> None:
@@ -187,4 +187,3 @@ def main() -> None:
 
 
 if __name__ == "__main__": main()
-

@@ -36,7 +36,7 @@
   | `github-url` | GitHub 仓库 URL | `resourceId → sourceUrl` |
   | `passage-content` | 已抓取正文条目 | `resourceIds → documents/query/k` |
 
-  新增取值需先在 `lib/agent/resource-adaptation.mjs` 的 `RESOURCE_KIND_PROFILES` 增加档案（含 Schema 与参数改写）；目录条目填了非法值时校验报错会直接列出全部合法取值。授权拒绝文案按"Agent + capability"二维维护在 `config/agent-adaptation-messages.json`（`messages.<consumerId>.<capability>`），文件或条目缺失时回退档案内联兜底文案。
+  新增取值需先在 `server/platform/agent/resource-adaptation.mjs` 的 `RESOURCE_KIND_PROFILES` 增加档案（含 Schema 与参数改写）；目录条目填了非法值时校验报错会直接列出全部合法取值。授权拒绝文案按"Agent + capability"二维维护在 `config/agent-adaptation-messages.json`（`messages.<consumerId>.<capability>`），文件或条目缺失时回退档案内联兜底文案。
 
   档案（profile）的代码契约：
 
@@ -67,10 +67,10 @@
 
 Agent 接入的补充说明：
 
-- **Adapter 的 `*_AGENT_CAPABILITIES` 常量不用改**。Agent 工具目录从登记派生（`lib/agent/entry-capabilities.mjs`）；常量只声明"本 Adapter 为哪些能力写过特化适配代码"，规则是常量 ⊆ 登记。纯参数能力、以及命中档案（目录声明了 `resourceKind`）的资源类能力，登记即可生效。
+- **Adapter 的 `*_AGENT_CAPABILITIES` 常量不用改**。Agent 工具目录从登记派生（`server/platform/agent/entry-capabilities.mjs`）；常量只声明"本 Adapter 为哪些能力写过特化适配代码"，规则是常量 ⊆ 登记。纯参数能力、以及命中档案（目录声明了 `resourceKind`）的资源类能力，登记即可生效。
 - **资源类能力**还需确认该 Agent 的 `adaptation.resourceSources` 里有产出对应资源的注册器；需要业务化结果解释时在 `adaptation.resultHandlers` 引用具名处理器（`fact-attachment` 等），默认 `sanitize-only` 进【素材】。
 - **授权拒绝文案**（可选）：`config/agent-adaptation-messages.json` 按 `messages.<consumerId>.<capability>` 加条目；不加则用档案内联兜底文案。
-- 仅当需要新 `resourceKind`、新资源来源或新结果处理逻辑时才改代码，集中在 `lib/agent/resource-adaptation.mjs` 的三张注册表。
+- 仅当需要新 `resourceKind`、新资源来源或新结果处理逻辑时才改代码，集中在 `server/platform/agent/resource-adaptation.mjs` 的三张注册表。
 
 接入后图谱可用性、页面展示、停用影响预览自动生效；以 `npm run capability:gates` 验证零违规。成本矩阵、生命周期状态机与各消费者 SOP 详见 [design/capability-expansion-guide.md](./design/capability-expansion-guide.md)。
 
@@ -88,7 +88,7 @@ Agent 接入的补充说明：
 
 ### 4.1 新增 resourceKind 档案
 
-`lib/agent/resource-adaptation.mjs` 的 `RESOURCE_KIND_PROFILES` 加一项：
+`server/platform/agent/resource-adaptation.mjs` 的 `RESOURCE_KIND_PROFILES` 加一项：
 
 ```js
 'xiaohongshu-note': {
@@ -196,7 +196,7 @@ npm run test                 # 全量回归
 
 ## 5. 通用设计原则
 
-> 插件边界规则由 `npm run plugin:audit-boundaries` 强制校验（基线见 `test/fixtures/`）。新增插件不得直接 import 其他插件、项目 `lib/` / `scripts/` / `skills/` 或用户目录文件；插件间协作应声明并调用 capability。现有内置插件的少量跨目录依赖记录在基线中，不应作为开发范例。
+> 插件边界规则由 `npm run plugin:audit-boundaries` 强制校验（基线见 `test/fixtures/`）。新增插件不得直接 import 其他插件、项目 `server/` / `scripts/` / `skills/` 或用户目录文件；插件间协作应声明并调用 capability。现有内置插件的少量跨目录依赖记录在基线中，不应作为开发范例。
 
 1. Manifest 是唯一能力与权限声明，不要在运行时偷偷扩大范围。
 2. 输入输出必须是 JSON 可序列化对象，并通过 Schema 校验。
@@ -435,7 +435,7 @@ my-skill/
 - `context.capabilities.invoke`：按 capability 调用其他插件实现并保留审计链；
 - `context.configuration`：当前插件解析后的配置，不包含其他插件配置。
 
-插件不得通过相对路径 import `lib/`、其他插件或历史 `plugins/shared`。采集插件通过 `createAdapter(context)` 接收对应的 `network`、`github` 与配置服务。
+插件不得通过相对路径 import `server/`、其他插件或历史 `plugins/shared`。采集插件通过 `createAdapter(context)` 接收对应的 `network`、`github` 与配置服务。
 
 包只允许 Markdown、JSON、TXT、LICENSE、NOTICE 等静态文件，最多 100 个文件、5 MB。Markdown 引用必须存在且不能越界。
 
@@ -490,4 +490,4 @@ npm run skill:validate -- docs/examples/skill-package
 5. 出现完整性错误时重新安装，不要直接修改已安装目录。
 6. 出现能力未找到时检查 capability 拼写、启用状态、优先级和技能工具白名单。
 
-实现参考以 `lib/tools/manifest-loader.mjs`、`lib/plugin-sdk/manifest-contract.mjs`、`lib/collectors/contracts.mjs` 和各 package manager 为准。
+实现参考以 `server/platform/tools/manifest-loader.mjs`、`server/platform/plugin-sdk/manifest-contract.mjs`、`server/platform/collectors/contracts.mjs` 和各 package manager 为准。

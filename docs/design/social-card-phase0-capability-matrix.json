@@ -4,12 +4,12 @@
   "scope": "social-card",
   "capturedAt": "2026-08-20",
   "sourceFiles": [
-    "lib/rendering/social-card-role.mjs",
-    "lib/rendering/social-card-composition.mjs",
-    "lib/rendering/social-card-layout.mjs",
-    "lib/rendering/storyboard-html-content.mjs",
-    "lib/domain/social-card-storyboard-contracts.mjs",
-    "lib/themes/recipe-catalog.mjs"
+    "server/shared/rendering/social-card-role.mjs",
+    "server/shared/rendering/social-card-composition.mjs",
+    "server/shared/rendering/social-card-layout.mjs",
+    "server/shared/rendering/storyboard-html-content.mjs",
+    "server/domain/social-card-storyboard-contracts.mjs",
+    "server/shared/themes/recipe-catalog.mjs"
   ],
   "pageRoles": {
     "values": [

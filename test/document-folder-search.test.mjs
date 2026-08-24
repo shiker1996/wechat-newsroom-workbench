@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { getToolRegistry } from '../lib/tools/index.mjs';
-import { attachInformationSearch } from '../lib/integrations/information-search.mjs';
+import { getToolRegistry } from '../server/platform/tools/index.mjs';
+import { attachInformationSearch } from '../server/platform/integrations/information-search.mjs';
 
 function makeVault() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'doc-vault-'));

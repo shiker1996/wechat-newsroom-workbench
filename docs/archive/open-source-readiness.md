@@ -45,7 +45,7 @@
 - [x] 提供完全虚构且可公开的 `account-context.example.json`，或者在 README 中明确说明字段格式；不得提交真实账号画像。
   - 2026-07-31 处理：新增全字段虚构示例 `account-context.example.json`；README 补充复制为 `account-context.json` 的用法与「请勿提交真实账号画像」提示。
 - [x] 增加提交前秘密扫描规则，并在 CI 中执行。若历史曾泄密，先轮换密钥，再重写历史；两步缺一不可。
-  - 2026-07-31 处理：新增 `.githooks/pre-commit`（`git config core.hooksPath .githooks` 启用，说明见 CONTRIBUTING「安全」节），与 CI 共用 `scripts/secret-scan.mjs`；历史扫描零真实密钥命中，无需轮换；历史重写已完成并推送新仓库。
+  - 2026-07-31 处理：新增 `.githooks/pre-commit`（`git config core.hooksPath .githooks` 启用，说明见 CONTRIBUTING「安全」节），与 CI 共用 `scripts/quality/secret-scan.mjs`；历史扫描零真实密钥命中，无需轮换；历史重写已完成并推送新仓库。
 
 ### 2.3 安全边界
 
@@ -66,12 +66,12 @@
 
 ### 2.4 可复现安装与基础文档
 
-> 实施记录（2026-07-31）：`.env.example` 补 `TAVILY_API_KEY`、`GITHUB_TOKEN`；`config.example.json` 对齐内置默认值（补 GitHub Trending 路由、`githubDiscovery`、`tavily`、`sourceFetch`、`taggingChunkSize/Concurrency`、`webSearchConfig`，修正 `keepAlive`）；新增 `test/example-config-sync.test.mjs` 与 `test/api-docs-routes.test.mjs` 把示例配置、API.md 与代码双向钉死（API.md 补 2 条护栏路由记录）。README 新增「支持矩阵」与 `node:sqlite`/生成目录/备份/删除/升级说明。冷启动验收（`scripts/cold-start-acceptance.sh`，临时目录重建 → `npm ci` → `build` → `test` → 无密钥启动 → 停止脚本）全绿：432/432 测试通过，无密钥时 `/api/overview` 200、`/api/models` 返回 `configured:false` 降级视图。验收中发现并修复 3 个真实问题：`article-pipeline` 测试硬编码仓库目录名、`research-pipeline` 测试隐式依赖本机 `account-context.json`（`selectDimensionPool` 新增 `accountContext` 注入参数）、技能级依赖无自动化安装（新增 `scripts/install-skill-deps.mjs` 挂 `postinstall` 级联安装 `skills/*/package.json`）。
+> 实施记录（2026-07-31）：`.env.example` 补 `TAVILY_API_KEY`、`GITHUB_TOKEN`；`config.example.json` 对齐内置默认值（补 GitHub Trending 路由、`githubDiscovery`、`tavily`、`sourceFetch`、`taggingChunkSize/Concurrency`、`webSearchConfig`，修正 `keepAlive`）；新增 `test/example-config-sync.test.mjs` 与 `test/api-docs-routes.test.mjs` 把示例配置、API.md 与代码双向钉死（API.md 补 2 条护栏路由记录）。README 新增「支持矩阵」与 `node:sqlite`/生成目录/备份/删除/升级说明。冷启动验收（`scripts/archive/cold-start-acceptance.sh`，临时目录重建 → `npm ci` → `build` → `test` → 无密钥启动 → 停止脚本）全绿：432/432 测试通过，无密钥时 `/api/overview` 200、`/api/models` 返回 `configured:false` 降级视图。验收中发现并修复 3 个真实问题：`article-pipeline` 测试硬编码仓库目录名、`research-pipeline` 测试隐式依赖本机 `account-context.json`（`selectDimensionPool` 新增 `accountContext` 注入参数）、技能级依赖无自动化安装（新增 `scripts/runtime/install-skill-deps.mjs` 挂 `postinstall` 级联安装 `skills/*/package.json`）。
 
-- [x] 校准 `.env.example` 与 `lib/integrations/runtime-settings.mjs` 的字段，补齐 `TAVILY_API_KEY`、`GITHUB_TOKEN` 等当前支持项，并确保注释 UTF-8 正常。（`APP_FIELDS` 已导出，一致性由 `test/example-config-sync.test.mjs` 固化，含乱码检测）
-- [x] 校准 `config.example.json` 与 `lib/core/config.mjs` 的当前默认结构，特别是 GitHub 项目发现、GitHub Trending 路由、`sourceFetch`、Tavily、RSSHub `keepAlive` 和模型并发参数。（键集合与叶子值逐条比对，路径字段除外）
+- [x] 校准 `.env.example` 与 `server/platform/integrations/runtime-settings.mjs` 的字段，补齐 `TAVILY_API_KEY`、`GITHUB_TOKEN` 等当前支持项，并确保注释 UTF-8 正常。（`APP_FIELDS` 已导出，一致性由 `test/example-config-sync.test.mjs` 固化，含乱码检测）
+- [x] 校准 `config.example.json` 与 `server/platform/core/config.mjs` 的当前默认结构，特别是 GitHub 项目发现、GitHub Trending 路由、`sourceFetch`、Tavily、RSSHub `keepAlive` 和模型并发参数。（键集合与叶子值逐条比对，路径字段除外）
 - [x] 明确支持矩阵：Windows 版本、PowerShell、Node.js 24、Python 的必要 / 可选范围、Chrome / Chromium、RSSHub、网络服务商和磁盘空间。（README「启动 → 支持矩阵」）
-- [x] 从全新目录按公开文档执行一次冷启动验收：`npm ci`、`npm run build`、`npm test`、首次启动、无密钥降级、单服务商配置和停止脚本。（`scripts/cold-start-acceptance.sh` 全绿；单服务商配置与无密钥共用 `/api/models` 的 `configured` 标记，界面层按此降级）
+- [x] 从全新目录按公开文档执行一次冷启动验收：`npm ci`、`npm run build`、`npm test`、首次启动、无密钥降级、单服务商配置和停止脚本。（`scripts/archive/cold-start-acceptance.sh` 全绿；单服务商配置与无密钥共用 `/api/models` 的 `configured` 标记，界面层按此降级）
 - [x] 说明 Node.js 24 的 `node:sqlite` 依赖、生成目录、备份内容、数据删除方法和升级兼容策略。（README「数据与产物」节）
 - [x] 为 `API.md` 增加自动路由清单校验，至少保证代码中的方法 + 路径不会无文档新增或在删除后残留。（`test/api-docs-routes.test.mjs`：覆盖字面量/数组/变量正则/内联正则路由与 `###`、行内代码两种文档形式，双向比对）
 
@@ -90,11 +90,11 @@
 
 > 实施记录（2026-07-31）：
 >
-> - 测试分层：新增 `test/helpers/tiers.mjs`（`SKIP_BROWSER_TESTS=1` 时跳过浏览器层），7 个依赖真实浏览器/Puppeteer 缓存的测试已打标（`test/social-card-p2.test.mjs` 4 个、`test/typeset-chart-render.test.mjs` 2 个、`test/typeset-pipeline.test.mjs` 1 个）；新增 `npm run test:fast`（`scripts/test-fast.mjs`），实测 425 过 / 7 跳过 / 0 失败。CI 用缓存的 Puppeteer 跑全量，本地无浏览器缓存时用 test:fast。全部测试不依赖真实 API Key、用户 Chrome Profile、RSSHub 常驻进程或 CDN 写入（CDN 上传在测试中走 mock）。
+> - 测试分层：新增 `test/helpers/tiers.mjs`（`SKIP_BROWSER_TESTS=1` 时跳过浏览器层），7 个依赖真实浏览器/Puppeteer 缓存的测试已打标（`test/social-card-p2.test.mjs` 4 个、`test/typeset-chart-render.test.mjs` 2 个、`test/typeset-pipeline.test.mjs` 1 个）；新增 `npm run test:fast`（`scripts/build/test-fast.mjs`），实测 425 过 / 7 跳过 / 0 失败。CI 用缓存的 Puppeteer 跑全量，本地无浏览器缓存时用 test:fast。全部测试不依赖真实 API Key、用户 Chrome Profile、RSSHub 常驻进程或 CDN 写入（CDN 上传在测试中走 mock）。
 > - 治理文件：`CONTRIBUTING.md`（开发环境、分支/提交约定、测试分层说明、技能与插件扩展流程、文档同步要求、仓库体积约定）；`CODE_OF_CONDUCT.md`（Contributor Covenant 2.1 中文版）；`.github/ISSUE_TEMPLATE/bug_report.md` 与 `feature_request.md`；`.github/PULL_REQUEST_TEMPLATE.md`；`.github/CODEOWNERS`（维护者 @shiker1996，安全核心文件单列）。
-> - CI：`.github/workflows/ci.yml`（windows-latest + Node 24，缓存 npm 与 `~/.cache/puppeteer`），步骤为 `npm ci` → `npm run build` → `npm test`（全量含浏览器层）→ 校验 `docs/examples/skill-package` 与 `docs/examples/tool-plugin` 两个示例包 → `npm audit --audit-level=high --omit=dev`（实测 0 漏洞）→ `node scripts/license-scan.mjs` → `node scripts/secret-scan.mjs`。内置技能多数不过第三方包校验器（agents/openai.yaml、source.type 等属设计使然），故 CI 只校验示例包。
-> - 扫描脚本：`scripts/secret-scan.mjs` 扫全部 git 跟踪文件（396 个）的高危密钥模式，实测 exit 0；`scripts/license-scan.mjs` 扫根 + 技能级 lockfile（528 依赖），强 copyleft 失败、弱 copyleft 警告，实测 exit 0（4 个警告：dompurify MPL-2.0 OR Apache-2.0、elkjs EPL-2.0、khroma 与 html-pages-to-images 未声明许可证）。
-> - 顺带修复：`lib/skills/package-manager.mjs` 的包校验器此前只认 .md/.json/.txt，无扩展名的 LICENSE 文件会被拒——新增 `ALLOWED_LICENSE_FILES` 白名单（license/notice 各形态），目录校验与 ZIP 校验两处统一走 `allowedSkillFile()`。
+> - CI：`.github/workflows/ci.yml`（windows-latest + Node 24，缓存 npm 与 `~/.cache/puppeteer`），步骤为 `npm ci` → `npm run build` → `npm test`（全量含浏览器层）→ 校验 `docs/examples/skill-package` 与 `docs/examples/tool-plugin` 两个示例包 → `npm audit --audit-level=high --omit=dev`（实测 0 漏洞）→ `node scripts/quality/license-scan.mjs` → `node scripts/quality/secret-scan.mjs`。内置技能多数不过第三方包校验器（agents/openai.yaml、source.type 等属设计使然），故 CI 只校验示例包。
+> - 扫描脚本：`scripts/quality/secret-scan.mjs` 扫全部 git 跟踪文件（396 个）的高危密钥模式，实测 exit 0；`scripts/quality/license-scan.mjs` 扫根 + 技能级 lockfile（528 依赖），强 copyleft 失败、弱 copyleft 警告，实测 exit 0（4 个警告：dompurify MPL-2.0 OR Apache-2.0、elkjs EPL-2.0、khroma 与 html-pages-to-images 未声明许可证）。
+> - 顺带修复：`server/platform/skills/package-manager.mjs` 的包校验器此前只认 .md/.json/.txt，无扩展名的 LICENSE 文件会被拒——新增 `ALLOWED_LICENSE_FILES` 白名单（license/notice 各形态），目录校验与 ZIP 校验两处统一走 `allowedSkillFile()`。
 > - 仓库体积：实测最大跟踪文件 public/styles.css 177KB、markdown-it.min.js 124KB、package-lock.json 111KB，无超 1MB 文件；`.git` 约 47MB（历史重写后）。体积预算与「大文件不入库」约定已写进 CONTRIBUTING「仓库体积约定」节，暂不引入 Git LFS。`.idea/` 已在 2.2 移出跟踪并加入 .gitignore。
 
 ## 3. P1：首次公开版本前建议完成
@@ -109,8 +109,8 @@
 > 实施记录（2026-07-31）：
 >
 > - 发布策略：纯源码仓库分发，不发布 npm 包（`package.json` 保持 `private: true`），README 新增「发布与版本」一节说明。
-> - 版本与兼容政策：新增 `CHANGELOG.md`（Keep a Changelog + 语义化版本，含 0.0.1 / 0.1.0 历史条目与四类接口兼容政策：数据库只增式幂等迁移、技能 `schemaVersion`/`compatibleApp`、插件 Manifest 同前、REST API 只增不破）。修复一个真实问题：`APP_VERSION` 此前在 3 个包管理器（`lib/skills/package-manager.mjs`、`lib/tools/package-manager.mjs`、`lib/tools/remote-package-manager.mjs`）中硬编码为 `'0.1.0'`，已统一为 `lib/version.mjs` 从 `package.json` 读取，`test/version-compat.test.mjs` 钉死唯一来源。
-> - release 流程：新增 `scripts/release.mjs`（`npm run release`：`git archive HEAD` → `dist/<name>-<version>.zip` + `SHA256SUMS.txt`，工作区有未提交改动时警告；`dist/` 已入 `.gitignore`，实测产物 1.0MB）与 `docs/release.md`（发布 8 步、升级 / 降级 / 备份恢复说明；降级明确「迁移只增不回退，必须恢复升级前备份」）。
+> - 版本与兼容政策：新增 `CHANGELOG.md`（Keep a Changelog + 语义化版本，含 0.0.1 / 0.1.0 历史条目与四类接口兼容政策：数据库只增式幂等迁移、技能 `schemaVersion`/`compatibleApp`、插件 Manifest 同前、REST API 只增不破）。修复一个真实问题：`APP_VERSION` 此前在 3 个包管理器（`server/platform/skills/package-manager.mjs`、`server/platform/tools/package-manager.mjs`、`server/platform/tools/remote-package-manager.mjs`）中硬编码为 `'0.1.0'`，已统一为 `server/version.mjs` 从 `package.json` 读取，`test/version-compat.test.mjs` 钉死唯一来源。
+> - release 流程：新增 `scripts/release/release.mjs`（`npm run release`：`git archive HEAD` → `dist/<name>-<version>.zip` + `SHA256SUMS.txt`，工作区有未提交改动时警告；`dist/` 已入 `.gitignore`，实测产物 1.0MB）与 `docs/release.md`（发布 8 步、升级 / 降级 / 备份恢复说明；降级明确「迁移只增不回退，必须恢复升级前备份」）。
 > - 跨版本验收样例：`test/version-compat.test.mjs` 5 例——旧版数据库（batches/hotspots 缺后期列）迁移后结构补全且数据保留、当前契约的技能包 / 插件包通过校验、`compatibleApp >=99.0.0` 明确拒绝、未知 `schemaVersion` 明确拒绝。
 
 ### 3.2 架构与扩展文档
@@ -130,7 +130,7 @@
 ### 3.3 用户可控性
 
 - [x] 增加数据导出、按批次删除、完整清空和缓存清理说明；删除操作应先展示影响范围并可恢复。
-  - 2026-07-31 实施：删除分两级——归档（已有，可恢复）+ 彻底删除（新增，仅已归档批次）：`GET /api/batches/:id/delete-impact` 展示影响范围（各表计数 + 产物目录清单，同日共享的遗留目录标记保留），`DELETE /api/batches/:id` 需 `x-admin-confirm: DELETE-BATCH`，级联删子表、审计表脱钩保留、产物目录一并清理（`lib/domain/batch-deletion.mjs`）；新增 `POST /api/system/cache/clear` 清理 GitHub / 来源缓存（设置页一键操作）；README「数据与产物」补数据生命周期说明（导出 / 两级删除 / 缓存清理 / 完整清空）。新增 `test/batch-deletion.test.mjs` 6 例。
+  - 2026-07-31 实施：删除分两级——归档（已有，可恢复）+ 彻底删除（新增，仅已归档批次）：`GET /api/batches/:id/delete-impact` 展示影响范围（各表计数 + 产物目录清单，同日共享的遗留目录标记保留），`DELETE /api/batches/:id` 需 `x-admin-confirm: DELETE-BATCH`，级联删子表、审计表脱钩保留、产物目录一并清理（`server/domain/batch-deletion.mjs`）；新增 `POST /api/system/cache/clear` 清理 GitHub / 来源缓存（设置页一键操作）；README「数据与产物」补数据生命周期说明（导出 / 两级删除 / 缓存清理 / 完整清空）。新增 `test/batch-deletion.test.mjs` 6 例。
 - [x] 在 UI 中统一标注会产生费用、会向第三方发送内容或会产生外部写入的操作。
   - 2026-07-31 实施：四处主 AI 操作面加 `action-hint` 标注——批次打标/研判（计费 + 联网搜索外发查询词）、文章编辑器生成/改写（计费）、排版（默认本地确定性渲染不计费；模型初稿计费、CDN 上传属外部写入）、图文生成（计费，渲染本地确定性）；外部写入类原有标注保留（配图页 CDN 按钮、插件卡片的「外部写入 是/否」）。
 - [x] 为模型和信息工具提供超时、重试、并发和预算的安全默认值及说明。

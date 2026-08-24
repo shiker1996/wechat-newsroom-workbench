@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { filterCollectedItems, hasMeaningfulCollectedContent } from '../lib/domain/collection-quality.mjs';
+import { filterCollectedItems, hasMeaningfulCollectedContent } from '../server/features/collection/index.mjs';
 
 test('采集质量门丢弃只有链接但标题和正文均为空的记录', () => {
   assert.equal(hasMeaningfulCollectedContent({ url:'https://x.com/example/1', title:'', summary:'' }), false);
@@ -21,8 +21,8 @@ test('采集质量门兼容正文类字段并拒绝空白内容', () => {
 });
 
 test('Reddit 与 RSSHub 采集结果均在入库前经过统一质量门', () => {
-  const manager = fs.readFileSync(new URL('../lib/jobs/job-manager.mjs', import.meta.url), 'utf8');
-  assert.match(manager, /runner\.run[\s\S]*filterCollectedItems\(run\.items\)[\s\S]*addHotspots\(job\.batchId,source,selected\)/);
+  const manager = fs.readFileSync(new URL('../server/features/collection/application/collection-job-manager.mjs', import.meta.url), 'utf8');
+  assert.match(manager, /runner\.run[\s\S]*filterCollectedItems\(run\.items\)[\s\S]*addHotspots\(job\.batchId,\s*source,\s*selected\)/);
   assert.match(manager, /createCollectorRuntime/);
   assert.match(manager, /过滤空内容|采集质量过滤/);
 });

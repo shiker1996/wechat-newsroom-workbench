@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
-import { AI_THEME_ERROR_CODES, AiThemeContractError, composeAiThemeDefinition, validateAiThemeCandidate, validateAiThemeRequest } from '../lib/themes/ai-theme-contract.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
+import { AI_THEME_ERROR_CODES, AiThemeContractError, composeAiThemeDefinition, validateAiThemeCandidate, validateAiThemeRequest } from '../server/shared/themes/ai-theme-contract.mjs';
 
 const baseline=JSON.parse(fs.readFileSync(new URL('./fixtures/ai-theme-contract-cases.json',import.meta.url),'utf8'));
 const registry=getBuiltinThemeRegistry();

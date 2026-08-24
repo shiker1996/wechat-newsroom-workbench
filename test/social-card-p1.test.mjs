@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectRepository } from '../plugins/repository-inspector/implementation.mjs';
-import { evaluateCardGate } from '../lib/domain/social-card-gate.mjs';
+import { evaluateCardGate } from '../server/features/social-cards/index.mjs';
 
 function response(status,data){return {status,ok:status>=200&&status<300,async json(){return data;},async text(){return JSON.stringify(data);}};}
 

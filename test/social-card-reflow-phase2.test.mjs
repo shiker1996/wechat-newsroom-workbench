@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSocialCardTemplatePack } from '../lib/rendering/social-card-template-registry.mjs';
-import { resolveSocialCardCapacityProfile } from '../lib/rendering/social-card-capacity.mjs';
-import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad } from '../lib/rendering/social-card-reflow.mjs';
+import { getSocialCardTemplatePack } from '../server/shared/rendering/social-card-template-registry.mjs';
+import { resolveSocialCardCapacityProfile } from '../server/shared/rendering/social-card-capacity.mjs';
+import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad } from '../server/shared/rendering/social-card-reflow.mjs';
 
 function profile(pack = 'brutalist-v1') {
   return resolveSocialCardCapacityProfile({

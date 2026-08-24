@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { getToolRegistry, PHASE_A_PLUGINS } from '../lib/tools/index.mjs';
-import { ToolRegistry } from '../lib/tools/registry.mjs';
-import { failure, ok } from '../lib/tools/schemas.mjs';
-import { readToolPluginSettings, writeToolPluginSetting } from '../lib/tools/settings.mjs';
+import { getToolRegistry, PHASE_A_PLUGINS } from '../server/platform/tools/index.mjs';
+import { ToolRegistry } from '../server/platform/tools/registry.mjs';
+import { failure, ok } from '../server/platform/tools/schemas.mjs';
+import { readToolPluginSettings, writeToolPluginSetting } from '../server/platform/tools/settings.mjs';
 
 test('阶段 A 插件通过白名单加载并暴露稳定能力', async () => {
   const registry = await getToolRegistry();

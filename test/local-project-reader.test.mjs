@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { extractLocalProjectPath, readLocalProject } from '../lib/integrations/local-project-reader.mjs';
+import { extractLocalProjectPath, readLocalProject } from '../server/platform/integrations/local-project-reader.mjs';
 
 test('本地项目读取器只读取受支持文本并跳过密钥和依赖目录', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-project-'));

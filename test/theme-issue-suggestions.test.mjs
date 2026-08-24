@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enrichThemeIssues, suggestContrastColor } from '../lib/themes/theme-issue-suggestions.mjs';
-import { auditThemeForPublish } from '../lib/themes/theme-publish-gate.mjs';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
+import { enrichThemeIssues, suggestContrastColor } from '../server/shared/themes/theme-issue-suggestions.mjs';
+import { auditThemeForPublish } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
 
 test('suggestContrastColor returns a passing color', () => {
   const fix = suggestContrastColor('#777777', '#FFFFFF', 4.5);

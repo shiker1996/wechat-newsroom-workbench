@@ -8,12 +8,12 @@
 
 主版本为 0 期间（0.x.y）：minor 可引入新功能与向后兼容的契约演进，patch 只含修复。以下四类接口的兼容承诺：
 
-- **数据库 Schema**：只做幂等、只增式迁移（新增表 / 列、默认值回填），启动时自动执行（`lib/core/store.mjs`）。同一大版本内旧库直接启动即可；跨大版本恢复备份必须走备份包校验（清单 `schemaVersion` + 逐文件 SHA-256，恢复前自动保存快照，失败可回滚）。
+- **数据库 Schema**：只做幂等、只增式迁移（新增表 / 列、默认值回填），启动时自动执行（`server/platform/core/store.mjs`）。同一大版本内旧库直接启动即可；跨大版本恢复备份必须走备份包校验（清单 `schemaVersion` + 逐文件 SHA-256，恢复前自动保存快照，失败可回滚）。
 - **技能契约**：第三方技能包以 `skill.json` 的 `schemaVersion`（当前 1）与 `compatibleApp` 判定兼容；`schemaVersion` 升版时旧版技能至少保留 1 个 minor 的并行支持期。
 - **插件 Manifest**：本地与远程插件以 `schemaVersion`（当前 1）与 `compatibleApp` 判定；不兼容的插件在安装时明确报错，不静默加载。
 - **REST API**：`API.md` 记录的路由在同一大版本内只增不破（`test/api-docs-routes.test.mjs` 双向钉死）；破坏性变更先在 CHANGELOG 标记 Deprecated，至少保留 1 个 minor 后才移除。
 
-应用版本的唯一来源是 `package.json` 的 `version` 字段（`lib/version.mjs` 统一读取，技能与插件的 `compatibleApp` 判定均以此为准）。发布流程见 `docs/release.md`。
+应用版本的唯一来源是 `package.json` 的 `version` 字段（`server/version.mjs` 统一读取，技能与插件的 `compatibleApp` 判定均以此为准）。发布流程见 `docs/release.md`。
 
 ## [Unreleased]
 
@@ -138,7 +138,7 @@
 ### Added
 
 - **AI 生成封面主题**（封面二期）：AI 主题生成器的 target 参数化扩展到 `cover`——封面主题是纯 token 主题（无组件配方），契约允许 targetConfig 省略、归一化跳过 recipes/behavior/effects/components 修复、prompt 使用封面专属设计方向（900×383 固定画布、标题为绝对主角）；`compileThemePreview` 与发布门禁支持 cover（固定封面样稿渲染、900×383 结构检查，反白文字由封面编译器 `pick()` 动态保证对比度，不做 token 级硬门禁）；视觉相似度比较兼容无配方主题；主题中心 AI 生成表单新增「封面主题」类型，封面用户主题在编辑器中走纯 token 编辑；克隆与导入同步支持 cover 目标
-- **公众号文章封面图**（AI 非视觉生成）：新增「文章封面图」工作台（导航位于「公众号排版」之后，排版页「复制公众号富文本」旁有引导按钮）。AI 只做排版决策——选封面主题、组合组件（画布/几何色块/主标题断行与高亮/标签/副标题/信息行/装饰）、产出规格 JSON；规格经 `validateCoverSpec` 校验，任一不合规整体回退 `fallbackCoverSpec` 保证永远出图；最终由确定性 HTML 模板渲染并截图为 900×383 PNG（`lib/themes/cover-components.mjs`、`cover-theme-compiler.mjs`、`lib/llm/cover-image-generator.mjs`，产物落 `images/cover.png` 并登记 kind=封面图 artifact）。封面主题进主题中心体系（`targets:['cover']`，`themes/cover/` 内置 10 套），API：`POST /api/candidates/:id/cover/generate`、`GET /api/candidates/:id/cover`、`GET /api/candidates/:id/cover/local`
+- **公众号文章封面图**（AI 非视觉生成）：新增「文章封面图」工作台（导航位于「公众号排版」之后，排版页「复制公众号富文本」旁有引导按钮）。AI 只做排版决策——选封面主题、组合组件（画布/几何色块/主标题断行与高亮/标签/副标题/信息行/装饰）、产出规格 JSON；规格经 `validateCoverSpec` 校验，任一不合规整体回退 `fallbackCoverSpec` 保证永远出图；最终由确定性 HTML 模板渲染并截图为 900×383 PNG（`server/shared/themes/cover-components.mjs`、`cover-theme-compiler.mjs`、`server/platform/llm/cover-image-generator.mjs`，产物落 `images/cover.png` 并登记 kind=封面图 artifact）。封面主题进主题中心体系（`targets:['cover']`，`themes/cover/` 内置 10 套），API：`POST /api/candidates/:id/cover/generate`、`GET /api/candidates/:id/cover`、`GET /api/candidates/:id/cover/local`
 - **AI 兴趣仓库发现**（`githubDiscovery.aiQueries`）：LLM 按 `account-context.json` 内容支柱生成 GitHub Search 查询组（缓存 `data/repo-discovery-queries.json`，默认 7 天复用，可手工编辑），随 github 采集执行为新通道 `ai-search`（来源名「AI 兴趣发现 · {方向}」），结果再经 LLM 兴趣相关性打分过滤（≥ `minInterestScore` 6 分保留，分数/理由随热点 `raw_json` 入库）；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）
 - **编辑会外部链接入库**：编辑会回答中粘贴的链接（去重后最多 5 条）自动逐个抓取并落新增的 `candidate_sources` 表（按候选+URL 覆盖），以「用户补充来源」分组注入事实基座；每条抓取结果（成功标题字数/失败原因）写入对话，对用户与模型可见
 
@@ -171,7 +171,7 @@
 - 语义打标重试不再把已开启的 thinking 关掉：JSON 截断进入拆分重试时，拆分后的子批继续沿用 thinking（此前拆分路径把 thinking 重置为关闭，导致模型退化问题复现）
 - 图文主题代码块对比度：`inverseText` 与 `codeBackground` 同色的主题（crimson / orange / charcoal）代码块此前是黑字黑底几乎不可见；新增 `accent-panel`（白字强调色底）与 `ink-panel`（白字深色底）代码配方并切换这三个主题，代码文字改为 `--ink` / `--inverse` 高对比色
 - crimson 列表由「白字黄底」（`hard-card`）改为「白字红底」（新增 `hard-accent` 列表配方），并提升结尾页文字对比度；crimson / orange / charcoal 主题版本升至 1.0.1
-- 全量图文主题对比度审计（`scripts/audit-theme-contrast.mjs`，无头浏览器实测）：brutalist 眉题由 1:1 不可见改为正文色；peach / tokyo-night / lavender / solarized 加深强调色使白字达标（步骤号 / 表头 / 结尾页），brand 对比度随之提升；bone-white / ice-blue / mocha / paper-craft / peach / solarized 眉题由 accent2 改为 muted 色提升可读性；相关主题版本升至 1.0.1
+- 全量图文主题对比度审计（`scripts/quality/audit-theme-contrast.mjs`，无头浏览器实测）：brutalist 眉题由 1:1 不可见改为正文色；peach / tokyo-night / lavender / solarized 加深强调色使白字达标（步骤号 / 表头 / 结尾页），brand 对比度随之提升；bone-white / ice-blue / mocha / paper-craft / peach / solarized 眉题由 accent2 改为 muted 色提升可读性；相关主题版本升至 1.0.1
 
 ### Changed
 
@@ -182,7 +182,7 @@
 - AI 后台任务并发模型：候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥；超出 `aiJobs.maxConcurrent`（默认 2，可配）的任务进入 FIFO 队列以 `queued` 状态等待，不再互相阻塞或报「已有任务运行」
 - 服务重启恢复：`queued` 状态的 AI 任务与 `running` 一并标记为中断，避免残留排队记录
 
-- README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
+- README 顶部示例改为演示封面图（`docs/screenshots/ui-demo-cover.png`，`scripts/media/render-demo-cover.mjs` 可重新生成），点击跳转 CDN 演示视频 `https://img.shiker.tech/project/export-1785841213192.mp4`（GitHub README 不支持 `<video>` 标签，采用封面图 + 播放链接方案）；原截图保留在 `docs/screenshots/` 作海报与渠道物料
 
 ## [0.2.0] - 2026-08-04
 
@@ -213,11 +213,11 @@
 - CI（GitHub Actions）：`npm ci`、构建、全量测试、示例技能包 / 插件校验、依赖漏洞与许可证扫描、秘密扫描
 - 测试分层：浏览器依赖测试打标，`npm run test:fast` 可在无 Puppeteer 缓存环境运行
 - 提交前秘密扫描钩子（`.githooks/pre-commit`，`git config core.hooksPath .githooks` 启用）
-- 冷启动验收脚本（`scripts/cold-start-acceptance.sh`）、示例配置与 API 路由清单双向校验测试
+- 冷启动验收脚本（`scripts/archive/cold-start-acceptance.sh`）、示例配置与 API 路由清单双向校验测试
 - 全字段虚构的 `account-context.example.json`
 - 版本兼容验收样例（`test/version-compat.test.mjs`）：旧版数据库幂等迁移、技能包与插件的 `schemaVersion` / `compatibleApp` 判定
 - 演示模式（`--demo` / `WORKBENCH_DEMO=1` / `start-workbench.ps1 -Demo`）：无模型服务商时写入两份虚构演示批次（热点、打标、文章 / 图文选题池、排版与终稿产物），使用独立数据库 `data/demo.db`，跳过 RSSHub 自动启动，浏览型视图完整可用
-- README 视觉物料：`docs/screenshots/` 工作台截图，`scripts/render-ui-shots.mjs` 可重新生成
+- README 视觉物料：`docs/screenshots/` 工作台截图，`scripts/media/render-ui-shots.mjs` 可重新生成
 
 ### Security
 

@@ -4,7 +4,7 @@
 
 - 设计方案统一收在 [design/](./design/)；
 - 已闭环的历史方案、复盘与审计记录归档在 [archive/](./archive/)；
-- 回归基线 JSON（`*-baseline.json`、`configuration-migration-inventory.json`）在 `test/fixtures/`，由 `scripts/snapshot-*` 生成、测试逐字比对，勿手工编辑。
+- 回归基线 JSON（`*-baseline.json`、`configuration-migration-inventory.json`）在 `test/fixtures/`，由 `scripts/quality/snapshot-*.mjs` 生成、测试逐字比对，勿手工编辑。
 
 新增文档时在头部注明类别与状态（如 `> 状态：已实施` / `> 状态：待评审`），并登记到下表；已闭环的阶段性文档移入 `archive/` 并更新本索引。
 
@@ -39,7 +39,7 @@
 | [capability-onboarding-configurability-plan.md](./design/capability-onboarding-configurability-plan.md) | 能力接入配置化与开发规范化：五种情形分级、能力生命周期状态机、Agent 登记驱动（阶段 1–4 已实施；页面添加入口 2026-08-15 已下线） |
 | [capability-expansion-guide.md](./design/capability-expansion-guide.md) | 能力拓展单一视图：消费者×能力类型成本矩阵、生命周期状态机、三类消费者 SOP 与遗留方向（2026-08-15 汇总，拓展先读） |
 | [agent-adapter-configurability-design.md](./design/agent-adapter-configurability-design.md) | Agent 能力适配层配置化设计：resourceKind 档案表 + Agent 双 map 声明，资源类能力接入免改代码（2026-08-15，阶段 1–4 已实施） |
-| [conversation-agent-form-unification-design.md](./design/conversation-agent-form-unification-design.md) | 对话 Agent 表单统一设计（`lib/domain/editorial-readiness.mjs` 的设计依据） |
+| [conversation-agent-form-unification-design.md](./design/conversation-agent-form-unification-design.md) | 对话 Agent 表单统一设计（`server/features/articles/domain/editorial-readiness.mjs` 的设计依据） |
 | [star-growth-roadmap.md](./design/star-growth-roadmap.md) | Star 增长路线图：发布临门一脚、首个公开 Release、可见性渠道与留存运营（待评审） |
 
 ## 历史归档（archive/）

@@ -7,7 +7,7 @@ const system=fs.readFileSync(new URL("../public/src/views/system.js",import.meta
 const main=fs.readFileSync(new URL("../public/src/main.js",import.meta.url),"utf8");
 const html=fs.readFileSync(new URL("../public/index.html",import.meta.url),"utf8");
 const css=fs.readFileSync(new URL("../public/styles.css",import.meta.url),"utf8");
-const systemRoutes=fs.readFileSync(new URL("../lib/http/routes/system-routes.mjs",import.meta.url),"utf8");
+const systemRoutes=fs.readFileSync(new URL("../server/platform/http/routes/system-routes.mjs",import.meta.url),"utf8");
 
 test("热点全景空批次合并为空态并引导打开批次采集研判",()=>{
   assert.match(html,/id="atlas-stage-empty" hidden/);

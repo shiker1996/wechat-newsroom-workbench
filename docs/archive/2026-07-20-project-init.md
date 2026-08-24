@@ -157,7 +157,7 @@ AI 生成或修改草稿（手动启动）
 
 1. **P0：修复成稿提示词变量没有展开**
 
-   [article-pipeline.mjs (line 110)](E:/Documents/write-assistant/lib/llm/article-pipeline.mjs:110) 使用了 `\u0024{selectedTitle}`、`\u0024{JSON.stringify(brief)}` 等写法。它们会作为字面文本 `${selectedTitle}` 发送给模型，而不是真实标题、简报和大纲。这会直接降低初稿质量并增加幻觉风险。
+   [article-pipeline.mjs (line 110)](E:/Documents/write-assistant/server/platform/llm/article-pipeline.mjs:110) 使用了 `\u0024{selectedTitle}`、`\u0024{JSON.stringify(brief)}` 等写法。它们会作为字面文本 `${selectedTitle}` 发送给模型，而不是真实标题、简报和大纲。这会直接降低初稿质量并增加幻觉风险。
 
 2. **P0：修复默认测试命令**
 
@@ -173,11 +173,11 @@ AI 生成或修改草稿（手动启动）
 
 5. **P1：让构建命令真正验证代码**
 
-   [build.mjs (line 21)](E:/Documents/write-assistant/scripts/build.mjs:21) 目前只是读取文件，并没有真正解析、打包或校验 import。建议至少加入全模块语法/import 检查，前端收拢后再考虑真正 bundling。
+   [build.mjs (line 21)](E:/Documents/write-assistant/scripts/build/build.mjs:21) 目前只是读取文件，并没有真正解析、打包或校验 import。建议至少加入全模块语法/import 检查，前端收拢后再考虑真正 bundling。
 
 6. **P1：完善来源健康时间轴**
 
-   backlog 标记为已完成，但当前数据库接口只返回每个来源的最后一次记录，[store.mjs (line 352)](E:/Documents/write-assistant/lib/store.mjs:352)；前端展示的也是最新状态汇总点阵，不是“逐来源、逐日”的历史时间轴。
+   backlog 标记为已完成，但当前数据库接口只返回每个来源的最后一次记录，[store.mjs (line 352)](E:/Documents/write-assistant/server/store.mjs:352)；前端展示的也是最新状态汇总点阵，不是“逐来源、逐日”的历史时间轴。
 
 7. **P1：任务完成通知与断点恢复**
 

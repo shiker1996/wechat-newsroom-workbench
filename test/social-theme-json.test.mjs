@@ -3,9 +3,9 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { compileSocialTheme, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 
@@ -33,7 +33,7 @@ test('阶段 3 生成 HTML 只注入当前主题 CSS 和不可变主题引用',(
 });
 
 test('阶段 3 图文渲染器不再维护主题白名单、主题色或内嵌主题类',()=>{
-  const source=fs.readFileSync(path.join(root,'lib','llm','social-card-pipeline.mjs'),'utf8');
+  const source=fs.readFileSync(path.join(root,'server','features','social-cards','application','social-card-pipeline.mjs'),'utf8');
   assert.doesNotMatch(source,/const themes\s*=|themes\.includes/);
   assert.doesNotMatch(source,/\.theme-(?:tokyo-night|solarized|retro-terminal|paper-craft|charcoal|peach|orange|mocha|lavender|crimson|bone-white|neon|brutalist)\{/);
   for(const color of ['#16161e','#00ff41','#ff9ab8','#ff7a00','#967bb6','#ff2d55'])assert.doesNotMatch(source,new RegExp(color,'i'));

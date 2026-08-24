@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { aggregateSocialTemplateMetrics, summarizeSocialTemplateRun } from '../lib/rendering/social-card-template-metrics.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { aggregateSocialTemplateMetrics, summarizeSocialTemplateRun } from '../server/shared/rendering/social-card-template-metrics.mjs';
 
 test('Phase 4 模板指标统计区分模板回退、布局问题和单页成功率', () => {
   const run = summarizeSocialTemplateRun({
@@ -58,7 +58,7 @@ test('Phase 4 social 模板指标落库且不进入文章/封面主题使用统�
 });
 
 test('Phase 4 单页接口显式传入模板上下文并返回逐页模板信息', () => {
-  const source = fs.readFileSync(path.join(process.cwd(), 'lib/http/routes/social-card-routes.mjs'), 'utf8');
+  const source = fs.readFileSync(path.join(process.cwd(), 'server/platform/http/routes/social-card-routes.mjs'), 'utf8');
   assert.match(source, /targetTemplateContext/);
   assert.match(source, /target_template:targetTemplateContext/);
   assert.match(source, /template:\{\.\.\.templateCompatibility,target:templateCompatibility\.pages/);

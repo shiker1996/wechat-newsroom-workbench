@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { deriveAgentEntryCapabilities } from '../lib/agent/entry-capabilities.mjs';
-import { EDITORIAL_AGENT_CAPABILITIES } from '../lib/agent/editorial-adapter.mjs';
-import { applyCatalogSchemas, buildAdaptation, resolveCatalogResourceProfiles, RESOURCE_ID_SCHEMA } from '../lib/agent/resource-adaptation.mjs';
-import { addCapabilityCatalogEntries, readCapabilityCatalog } from '../lib/tools/capability-catalog.mjs';
-import { buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
+import { deriveAgentEntryCapabilities } from '../server/platform/agent/entry-capabilities.mjs';
+import { EDITORIAL_AGENT_CAPABILITIES } from '../server/features/articles/application/agent/editorial-adapter.mjs';
+import { applyCatalogSchemas, buildAdaptation, resolveCatalogResourceProfiles, RESOURCE_ID_SCHEMA } from '../server/platform/agent/resource-adaptation.mjs';
+import { addCapabilityCatalogEntries, readCapabilityCatalog } from '../server/platform/tools/capability-catalog.mjs';
+import { buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
 
 // 阶段 3（docs/design/agent-adapter-configurability-design.md §4）：新资源类能力走默认档案路径——
 // 目录条目声明 resourceKind + 消费者登记即接入，全程不改任何 .mjs（不进 Adapter 常量）。

@@ -1,0 +1,43 @@
+:root {
+  --paper: #f3efe5;
+  --paper-deep: #e6dfd0;
+  --ink: #17201e;
+  --muted: #6d726b;
+  --line: rgba(23, 32, 30, .18);
+  --line-strong: rgba(23, 32, 30, .42);
+  --red: #c83a2e;
+  --red-dark: #99271f;
+  --mint: #a8d9ca;
+  --yellow: #e9cf76;
+  --green: #2e7d5b;
+  --white: #fbf9f2;
+  --display: "Iowan Old Style", "Songti SC", "STSong", Georgia, serif;
+  --body: "Avenir Next", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --serif: var(--display);
+  --mono: ui-monospace, Consolas, "Courier New", monospace;
+  --cream: var(--white);
+  --paper-soft: rgba(251, 249, 242, .52);
+  --soft: var(--paper-deep);
+  --accent: var(--red);
+  /* 固定侧栏宽度：.rail 与 .shell 的 margin-left 必须保持一致 */
+  --rail-width: 226px;
+  /* 层级体系：数值保持既有层级关系，新增浮层请就近取档 */
+  --z-raised: 1;    /* 悬停/焦点微抬升 */
+  --z-sticky: 2;    /* 局部 sticky 与卡片内浮层 */
+  --z-elevated: 3;  /* 组内压层（候选 tab 箭头等） */
+  --z-dropdown: 5;  /* 下拉/弹出菜单 */
+  --z-bar: 7;       /* 底部吸附操作条 */
+  --z-toolbar: 8;   /* 顶部吸附工具条 */
+  --z-rail: 10;     /* 固定侧栏 */
+  --z-noise: 20;    /* 纸纹覆盖层、创作配置弹层 */
+  --z-toast: 40;    /* 全局提示 */
+  --z-modal: 1000;  /* 沉浸式全屏层 */
+  --z-zoom: 1200;   /* 图片放大覆盖层 */
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); color: var(--ink); }
+body { margin: 0; min-height: 100vh; font-family: var(--body); }
+img { display:block; max-inline-size:100%; block-size:auto; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+.paper-noise { position: fixed; inset: 0; pointer-events: none; opacity: .28; z-index: var(--z-noise); background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.09'/%3E%3C/svg%3E"); }

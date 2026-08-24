@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTaggingInput } from '../lib/llm/tasks.mjs';
-import { clusterItems, preselection, selectSocialCandidates } from '../lib/llm/research-pipeline.mjs';
+import { buildTaggingInput } from '../server/features/research/llm/tasks.mjs';
+import { clusterItems, preselection, selectSocialCandidates } from '../server/features/research/application/research-pipeline.mjs';
 
 const tags={eventKey:'repo|发布|工具',chinaRelevance:8,relevanceReason:'适合国内开发者',riskLevel:'低',keywords:['开发工具'],
   preScores:{conflict:5,audience:14,informationGain:12,emotion:5,impact:7,sourceReliability:8},credibleScoop:0,saturationPenalty:1};

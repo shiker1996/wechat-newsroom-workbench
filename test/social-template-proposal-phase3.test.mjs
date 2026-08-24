@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { compileSocialTemplateProposal, compileSocialTemplateProposalPack, auditSocialTemplateProposal } from '../lib/themes/social-template-proposal-compiler.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
+import { compileSocialTemplateProposal, compileSocialTemplateProposalPack, auditSocialTemplateProposal } from '../server/platform/application/themes/social-template-proposal-compiler.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
 
 const ROLES = ['cover', 'concept', 'feature', 'steps', 'data', 'compare', 'evidence', 'timeline', 'risk', 'ending'];
 function proposal(overrides = {}) {

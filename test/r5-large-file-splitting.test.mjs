@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizePlanningResult, selectWriterSkill } from '../lib/llm/article-pipeline-contract.mjs';
-import { stageSkillPackageRestore, stageWritingSkillRestore } from '../lib/http/routes/system-restore-transactions.mjs';
+import { normalizePlanningResult, selectWriterSkill } from '../server/features/articles/application/article-pipeline-contract.mjs';
+import { stageSkillPackageRestore, stageWritingSkillRestore } from '../server/platform/http/routes/system-restore-transactions.mjs';
 import { socialTokenLimits, targetLabel } from '../public/src/views/theme-manager-fields.js';
 
 test('R5.4 文章流水线契约可脱离执行器独立使用',()=>{

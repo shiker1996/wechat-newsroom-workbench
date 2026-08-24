@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, classifySocialCardLayoutIssue, socialCardRepairStateSignature, structuralLayoutPages, validateSocialCardRestructureOperations } from '../lib/rendering/social-card-repair-policy.mjs';
+import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, classifySocialCardLayoutIssue, socialCardRepairStateSignature, structuralLayoutPages, validateSocialCardRestructureOperations } from '../server/shared/rendering/social-card-repair-policy.mjs';
 
 const plan = [{ kind: 'cover', title: '封面', content_blocks: [] }, {
   kind: 'content', role: 'feature', title: '能力清单', content_blocks: [{ type: 'list', title: '要点', items: ['事实一', '事实二', '事实三', '事实四'] }],

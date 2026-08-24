@@ -2,7 +2,7 @@
 
 状态：设计提案，尚未实施  
 日期：2026-08-23  
-相关现状：[架构总览](../architecture.md)、`lib/llm/research-pipeline.mjs`、`lib/domain/hotspot-atlas.mjs`
+相关现状：[架构总览](../architecture.md)、`server/features/research/application/research-pipeline.mjs`、`server/features/research/domain/hotspot-atlas.mjs`
 
 ## 1. 背景与结论
 
@@ -668,8 +668,8 @@ F = A × 70% + T × 30% − S − D
 改造按“先统一 T，再接入 F，最后切换候选池”的顺序实施，避免中间版本同时存在两套事件价值口径：
 
 1. **统一事件价值来源**
-   - `lib/domain/event-heat-ranking.mjs` 将 `heatScore` 增加兼容别名 `eventValue`/`t`，事件热榜的分项成为 T 的唯一来源；
-   - `lib/llm/research-pipeline.mjs` 的 `topicValueParts()` 不再重新叠加账号相关或开发者专属信号，候选的 `topicValue` 直接读取事件热榜 T；
+   - `server/domain/event-heat-ranking.mjs` 将 `heatScore` 增加兼容别名 `eventValue`/`t`，事件热榜的分项成为 T 的唯一来源；
+   - `server/features/research/application/research-pipeline.mjs` 的 `topicValueParts()` 不再重新叠加账号相关或开发者专属信号，候选的 `topicValue` 直接读取事件热榜 T；
    - `selectArticlePool()` 先按 T 构造候选宇宙，再把 `accountFit` 作为 L2 的结构化结果和轻量同分排序依据，不再使用 `T + accountFit` 伪装成新的事件分。
 2. **把 T 接入 F，而不是只作为入围条件**
    - `scoreCards()` 接收候选的 `eventValue/T`，先计算 `articleValue=A`，再按 `eventValueWeight`（默认 0.30）计算最终 F；

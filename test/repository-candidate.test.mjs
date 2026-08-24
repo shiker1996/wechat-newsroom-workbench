@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { createRepositoryCandidate } from '../lib/domain/repository-candidate.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { createRepositoryCandidate } from '../server/features/social-cards/index.mjs';
 
 function tmpStore() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'repository-candidate-'));

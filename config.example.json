@@ -9,8 +9,8 @@
   "rsshub": {
     "baseUrl": "http://127.0.0.1:1200",
     "rootDir": "RSSHub",
-    "startScript": "scripts/rsshub-start.ps1",
-    "stopScript": "scripts/rsshub-stop.ps1",
+    "startScript": "scripts/runtime/rsshub-start.ps1",
+    "stopScript": "scripts/runtime/rsshub-stop.ps1",
     "pidFile": "data/rsshub.pid",
     "startupTimeoutMs": 180000,
     "keepAlive": true,

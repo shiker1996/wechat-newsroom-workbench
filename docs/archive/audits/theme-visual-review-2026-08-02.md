@@ -1,7 +1,7 @@
 # 主题视觉增强逐主题审查
 
 日期：2026-08-02
-关联：[主题视觉 UX 审查](./theme-ux.md)（审查对象），数据见 [review/](./theme-ux/review/)（由 `scripts/render-theme-review.mjs` 生成，含正式样稿 HTML、密度审计 JSON 与配方分配表；逐页 PNG 已于 2026-08-02 从仓库移除以减小体积，可用同一脚本重新生成，git 历史亦可追溯）。
+关联：[主题视觉 UX 审查](./theme-ux.md)（审查对象），数据见 [review/](./theme-ux/review/)（由 `scripts/media/render-theme-review.mjs` 生成，含正式样稿 HTML、密度审计 JSON 与配方分配表；逐页 PNG 已于 2026-08-02 从仓库移除以减小体积，可用同一脚本重新生成，git 历史亦可追溯）。
 
 ## 审查方法
 
@@ -25,7 +25,7 @@
 
 ### P0：`skeleton` 只作用于封面，内容页构图差异没有发生
 
-证据：`lib/llm/social-card-pipeline.mjs:483` 仅在 `pageKind==='cover'` 时输出 `skeleton-*` 类名；密度审计中 12/14 个主题的 p2–p5 利用率完全相同（76.1% / 44.7% / 35.4% / 10.4%），逐页截图确认内容页都是同一个单栏 `page-content-stack`。
+证据：`server/platform/llm/social-card-pipeline.mjs:483` 仅在 `pageKind==='cover'` 时输出 `skeleton-*` 类名；密度审计中 12/14 个主题的 p2–p5 利用率完全相同（76.1% / 44.7% / 35.4% / 10.4%），逐页截图确认内容页都是同一个单栏 `page-content-stack`。
 
 影响：theme-ux.md 的 P1 建议"页面骨架配方让主题差异从换肤升级为构图差异"只完成了一半；用户在内容页（图集的主体）看到的仍然是同一模板换色。
 
@@ -57,7 +57,7 @@ b. 或把配方明确定义为"封面构图"，另设内容页构图配方。方
 
 ### P2：骨架/节奏分配硬编码在编译器里，主题 JSON 没有显式字段
 
-证据：`lib/themes/social-theme-compiler.mjs:29` 的 `derivedSkeleton` 按主题 id 匹配，`lib/themes/article-theme-compiler.mjs:17` 的 `derivedRhythm` 同理；14 个图文 JSON 只新增了 `coverTitle`，均未显式声明 `skeleton`/`coverSupport`。
+证据：`server/shared/themes/social-theme-compiler.mjs:29` 的 `derivedSkeleton` 按主题 id 匹配，`server/shared/themes/article-theme-compiler.mjs:17` 的 `derivedRhythm` 同理；14 个图文 JSON 只新增了 `coverTitle`，均未显式声明 `skeleton`/`coverSupport`。
 
 影响：分配思路只存在于代码注释外的映射表里；AI 创建的新主题、用户复制主题、主题改名后都会静默落回默认值。
 
@@ -118,14 +118,14 @@ b. 或把配方明确定义为"封面构图"，另设内容页构图配方。方
 
 ### P0 已修复：skeleton 全页型生效
 
-- `lib/llm/social-card-pipeline.mjs`：骨架类名不再只输出到封面，而是作用于封面、内容页和结尾页；默认 `stacked` 不输出类名，保持旧主题渲染字节不变。
-- `lib/themes/social-theme-compiler.mjs`：editorial-split 双栏构图限定为非封面页（`:not(.page-cover)`），封面回到 layout-poster 的顶部标题 + 底部承载物锚定；数据卡、对比表、代码块在双栏中跨全栏（`.content-block.stats-block` 等，避免窄列挤压换行）。
+- `server/platform/llm/social-card-pipeline.mjs`：骨架类名不再只输出到封面，而是作用于封面、内容页和结尾页；默认 `stacked` 不输出类名，保持旧主题渲染字节不变。
+- `server/shared/themes/social-theme-compiler.mjs`：editorial-split 双栏构图限定为非封面页（`:not(.page-cover)`），封面回到 layout-poster 的顶部标题 + 底部承载物锚定；数据卡、对比表、代码块在双栏中跨全栏（`.content-block.stats-block` 等，避免窄列挤压换行）。
 - 效果：bone-white / solarized 封面利用率从 34–35% 回到 79.7%；editorial-split 内容页呈现真实双栏构图（`social-bone-white-p2-content.png`），p2 利用率 53.1% → 81.4%。
 - 已知边界：terminal-rail / impact-band / paper-offset 在内容页仍是轨道边线、硬阴影、微倾斜等轻量构图（受密度门禁约束，暂不做更激进的内容页结构）；对比页、结尾页样稿欠填充是固定样稿内容单薄的既有问题，见上文 P2。
 
 ### P1 已修复：文章代码与深色表头对比度
 
-- `lib/llm/typeset-pipeline.mjs`：`codeBackground` 与 `inverseText` 不再盲目配对；代码、代码块、dark-block 引用和 dark-header 表头的文字色在 `inverseText` 与正文色之间确定性选择对比度更高者（复用 `colorContrast`）。
+- `server/platform/llm/typeset-pipeline.mjs`：`codeBackground` 与 `inverseText` 不再盲目配对；代码、代码块、dark-block 引用和 dark-header 表头的文字色在 `inverseText` 与正文色之间确定性选择对比度更高者（复用 `colorContrast`）。
 - 效果：research-report 代码块由浅灰字浅灰底修复为深色文字；tech-wire 表头与 inline code 由深底深字修复为 `#E6EDF3`（见 `article-research-report.png`、`article-tech-wire.png`）。
 - 对比度正常的主题（如 gossip-card 白字深色面板）渲染不变；发布门禁原有的 `inverseText × codeBackground` 检查保持不变。
 
@@ -146,7 +146,7 @@ b. 或把配方明确定义为"封面构图"，另设内容页构图配方。方
 - 回归：全量 638 项测试通过。
 
 ### P2 已修复：固定样稿 p3–p5 补充内容（2026-08-02 第二轮）
-- `lib/themes/theme-preview.mjs` 的 `SOCIAL_THEME_SPECIMEN`：步骤页补"检查清单"列表与提示块（3 块），对比页补"适用场景"列表与备注块（3 块），结尾页补"行动提示"列表与品牌区（2 块）。
+- `server/shared/themes/theme-preview.mjs` 的 `SOCIAL_THEME_SPECIMEN`：步骤页补"检查清单"列表与提示块（3 块），对比页补"适用场景"列表与备注块（3 块），结尾页补"行动提示"列表与品牌区（2 块）。
 - 效果（layout-audit 实测）：步骤页 45% → 69–81%，对比页 36% → 67–72%，结尾页 10–12% → 34–47%，全部高于 20% 欠填充阈值且无溢出；结尾页配方（accent-fill/hard-fill/dark-fill）终于有了承载物可展示（`social-brutalist-p5-ending.png`）。
 
 ### P1 已修复：主题选择器按内容任务辅助决策（2026-08-02 第二轮，对应 theme-ux.md P1）
@@ -163,6 +163,6 @@ b. 或把配方明确定义为"封面构图"，另设内容页构图配方。方
 - P3（4 个列表块的内容页）利用率 131.9%，**两个版本完全一致**——故事板密度超出固定画布，属于既有问题，与主题改动无关；
 - 封面（3 个内容块 + 31 字标题）HEAD 已溢出（93.8%，目标上限 90%），主题改动把它推高到 112.5%：`coverSupport` 给封面追加导语是主因，`coverTitle` 装饰padding 是次因。
 
-已实施的加固（`lib/llm/social-card-pipeline.mjs`）：封面已有内容块时不再叠加封面承载物；承载文本超过 60 字确定性截断。加固后封面回落到 100.9%（仍溢出，剩余为故事板自身密度问题，HEAD 同样失败）。
+已实施的加固（`server/platform/llm/social-card-pipeline.mjs`）：封面已有内容块时不再叠加封面承载物；承载文本超过 60 字确定性截断。加固后封面回落到 100.9%（仍溢出，剩余为故事板自身密度问题，HEAD 同样失败）。
 
 结论：主题改动不是这次失败的根因，但确实放大了封面溢出；已加固。真正的根因是故事板/文案密度预算与布局修复循环无法消化超高密度页面（修复循环 5 轮后失败，且禁止改页数），需要单独立项处理。

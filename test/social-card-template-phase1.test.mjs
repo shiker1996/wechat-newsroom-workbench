@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
-import { socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
+import { socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
 import {
   buildSocialCardTemplateCapabilityPrompt,
   getSocialCardTemplateCapabilities,
   resolveSocialCardTemplate,
   resolveSocialCardTemplateContext,
   validateSocialCardTemplateCompatibility,
-} from '../lib/rendering/social-card-template-resolver.mjs';
+} from '../server/shared/rendering/social-card-template-resolver.mjs';
 
 function legacyTheme(id='peach') {
   const theme=structuredClone(socialThemeDefinition(id));
@@ -85,7 +85,7 @@ test('Phase 1 HTML 记录模板包元数据且不改变页面结构', () => {
 });
 
 test('Phase 1 故事板路由在生成前注入模板能力并在生成后校验', () => {
-  const source = fs.readFileSync(new URL('../lib/http/routes/social-card-routes.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../server/platform/http/routes/social-card-routes.mjs', import.meta.url), 'utf8');
   assert.match(source, /templateCapabilities:templateContext\.capabilities/);
   assert.match(source, /validateSocialCardTemplateCompatibility/);
   assert.match(source, /socialTemplateContext\(/);

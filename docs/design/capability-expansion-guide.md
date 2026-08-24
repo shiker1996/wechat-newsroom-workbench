@@ -54,7 +54,7 @@ consumable（可消费，按消费者逐个计算）
 
 ### 3.2 Agent 接入已有能力
 
-**纯参数能力（半配置化，无代码）**：在 `config/capability-consumers.json` 为该 Agent 加一条登记依赖即生效。登记驱动机制（`lib/agent/entry-capabilities.mjs`）使 Adapter 目录从登记派生，纯参数能力不在 Adapter 常量上界约束内，登记了即生效。同步对应运行时技能的 `skill.json` Manifest 声明与白名单。
+**纯参数能力（半配置化，无代码）**：在 `config/capability-consumers.json` 为该 Agent 加一条登记依赖即生效。登记驱动机制（`server/platform/agent/entry-capabilities.mjs`）使 Adapter 目录从登记派生，纯参数能力不在 Adapter 常量上界约束内，登记了即生效。同步对应运行时技能的 `skill.json` Manifest 声明与白名单。
 
 > 历史：2026-08-14 至 08-15 曾有页面"添加能力"入口（阶段 3），因候选仅限少数纯参数能力、实际价值不足已下线；登记驱动机制保留。
 
@@ -90,7 +90,7 @@ feature 的能力调用是业务流程里确定性的一环，"改代码"即功�
 
 图谱可用性计算与原因码、页面展示、停用影响预览、CI 门禁。
 
-注意：`scripts/snapshot-consumer-capability-baseline.mjs` 的 adaptation 信息自 2026-08-16 起从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 刷新基线即可。
+注意：`scripts/quality/snapshot-consumer-capability-baseline.mjs` 的 adaptation 信息自 2026-08-16 起从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 刷新基线即可。
 
 ## 4. 明确边界
 

@@ -260,7 +260,7 @@
 
 主要事项：
 
-- 选题阶段 5 个 LLM 环节（热点打标、事件卡、探索脑暴、综合研判、编辑会）的 system prompt 从代码内联常量提取为项目技能，统一经 `lib/llm/selection-prompts.mjs` 走标准技能运行时加载；技能缺失时回退内联原文，行为不变；编辑会的账号上下文改为 `{{ACCOUNT_CONTEXT}}` 占位符由代码注入，数据与 prompt 保持分离。
+- 选题阶段 5 个 LLM 环节（热点打标、事件卡、探索脑暴、综合研判、编辑会）的 system prompt 从代码内联常量提取为项目技能，统一经 `server/platform/llm/selection-prompts.mjs` 走标准技能运行时加载；技能缺失时回退内联原文，行为不变；编辑会的账号上下文改为 `{{ACCOUNT_CONTEXT}}` 占位符由代码注入，数据与 prompt 保持分离。
 - 选题评分参数从代码常量变为账号配置：`account-context.json` 的 `scoring` 段可覆盖 F=H×h+B×b+P×p-S 权重、账号契合加分、分类偏好与 pBase/hBase 基分；`resolveScoring` 按键合并、非法值回退默认，生产调用点显式传参，纯函数默认值不受用户配置影响，保证既有测试稳定。
 - 成稿技能加入流量主变现配合规则（结尾留言引导问题、商业词汇自然覆盖、文中广告发布侧位置），来自真实账号后台数据复盘（留言区广告 eCPM 约为文中广告 4 倍但曝光率低）。
 - 新增 `docs/configuration.md` 配置项参考，收拢此前分散在 README 与各文档中的配置字段；技能与工具的编写安装保持 `docs/extending.md` 单一来源。

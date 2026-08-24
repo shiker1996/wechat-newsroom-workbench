@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessSocialCardDensityTargets, resolveSocialCardDensityTarget } from '../lib/rendering/social-card-density-targets.mjs';
+import { assessSocialCardDensityTargets, resolveSocialCardDensityTarget } from '../server/shared/rendering/social-card-density-targets.mjs';
 
 test('阶段 4 角色目标利用率区分普通页、续页和模板视觉负担', () => {
   assert.equal(resolveSocialCardDensityTarget({ kind: 'content', role: 'feature' }, { templatePackId: 'clean-v1' }), 0.72);

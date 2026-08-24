@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARTICLE_THEME_RECIPES, SOCIAL_THEME_RECIPES } from '../lib/themes/recipe-catalog.mjs';
+import { ARTICLE_THEME_RECIPES, SOCIAL_THEME_RECIPES } from '../server/shared/themes/recipe-catalog.mjs';
 
 const root=new URL('..',import.meta.url);
 const coverage=JSON.parse(fs.readFileSync(new URL('./fixtures/theme-style-coverage.json',import.meta.url),'utf8'));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
+import { Store } from '../server/platform/core/store.mjs';
 
 function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'event-resolution-store-'));
@@ -16,7 +16,8 @@ function shadow(eventId, hotspotIds, legacyIds = []) {
     events: [{ event_id: eventId, title: '事件', canonical_key: '主体|对象|事实',
       normalized: { whoKey: '主体', objectKey: '对象', actionType: '发布' },
       hotspot_ids: hotspotIds, legacy_event_ids: legacyIds, first_seen_at: '2026-08-23T08:00:00Z',
-      last_seen_at: '2026-08-23T08:00:00Z', historical_match: null }],
+      last_seen_at: '2026-08-23T08:00:00Z', historical_match: null, event_state: 'new_event', update_type: 'new_event',
+      new_information_hotspot_ids: hotspotIds }],
   };
 }
 
@@ -45,6 +46,32 @@ test('事件归并双写：事件记录和报道归属可幂等写入并保留 l
   }
 });
 
+test('事件归并双写：历史事件的新事实保留 new_update、增量标记和最近更新时间', () => {
+  const { root, db } = workspace();
+  let store;
+  try {
+    store = new Store(db);
+    const first = store.createBatch({ date: '2026-08-22', title: '历史批次' });
+    const second = store.createBatch({ date: '2026-08-23', title: '当前批次' });
+    store.addHotspots(first.id, 'rsshub', [{ id: 'source-1', title: '旧报道', url: 'https://example.com/old', publishedAt: '2026-08-22T08:00:00Z' }]);
+    store.addHotspots(second.id, 'rsshub', [{ id: 'source-2', title: '新回应', url: 'https://example.com/new', publishedAt: '2026-08-23T08:00:00Z' }]);
+    const [oldHotspot] = store.getBatch(first.id).hotspots;
+    const [newHotspot] = store.getBatch(second.id).hotspots;
+    store.saveEventResolutionShadow(first.id, shadow('S-HISTORY', [oldHotspot.id]));
+    store.saveEventResolutionShadow(second.id, {
+      schema_version: 1, resolver_version: 'shadow-v1', algorithm_version: 'structured-v1',
+      events: [{ ...shadow('S-HISTORY', [newHotspot.id]).events[0], historical_match: { event_id: 'S-HISTORY', score: 90, method: 'structured' }, event_state: 'new_update', update_type: 'new_fact', new_information_hotspot_ids: [newHotspot.id], last_seen_at: '2026-08-23T08:00:00Z' }],
+    });
+    const record = store.getEventRecord('S-HISTORY');
+    assert.equal(record.event_state, 'new_update');
+    assert.equal(record.last_update_at, '2026-08-23T08:00:00Z');
+    assert.equal(store.listEventHotspots({ batchId: second.id })[0].is_new_information, 1);
+  } finally {
+    store?.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('事件归并双写：同批次报道改判时移除旧归属，避免一条报道挂两个主事件', () => {
   const { root, db } = workspace();
   let store;
@@ -63,4 +90,3 @@ test('事件归并双写：同批次报道改判时移除旧归属，避免一�
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
-

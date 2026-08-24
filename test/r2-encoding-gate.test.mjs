@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const files=[
-  '../lib/http/routes/article-routes.mjs',
-  '../lib/plugin-sdk/github-client.mjs',
+  '../server/platform/http/routes/article-routes.mjs',
+  '../server/platform/plugin-sdk/github-client.mjs',
   '../plugins/mermaid-render/scripts/render-mermaid.mjs',
   '../plugins/echarts-render/scripts/render-echarts.mjs',
   '../plugins/url-fetch/scripts/fetch-hotspot-url.py',

@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getBuiltinThemeRegistry } from '../lib/themes/theme-registry.mjs';
-import { composeAiThemeDefinition, validateAiThemeCandidate, validateAiThemeRequest } from '../lib/themes/ai-theme-contract.mjs';
-import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../lib/themes/ai-theme-generator.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { auditThemeForPublish } from '../lib/themes/theme-publish-gate.mjs';
-import { compactThemeSignatures, compareAiThemeCandidate, themeVisualSimilarity } from '../lib/themes/ai-theme-quality.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
+import { composeAiThemeDefinition, validateAiThemeCandidate, validateAiThemeRequest } from '../server/shared/themes/ai-theme-contract.mjs';
+import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../server/platform/application/themes/ai-theme-generator.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { auditThemeForPublish } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { compactThemeSignatures, compareAiThemeCandidate, themeVisualSimilarity } from '../server/shared/themes/ai-theme-quality.mjs';
 
 const registry = getBuiltinThemeRegistry();
 const coverTokens = structuredClone(registry.get('cover-navy-gold').tokens);
@@ -279,7 +279,7 @@ test('主题管理 UI 提供封面 AI 生成入口与三目标文案', () => {
 });
 
 test('克隆与导入支持 cover 目标', () => {
-  const service = fs.readFileSync('lib/themes/user-theme-service.mjs', 'utf8');
+  const service = fs.readFileSync('server/platform/application/themes/user-theme-service.mjs', 'utf8');
   assert.ok(service.includes("resolveWorkspaceTheme(store,sourceId,'cover')"));
   assert.ok(service.includes("'article','social','cover'"));
 });

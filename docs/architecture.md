@@ -4,34 +4,36 @@
 
 「见字」是本地优先的 Windows 单用户工作台：Node.js 24 原生 HTTP（无 Web 框架）+ `node:sqlite`（无原生编译依赖）+ 浏览器端原生 ES Modules（`public/src/`，构建仅做打包）。只监听 `127.0.0.1:4317`。
 
+当前采用“业务能力垂直入口 + 平台基础设施”的垂直架构：`server/` 顶层严格收敛为 `features/`、`platform/`、`shared/` 三个目录。业务调用方从 `server/features/*` 进入，当前已建立 `research`、`social-cards`、`articles`、`collection`、`batches` 五个业务入口；研究、图文、文章主流水线与排版流水线已物理归入各自垂直的 `application/`。HTTP、LLM、持久化、任务、工具和外部集成统一位于 `server/platform/`；跨业务纯规则、Schema、渲染和主题位于 `server/shared/`。兼容导出只允许留在对应的 platform/shared 边界内，不再新增旧顶层目录。
+
 ## 总览图
 
 ```text
 浏览器（public/src 视图）
    │  /api/*（JSON 与 NDJSON 流）
    ▼
-server.mjs ──► lib/http/routes/*（按批次、候选创作、任务及既有领域模块拆分）
+server.mjs ──► server/platform/http/routes/*（按批次、候选创作、任务及既有领域模块拆分）
    │        └─► server.mjs（只保留装配、静态资源和少量顶层入口）
    ▼
 ┌────────────────┬─────────────────┬──────────────────┐
 │ Store（数据层） │ AiJobManager /   │ ModelGateway      │
-│ lib/core/store │ JobManager       │ lib/llm/gateway   │
+│ server/platform/core/store │ JobManager       │ server/platform/llm/gateway   │
 │                │ （后台任务）      │ （LLM 网关）       │
 └────────────────┴─────────────────┴──────────────────┘
    ▼                                   ▼
-SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
-                                        工具注册中心 lib/tools + plugins/
+SQLite（data/workbench.db）      技能运行时 server/skills + skills/
+                                        工具注册中心 server/platform/tools + plugins/
 ```
 
 ## 启动流程（server.mjs，约 960 行）
 
-1. `loadEnv`（`lib/core/env.mjs`）→ `loadConfig`（`lib/core/config.mjs`，全部默认值内置，`config.local.json` 覆盖）。
+1. `loadEnv`（`server/platform/core/env.mjs`）→ `loadConfig`（`server/platform/core/config.mjs`，全部默认值内置，`config.local.json` 覆盖）。
 2. 组装单例：`Store`（`data/workbench.db`）、`JobManager`（采集任务）、`ModelGateway`、`AiJobManager`，构造函数传参，无 DI 框架。
-3. 路由注册是**顺序链式**：`/api/` 请求先依次经过 `lib/http/routes/` 的模型、主题、内容、系统、媒体、文章、社交卡、批次、候选创作和任务 handler（返回 falsy 则继续），最后由顶层入口决定 404。路由模块只负责 HTTP 适配，批次/候选/任务的业务编排通过显式上下文注入。
+3. 路由注册是**顺序链式**：`/api/` 请求先依次经过 `server/platform/http/routes/` 的模型、主题、内容、系统、媒体、文章、社交卡、批次、候选创作和任务 handler（返回 falsy 则继续），最后由顶层入口决定 404。路由模块只负责 HTTP 适配，批次/候选/任务的业务编排通过显式上下文注入。
 4. 静态资源只服务 `public/`，路径越界检查 + `no-store`，无 SPA fallback。
 5. 引导时异步自启 RSSHub（失败只记日志不阻塞）；端口被占用时探测既有实例 `/api/overview`，已运行则提示退出。除 RSSHub 外无常驻守护，后台任务均为请求触发。
 
-## HTTP 层（lib/http/routes/）
+## HTTP 层（server/platform/http/routes/）
 
 | 模块 | 职责 |
 |---|---|
@@ -51,7 +53,7 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 - **NDJSON 流**（`application/x-ndjson`，每行一个 `{type}` 事件）：`POST /api/candidates/:id/ai/editorial/stream`、`POST /api/batches/:id/custom-social-chat/stream`、`POST /api/batches/:id/tutorial-chat/stream`。
 - **确认头**：技能包与插件的变更类路由要求 `x-admin-confirm: TRUSTED-LOCAL-PLUGIN`（`system-routes.mjs` 单点校验），备份恢复要求 `x-restore-confirm: RESTORE`。两者是防误触门禁，不是鉴权。
 
-## 数据层（lib/core/）
+## 数据层（server/platform/core/）
 
 - `store.mjs` 的 `Store` 类是兼容 facade：负责打开数据库、执行启动迁移、组装 Repository/Query Service/Application Service，并暴露旧公共 API；Store 本身不再直接执行 SQL。
 - 迁移是**幂等的 `CREATE TABLE IF NOT EXISTS` + `PRAGMA table_info` 探测补列**（无 `user_version`），只增不破；跨版本验收见 `test/version-compat.test.mjs`。
@@ -61,43 +63,49 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 ### 核心实体关系（批次 / 热点 / 事件 / 选题）
 
 - **批次（`batches`）→ 热点（`hotspots`）**：一批采集 N 条热点，热点 = 一条报道 = 一个原始 URL；每条热点最多一份原文快照（`hotspot_sources`，按 `hotspot_id` 单行覆盖）。
-- **事件无实体表**：由 `clusterItems`（`lib/llm/research-pipeline.mjs`）按热点的 `eventKey` 标签在读取时实时聚类派生；`event_id = 'E' + sha1(eventKey)[:10]`，由指纹哈希决定，与输入顺序、成员增减无关，重算稳定。事件的持久化产物是事件卡文件（`topics/<批次>/sources/event-cards.json`，按 `event_id` 关联）与突发批次的 `breaking_analyses` 表。
+- **事件无实体表**：由 `clusterItems`（`server/features/research/application/research-pipeline.mjs`）按热点的 `eventKey` 标签在读取时实时聚类派生；`event_id = 'E' + sha1(eventKey)[:10]`，由指纹哈希决定，与输入顺序、成员增减无关，重算稳定。事件的持久化产物是事件卡文件（`topics/<批次>/sources/event-cards.json`，按 `event_id` 关联）与突发批次的 `breaking_analyses` 表。
 - **选题（`candidates`）**：普通选题经 `candidates.hotspot_id` 单指一个热点；综合（composite）选题经 `candidate_hotspots` 关联多个热点（成员关系，决定选题归属哪些事件）。选题的"关联事件" = 其成员热点聚类落到的事件（`eventGroupsForCandidate`）。
 - **候选级补充来源（`candidate_sources`）**：编辑会中作者粘贴的外部报道链接，抓取快照按 `(candidate_row_id, url)` 覆盖存储；不属于任何热点/事件，由 `eventGroupsForCandidate` 以"用户补充来源"合成分组注入事实基座（与 `hotspot_sources` 的热点级快照并列）。
 
 ## 后台任务
 
-- `lib/jobs/job-manager.mjs`：非 AI **采集任务**，内存 Map 按批次防重，并行跑 Reddit（CDP）与 RSSHub / GitHub 采集，逐源写 `source_runs` / `subscription_runs`。
-- `lib/llm/ai-job-manager.mjs`：**AI 任务调度器**，只负责排队、并发上限、批次/候选互斥、thinking 日志、状态持久化与统一异常收口。
-- `lib/jobs/ai-job-handlers.mjs`：12 类 AI 任务的显式注册表，集中声明合法任务类型、批次级互斥类型以及各流水线参数映射。
-- `lib/jobs/auto-pipeline.mjs`：`auto` 复合流程，普通批次串联打标 → 事件卡 → 研判，突发批次转入突发事实分析。
+- `server/platform/jobs/job-manager.mjs`：非 AI **采集任务**，内存 Map 按批次防重，并行跑 Reddit（CDP）与 RSSHub / GitHub 采集，逐源写 `source_runs` / `subscription_runs`。
+- `server/platform/jobs/ai-job-manager.mjs`：**AI 任务调度器**，只负责排队、并发上限、批次/候选互斥、thinking 日志、状态持久化与统一异常收口。
+- `server/platform/jobs/ai-job-handlers.mjs`：12 类 AI 任务的显式注册表，集中声明合法任务类型、批次级互斥类型以及各流水线参数映射。
+- `server/platform/jobs/auto-pipeline.mjs`：`auto` 复合流程，普通批次串联打标 → 事件卡 → 研判，突发批次转入突发事实分析。
 - 持久化：内存与 `ai_runs` 表双写，`GET /api/jobs/:id` 先查内存再回退数据库。**重启后任务视为结束，不做断点续跑**；逐行内存日志不恢复，数据库审计仍在。
-- `lib/llm/tasks.mjs`：基础任务单元（热点打标 `tagBatch`、快速起草 `draftArticle`）。
+- `server/features/research/llm/tasks.mjs`：研究业务模型任务单元（热点打标 `tagBatch`、快速起草 `draftArticle`）。
 
-## LLM 网关（lib/llm/）
+## LLM 网关（server/platform/llm/）
 
 - `gateway.mjs`：OpenAI 兼容客户端，统一 `complete` / `streamComplete`。多服务商在 `config.llm.providers`（含 baseUrl / model / apiKeyEnv / contextWindow / 输出上限 / jsonMode / webSearch 配置），`defaultProvider` 选择，`resolve()` 校验启用状态与 Key。降级：jsonMode 不支持自动去 `response_format` 重试；无原生 webSearch 且配置 Tavily 时注入搜索结果；`finishReason=length` 且 adaptive 时自动扩容重试一次。每次调用（含失败）写 `model_calls` 审计（含原始输出与推理文本，仅保留最近 2000 条，超出自动清理）。
 - `context-manager.mjs`：CJK 加权 token 估算与上下文预算；超预算时先 LLM 摘要老消息（不新增事实），仍超则丢弃最老非保护消息，不静默截断。
 - `output-budget.mjs`：按用途（typeset-html、editorial-room 等 16 组画像）定输出预算，截断时带重试提示词重试。
 
-## 技能运行时（lib/skills/ + skills/）
+## 技能运行时（server/platform/skills/ + skills/）
 
 - `skills/` 是内置技能源码（31 个，SKILL.md + 可选 skill.json + references/）；第三方技能安装在 `data/installed-skills/`，目录清单 `data/skill-packages.json`。
-- `lib/llm/skill-runtime.mjs`：按 `CODEX_SKILLS_ROOT → skills/ → data/installed-skills/` 找技能，拼接 SKILL.md + references 为 prompt，叠加用户配置覆盖层，末尾强制追加不可覆盖的安全门禁段；产出带 sha256 的 bundle。
+- `server/platform/llm/skill-runtime.mjs`：按 `CODEX_SKILLS_ROOT → skills/ → data/installed-skills/` 找技能，拼接 SKILL.md + references 为 prompt，叠加用户配置覆盖层，末尾强制追加不可覆盖的安全门禁段；产出带 sha256 的 bundle。
 - `registry.mjs`：合并内置与已安装技能，读结构化 manifest（kind / entryPoints / 输入输出契约 / 能力声明）；`createGenerationSnapshot` 冻结 prompt hash、工具、模型供复跑。
 - `entry-routing.mjs`：创作入口契约（hotspot-article / independent-writing / batch-daily）与阶段槽位（title / reviewer / humanizer / seo、图文三入口故事板），路由时做契约兼容 + 能力缺口 + 工具策略检查。
 - `pipeline-runtime.mjs`：工具白名单 ∩ 注册中心能力、快照复跑（校验历史工具与模型版本仍可用）、给 gateway 调用注入 snapshotId。
 - `package-manager.mjs`：第三方技能包校验（文件类型 / 大小 / 路径越界 / Markdown 引用 / `compatibleApp`）、staging 原子安装、启停与卸载。
 - `roles.mjs`：只有 writer / typesetter 类技能拥有运行时策略（模型、工具白名单、门禁）。
 
-## 工具注册中心（lib/tools/ + plugins/）
+## 工具注册中心（server/platform/tools/ + plugins/）
 
 - `plugins/` 是内置本地适配器（echarts-render、mermaid-render、repository-inspector、upyun-image-upload、url-fetch、local-project-reader、tavily-search、document-folder-search）。
-- `lib/tools/index.mjs` 启动时合并三来源为单例注册中心：内置插件、`data/installed-tool-plugins/` 中启用且**内容哈希一致**的第三方插件、`data/remote-tool-plugins.json` 中启用的远程声明式插件。
+- `server/platform/tools/index.mjs` 启动时合并三来源为单例注册中心：内置插件、`data/installed-tool-plugins/` 中启用且**内容哈希一致**的第三方插件、`data/remote-tool-plugins.json` 中启用的远程声明式插件。
 - `registry.mjs`：`resolve(capability)` 按优先级选实现；`execute` 走 输入 schema 校验 → 策略检查 → adapter.execute → 输出 schema 校验 → 执行日志（`tool_executions` 表，标注 provenance 与外部写入授权）。
 - `policy.mjs`：技能能力白名单、`external-write` 需显式授权、路径输入必须落在允许根目录内（realpath 防穿越）。
 - `capability-slots.mjs`：6 个信息能力槽位（web-page / web-search / news-search / repository / document / local-project），是管线调用信息工具的入口。
 - 远程插件（`remote-adapter.mjs` / `remote-package-manager.mjs`）：纯声明式 Manifest，HTTPS + 超时 + 响应上限 + 内网拒绝，不允许分发可执行代码；凭据按 profile 隔离存储，不入库。
+
+## 采集边界
+
+- `server/platform/collectors/` 只负责 Collector 插件协议、Manifest 校验、注册发现、安装启停和运行时加载。
+- `server/features/collection/application/` 负责采集源配置、统一采集 Runner、Store 事件落库和静态页面采集助手；这些属于采集业务用例。
+- `server/features/collection/domain/` 负责采集结果质量规则。业务入口统一从 `server/features/collection/index.mjs` 导出。
 
 ## 两条流水线
 
@@ -134,16 +142,19 @@ SQLite（data/workbench.db）      技能运行时 lib/skills + skills/
 
 | 目录 | 内容 |
 |---|---|
-| `lib/core/` | 配置、环境、Store、产物路径 |
-| `lib/domain/` | 纯领域逻辑（账号上下文、事实基座、来源质量、图文门禁与提示词） |
-| `lib/http/routes/` | 已抽出的 HTTP 路由模块 |
-| `lib/llm/` | LLM 网关、各条流水线、AI 任务、技能 bundle 加载 |
-| `lib/persistence/` | SQLite 连接、完整 Schema/兼容迁移、外键校验、按领域拆分的数据仓储与跨领域只读 Query Service；`Store` 作为兼容 facade 暴露旧 API |
-| `lib/rendering/` | 无文件系统和模型副作用的 Markdown/HTML、故事板和主题输出纯函数 |
-| `lib/themes/` | 主题注册 / 校验 / 编译、发布门禁、AI 主题生成（article / social / cover 三目标）、封面组件与封面编译器 |
-| `lib/skills/` | 技能注册、清单、路由、包管理 |
-| `lib/tools/` | 工具注册中心、策略、插件包管理、远程适配 |
-| `lib/jobs/` | 采集任务编排 |
-| `lib/artifacts/` | 备份归档等产物处理 |
+| `server/features/` | 按业务能力组织的垂直入口与用例，目前包括研究、图文、文章、采集和批次 |
+| `server/platform/` | HTTP、配置、环境、Store、任务、LLM、工具、集成和插件运行时 |
+| `server/shared/domain/` | 跨业务复用的规则、事实模型与 Schema；保持纯业务依赖方向 |
+| `server/platform/http/routes/` | 已抽出的 HTTP 路由模块 |
+| `server/platform/llm/` | LLM 网关、JSON/安全/上下文等通用模型基础设施与少量兼容转发 |
+| `server/features/*/llm/` | 各业务垂直专用的模型任务、Prompt 编排和结构化输出适配 |
+| `server/platform/persistence/` | SQLite 连接、完整 Schema/兼容迁移、外键校验、按领域拆分的数据仓储与跨领域只读 Query Service；`Store` 作为兼容 facade 暴露旧 API |
+| `server/shared/rendering/` | 无文件系统和模型副作用的 Markdown/HTML、故事板和主题输出纯函数 |
+| `server/platform/application/themes/` | 主题生成、用户主题服务、预览和发布门禁等应用编排 |
+| `server/shared/themes/` | 无副作用的主题值对象、默认主题、注册 / 校验 / 编译基元与主题渲染辅助 |
+| `server/platform/skills/` | 技能注册、清单、路由、包管理 |
+| `server/platform/tools/` | 工具注册中心、策略、插件包管理、远程适配 |
+| `server/platform/jobs/` | 采集任务编排 |
+| `server/platform/artifacts/` | 备份归档等产物处理 |
 | `skills/`、`plugins/` | 内置技能与内置工具插件源码 |
 | `public/` | 浏览器端（原生 ESM 视图）；大型编辑器视图把无 DOM 文档分析和图文展示规则分别下沉到 `editor-document-model.js`、`social-editor-model.js` |

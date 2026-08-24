@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { renderStoryboardHtml } from '../lib/llm/social-card-pipeline.mjs';
+import { renderStoryboardHtml } from '../server/features/social-cards/application/social-card-pipeline.mjs';
 
 const execFileAsync = promisify(execFile);
 const root = process.cwd();

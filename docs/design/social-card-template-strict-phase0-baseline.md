@@ -37,9 +37,9 @@
 
 相关实现：
 
-- `lib/rendering/social-card-template-registry.mjs`
-- `lib/llm/social-card-pipeline.mjs`
-- `lib/rendering/social-card-template-resolver.mjs`
+- `server/shared/rendering/social-card-template-registry.mjs`
+- `server/features/social-cards/application/social-card-pipeline.mjs`
+- `server/shared/rendering/social-card-template-resolver.mjs`
 
 ## 3. 新主题创建入口
 
@@ -126,4 +126,3 @@ fail: 0
 - 最终失败必须记录请求模板、失败页、审计问题和已尝试的修复轮次。
 - 新建 Social 主题必须由程序产生模板匹配结果；AI 不直接写模板 ID。
 - 历史故事板和已发布图文不做批量迁移。
-

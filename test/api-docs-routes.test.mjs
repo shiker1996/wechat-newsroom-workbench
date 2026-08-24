@@ -58,8 +58,8 @@ function regexToPaths(raw) {
 
 function extractCodeRoutes() {
   const files = [path.join(root, 'server.mjs'),
-    ...fs.readdirSync(path.join(root, 'lib/http/routes')).filter((name) => name.endsWith('.mjs'))
-      .map((name) => path.join(root, 'lib/http/routes', name))];
+    ...fs.readdirSync(path.join(root, 'server/platform/http/routes')).filter((name) => name.endsWith('.mjs'))
+      .map((name) => path.join(root, 'server/platform/http/routes', name))];
   // 每个条目：method + 一组可接受的文档写法（展开形式或折叠形式，任一被文档覆盖即视为已记录）
   const entries = [];
   const add = (method, routePaths) => {

@@ -6,10 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { Store } from '../lib/core/store.mjs';
-import { validateSkillPackageDirectory } from '../lib/skills/package-manager.mjs';
-import { validateToolPluginDirectory } from '../lib/tools/package-manager.mjs';
-import { APP_VERSION } from '../lib/version.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { validateSkillPackageDirectory } from '../server/platform/skills/package-manager.mjs';
+import { validateToolPluginDirectory } from '../server/platform/tools/package-manager.mjs';
+import { APP_VERSION } from '../server/platform/version.mjs';
 
 function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'version-compat-'));

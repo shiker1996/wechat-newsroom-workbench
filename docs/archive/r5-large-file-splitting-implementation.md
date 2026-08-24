@@ -8,13 +8,13 @@
 
 ### 文章流水线
 
-- 新增 `lib/llm/article-pipeline-contract.mjs`。
+- 新增 `server/platform/llm/article-pipeline-contract.mjs`。
 - 迁移规划结果归一化、阶段输出门禁、来源拼接与一致性检查、事实基座检查、写作技能路由、文章长度契约和初稿提示词构造。
 - `article-pipeline.mjs` 保留模型调用、阶段顺序、返工和产物落盘，并重新导出原有公共 API，调用方无须迁移。
 
 ### 系统路由
 
-- 新增 `lib/http/routes/system-restore-transactions.mjs`。
+- 新增 `server/platform/http/routes/system-restore-transactions.mjs`。
 - 迁移写作技能和扩展包备份恢复的 staging、swap、commit、rollback 事务。
 - `system-routes.mjs` 只负责识别恢复请求并编排事务。
 
@@ -26,7 +26,7 @@
 
 ### Server 与社交图文流水线复核
 
-- `server.mjs` 当前约 358 行，路由已由各 `lib/http/routes/*` 模块注册，继续拆分会削弱上下文可读性，因此本阶段不做机械拆分。
+- `server.mjs` 当前约 358 行，路由已由各 `server/platform/http/routes/*` 模块注册，继续拆分会削弱上下文可读性，因此本阶段不做机械拆分。
 - `social-card-pipeline.mjs` 已把渲染职责交给 `social-card-rendering.mjs` 等模块；主文件保留流水线阶段控制，本阶段不重复迁移。
 
 ## 兼容性与依赖边界

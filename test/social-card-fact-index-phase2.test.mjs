@@ -7,8 +7,8 @@ import {
   buildDeterministicSocialCardFactSupplementOperations,
   knownSourceRefsFromSocialCardFactIndex,
   selectSocialCardFactCandidates,
-} from '../lib/rendering/social-card-fact-index.mjs';
-import { validateSocialCardContentPlannerOperations } from '../lib/rendering/social-card-content-planner.mjs';
+} from '../server/shared/rendering/social-card-fact-index.mjs';
+import { validateSocialCardContentPlannerOperations } from '../server/features/social-cards/application/social-card-content-planner.mjs';
 
 test('事实候选索引保留来源并排除未核实主张', () => {
   const index = buildSocialCardFactIndex({

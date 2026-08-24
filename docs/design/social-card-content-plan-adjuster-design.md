@@ -299,10 +299,10 @@ AI 只需要决定“哪些内容放在哪一页”，而不是生成 HTML 或 C
 
 建议新增：
 
-- `lib/rendering/social-card-content-atoms.mjs`：故事板到内容原子的规范化；
-- `lib/rendering/social-card-content-plan.mjs`：内容计划模型、版本和编译器；
-- `lib/rendering/social-card-content-operations.mjs`：合并、拆分、移动、补事实和文字改写操作；
-- `lib/rendering/social-card-content-planner.mjs`：内容计划调整器 Prompt、受控结果解析和程序校验；生成链路调用适配留在阶段 4；
+- `server/shared/rendering/social-card-content-atoms.mjs`：故事板到内容原子的规范化；
+- `server/shared/rendering/social-card-content-plan.mjs`：内容计划模型、版本和编译器；
+- `server/shared/rendering/social-card-content-operations.mjs`：合并、拆分、移动、补事实和文字改写操作；
+- `server/features/social-cards/application/social-card-content-planner.mjs`：内容计划调整器 Prompt、受控结果解析和程序校验；生成链路调用适配留在阶段 4；
 - `test/social-card-content-plan-*.test.mjs`：原子守恒、操作合法性和计划收敛测试。
 
 改造：

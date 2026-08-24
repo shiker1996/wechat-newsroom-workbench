@@ -10,12 +10,12 @@ R5.3 已完成第一优先级公共能力的生产实现收敛。调用方可以
 
 | 能力 | 规范实现 | 已迁移范围 |
 |---|---|---|
-| 原子 UTF-8 / JSON 写入 | `lib/core/atomic-file.mjs` | HTTP 产物、工具/远程工具/采集器目录、能力路由、工具与采集设置、凭据元数据、技能包与技能配置、模型供应商配置 |
-| HTML 转义 | `lib/rendering/html-utils.mjs` | 图文故事板、Markdown 渲染、封面编译、文章配图 |
-| 颜色对比度与混色 | `lib/themes/color-utils.mjs` | 主题校验、发布门禁、问题修复建议、AI 主题归一化、封面编译 |
-| 字体栈 | `lib/themes/font-utils.mjs` | 图文主题和封面主题编译器 |
-| 模型 JSON 围栏解析 | `lib/llm/model-json.mjs` | R4 统一模型解析链，并继续迁移视觉规划、来源字段补齐、来源排序和突发分析 |
-| URL/IP/SSRF | `lib/plugin-sdk/network.mjs` + `lib/tools/remote-adapter.mjs` | 插件网络访问与远程扩展共同复用保留地址判定和安全 URL 门禁 |
+| 原子 UTF-8 / JSON 写入 | `server/platform/core/atomic-file.mjs` | HTTP 产物、工具/远程工具/采集器目录、能力路由、工具与采集设置、凭据元数据、技能包与技能配置、模型供应商配置 |
+| HTML 转义 | `server/shared/rendering/html-utils.mjs` | 图文故事板、Markdown 渲染、封面编译、文章配图 |
+| 颜色对比度与混色 | `server/shared/themes/color-utils.mjs` | 主题校验、发布门禁、问题修复建议、AI 主题归一化、封面编译 |
+| 字体栈 | `server/shared/themes/font-utils.mjs` | 图文主题和封面主题编译器 |
+| 模型 JSON 围栏解析 | `server/platform/llm/model-json.mjs` | R4 统一模型解析链，并继续迁移视觉规划、来源字段补齐、来源排序和突发分析 |
+| URL/IP/SSRF | `server/platform/plugin-sdk/network.mjs` + `server/platform/tools/remote-adapter.mjs` | 插件网络访问与远程扩展共同复用保留地址判定和安全 URL 门禁 |
 
 HTTP JSON 响应继续由服务器注入给各路由，`route-helpers.respond` 只负责统一“响应并结束路由”的控制流，不另行序列化。
 

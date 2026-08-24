@@ -4,7 +4,7 @@ import {
   buildSocialCardPlanBaseline,
   summarizeSocialCardLayoutReport,
   summarizeSocialCardPlan,
-} from '../lib/rendering/social-card-plan-baseline.mjs';
+} from '../server/shared/rendering/social-card-plan-baseline.mjs';
 
 const plan = [
   { kind: 'cover', role: 'cover', title: '封面', content_blocks: [{ type: 'text', content: '标题说明' }] },

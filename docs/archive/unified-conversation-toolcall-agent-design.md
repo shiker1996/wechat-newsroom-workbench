@@ -98,7 +98,7 @@
 新增目录建议：
 
 ```text
-lib/agent/
+server/platform/agent/
   conversation-agent.mjs       # 有限循环调度器
   tool-protocol.mjs            # ToolRequest / ToolResult Schema 与清洗
   tool-catalog.mjs             # 按入口和技能裁剪模型可见目录
@@ -522,7 +522,7 @@ error
 - [x] 标记现有 `fetchEvents`、路径读取、URL 抓取和 provider 搜索调用点；
 - [x] 明确现有执行日志中缺失的 batch/candidate/skill 元数据。
 
-实施产物：`lib/agent/contracts.mjs`、`lib/agent/schemas/*.schema.json`、`docs/conversation-agent-phase0-baseline.json`、`test/conversation-agent-phase0.test.mjs`。Phase 0 仅建立契约与回归基线，`productionAgentEnabled=false`，三个生产入口尚未导入 Agent runtime。
+实施产物：`server/platform/agent/contracts.mjs`、`server/platform/agent/schemas/*.schema.json`、`docs/conversation-agent-phase0-baseline.json`、`test/conversation-agent-phase0.test.mjs`。Phase 0 仅建立契约与回归基线，`productionAgentEnabled=false`，三个生产入口尚未导入 Agent runtime。
 
 验收：Schema 测试通过；无生产逻辑变化；文档矩阵与代码调用点一致。
 
@@ -530,14 +530,14 @@ error
 
 目标：实现 provider-neutral 的有限循环运行时。
 
-- [x] 新建 `lib/agent/` 核心模块；
+- [x] 新建 `server/platform/agent/` 核心模块；
 - [x] 实现目录裁剪、请求校验、去重、预算和中止；
 - [x] 复用 ToolRegistry、策略检查和 execution logger；
 - [x] 支持 provider-neutral 的 JSON 信封运行接口；原生 Function Calling 适配留在入口迁移时补充；
 - [x] 增加 `agent_runs`、`agent_tool_calls` 幂等迁移；
 - [x] 完成单元测试：final、单工具、多工具并行、多步、超限、拒绝和超时。
 
-实施产物：`lib/agent/conversation-agent.mjs`、`tool-protocol.mjs`、`tool-catalog.mjs`、`tool-executor.mjs`、`context.mjs`、`events.mjs`、`AgentRunRepository` 和 `test/conversation-agent-core.test.mjs`。运行时当前只由测试直接调用，尚未接入三个生产入口。
+实施产物：`server/platform/agent/conversation-agent.mjs`、`tool-protocol.mjs`、`tool-catalog.mjs`、`tool-executor.mjs`、`context.mjs`、`events.mjs`、`AgentRunRepository` 和 `test/conversation-agent-core.test.mjs`。运行时当前只由测试直接调用，尚未接入三个生产入口。
 
 验收：模拟模型可完成两轮工具循环；越权请求零执行；每次申请均写 Agent 审计，实际插件执行继续进入 `tool_executions`。
 
@@ -554,7 +554,7 @@ error
 
 验收：模型可在同轮申请事件原文、读完后再给下一问题；锁定候选不能被 Agent 修改；旧客户端仍可工作。
 
-实施产物：`lib/agent/editorial-adapter.mjs`、编辑室统一 Agent 路由、`public/src/core/stream-chat.js` 通用工具卡，以及 `test/conversation-agent-editorial.test.mjs`。Phase 5 收口后默认启用，旧编辑室执行器与私有工具协议已删除。
+实施产物：`server/platform/agent/editorial-adapter.mjs`、编辑室统一 Agent 路由、`public/src/core/stream-chat.js` 通用工具卡，以及 `test/conversation-agent-editorial.test.mjs`。Phase 5 收口后默认启用，旧编辑室执行器与私有工具协议已删除。
 
 ### Phase 3：自主写作迁移
 
@@ -569,7 +569,7 @@ error
 
 验收：路径不进入模型自由参数；项目材料不能自动升级为亲历；相同查询不会在对话与创建阶段重复计费。
 
-实施产物：`lib/agent/tutorial-adapter.mjs`、`fact-attachments.mjs`、`conversation_fact_attachments` 持久化表、自主写作统一 Agent 路由和 `test/conversation-agent-tutorial.test.mjs`。项目绝对路径只由服务端资源解析器持有，ToolResult 注入模型前移除根路径；项目摘要、URL 正文和同查询搜索结果可被创建阶段复用。
+实施产物：`server/platform/agent/tutorial-adapter.mjs`、`fact-attachments.mjs`、`conversation_fact_attachments` 持久化表、自主写作统一 Agent 路由和 `test/conversation-agent-tutorial.test.mjs`。项目绝对路径只由服务端资源解析器持有，ToolResult 注入模型前移除根路径；项目摘要、URL 正文和同查询搜索结果可被创建阶段复用。
 
 ### Phase 4：自定义图文迁移
 
@@ -584,7 +584,7 @@ error
 
 验收：所有外部材料均有来源；模型不能把搜索结果标成体验；仓库分析只能作用于授权仓库。
 
-实施产物：`lib/agent/custom-social-adapter.mjs`、自定义图文统一 Agent 路由、事实附件复用和 `test/conversation-agent-custom-social.test.mjs`。对话明确设置 `webSearch:false`；外部工具产生的新增【体验】会被确定性降级为带公开 URL 的【素材】，仓库资源仅接受用户表单或本轮消息中提供的 GitHub URL。
+实施产物：`server/platform/agent/custom-social-adapter.mjs`、自定义图文统一 Agent 路由、事实附件复用和 `test/conversation-agent-custom-social.test.mjs`。对话明确设置 `webSearch:false`；外部工具产生的新增【体验】会被确定性降级为带公开 URL 的【素材】，仓库资源仅接受用户表单或本轮消息中提供的 GitHub URL。
 
 ### Phase 5：治理与收口
 
@@ -670,9 +670,9 @@ error
 
 新增：
 
-- `lib/agent/*`
-- `lib/persistence/repositories/agent-run-repository.mjs`
-- `lib/persistence/migrations` 中 Agent 表迁移
+- `server/platform/agent/*`
+- `server/platform/persistence/repositories/agent-run-repository.mjs`
+- `server/platform/persistence/migrations` 中 Agent 表迁移
 - `public/src/components/tool-call-card.js`
 - `test/conversation-agent*.test.mjs`
 - `test/editorial-agent.test.mjs`
@@ -681,13 +681,13 @@ error
 
 调整：
 
-- `lib/llm/gateway.mjs`：原生工具格式适配和 JSON 回退；
-- `lib/http/routes/article-routes.mjs`：编辑室 Adapter；
-- `lib/http/routes/candidate-routes.mjs`：自主写作和自定义图文 Adapter；
-- `lib/tools/registry.mjs`：返回 execution ID 与标准 provenance；
-- `lib/tools/execution-log.mjs`：关联 agent run/tool call；
+- `server/platform/llm/gateway.mjs`：原生工具格式适配和 JSON 回退；
+- `server/platform/http/routes/article-routes.mjs`：编辑室 Adapter；
+- `server/platform/http/routes/candidate-routes.mjs`：自主写作和自定义图文 Adapter；
+- `server/platform/tools/registry.mjs`：返回 execution ID 与标准 provenance；
+- `server/platform/tools/execution-log.mjs`：关联 agent run/tool call；
 - `public/src/main.js` 与三个对话视图：统一工具事件；
-- `lib/core/config.mjs`：Agent flag 和预算；
+- `server/platform/core/config.mjs`：Agent flag 和预算；
 - `API.md`：NDJSON 工具事件和响应协议。
 
 已完成废弃：

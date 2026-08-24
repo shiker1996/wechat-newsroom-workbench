@@ -286,7 +286,7 @@ async function loadSimilarArticles(id) {
 }
 
 function renderEditorialReadiness() {
-  // 与 lib/domain/editorial-readiness.mjs 的 evaluateEditorialReadiness 保持一致：
+  // 与 server/features/articles/domain/editorial-readiness.mjs 的 evaluateEditorialReadiness 保持一致：
   // 5 个必填表单项填好（非占位符）即可成稿；2 个选填项只展示不阻塞。
   const PLACEHOLDER = /(?:待定|未定|待确认|待锁定|暂无|尚未|需作者|待作者|待主线|未明确|TBD)/i;
   const substantive = (value) => Boolean(String(value || "").trim()) && !PLACEHOLDER.test(String(value));

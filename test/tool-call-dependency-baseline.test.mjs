@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { auditCapabilityConsumers, buildToolCallBaseline } from '../lib/tools/dependency-baseline.mjs';
+import { auditCapabilityConsumers, buildToolCallBaseline } from '../server/platform/tools/dependency-baseline.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 test('生产代码中的工具调用必须登记功能消费者和能力依赖',()=>{const result=auditCapabilityConsumers(root);assert.deepEqual(result.issues,[]);assert.ok(result.calls.length>0);});

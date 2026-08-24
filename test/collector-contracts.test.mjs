@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { CollectorRegistry } from '../lib/collectors/registry.mjs';
-import { CollectionRunner } from '../lib/collectors/runner.mjs';
-import { normalizeCollectorResult, validateCollectorManifest } from '../lib/collectors/contracts.mjs';
-import { createBuiltinCollectorRegistry } from '../lib/collectors/builtin-registry.mjs';
-import { createStoreCollectionRunner } from '../lib/collectors/store-runner.mjs';
-import { CollectionSourceService } from '../lib/collectors/source-service.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { CollectorRegistry } from '../server/platform/collectors/registry.mjs';
+import { CollectionRunner } from '../server/features/collection/application/collection-runner.mjs';
+import { normalizeCollectorResult, validateCollectorManifest } from '../server/platform/collectors/contracts.mjs';
+import { createBuiltinCollectorRegistry } from '../server/platform/collectors/builtin-registry.mjs';
+import { createStoreCollectionRunner } from '../server/features/collection/application/store-collection-runner.mjs';
+import { CollectionSourceService } from '../server/features/collection/application/source-service.mjs';
 
 function manifest(id='demo-collector'){const inputSchema={type:'object',additionalProperties:false,required:['url'],properties:{url:{type:'string',format:'url'}}};return {schemaVersion:1,id,name:'演示采集器',version:'1.0.0',kind:'collector',entry:'./adapter.mjs',capabilities:['collect.demo'],riskLevel:'network-read',inputSchema,outputSchema:{type:'object',properties:{items:{type:'array'}}},runtime:{timeoutMs:10000,concurrency:'parallel'},collector:{sourceTypes:['demo'],sourceConfigSchema:inputSchema}};}
 function workspace(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'collector-stage0-'));const store=new Store(path.join(root,'workbench.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});return {root,store};}

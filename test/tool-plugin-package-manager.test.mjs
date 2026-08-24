@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { loadPluginManifests } from '../lib/tools/manifest-loader.mjs';
+import { loadPluginManifests } from '../server/platform/tools/manifest-loader.mjs';
 import {
   acknowledgeToolPluginRestarts, installToolPlugin, listToolPluginInstallEvents, listToolPluginVersions, readToolPluginCatalog,
   rollbackToolPlugin, setInstalledToolPluginStatus, uninstallToolPlugin, validateToolPluginDirectory,
-} from '../lib/tools/package-manager.mjs';
+} from '../server/platform/tools/package-manager.mjs';
 
 function fixture(root,{id='trusted-demo',version='1.0.0',outsideImport=false}={}){
   const directory=path.join(root,`source-${id}-${version}`);

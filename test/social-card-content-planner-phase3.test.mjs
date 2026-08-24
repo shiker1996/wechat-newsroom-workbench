@@ -8,9 +8,9 @@ import {
   normalizeSocialCardContentPlannerResult,
   validateSocialCardContentPlannerSchema,
   validateSocialCardContentPlannerOperations,
-} from '../lib/rendering/social-card-content-planner.mjs';
-import { validateSocialCardSupplementSlotCatalog } from '../lib/rendering/social-card-supplement-slots.mjs';
-import { buildDeterministicSocialCardPageCapOperations, applySocialCardRestructureOperations } from '../lib/rendering/social-card-repair-policy.mjs';
+} from '../server/features/social-cards/application/social-card-content-planner.mjs';
+import { validateSocialCardSupplementSlotCatalog } from '../server/shared/rendering/social-card-supplement-slots.mjs';
+import { buildDeterministicSocialCardPageCapOperations, applySocialCardRestructureOperations } from '../server/shared/rendering/social-card-repair-policy.mjs';
 
 const sourceRefs = ['repo:readme:overview', 'repo:readme:limits'];
 const plan = [

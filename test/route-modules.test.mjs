@@ -30,7 +30,7 @@ test('server delegates isolated functional route modules', () => {
 });
 
 test('候选详情路由使用注入的 candidateEventGroups 返回事件组', async () => {
-  const { handleCandidateRoutes } = await import('../lib/http/routes/candidate-routes.mjs');
+  const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
   let payload = null;
   const candidate = { id:578, hotspot_title:'测试候选' };
   const handled = await handleCandidateRoutes({
@@ -48,7 +48,7 @@ test('候选详情路由使用注入的 candidateEventGroups 返回事件组', a
 });
 
 test('服务端路由模块均可通过 Node 语法编译', () => {
-  const routeDirectory=new URL('../lib/http/routes/',import.meta.url);
+  const routeDirectory=new URL('../server/platform/http/routes/',import.meta.url);
   const routeFiles=fs.readdirSync(routeDirectory).filter((name)=>name.endsWith('.mjs'));
   for(const name of routeFiles){
     const file=new URL(name,routeDirectory);
@@ -58,7 +58,7 @@ test('服务端路由模块均可通过 Node 语法编译', () => {
 });
 
 test('all server route modules link through ESM with valid named exports', async () => {
-  const routeDirectory = new URL('../lib/http/routes/', import.meta.url);
+  const routeDirectory = new URL('../server/platform/http/routes/', import.meta.url);
   const routeFiles = fs.readdirSync(routeDirectory).filter((name) => name.endsWith('.mjs'));
   for (const name of routeFiles) {
     await assert.doesNotReject(import(new URL(name, routeDirectory)), `${name} ESM link failed`);

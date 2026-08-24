@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ModelGateway } from '../lib/llm/gateway.mjs';
+import { ModelGateway } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 test('complete retries a truncated structured stage once with expanded budget', async () => {
   process.env.TEST_RETRY_KEY = 'secret';
@@ -25,7 +26,7 @@ test('complete retries a truncated structured stage once with expanded budget', 
     },
   }, {
     recordModelCall(input) { records.push(input); return 9; },
-  });
+  }, testConfigurationResolver);
   gateway.rawComplete = async (input) => {
     calls.push(input);
     return calls.length === 1

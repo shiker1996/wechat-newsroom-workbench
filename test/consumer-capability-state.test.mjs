@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { CONSUMER_CAPABILITY_REASON_CODES, analyzeImplementationImpact, buildCapabilityGraph } from '../lib/tools/capability-graph.mjs';
-import { handleSystemRoutes } from '../lib/http/routes/system-routes.mjs';
+import { CONSUMER_CAPABILITY_REASON_CODES, analyzeImplementationImpact, buildCapabilityGraph } from '../server/platform/tools/capability-graph.mjs';
+import { handleSystemRoutes } from '../server/platform/http/routes/system-routes.mjs';
 
 // 阶段 2/3：消费者—能力统一可用性计算（设计文档 §5）与只读接口（§8）的测试。
 // available = consumerDeclared && adapterReady && skillAllowed && implementationEnabled && implementationHealthy
@@ -101,11 +101,11 @@ test('三向反向查询：消费者→能力、能力→消费者、实现→�
 });
 
 test('真实仓库：三个 Agent 的现状状态与缺口',async ()=>{
-  const { getToolRegistry }=await import('../lib/tools/index.mjs');
+  const { getToolRegistry }=await import('../server/platform/tools/index.mjs');
   const registry=await getToolRegistry();
   const listed=registry.listCapabilities({includeDisabled:true});
   const graph=buildCapabilityGraph({root:projectRoot,tools:listed.map((item)=>({id:item.plugin,name:item.plugin,version:item.version,capabilities:[item.capability],enabled:item.enabled,priority:item.priority,riskLevel:item.riskLevel}))});
-  // 阶段 5：通用资源适配层（lib/agent/resource-adaptation.mjs）为 tutorial/custom-social 补齐
+  // 阶段 5：通用资源适配层（server/platform/agent/resource-adaptation.mjs）为 tutorial/custom-social 补齐
   // passage.retrieve 的 resourceIds 映射（带透传回退），Agent 消费者不再有 degraded 适配
   const degraded=graph.consumerStates.filter((item)=>item.consumerType==='agent'&&item.adapterStatus==='degraded');
   assert.deepEqual(degraded,[]);

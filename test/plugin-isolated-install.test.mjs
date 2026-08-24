@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { stageAllBuiltinPluginPackages } from '../lib/plugins/distribution.mjs';
-import { installToolPlugin, readToolPluginCatalog, setInstalledToolPluginStatus, uninstallToolPlugin, validateToolPluginDirectory } from '../lib/tools/package-manager.mjs';
-import { installCollectorPlugin, readCollectorPluginCatalog, setCollectorPluginStatus, uninstallCollectorPlugin, validateCollectorPluginDirectory } from '../lib/collectors/package-manager.mjs';
+import { stageAllBuiltinPluginPackages } from '../server/platform/plugins/distribution.mjs';
+import { installToolPlugin, readToolPluginCatalog, setInstalledToolPluginStatus, uninstallToolPlugin, validateToolPluginDirectory } from '../server/platform/tools/package-manager.mjs';
+import { installCollectorPlugin, readCollectorPluginCatalog, setCollectorPluginStatus, uninstallCollectorPlugin, validateCollectorPluginDirectory } from '../server/platform/collectors/package-manager.mjs';
 
 const projectRoot=path.resolve(import.meta.dirname,'..');
 function workspace(t,prefix){const root=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}

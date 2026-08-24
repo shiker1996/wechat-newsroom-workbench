@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { cloneTheme, publishTheme } from '../lib/themes/user-theme-service.mjs';
-import { handleThemeRoutes } from '../lib/http/routes/theme-routes.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { cloneTheme, publishTheme } from '../server/platform/application/themes/user-theme-service.mjs';
+import { handleThemeRoutes } from '../server/platform/http/routes/theme-routes.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
 
 const ROLES = ['cover', 'concept', 'feature', 'steps', 'data', 'compare', 'evidence', 'timeline', 'risk', 'ending'];
 function gateway() {

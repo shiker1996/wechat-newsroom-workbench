@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSocialCardPlanRolloutReport, getSocialCardPlanRolloutProfile, summarizeSocialCardPlanRolloutRows } from '../lib/rendering/social-card-plan-rollout.mjs';
-import { summarizeSocialTemplateRun } from '../lib/rendering/social-card-template-metrics.mjs';
+import { buildSocialCardPlanRolloutReport, getSocialCardPlanRolloutProfile, summarizeSocialCardPlanRolloutRows } from '../server/shared/rendering/social-card-plan-rollout.mjs';
+import { summarizeSocialTemplateRun } from '../server/shared/rendering/social-card-template-metrics.mjs';
 
 test('Phase 5 模板灰度档案区分默认、保守和兼容策略', () => {
   const clean = getSocialCardPlanRolloutProfile('clean-v1');

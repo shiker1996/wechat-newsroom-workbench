@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { batchTopicsDir } from '../lib/core/workspace-paths.mjs';
-import { buildTopicScoreOperationsMetrics } from '../lib/domain/topic-score-operations.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { batchTopicsDir } from '../server/platform/core/workspace-paths.mjs';
+import { buildTopicScoreOperationsMetrics } from '../server/features/research/index.mjs';
 
 function writeDualRun(root, batch, summary) {
   const file = path.join(batchTopicsDir(root, batch), 'sources', 'score-dual-run.json');

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { ModelGateway } from '../lib/llm/gateway.mjs';
+import { ModelGateway } from '../server/platform/llm/gateway.mjs';
+import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 test('模型网关逐段解析 OpenAI 兼容 SSE 并记录成功调用', async () => {
   const server=http.createServer(async(request,response)=>{
@@ -15,7 +16,7 @@ test('模型网关逐段解析 OpenAI 兼容 SSE 并记录成功调用', async (
   const address=server.address();const calls=[];process.env.TEST_STREAM_KEY='secret';
   try {
     const gateway=new ModelGateway({llm:{defaultProvider:'test',requestTimeoutMs:2000,safetyReserveTokens:32,recentMessageCount:4,providers:{test:{label:'Test',baseUrl:`http://127.0.0.1:${address.port}`,model:'mock',apiKeyEnv:'TEST_STREAM_KEY',contextWindow:4096,maxOutputTokens:256,maxTokensField:'max_tokens',supportsJsonMode:true}}}},
-      {recordModelCall(input){calls.push(input);return 7;}});
+      {recordModelCall(input){calls.push(input);return 7;}},testConfigurationResolver);
     const deltas=[];const result=await gateway.streamComplete({purpose:'editorial-room',jsonMode:true,maxOutputTokens:128,messages:[{role:'user',content:'开始'}]},(delta)=>deltas.push(delta));
     assert.deepEqual(deltas,['{"assistantReply":"你','好"}']);
     assert.equal(result.content,'{"assistantReply":"你好"}');assert.equal(result.callId,7);assert.equal(calls[0].status,'completed');

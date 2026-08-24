@@ -1,5 +1,5 @@
 # 依赖更新：每周一检查根目录、技能级依赖与 GitHub Actions 版本。
-# 技能级 package.json 由 postinstall 级联安装（scripts/install-skill-deps.mjs），目录需逐一登记。
+# 技能级 package.json 由 postinstall 级联安装（scripts/runtime/install-skill-deps.mjs），目录需逐一登记。
 version: 2
 updates:
   - package-ecosystem: npm

@@ -38,4 +38,4 @@ description: 热点探索编辑。对已入池候选生成临时探索卡（角�
 
 ### v1.0.0 变更
 
-- 从 `lib/llm/research-pipeline.mjs` 的 `BRAINSTORM_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback
+- 从 `server/features/research/application/research-pipeline.mjs` 的 `BRAINSTORM_SYSTEM` 内联常量原样提取为技能，代码保留同名 fallback

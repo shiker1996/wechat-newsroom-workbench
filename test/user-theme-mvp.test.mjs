@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { cloneTheme, exportWorkspaceTheme, importThemeDraft, normalizeImportedTheme, publishTheme, restoreThemeVersion, saveThemeDraft, resolveWorkspaceTheme } from '../lib/themes/user-theme-service.mjs';
-import { handleThemeRoutes, themeCatalog } from '../lib/http/routes/theme-routes.mjs';
-import { compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { cloneTheme, exportWorkspaceTheme, importThemeDraft, normalizeImportedTheme, publishTheme, restoreThemeVersion, saveThemeDraft, resolveWorkspaceTheme } from '../server/platform/application/themes/user-theme-service.mjs';
+import { handleThemeRoutes, themeCatalog } from '../server/platform/http/routes/theme-routes.mjs';
+import { compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
 
 function workspace(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'user-theme-'));const store=new Store(path.join(dir,'themes.db'));t.after(()=>{store.close();fs.rmSync(dir,{recursive:true,force:true});});return store;}
 

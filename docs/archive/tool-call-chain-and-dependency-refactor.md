@@ -20,8 +20,8 @@
 
 ### 2.1 工具注册与解析
 
-- `lib/tools/index.mjs` 加载内置、本地安装和远程工具，生成全局 `ToolRegistry`。
-- `lib/tools/registry.mjs` 根据 `enabled + priority + preferred plugin` 选择单个实现。
+- `server/platform/tools/index.mjs` 加载内置、本地安装和远程工具，生成全局 `ToolRegistry`。
+- `server/platform/tools/registry.mjs` 根据 `enabled + priority + preferred plugin` 选择单个实现。
 - `data/tool-plugin-settings.json` 保存工具启停与优先级。
 - `data/information-capability-slots.json` 保存部分信息能力的首选实现。
 - 当前 `execute()` 只执行解析出的一个实现；该实现配置缺失、健康异常或执行失败后，不会继续尝试下一候选。

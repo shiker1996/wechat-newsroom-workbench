@@ -21,16 +21,16 @@
 
 ## 2. 现状
 
-上一批已落地的基座：登记（`config/capability-consumers.json`）、统一可用性计算（`lib/tools/capability-graph.mjs`）、"消费者接入"页签与授权编辑、通用资源适配层（`lib/agent/resource-adaptation.mjs`）、治理门禁（`scripts/check-consumer-capability-gates.mjs`）。
+上一批已落地的基座：登记（`config/capability-consumers.json`）、统一可用性计算（`server/platform/tools/capability-graph.mjs`）、"消费者接入"页签与授权编辑、通用资源适配层（`server/platform/agent/resource-adaptation.mjs`）、治理门禁（`scripts/quality/check-consumer-capability-gates.mjs`）。
 
 与本批相关的现状事实（均已核实）：
 
-1. **custom-social 缺口**：`capability-consumers.json` 已登记 gaps"工具存在、消费者未适配"；`lib/agent/custom-social-adapter.mjs` 目前只有 URL 和文档根两类资源；通用层五个函数（`registerProjectResource`、`resolveResourceArguments`、`trimProjectReadResult`、`deterministicProjectReadRequest`、`buildAllowedRoots`）全部现成，编辑室 Adapter（`lib/agent/editorial-adapter.mjs:40-49`）提供了完整接入参照。
+1. **custom-social 缺口**：`capability-consumers.json` 已登记 gaps"工具存在、消费者未适配"；`server/platform/agent/custom-social-adapter.mjs` 目前只有 URL 和文档根两类资源；通用层五个函数（`registerProjectResource`、`resolveResourceArguments`、`trimProjectReadResult`、`deterministicProjectReadRequest`、`buildAllowedRoots`）全部现成，编辑室 Adapter（`server/platform/agent/editorial-adapter.mjs:40-49`）提供了完整接入参照。
 2. **feature 消费者已有 4 条**，在图谱中参与计算，但缺适配字段、不上页面：
 
    | 消费者 | 对应链路 | 依赖 |
    |---|---|---|
-   | `feature.information-research` | 资料检索与来源抓取（lib/integrations/） | url.fetch / web.search / news.search / document.search / repository.inspect / project.read |
+   | `feature.information-research` | 资料检索与来源抓取（server/platform/integrations/） | url.fetch / web.search / news.search / document.search / repository.inspect / project.read |
    | `feature.article-passage-retrieval` | 编辑会摘录检索（article-routes.mjs:34-41） | passage.retrieve（required/block） |
    | `feature.wechat-typeset` | 公众号排版 job（typeset-pipeline） | mermaid / echarts / image.cdn.upload |
    | `feature.diagram-preview` | 图表预览端点（media-routes） | mermaid / echarts |
@@ -47,7 +47,7 @@
 
 ### 3.2 改动点
 
-- `lib/agent/custom-social-adapter.mjs`：用户输入含项目路径时 `registerProjectResource` 注册资源、allowedRoots 追加 projectPath；目录 overrides 增加 `RESOURCE_ID_SCHEMA`；能力常量加项；未启用时报错引导（同 editorial 语义）；Prompt 注入边界规则。
+- `server/platform/agent/custom-social-adapter.mjs`：用户输入含项目路径时 `registerProjectResource` 注册资源、allowedRoots 追加 projectPath；目录 overrides 增加 `RESOURCE_ID_SCHEMA`；能力常量加项；未启用时报错引导（同 editorial 语义）；Prompt 注入边界规则。
 - `config/capability-consumers.json`：删除 gaps 条目，新增依赖记录（`declaration: optional`、`adapterStatus: ready`、`resourceKinds: ["local-project"]`、`triggerPolicy: "explicit-resource"`、`authorizationAction: "local-project-read"`、`resultPolicy: "sanitized-project-summary"`）。
 - `skills/custom-card-storyboard/skill.json`：`optionalCapabilities` 同步增加（否则门禁失败）。
 
@@ -174,7 +174,7 @@ Schema 校验扩展：feature 依赖带新字段时校验枚举合法；门禁�
 
 图谱可用性计算与原因码、页面展示、停用影响预览、CI 门禁。
 
-注意：`scripts/snapshot-consumer-capability-baseline.mjs` 内含手工维护的 adaptation 静态表与 gaps，登记变更后需同步修改该表再重跑脚本（阶段 A 试点发现；后续可考虑消除静态表、改为从登记推导）。
+注意：`scripts/quality/snapshot-consumer-capability-baseline.mjs` 内含手工维护的 adaptation 静态表与 gaps，登记变更后需同步修改该表再重跑脚本（阶段 A 试点发现；后续可考虑消除静态表、改为从登记推导）。
 
 ### 9.5 全新能力（目录外，单独立项）
 
@@ -190,6 +190,6 @@ Schema 校验扩展：feature 依赖带新字段时校验枚举合法；门禁�
 
 1. ~~空白名单等同全放行的边角~~ 已裁定并收紧：显式空数组 = 全部禁止，`null`/无字段 = 全放行（见 5.1）；
 2. ~~基线脚本 adaptation 静态表手工维护，可考虑改为从登记推导（9.4 注记）~~ 已实施（2026-08-16）：`snapshot-consumer-capability-baseline.mjs` 从 `config/capability-consumers.json` 登记推导，gaps 改为声明未登记的派生判定；
-3. ~~`implementationHealthy` 仍为配置就绪代理~~ 已接真实 `registry.health()`：`lib/tools/health-check.mjs` 构建前并发预取健康表（进程内 TTL 45s 缓存，写操作后失效），检查异常回退代理并在 warnings 标注 `HEALTH_CHECK_UNAVAILABLE`；
+3. ~~`implementationHealthy` 仍为配置就绪代理~~ 已接真实 `registry.health()`：`server/platform/tools/health-check.mjs` 构建前并发预取健康表（进程内 TTL 45s 缓存，写操作后失效），检查异常回退代理并在 warnings 标注 `HEALTH_CHECK_UNAVAILABLE`；
 4. ~~tutorial/custom-social 的 passage content 回填未实施（上一批遗留）~~ 已实施（2026-08-16）：url.fetch 结果回填资源目录正文，passage.retrieve 严格分支在这两个入口可用；
 5. feature 详情接口的 `skillAuthorizations` 恒为空数组属预期；feature 行无授权开关是设计决策而非缺口。

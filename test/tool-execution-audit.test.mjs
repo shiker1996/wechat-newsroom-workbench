@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { Store } from '../lib/core/store.mjs';
-import { fetchUrlContent } from '../lib/integrations/source-fetcher.mjs';
-import { readLocalProjectViaRegistry } from '../lib/integrations/local-project-reader.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { fetchUrlContent } from '../server/platform/integrations/source-fetcher.mjs';
+import { readLocalProjectViaRegistry } from '../server/platform/integrations/local-project-reader.mjs';
 
 test('URL 抓取被技能白名单拒绝时不访问网络并持久化审计', async () => {
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'tool-audit-fetch-'));let store;

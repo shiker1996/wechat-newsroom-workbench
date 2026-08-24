@@ -79,10 +79,10 @@
 
 复制 `account-context.example.json` 后按自己的账号修改。被编辑会、选题契合加分和成稿技能读取。字段含义：
 
-- 画像：`name`、`description`、`readerProfile`、`contentPillars`（前缀映射打标五类，决定账号契合加分命中）、`voiceGuardrails`、`packagingModes`、`followReason`、`conversionBridge`、`differentiators`、`articleFramework`、`contentRatio`。格式化逻辑见 `lib/domain/account-context.mjs`。
+- 画像：`name`、`description`、`readerProfile`、`contentPillars`（前缀映射打标五类，决定账号契合加分命中）、`voiceGuardrails`、`packagingModes`、`followReason`、`conversionBridge`、`differentiators`、`articleFramework`、`contentRatio`。格式化逻辑见 `server/shared/domain/account-context.mjs`。
 - 双分发策略（可选）：`distributionStrategy.recommendation|notification|experiment`。每个池可配置 `purpose`、`preferredTopics` 和 `titleRule`，由选题、编辑会、标题和成稿技能读取；这些字段只描述内容规划，不授予自动群发或发布权限。
 - 通知资格（可选）：`notificationPolicy.minimumMatchedCriteria`、`minimumNotificationFit`（默认 4/5）、`minimumFactSupport`（默认 4/5）、`maxPerBatch`（默认 2，允许 0）、`blockedRiskLevels`、`readerStakes`、`criteria`。通知池必须有具体读者、明确动作或决策和具体后果；传闻、待核事实及禁入风险会确定性降到实验池，缺失配置时使用内置严格规则。
-- `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`lib/llm/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
+- `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`server/features/research/application/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
   - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`。
   - `eventValueWeight`（0.30，限制在 0.25–0.40）：事件价值 T 在最终分中的权重；当前公式为 `F = A×(1-eventValueWeight) + T×eventValueWeight - S - D`。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
@@ -95,7 +95,7 @@
 
 ## 4. 技能配置覆盖层：`writing-skills/<技能id>/active.json`
 
-在「技能与插件」页面维护，不写 Git 管理的技能本体；每次生成会冻结实际生效的 prompt、模型与工具快照，可回滚历史版本。字段（`lib/skills/configuration.mjs`）：
+在「技能与插件」页面维护，不写 Git 管理的技能本体；每次生成会冻结实际生效的 prompt、模型与工具快照，可回滚历史版本。字段（`server/platform/skills/configuration.mjs`）：
 
 - `prompt`：覆盖层，追加在内置技能 prompt 之后（`CONFIGURED OVERLAY`），与不可变安全门禁冲突时以门禁为准。
 - `defaultModel`：该技能默认模型路由。
@@ -106,7 +106,7 @@
 
 ## 5. 技能与工具的编写、校验、安装
 
-三类扩展（第三方技能包、本地工具插件、远程 API/MCP 插件）的形态、权限声明、失败语义、版本兼容与上手路径，统一见 [extending.md](./extending.md)；最小示例在 [examples/](./examples/)。内置技能清单与约定见 [skills/README.md](../skills/README.md)。扩展点契约以 `lib/skills/skill-manifest.schema.json` 与 `lib/tools/manifest-loader.mjs` 为准。
+三类扩展（第三方技能包、本地工具插件、远程 API/MCP 插件）的形态、权限声明、失败语义、版本兼容与上手路径，统一见 [extending.md](./extending.md)；最小示例在 [examples/](./examples/)。内置技能清单与约定见 [skills/README.md](../skills/README.md)。扩展点契约以 `server/platform/skills/skill-manifest.schema.json` 与 `server/platform/tools/manifest-loader.mjs` 为准。
 
 ## 6. 运行数据与备份
 

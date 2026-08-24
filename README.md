@@ -70,12 +70,12 @@ npm start -- --demo
 
 ```text
 server.mjs              HTTP 服务装配与静态资源入口
-lib/http/routes/        API 路由
-lib/core/               配置、Store 与工作区路径
-lib/llm/                模型网关、AI 任务与内容流水线
-lib/skills/ + skills/   技能运行时与内置技能
-lib/tools/ + plugins/   工具、采集器与能力注册中心
-lib/themes/             文章、图文与封面主题
+server/platform/http/routes/        API 路由
+server/platform/core/               配置、Store 与工作区路径
+server/platform/llm/                模型网关、AI 任务与内容流水线
+server/platform/skills/ + skills/   技能运行时与内置技能
+server/platform/tools/ + plugins/   工具、采集器与能力注册中心
+server/shared/themes/             文章、图文与封面主题
 public/                 原生 ES Modules 前端
 data/                   SQLite、配置状态、缓存与扩展目录（运行时生成）
 articles/ topics/ social-cards/  内容产物（运行时生成）

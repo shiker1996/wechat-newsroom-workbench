@@ -6,7 +6,7 @@ import {
   normalizeSocialCardContentPlannerResult,
   validateSocialCardContentPlannerSchema,
   validateSocialCardContentPlannerOperations,
-} from '../lib/rendering/social-card-content-planner.mjs';
+} from '../server/features/social-cards/application/social-card-content-planner.mjs';
 
 const sourceRefs = ['README:capability'];
 const plan = [{ kind: 'content', role: 'feature', title: '能力', content_blocks: [{ type: 'text', content: '核心能力' }] }];

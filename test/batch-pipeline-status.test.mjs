@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../lib/core/store.mjs';
-import { buildBatchPipelineStatus } from '../lib/domain/batch-pipeline-status.mjs';
-import { isResearchEligibleHotspot } from '../lib/domain/hotspot-pipeline-scope.mjs';
+import { Store } from '../server/platform/core/store.mjs';
+import { buildBatchPipelineStatus } from '../server/features/batches/index.mjs';
+import { isResearchEligibleHotspot } from '../server/features/research/index.mjs';
 
 test('autonomous writing placeholders are excluded from research progress', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pipeline-scope-'));

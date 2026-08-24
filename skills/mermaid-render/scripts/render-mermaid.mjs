@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mermaidConfigForTheme, mermaidSourceWithTheme } from '../../../lib/llm/chart-theme.mjs';
+import { mermaidConfigForTheme, mermaidSourceWithTheme } from '../../../server/features/articles/rendering/chart-theme.mjs';
 
 const execFileAsync = promisify(execFile);
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { formatAccountContext, loadAccountContext } from '../lib/domain/account-context.mjs';
+import { formatAccountContext, loadAccountContext } from '../server/shared/domain/account-context.mjs';
 
 test('账号上下文格式化双分发策略与通知资格', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'account-context-'));

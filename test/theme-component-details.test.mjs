@@ -6,12 +6,12 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { SOCIAL_COMPONENT_CATALOG, resolveSocialComponents, socialComponentDefaults } from '../lib/themes/component-catalog.mjs';
-import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../lib/themes/ai-theme-generator.mjs';
-import { compileSocialTheme, socialThemeDefinition } from '../lib/themes/social-theme-compiler.mjs';
-import { compileThemePreview } from '../lib/themes/theme-preview.mjs';
-import { auditThemeForPublish } from '../lib/themes/theme-publish-gate.mjs';
-import { validateThemeDefinition } from '../lib/themes/theme-validator.mjs';
+import { SOCIAL_COMPONENT_CATALOG, resolveSocialComponents, socialComponentDefaults } from '../server/shared/themes/component-catalog.mjs';
+import { normalizeAiThemeCandidate, buildAiThemeMessages } from '../server/platform/application/themes/ai-theme-generator.mjs';
+import { compileSocialTheme, socialThemeDefinition } from '../server/shared/themes/social-theme-compiler.mjs';
+import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
+import { auditThemeForPublish } from '../server/platform/application/themes/theme-publish-gate.mjs';
+import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),execFileAsync=promisify(execFile);
@@ -107,5 +107,5 @@ test('P1 展示档封面文字在 375×667 长标题样稿中无溢出',async(t)
 });
 
 test('P1 主题中心展示三组组件细节并保留原生键盘控件',()=>{
-  const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8'),routes=fs.readFileSync(new URL('../lib/http/routes/theme-routes.mjs',import.meta.url),'utf8');assert.match(ui,/function componentEditor/);assert.match(ui,/组件细节/);assert.match(ui,/data-reset-components/);assert.match(ui,/\$\{target\}\.components\.\$\{component\}\.\$\{key\}/);assert.match(styles,/\.theme-component-grid/);assert.match(styles,/@media\(max-width:1050px\)\{\.theme-component-grid\{grid-template-columns:1fr/);assert.match(routes,/socialComponentEditorCatalog\(draft\.social\?\.recipes\)/);assert.match(routes,/articleComponentEditorCatalog\(draft\.article\?\.recipes\)/);
+  const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8'),routes=fs.readFileSync(new URL('../server/platform/http/routes/theme-routes.mjs',import.meta.url),'utf8');assert.match(ui,/function componentEditor/);assert.match(ui,/组件细节/);assert.match(ui,/data-reset-components/);assert.match(ui,/\$\{target\}\.components\.\$\{component\}\.\$\{key\}/);assert.match(styles,/\.theme-component-grid/);assert.match(styles,/@media\(max-width:1050px\)\{\.theme-component-grid\{grid-template-columns:1fr/);assert.match(routes,/socialComponentEditorCatalog\(draft\.social\?\.recipes\)/);assert.match(routes,/articleComponentEditorCatalog\(draft\.article\?\.recipes\)/);
 });

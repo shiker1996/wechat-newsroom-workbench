@@ -197,15 +197,15 @@
 
 代码改动应少于配置和技能改动，只处理以下确定性职责：
 
-1. `lib/domain/account-context.mjs`
+1. `server/domain/account-context.mjs`
    - 格式化 `distributionStrategy` 与 `notificationPolicy`，使编辑会和成稿链能够读取。
    - 对字段缺失保持向后兼容。
-2. `lib/llm/research-pipeline.mjs`
+2. `server/platform/llm/research-pipeline.mjs`
    - 接受并保存脑暴输出中的分发字段。
    - 在研判报告中展示分发池和读者利益点，但不自动替代最终排名。
 3. 编辑决策与文章简报传递
    - 将 `distributionLane` 和 `readerStake` 从探索卡传递到锁定简报、作者素材和大纲。
-4. `lib/llm/article-pipeline.mjs`
+4. `server/platform/llm/article-pipeline.mjs`
    - 把分发字段提供给标题与写作阶段。
    - 不改变现有 writer skill 路由的安全判断。
 
@@ -244,7 +244,7 @@
 
 范围：
 
-- `lib/domain/account-context.mjs`
+- `server/domain/account-context.mjs`
 - `account-context.example.json`
 - `docs/configuration.md`
 - 账号上下文相关测试
@@ -277,7 +277,7 @@
 - `skills/wechat-mp-tech-hotspot/SKILL.md`
 - `skills/wechat-mp-deep-dive/SKILL.md`
 - `skills/wechat-mp-topic-to-article/` 的相关契约
-- `lib/llm/article-pipeline.mjs` 的最小字段传递
+- `server/platform/llm/article-pipeline.mjs` 的最小字段传递
 
 验收：
 

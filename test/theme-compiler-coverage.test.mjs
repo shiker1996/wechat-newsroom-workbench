@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { articleThemeDefinition, compileArticleTheme } from '../lib/themes/article-theme-compiler.mjs';
-import { socialThemeDefinition, compileSocialTheme } from '../lib/themes/social-theme-compiler.mjs';
-import { markdownToHtml } from '../lib/llm/typeset-pipeline.mjs';
+import { articleThemeDefinition, compileArticleTheme } from '../server/shared/themes/article-theme-compiler.mjs';
+import { socialThemeDefinition, compileSocialTheme } from '../server/shared/themes/social-theme-compiler.mjs';
+import { markdownToHtml } from '../server/features/articles/application/typeset-pipeline.mjs';
 
 test('两类主题编译器输出统一的目标、变量、配方和消费映射',()=>{
   for(const compiled of [compileArticleTheme('magazine-warm'),compileSocialTheme('ice-blue')]){

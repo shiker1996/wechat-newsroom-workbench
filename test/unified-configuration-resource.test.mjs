@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ExtensionConfigurationService } from '../lib/extensions/configuration-service.mjs';
-import { buildConfigurationCatalog, findConfigurationResource } from '../lib/extensions/configuration-catalog.mjs';
-import { applyModelProviderConfiguration, legacyModelProviderConfiguration, modelProviderManifest } from '../lib/extensions/model-provider-configuration.mjs';
+import { ExtensionConfigurationService } from '../server/platform/extensions/configuration-service.mjs';
+import { buildConfigurationCatalog, findConfigurationResource } from '../server/platform/extensions/configuration-catalog.mjs';
+import { applyModelProviderConfiguration, legacyModelProviderConfiguration, modelProviderManifest } from '../server/platform/extensions/model-provider-configuration.mjs';
 
 function repository(){const rows=new Map();return {get:(type,id)=>rows.get(`${type}:${id}`)||null,save:(input)=>{const value={...input,value:structuredClone(input.value),updated_at:new Date().toISOString()};rows.set(`${input.extensionType}:${input.extensionId}`,value);return value;}};}
 
@@ -33,6 +33,6 @@ test('不同扩展可引用同一个共享凭据 Profile',()=>{
 });
 
 test('统一资源路由保留旧扩展配置接口',()=>{
-  const source=fs.readFileSync(path.resolve('lib/http/routes/system-routes.mjs'),'utf8');
+  const source=fs.readFileSync(path.resolve('server/platform/http/routes/system-routes.mjs'),'utf8');
   assert.match(source,/\/api\/system\/configuration\/catalog/);assert.match(source,/unifiedConfigurationMatch/);assert.match(source,/extensionConfigurationMatch/);
 });

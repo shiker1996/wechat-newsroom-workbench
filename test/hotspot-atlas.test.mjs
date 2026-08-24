@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildHotspotAtlas } from '../lib/domain/hotspot-atlas.mjs';
+import { buildHotspotAtlas } from '../server/features/research/index.mjs';
 
 test('热点全景按事件覆盖聚合且报道数守恒', () => {
   const clusters=[{

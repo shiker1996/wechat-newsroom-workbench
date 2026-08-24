@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tagBatch, buildTaggingInput, normalizeEventPart, normalizeEventParts, normalizeActionType, deriveEventKey } from '../lib/llm/tasks.mjs';
+import { tagBatch, buildTaggingInput, normalizeEventPart, normalizeEventParts, normalizeActionType, deriveEventKey } from '../server/features/research/llm/tasks.mjs';
 
 test('eventParts 规范化为小写无标点形式，缺 who/what 时返回 null', () => {
   assert.equal(normalizeEventPart(' Moonshot AI '), 'moonshotai');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { insertVisualFences } from '../lib/llm/visual-planner.mjs';
-import { illustrateArticle } from '../lib/llm/article-illustration.mjs';
+import { insertVisualFences } from '../server/features/articles/llm/visual-planner.mjs';
+import { illustrateArticle } from '../server/features/articles/application/article-illustration.mjs';
 
 test('insertVisualFences inserts fence at end of the matching section', () => {
   const markdown = '# 标题\n\n## 流程\n\n第一段。\n\n第二段。\n\n## 数据\n\n数据正文。\n';

@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { confirmRemotePluginFirstRun, installRemotePlugin, readRemotePluginCatalog } from '../lib/tools/remote-package-manager.mjs';
-import { createRemoteAdapter } from '../lib/tools/remote-adapter.mjs';
-import { handleSystemRoutes } from '../lib/http/routes/system-routes.mjs';
+import { confirmRemotePluginFirstRun, installRemotePlugin, readRemotePluginCatalog } from '../server/platform/tools/remote-package-manager.mjs';
+import { createRemoteAdapter } from '../server/platform/tools/remote-adapter.mjs';
+import { handleSystemRoutes } from '../server/platform/http/routes/system-routes.mjs';
 
 function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'remote-first-run-'));
