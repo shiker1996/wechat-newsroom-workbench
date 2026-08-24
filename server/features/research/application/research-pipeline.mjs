@@ -123,10 +123,14 @@ function accountSnapshot(workspaceRoot) {
 // 账号内容支柱 → 打标五类映射（类目前列优先）。contentPillars 形如“AI 行业热点：描述”，按前缀匹配。
 const PILLAR_CATEGORY_MAP = {
   'AI 行业热点': ['🤖 AI/技术动态', '🏢 大厂战略'],
+  'AI/技术动态': ['🤖 AI/技术动态', '🏢 大厂战略'],
   '大厂战略': ['🏢 大厂战略', '🤖 AI/技术动态'],
+  '大厂战略分析': ['🏢 大厂战略', '🤖 AI/技术动态'],
   '开源与工程实践': ['🤖 AI/技术动态'],
   '技术认知': ['📈 行业趋势'],
+  '行业深度': ['📈 行业趋势'],
   '程序员工作与切身利益': ['💼 职场生态', '🤖 AI/技术动态'],
+  '职场与成长': ['💼 职场生态'],
 };
 
 export function focusedCategories(ctx = getAccountContext()) {
