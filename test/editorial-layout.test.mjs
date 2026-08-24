@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
 const source = fs.readFileSync(path.join(root, "public/src/views/editorial.js"), "utf8");
+const streamSource = fs.readFileSync(path.join(root, "public/src/core/stream-chat.js"), "utf8");
+const agentEventsSource = fs.readFileSync(path.join(root, "public/src/core/agent-events.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "public/styles.css"), "utf8");
 
 test("编辑室以对话和成稿门禁为主视图，详细决策字段默认折叠", () => {
@@ -33,6 +35,14 @@ test("编辑会中的超长链接不会撑宽消息区", () => {
   assert.match(styles, /\.editorial-messages\s*\{\s*overflow-x:hidden/);
   assert.match(styles, /\.editorial-message p\s*\{[^}]*overflow-wrap:anywhere[^}]*word-break:break-word/);
   assert.match(styles, /\.editorial-reply textarea\s*\{[^}]*overflow-x:hidden[^}]*overflow-wrap:anywhere/);
+});
+
+test("流式对话在布局完成后补滚外层与思考过程内层，避免底部内容被截住", () => {
+  assert.match(streamSource, /scrollToLatest\(messages\)/);
+  assert.match(streamSource, /await onDone\?\.\(done === true \? \{\} : done\);[\s\S]*scrollMessagesToLatest\(\)/);
+  assert.match(agentEventsSource, /export function scrollToLatest/);
+  assert.match(agentEventsSource, /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(apply\)/);
+  assert.match(styles, /\.editorial-messages\s*\{\s*scroll-behavior:auto;\s*\}/);
 });
 
 test("候选题以横向顶部 Tab 栏展示", () => {

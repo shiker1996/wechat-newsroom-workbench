@@ -4,7 +4,7 @@
 // onDone（收到 done 事件后的回调，参数为 event.data，无 data 时为 {}）、
 // rethrow（失败时是否把错误抛给调用方，true 时不再 toast）。
 import { toast } from "./ui.js";
-import { consumeAgentEvent } from "./agent-events.js";
+import { consumeAgentEvent, scrollToLatest } from "./agent-events.js";
 import { securityHeaders } from "./http.js";
 // Unified stream contract: tool.requested, assistant.delta.
 
@@ -12,8 +12,9 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
   const sm = document.createElement("div");
   sm.className = "editorial-message assistant streaming";
   sm.innerHTML = `<b>${title} · 实时回应</b><details class="thinking-box" hidden><summary>思考过程</summary><div class="thinking-text"></div></details><p class="reply-text"></p>`;
+  const scrollMessagesToLatest = () => scrollToLatest(messages);
   messages.append(sm);
-  messages.scrollTop = messages.scrollHeight;
+  scrollMessagesToLatest();
   const st = sm.querySelector(".reply-text");
   const thinkingText = sm.querySelector(".thinking-text");
   const thinkingBox = sm.querySelector(".thinking-box");
@@ -39,7 +40,7 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
       const event = JSON.parse(line);
       const completed=consumeAgentEvent(event,{toolCards,replyText:st,thinkingBox,thinkingText,errorLabel});
       if(completed)done=completed;
-      messages.scrollTop = messages.scrollHeight;
+      scrollMessagesToLatest();
     };
     while (true) {
       const { done: end, value } = await reader.read();
@@ -54,6 +55,7 @@ export async function streamChat({ url, body, messages, button, busyLabel, doneL
     if (!done) throw new Error(`${errorLabel}连接提前结束，请重试`);
     sm.classList.remove("streaming");
     await onDone?.(done === true ? {} : done);
+    scrollMessagesToLatest();
     return done;
   } catch (error) {
     sm.classList.remove("streaming");
