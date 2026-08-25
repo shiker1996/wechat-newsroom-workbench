@@ -69,6 +69,12 @@ function typographyStyle(scale, base, lineHeight = 1.45) {
   return ` style="font-size:${size}px;line-height:${line}"`;
 }
 
+function normalizeStepItem(item) {
+  if (item && typeof item === 'object') return item;
+  const text = String(item ?? '').trim();
+  return { title: text, content: '' };
+}
+
 export function renderStoryboardBlock(block, { pageLayout = 'stacked', pageRole = '' } = {}) {
   const scale = blockFontScale(block);
   const title = block.title ? `<h2${typographyStyle(scale, 11, 1.3)}>${escapeHtml(block.title)}</h2>` : '';
@@ -95,7 +101,7 @@ export function renderStoryboardBlock(block, { pageLayout = 'stacked', pageRole 
     const rows = Array.isArray(block.rows) ? block.rows : [];
     return `<div class="content-block compare-block">${title}<table><thead><tr>${headers.map((cell) => `<th data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${renderTechnicalText(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${(Array.isArray(row) ? row : []).map((cell) => `<td${typographyStyle(scale, 11, 1.4)}>${renderTechnicalText(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
-  if (block.type === 'steps' && items.length) return `<div class="content-block steps-block">${title}<div class="step-col">${items.map((item, index) => `<div class="step"><b${typographyStyle(scale, 11, 1.2)}>${index + 1}</b><div><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || '')}</p></div></div>`).join('')}</div></div>`;
+  if (block.type === 'steps' && items.length) return `<div class="content-block steps-block">${title}<div class="step-col">${items.map((rawItem, index) => { const item = normalizeStepItem(rawItem); return `<div class="step"><b${typographyStyle(scale, 11, 1.2)}>${index + 1}</b><div><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || '')}</p></div></div>`; }).join('')}</div></div>`;
   if (block.type === 'timeline' && items.length >= 2) return `<div class="content-block timeline-block">${title}<div class="tl">${items.map((item) => `<div class="tl-node"><span class="tl-time" data-text-role="auxiliary"${typographyStyle(scale, 9, 1.3)}>${escapeHtml(item.time || item.date || '')}</span><h3${typographyStyle(scale, 11, 1.3)}>${escapeHtml(item.title || item.event || item.label || '')}</h3><p${typographyStyle(scale, 11, 1.45)}>${renderTechnicalText(item.content || item.text || item.fact || item.description || '')}</p></div>`).join('')}</div></div>`;
   if (block.type === 'timeline' && items.length === 1) {
     const item = items[0] || {};

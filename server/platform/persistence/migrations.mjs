@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 17;
+export const WORKBENCH_SCHEMA_VERSION = 18;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -133,6 +133,18 @@ export function runDatabaseMigrations(db, migrateSchema) {
         db.prepare('UPDATE collection_sources SET label=?,config_json=?,updated_at=? WHERE id=?').run(label,JSON.stringify(config),new Date().toISOString(),row.id);
       }
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(17,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v18：保存内容路线与评分资料状态，避免综合选题缺少 T/事实时伪造 0 分。
+    if(applied<18){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(candidates)').all().map((column)=>column.name));
+      if(!columns.has('content_route'))db.exec("ALTER TABLE candidates ADD COLUMN content_route TEXT NOT NULL DEFAULT 'article'");
+      if(!columns.has('score_status'))db.exec("ALTER TABLE candidates ADD COLUMN score_status TEXT NOT NULL DEFAULT 'ready'");
+      if(!columns.has('score_warning'))db.exec("ALTER TABLE candidates ADD COLUMN score_warning TEXT NOT NULL DEFAULT ''");
+      if(!columns.has('format'))db.exec("ALTER TABLE candidates ADD COLUMN format TEXT NOT NULL DEFAULT ''");
+      if(!columns.has('material_type'))db.exec("ALTER TABLE candidates ADD COLUMN material_type TEXT NOT NULL DEFAULT ''");
+      if(!columns.has('historical_type'))db.exec("ALTER TABLE candidates ADD COLUMN historical_type TEXT NOT NULL DEFAULT ''");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(18,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

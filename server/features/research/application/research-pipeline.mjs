@@ -14,6 +14,7 @@ import { clusterItems, isFreshForBatch, tagsOf } from '../domain/hotspot-cluster
 import { DIMENSION_POOL_ROLES, dimensionPartsOf, dimensionSelections } from '../domain/hotspot-dimensions.mjs';
 import { ensureBatchEventCards, generateEventCards, overviewHtml, readEventCardsFile } from './research/event-card-stage.mjs';
 import { brainstorm, breakingSynthesis, synthesize } from './research/editorial-exploration.mjs';
+import { classifyContentRoute, scoreStatusForCard } from '../domain/content-routing.mjs';
 
 // 研究子阶段仍统一通过 selectionPrompt 加载项目技能：hotspot-brainstorm、hotspot-synthesis、event-card-generator。
 // 实现分别位于 research/editorial-exploration.mjs 与 research/event-card-stage.mjs，保留这些契约标记便于结构扫描。
@@ -30,7 +31,7 @@ export { brainstorm, breakingSynthesis, synthesize };
 const CATEGORIES = ['🤖 AI/技术动态','📰 综合资讯','🏢 大厂战略','📈 行业趋势','💼 职场生态'];
 const CATEGORY_PREFERENCE = { '🏢 大厂战略': 6, '🤖 AI/技术动态': 4, '📈 行业趋势': 3, '📰 综合资讯': 1, '💼 职场生态': 0 };
 const P_BASE = { '🏢 大厂战略': 50, '🤖 AI/技术动态': 40, '📈 行业趋势': 30, '📰 综合资讯': 20, '💼 职场生态': 10 };
-const H_BASE = { worker_social: 48, bigtech: 33, owned_experience: 35, controversial_return: 30, key_person_move: 33, github_tool: 25, ai_tool_test: 25, financing: 10, career_anxiety: 5, contrarian_bigtech: 35 };
+const H_BASE = { worker_social: 48, bigtech: 33, owned_experience: 35, controversial_return: 30, key_person_move: 33, github_tool: 15, ai_tool_test: 20, financing: 10, career_anxiety: 5, contrarian_bigtech: 35 };
 const ACCOUNT_FIT_LEVEL_SCORE = Object.freeze({ strong: 80, explore: 45, weak: 25 });
 
 // 评分参数默认值。account-context.json 可用 scoring 段覆盖：
@@ -44,8 +45,8 @@ const DEFAULT_SCORING = Object.freeze({
   pBase: P_BASE,
   hBase: H_BASE,
   accountFitBonus: 6,
-  toolEngineeringBonus: 10,
-  minimumToolCandidates: 2,
+  toolEngineeringBonus: 0,
+  minimumToolCandidates: 0,
 });
 
 export function resolveScoring(ctx = getAccountContext()) {
@@ -82,11 +83,7 @@ export function resolveScoring(ctx = getAccountContext()) {
 
 export function isSocialCardCandidate(item) {
   if (!item || item.status === 'NO_ANGLE' || item.writeReadiness === 'SKIP' || item.source?.riskLevel === '高') return false;
-  if (String(item.format || '').trim() === '贴图') return true;
-  const historicalType = String(item.hProfile?.historicalType || '');
-  if (historicalType === 'github_tool' || historicalType === 'ai_tool_test') return true;
-  const materialType = String(item.materialType || '').toLowerCase();
-  return /github|开源|仓库|工具|教程|产品演示/.test(materialType);
+  return classifyContentRoute(item).pureProject;
 }
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); }
@@ -382,12 +379,14 @@ function articleCandidateOf(event, rankingItem, scoring, accountContext) {
   const accountFit = scoring.accountFitByCategory?.[event.topic_category]
     ?? accountFitForCategory(event.topic_category, accountContext);
   const toolEngineering = toolEngineeringOf(event);
+  const contentRoute = classifyContentRoute({}, { event });
   return {
     dimension: 'event', key: event.event_id, title: event.representative_title, events: [event],
     // Phase 2：事件池只按 T 排序；accountFit 只用于同分优先级和审计，不再叠加到事件分。
     score: Number(parts.topicValue.toFixed(1)), topicValue: parts.topicValue,
     eventValue: parts.eventValue, t: parts.eventValue,
     topicValueParts: parts, accountFit, toolEngineering, toolEngineeringBonus: 0,
+    contentRoute: contentRoute.contentRoute, articleEligible: contentRoute.articleEligible,
     developerImpact: parts.directDeveloperImpact, category: event.topic_category,
     riskLevel: rankingItem.riskLevel || event.tags?.riskLevel || '待评估',
     leads: (event.articles || []).map((article) => article.title).slice(0, 3),
@@ -412,7 +411,8 @@ export function selectArticlePool(clusters, ranking, { coreLimit = 8, blackLimit
   const active = activeHotlistClusters(clusters, ranking);
   const rankingByEvent = new Map((ranking || []).map((item) => [item.eventId, item]));
   const candidates = active.map((event) => articleCandidateOf(event, rankingByEvent.get(event.event_id) || {}, scoring, accountContext));
-  const sorted = candidates.sort((left, right) => right.score - left.score
+  const articleCandidates = candidates.filter((candidate) => candidate.articleEligible);
+  const sorted = articleCandidates.sort((left, right) => right.score - left.score
     || right.accountFit - left.accountFit
     || Number(left.eventHeatRank || 9999) - Number(right.eventHeatRank || 9999));
   const coreGroups = sorted.slice(0, coreLimit);
@@ -461,7 +461,8 @@ export function selectArticlePool(clusters, ranking, { coreLimit = 8, blackLimit
     item.poolRole = roleByEvent.get(item.eventId) || '未入选';
     item.eliminationReason = item.poolRole === '未入选' ? eventEliminationReason(item) : '';
   });
-  return { selected: [...core, ...black], backup, groups: sorted, articleCandidates: sorted };
+  return { selected: [...core, ...black], backup, groups: sorted, articleCandidates: sorted,
+    socialOnly: candidates.filter((candidate) => !candidate.articleEligible) };
 }
 
 /** 维度组只作为早报/行业盘点候选，不直接占文章池席位。 */
@@ -476,6 +477,8 @@ export function scoreCards(cards, synthesis, scoring = resolveScoring()) {
   const corrections = new Map((synthesis.items ?? []).map((item) => [item.candidateId,item]));
   const normalized = cards.filter((card) => card.status !== 'NO_ANGLE').map((card) => {
     const b = card.bScores ?? {}; const hp = card.hProfile ?? {}; const correction = corrections.get(card.candidateId) ?? {};
+    const route = classifyContentRoute(card);
+    const scoreStatus = scoreStatusForCard(card);
     const distribution = resolveDistributionDecision({ ...card.packaging, title:card.source?.title, angle:card.angle, thesis:card.thesis,
       evidenceBoundary:card.evidenceBoundary, materialGaps:card.packaging?.materialGaps, factSupport:b.factSupport,
       riskLevel:card.source?.riskLevel, riskReason:card.source?.riskReason }, scoring.notificationPolicy);
@@ -494,10 +497,12 @@ export function scoreCards(cards, synthesis, scoring = resolveScoring()) {
     const P = clamp(Number(card.source?.accountFit ?? scoring.accountFitByCategory?.[card.source?.category] ?? 0), 0, 100);
     const S = clamp(correction.saturationPenalty,0,15);
     const D = clamp(Number(card.source?.duplicatePenalty || 0), 0, 20);
-    const eventValue = clamp(Number(card.source?.eventValue ?? card.source?.t ?? card.source?.eventHeatScore ?? 0), 0, 100);
+    const eventValue = scoreStatus.scoreStatus === 'needs_source_data'
+      ? null
+      : clamp(Number(card.source?.eventValue ?? card.source?.t ?? card.source?.eventHeatScore ?? 0), 0, 100);
     // 阶段 5：A 是文章化质量，T 作为事件价值底座进入 F 一次；S/D 仍是竞争扣分。
     const A = clamp(H*scoring.weights.h+B*scoring.weights.b+P*scoring.weights.p, 0, 100);
-    const F = clamp(A*(1-scoring.eventValueWeight)+eventValue*scoring.eventValueWeight-S-D,0,100);
+    const F = eventValue == null ? null : clamp(A*(1-scoring.eventValueWeight)+eventValue*scoring.eventValueWeight-S-D,0,100);
     const allowedSkills = new Set(['wechat-mp-tech-hotspot','wechat-mp-tech-deep','wechat-mp-deep-dive','wechat-mp-gossip-chill']);
     const fallbackSkill = card.source?.category === '🤖 AI/技术动态' ? 'wechat-mp-tech-hotspot' : 'wechat-mp-deep-dive';
     const recommendedSkill = allowedSkills.has(card.recommendedSkill) ? card.recommendedSkill : fallbackSkill;
@@ -507,7 +512,9 @@ export function scoreCards(cards, synthesis, scoring = resolveScoring()) {
       notificationFit:distribution.notificationFit, notificationEligible:distribution.notificationEligible,
       notificationBlockers:distribution.notificationBlockers,
       a:Number(A.toFixed(1)), h:H, b:B, p:P, s:S, d:D, duplicatePenalty:D,
-      f:Number(F.toFixed(1)), bParts,
+      f:F == null ? null : Number(F.toFixed(1)), bParts,
+      contentRoute: route.contentRoute, articleEligible: route.articleEligible, pureProject: route.pureProject,
+      scoreStatus: scoreStatus.scoreStatus, scoreWarning: scoreStatus.scoreWarning,
       synthesisReason:correction.reason || '', audienceRelevance:audience };
   }).sort((a,b) => b.f-a.f || a.candidateId.localeCompare(b.candidateId));
   return enforceNotificationQuota(normalized, scoring.notificationPolicy)
@@ -662,10 +669,12 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   if (!scored.length) throw new Error('全部候选均为 NO_ANGLE，请检查标注或更换批次');
   // 成稿门槛前置：F 低于 55 的候选不进选题池（进池也过不了成稿门禁）；全灭时保留第 1 名兜底
   const DRAFT_FLOOR = 55;
-  const draftable = breaking ? scored : scored.filter((item) => item.f >= DRAFT_FLOOR);
+  const draftable = breaking
+    ? scored.filter((item) => item.scoreStatus === 'ready')
+    : scored.filter((item) => item.scoreStatus === 'ready' && item.f >= DRAFT_FLOOR);
   const dropped = scored.length - draftable.length;
   if (dropped) onProgress(`${dropped} 个候选 F 低于成稿线 ${DRAFT_FLOOR}，未进入选题池`);
-  if (!draftable.length) { draftable.push(scored[0]); onProgress('全部候选低于成稿线，保留最高分候选供参考'); }
+  if (!draftable.length) throw new Error('没有可评分候选：请先补齐事件价值 T 和可核验事实');
   onProgress('写入临时总榜、编辑议题卡与选题池');
   writeFile(path.join(workdir,'editorial-agenda.md'),markdownAgenda(scored));
   writeFile(path.join(workdir,'topics-ranked.md'),markdownRanked(scored,synthesis,briefPool,scoring));
@@ -679,7 +688,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     topicValue:item.source.topicValue, eventValue:item.eventValue, a:item.a,
     angle:item.angle,thesis:item.thesis,editorQuestion:item.editorQuestion,h:item.h,b:item.b,p:item.p,s:item.s,d:item.d,f:item.f,
     distributionLane:item.distributionLane,readerStake:item.readerStake,readerStakeScore:item.readerStakeScore,
-    format:item.format || '',materialType:item.materialType || '',historicalType:item.hProfile?.historicalType || ''})));
+    format:item.format || '',materialType:item.materialType || '',historicalType:item.hProfile?.historicalType || '',
+    contentRoute:item.contentRoute || 'article', scoreStatus:item.scoreStatus || 'ready', scoreWarning:item.scoreWarning || '' })));
   if(breaking){
     const tracks=batch.requested_tracks_list||['article'];
     for(const record of scored){

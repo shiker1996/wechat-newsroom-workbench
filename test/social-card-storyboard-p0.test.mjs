@@ -25,6 +25,14 @@ test('技术命令和 URL 以安全可换行片段渲染，续页显示连续标
   assert.match(continuationBadge({continuation_index:2}),/CONTINUED · 02/);
 });
 
+test('步骤块兼容字符串 items，避免只渲染序号而丢失步骤正文',()=>{
+  const html=renderStoryboardBlock({type:'steps',title:'本地运行',items:['进入 web 目录','安装依赖','启动开发服务器']});
+  assert.match(html,/<h3>进入 web 目录<\/h3>/);
+  assert.match(html,/<h3>安装依赖<\/h3>/);
+  assert.match(html,/<h3>启动开发服务器<\/h3>/);
+  assert.doesNotMatch(html,/<h3><\/h3><p><\/p>/);
+});
+
 test('完整 fenced code 不受内容块类型影响，统一渲染为代码块',()=>{
   const html=renderStoryboardBlock({type:'list',title:'安装命令',content:'```bash\ncurl -fsSl https://example.com/install | bash\n```'});
   assert.match(html,/class="content-block code-block"/);

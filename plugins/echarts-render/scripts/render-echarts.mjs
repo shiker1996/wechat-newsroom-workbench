@@ -41,9 +41,12 @@ async function loadPuppeteer() {
 }
 
 function loadEchartsSource() {
-  const require = createRequire(import.meta.url);
-  const entry = require.resolve('echarts/dist/echarts.min.js', { paths: [skillRoot, process.cwd()] });
-  return fs.readFileSync(entry, 'utf8');
+  // The plugin is distributed independently of the project skills. Keep the
+  // browser bundle inside this package so installed plugins do not reach back
+  // into the workspace to resolve a private skill dependency.
+  const bundled = path.join(skillRoot, 'echarts.min.txt');
+  if (!fs.existsSync(bundled)) throw new Error(`插件包缺少 ECharts 运行时：${path.basename(bundled)}`);
+  return fs.readFileSync(bundled, 'utf8');
 }
 
 const FENCE_RE = /```echarts\b[^\n]*\r?\n([\s\S]*?)```/gi;

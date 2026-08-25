@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../server/features/research/application/research-pipeline.mjs';
+import { classifyContentRoute, isPureProjectEvent } from '../server/features/research/domain/content-routing.mjs';
 import { buildScoreDualRun } from '../scripts/migration/replay-topic-score.mjs';
 
 function hotspot(id, title, eventKey, source='rsshub') {
@@ -72,8 +73,15 @@ test('维度统一选题：核心8混排 + 黑马2 + 候补3，事件回填入�
 test('成稿线前置：F 低于 55 的候选不进入选题池', () => {
   const source = fs.readFileSync(new URL('../server/features/research/application/research-pipeline.mjs', import.meta.url), 'utf8');
   assert.match(source, /const DRAFT_FLOOR = 55/);
-  assert.match(source, /draftable = breaking \? scored : scored\.filter\(\(item\) => item\.f >= DRAFT_FLOOR\)/);
+  assert.match(source, /draftable = breaking[\s\S]*item\.scoreStatus === 'ready'[\s\S]*item\.f >= DRAFT_FLOOR/);
   assert.match(source, /saveAnalyzedCandidates\(batchId,draftable\.map/);
+});
+
+test('手动锁定简报后，低分选题不再被成稿管线二次拦截', () => {
+  const source = fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs', import.meta.url), 'utf8');
+  assert.match(source, /brief_status!==['"]LOCKED['"]/);
+  assert.doesNotMatch(source, /candidate\.f_score!=null&&candidate\.f_score<55/);
+  assert.match(source, /手动确认的低分选题也应允许进入成稿链/);
 });
 
 test('文章选题池只从事件热榜前50事件中产生维度候选', () => {
@@ -274,6 +282,35 @@ test('图文推荐优先采用模型贴图建议并识别工具类候选', () =>
   assert.equal(isSocialCardCandidate({ ...safe, format:'文章', hProfile:{ historicalType:'github_tool' } }), true);
   assert.equal(isSocialCardCandidate({ ...safe, format:'文章', hProfile:{ historicalType:'bigtech' }, materialType:'行业新闻' }), false);
   assert.equal(isSocialCardCandidate({ ...safe, format:'贴图', source:{ riskLevel:'高' } }), false);
+});
+
+test('纯项目按内容路线进入图文，评分字段可识别为项目属性', () => {
+  assert.equal(classifyContentRoute({ format:'贴图', hProfile:{ historicalType:'bigtech' } }).contentRoute, 'social_only');
+  assert.equal(classifyContentRoute({ format:'文章', hProfile:{ historicalType:'github_tool' } }).articleEligible, false);
+  assert.equal(classifyContentRoute({ format:'文章', hProfile:{ historicalType:'bigtech' }, materialType:'GitHub 工具项目' }).contentRoute, 'social_only');
+  assert.equal(classifyContentRoute({ format:'文章', hProfile:{ historicalType:'bigtech' }, materialType:'行业新闻' }).contentRoute, 'article');
+  assert.equal(isPureProjectEvent({ representative_title:'某开源项目发布', keywords:[], articles:[] }), true);
+});
+
+test('缺少事件价值时不再把综合选题静默算成 0 分', () => {
+  const base={candidateId:'COMPOSITE-1',status:'PASS',source:{title:'综合选题',category:'🏢 大厂战略',poolRole:'综合选题',riskLevel:'待评估',composite:true},
+    bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,readerStakeScore:4,factSupport:4},hProfile:{historicalType:'bigtech'}};
+  const missing=scoreCards([base],{items:[]})[0];
+  assert.equal(missing.scoreStatus,'needs_source_data');
+  assert.equal(missing.eventValue,null);
+  assert.equal(missing.f,null);
+  const ready=scoreCards([{...base,source:{...base.source,eventValue:55,scoreStatus:'ready'}}],{items:[]})[0];
+  assert.equal(ready.scoreStatus,'ready');
+  assert.ok(ready.f > 0);
+});
+
+test('纯项目不再被文章池的工具席位强行补入', () => {
+  const events=clusterItems([hotspot(1,'开源项目发布','主体|发布|开源项目')]);
+  const ranking=preselection(events,'2026-07-23');
+  const pool=selectArticlePool(events,ranking,{coreLimit:1,blackLimit:0,backupLimit:0,accountContext:{contentPillars:[],scoring:{minimumToolCandidates:2}}});
+  assert.equal(pool.selected.length,0);
+  assert.equal(pool.socialOnly.length,1);
+  assert.equal(pool.socialOnly[0].contentRoute,'social_only');
 });
 
 test('图文预选从全量事件独立选择 GitHub 工具，不受文章前十限制', () => {

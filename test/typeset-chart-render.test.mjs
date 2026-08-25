@@ -10,6 +10,7 @@ import { skipBrowser } from './helpers/tiers.mjs';
 const execFileAsync = promisify(execFile);
 const MERMAID_SCRIPT = path.resolve('skills/mermaid-render/scripts/render-mermaid.mjs');
 const ECHARTS_SCRIPT = path.resolve('skills/wechat-echarts-blocks-to-images/scripts/render-echarts.mjs');
+const ECHARTS_PLUGIN_SCRIPT = path.resolve('plugins/echarts-render/scripts/render-echarts.mjs');
 
 function tempDir(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chart-render-'));
@@ -68,6 +69,22 @@ test('echarts 围栏渲染为 PNG 并替换为图片引用', { timeout: 120000 }
   assert.doesNotMatch(result, /```echarts/);
   const png = path.join(dir, 'images', 'echarts-1.png');
   assert.ok(fs.existsSync(png) && fs.statSync(png).size > 0, 'PNG 产物存在且非空');
+});
+
+test('ECharts 插件入口可以解析技能包内的运行时依赖', { timeout: 120000 }, async (t) => {
+  if (skipBrowser(t)) return;
+  const dir = tempDir(t);
+  const input = path.join(dir, 'in.md');
+  const output = path.join(dir, 'out.md');
+  const option = { xAxis: { type: 'category', data: ['一', '二'] }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: [2, 5] }] };
+  fs.writeFileSync(input, `# 测试\n\n\`\`\`echarts\n${JSON.stringify(option)}\n\`\`\`\n`, 'utf8');
+  const { stdout } = await execFileAsync(process.execPath, [ECHARTS_PLUGIN_SCRIPT, input, output], { windowsHide: true, timeout: 120000 });
+  const report = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
+  assert.equal(report.converted, 1);
+  assert.deepEqual(report.failed, []);
+  assert.match(fs.readFileSync(output, 'utf8'), /!\[echarts-1\]\(images\/echarts-1\.png\)/);
+  const png = path.join(dir, 'images', 'echarts-1.png');
+  assert.ok(fs.existsSync(png) && fs.statSync(png).size > 0, '插件入口生成的 PNG 产物存在且非空');
 });
 
 test('echarts 非 JSON 配置被拒绝并保留围栏', { timeout: 120000 }, async (t) => {

@@ -197,3 +197,18 @@ test('就绪判定：长文本中的事实状态描述（尚未完成）不被�
   });
   assert.equal(readiness.ready,true,'必填项齐备即可成稿');
 });
+
+test('就绪判定：没有禁止写入内容时允许该字段留空',async()=>{
+  const {evaluateEditorialReadiness}=await import('../server/features/articles/index.mjs');
+  const readiness=evaluateEditorialReadiness({
+    candidate:{angle:'从开发者视角看工具演进',thesis:'大厂收编加速工具演进'},
+    editorial:{confirmed_facts:'已确认事实',author_opinions:'作者明确观点',forbidden_claims:''},
+  });
+  assert.equal(readiness.ready,true,'禁止写入为空表示没有额外禁写边界，不应阻塞成稿');
+  assert.deepEqual(readiness.missing,[]);
+});
+
+test('编辑室前端门禁：长文本中的边界词不应被当作占位符',()=>{
+  const source=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
+  assert.match(source,/text\.length\s*<=\s*30\s*&&\s*PLACEHOLDER\.test\(text\)/,'前端应与服务端按短文本范围判断占位符');
+});

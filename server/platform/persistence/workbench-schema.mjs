@@ -163,6 +163,12 @@ export function applyWorkbenchSchema(db) {
         topic_value REAL,
         event_value REAL,
         article_value REAL,
+        content_route TEXT NOT NULL DEFAULT 'article',
+        score_status TEXT NOT NULL DEFAULT 'ready',
+        score_warning TEXT NOT NULL DEFAULT '',
+        format TEXT NOT NULL DEFAULT '',
+        material_type TEXT NOT NULL DEFAULT '',
+        historical_type TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'pooled',
         composite INTEGER NOT NULL DEFAULT 0,
         hotspot_titles TEXT NOT NULL DEFAULT '',
@@ -807,6 +813,12 @@ export function applyWorkbenchSchema(db) {
     if(!finalCandidateCols.has('topic_value'))db.exec("ALTER TABLE candidates ADD COLUMN topic_value REAL");
     if(!finalCandidateCols.has('event_value'))db.exec("ALTER TABLE candidates ADD COLUMN event_value REAL");
     if(!finalCandidateCols.has('article_value'))db.exec("ALTER TABLE candidates ADD COLUMN article_value REAL");
+    if(!finalCandidateCols.has('content_route'))db.exec("ALTER TABLE candidates ADD COLUMN content_route TEXT NOT NULL DEFAULT 'article'");
+    if(!finalCandidateCols.has('score_status'))db.exec("ALTER TABLE candidates ADD COLUMN score_status TEXT NOT NULL DEFAULT 'ready'");
+    if(!finalCandidateCols.has('score_warning'))db.exec("ALTER TABLE candidates ADD COLUMN score_warning TEXT NOT NULL DEFAULT ''");
+    if(!finalCandidateCols.has('format'))db.exec("ALTER TABLE candidates ADD COLUMN format TEXT NOT NULL DEFAULT ''");
+    if(!finalCandidateCols.has('material_type'))db.exec("ALTER TABLE candidates ADD COLUMN material_type TEXT NOT NULL DEFAULT ''");
+    if(!finalCandidateCols.has('historical_type'))db.exec("ALTER TABLE candidates ADD COLUMN historical_type TEXT NOT NULL DEFAULT ''");
     if (!candidateTracksExisted) {
       const trackNow = new Date().toISOString();
       db.prepare(`INSERT OR IGNORE INTO candidate_tracks

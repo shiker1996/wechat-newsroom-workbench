@@ -15,6 +15,40 @@ import { getFactAttachment, selectConversationSearchAttachments } from '../../ag
 import { runCustomSocialAgentTurn } from '../../../features/social-cards/application/agent/custom-social-adapter.mjs';
 import { runWithThinkingSink } from '../../llm/gateway.mjs';
 
+function readJsonFile(filePath) {
+  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
+}
+
+function compositeScoreContext({ root, batchId, hotspots, store }) {
+  const sourcesDir = path.join(root || '', 'topics', `${batchId}-orchestrated`, 'sources');
+  const ranking = readJsonFile(path.join(sourcesDir, 'preselection-ranking.json'));
+  const rankingByHotspot = new Map((ranking?.items || []).map((item) => [Number(item.hotspotId), item]));
+  const items = (hotspots || []).map((hotspot) => ({
+    hotspot,
+    ranking: rankingByHotspot.get(Number(hotspot.id)) || null,
+    source: store.getHotspotSource?.(hotspot.id) || null,
+  }));
+  const eventValues = items.map((item) => Number(item.ranking?.eventValue ?? item.ranking?.t ?? item.ranking?.eventHeatScore))
+    .filter((value) => Number.isFinite(value));
+  const facts = items.flatMap(({ hotspot, source }) => {
+    let raw = {}; try { raw = JSON.parse(hotspot.raw_json || '{}'); } catch {}
+    const tags = raw.aiTags || {};
+    const excerpt = String(source?.description || source?.content || '').replace(/\s+/g, ' ').trim().slice(0, 700);
+    return [`${hotspot.title || '(无标题)'}；分类：${hotspot.category || '待评估'}；关键词：${(tags.keywords || []).join('、')}${excerpt ? `；资料摘要：${excerpt}` : ''}`];
+  });
+  const category = items.map((item) => item.hotspot.category).find(Boolean) || '';
+  const riskLevel = items.map((item) => item.ranking?.riskLevel || '').find((value) => value && value !== '待评估') || '待评估';
+  const eventValue = eventValues.length ? Math.max(...eventValues) : null;
+  return {
+    category,
+    riskLevel,
+    eventValue,
+    scoreStatus: eventValue == null ? 'needs_source_data' : 'ready',
+    scoreWarning: eventValue == null ? '批次没有找到对应的事件热榜价值 T，请先补齐热榜或事实资料' : '',
+    facts,
+  };
+}
+
 export async function handleCandidateRoutes({ request, response, pathname, searchParams, root, config, store, body, json, models, aiJobs, localSecurity,
   batchWorkdir, articleWorkdir, socialCardWorkdir, writeUtf8, candidateRepositoryUrl, candidateEventGroups, attachEventConclusions,
   evaluateCustomCardGate }) {
@@ -82,13 +116,14 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
     try {
       if (composite && models) {
         const providerConfig = models.config.providers[models.config.defaultProvider];
-        const hotInfo = (composite.hotspots || []).slice(0, 5).map((h) => `- ${h.title || '(无标题)'}：${h.source || '未知来源'}`).join('\n');
-        const result = await models.complete({ purpose: 'composite-score', batchId, jsonMode: true, maxOutputTokens: Math.min(3000, providerConfig.maxOutputTokens), messages: [{ role: 'system', protected: true, content: '你是热点探索编辑。对综合选题生成临时评分。返回严格JSON：{"bScores":{},"hProfile":{},"angle":"","thesis":""}' }, { role: 'user', protected: true, content: `综合选题标题：${composite.hotspot_title}\n包含以下热点信息：\n${hotInfo}` }] });
+        const context = compositeScoreContext({ root, batchId, hotspots: composite.hotspots, store });
+        const hotInfo = context.facts.slice(0, 5).map((fact) => `- ${fact}`).join('\n');
+        const result = await models.complete({ purpose: 'composite-score', batchId, jsonMode: true, maxOutputTokens: Math.min(3000, providerConfig.maxOutputTokens), messages: [{ role: 'system', protected: true, content: '你是热点探索编辑。只能依据给出的事实生成综合选题临时评分；不要把缺失事实当作 0 分。返回严格JSON：{"bScores":{"angleUniqueness":0,"emotionSpread":0,"titleHook":0,"readerStakeScore":0,"factSupport":0},"hProfile":{"historicalType":"bigtech","fiveSenseCount":0,"fiveQuestionCount":0,"recommendationFit":0,"emotionTheme":0,"searchFriendly":0},"angle":"","thesis":""}' }, { role: 'user', protected: true, content: `综合选题标题：${composite.hotspot_title}\n事件价值 T：${context.eventValue == null ? '缺失（不要生成正式 F 分）' : context.eventValue}\n包含以下热点信息：\n${hotInfo}` }] });
         let parsed; try { parsed = JSON.parse(result.content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); } catch { parsed = null; }
         if (parsed) {
-          const card = { bScores: parsed.bScores || {}, hProfile: parsed.hProfile || { historicalType: 'bigtech', fiveSenseCount: 0, fiveQuestionCount: 0, recommendationFit: 0, emotionTheme: 0, searchFriendly: 0 }, angle: parsed.angle || '', thesis: parsed.thesis || '', source: { title: composite.hotspot_title, category: '', riskLevel: '待评估', poolRole: '综合选题', hotspotId: null } };
+          const card = { bScores: parsed.bScores || {}, hProfile: parsed.hProfile || { historicalType: 'bigtech', fiveSenseCount: 0, fiveQuestionCount: 0, recommendationFit: 0, emotionTheme: 0, searchFriendly: 0 }, angle: parsed.angle || '', thesis: parsed.thesis || '', source: { title: composite.hotspot_title, category: context.category, riskLevel: context.riskLevel, poolRole: '综合选题', hotspotId: null, composite: true, eventValue: context.eventValue, scoreStatus: context.scoreStatus, scoreWarning: context.scoreWarning } };
           const scored = scoreCards([card], { items: [] });
-          if (scored.length) store.updateCandidate(composite.id, { h_score: scored[0].h, b_score: scored[0].b, p_score: scored[0].p.toFixed(1), s_score: scored[0].s, d_score: scored[0].d, f_score: scored[0].f, event_value: scored[0].eventValue, article_value: scored[0].a, angle: parsed.angle || '', thesis: parsed.thesis || '', status: 'scored' });
+          if (scored.length) store.updateCandidate(composite.id, { h_score: scored[0].h, b_score: scored[0].b, p_score: scored[0].p.toFixed(1), s_score: scored[0].s, d_score: scored[0].d, f_score: scored[0].f, event_value: scored[0].eventValue, article_value: scored[0].a, content_route: scored[0].contentRoute, score_status: scored[0].scoreStatus, score_warning: scored[0].scoreWarning, angle: parsed.angle || '', thesis: parsed.thesis || '', status: scored[0].scoreStatus === 'needs_source_data' ? 'pooled' : 'scored' });
         }
       }
     } catch { /* auto-scoring is best-effort */ }

@@ -15,7 +15,7 @@
     {
       "id": "echarts-render",
       "name": "ECharts 图片渲染",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "kind": "tool",
       "capabilities": [
         "diagram.echarts.render"

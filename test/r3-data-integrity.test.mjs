@@ -26,7 +26,7 @@ test('存量迁移补齐 candidates 的 reader_stake_score 列',()=>{
   try {
     store=new Store(dbPath);
     store.db.exec('ALTER TABLE candidates DROP COLUMN reader_stake_score');
-    store.db.prepare('DELETE FROM schema_migrations WHERE version IN (16,17)').run();
+    store.db.prepare('DELETE FROM schema_migrations WHERE version IN (16,17,18)').run();
     store.close();store=null;
     store=new Store(dbPath);
     const columns=new Set(store.db.prepare('PRAGMA table_info(candidates)').all().map((column)=>column.name));

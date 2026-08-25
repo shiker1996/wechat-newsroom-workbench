@@ -98,7 +98,7 @@ async function loadEditorialRoom(selectedId) {
   }
   const sidebar = document.getElementById("editorial-candidates");
   if (!sidebar) return;
-  // 与选题池同一成稿线：默认只展示 F≥55 的候选，选题池的"显示全部"开关同样生效
+  // 与选题池同一自动入池筛选线：默认只展示 F≥55 的候选，选题池的"显示全部"开关同样生效
   const hiddenCount = state.topicShowAll ? 0 : state.candidates.filter((item) => item.f_score != null && Number(item.f_score) < DRAFT_SCORE_THRESHOLD).length;
   const visibleCandidates = state.topicShowAll ? state.candidates : state.candidates.filter((item) => item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD);
   sidebar.innerHTML = visibleCandidates.length
@@ -287,9 +287,15 @@ async function loadSimilarArticles(id) {
 
 function renderEditorialReadiness() {
   // 与 server/features/articles/domain/editorial-readiness.mjs 的 evaluateEditorialReadiness 保持一致：
-  // 5 个必填表单项填好（非占位符）即可成稿；2 个选填项只展示不阻塞。
+  // 4 个必填表单项填好，加上“禁止写入”无内容时的明确留空，即可成稿；2 个选填项只展示不阻塞。
   const PLACEHOLDER = /(?:待定|未定|待确认|待锁定|暂无|尚未|需作者|待作者|待主线|未明确|TBD)/i;
-  const substantive = (value) => Boolean(String(value || "").trim()) && !PLACEHOLDER.test(String(value));
+  // 与 server/features/articles/domain/editorial-readiness.mjs 保持一致：
+  // 长文本里的“未明确/待核”等可能是具体事实边界，只有短占位回复才判为不合格。
+  const substantive = (value) => {
+    const text = String(value || "").trim();
+    return Boolean(text) && !(text.length <= 30 && PLACEHOLDER.test(text));
+  };
+  const forbiddenClaimsComplete = (value) => !String(value || "").trim() || substantive(value);
   const gate = document.getElementById("editorial-production-gate");
   if (!gate) return;
   const form = document.getElementById("editorial-form");
@@ -300,7 +306,7 @@ function renderEditorialReadiness() {
     { label: "明确观点", field: "author_opinions", ok: substantive(text("author_opinions")) },
     { label: "写作角度", field: "angle", ok: substantive(text("angle")) },
     { label: "锁定命题", field: "thesis", ok: substantive(text("thesis")) },
-    { label: "禁止写入", field: "forbidden_claims", ok: substantive(text("forbidden_claims")) },
+    { label: "禁止写入", field: "forbidden_claims", ok: forbiddenClaimsComplete(text("forbidden_claims")) },
     { label: "已确认实践（选填）", field: "confirmed_experiences", ok: substantive(text("confirmed_experiences")), optional: true },
     { label: "否定角度/反证边界（选填）", field: "rejected_angles", ok: substantive(text("rejected_angles")), optional: true },
   ];

@@ -126,7 +126,8 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   if(editorial.brief_status!=='LOCKED')throw new Error('必须先完成编辑会并锁定 article-brief.md');
   const editorialReadiness=evaluateEditorialReadiness({candidate,editorial});
   if(!editorialReadiness.ready)throw new Error(`编辑底稿未就绪,仍缺：${editorialReadiness.missing.join('、')}`);
-  if(candidate.f_score!=null&&candidate.f_score<55)throw new Error(`候选 F=${candidate.f_score},低于成稿硬门槛 55`);
+  // F 分数只决定自动入池；能完成编辑会并锁定简报，表示作者已人工确认该选题，
+  // 手动确认的低分选题也应允许进入成稿链。
   const batch=store.getBatch(batchId); const workdir=candidateArticleDir(workspaceRoot,batch,candidate);
   fs.mkdirSync(workdir,{recursive:true}); let providerConfig=gateway.config.providers[provider||gateway.config.defaultProvider];
   const sourceUrls=candidate.composite?(candidate.hotspots||[]).map((h)=>h.url).filter(Boolean).join(String.fromCharCode(10)):

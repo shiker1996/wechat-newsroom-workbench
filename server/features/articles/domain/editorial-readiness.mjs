@@ -18,16 +18,21 @@ export const EDITORIAL_FIELDS=Object.freeze([
   {key:'author_opinions',label:'明确观点',required:true,scope:'editorial'},
   {key:'angle',label:'写作角度',required:true,scope:'candidate'},
   {key:'thesis',label:'锁定命题',required:true,scope:'candidate'},
-  {key:'forbidden_claims',label:'禁止写入',required:true,scope:'editorial'},
+  // 没有额外禁写项时，空值本身就是明确边界；若填写内容仍需通过实质性校验。
+  {key:'forbidden_claims',label:'禁止写入',required:true,allowEmpty:true,scope:'editorial'},
   {key:'confirmed_experiences',label:'已确认实践',required:false,scope:'editorial'},
   {key:'rejected_angles',label:'否定角度/反证边界',required:false,scope:'editorial'},
 ]);
+
+export function editorialFieldComplete(field,value){
+  return field.allowEmpty&&!String(value??'').trim()||substantiveDecision(value);
+}
 
 export function evaluateEditorialReadiness({candidate={},editorial={}}={}){
   const fields=EDITORIAL_FIELDS.map((field)=>{
     const source=field.scope==='candidate'?candidate:editorial;
     const value=String(source[field.key]??'').trim();
-    return {...field,value,ok:substantiveDecision(value)};
+    return {...field,value,ok:editorialFieldComplete(field,value)};
   });
   const missing=fields.filter((field)=>field.required&&!field.ok).map((field)=>field.label);
   return {ready:missing.length===0,missing,fields};

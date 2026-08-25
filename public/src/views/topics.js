@@ -23,7 +23,7 @@ const articleScoreFields = [
 ];
 const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
-  DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判",
+  DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判", needs_source_data: "待补评分资料",
 };
 function statusLabel(value) { return editorialStatusLabels[String(value || "")] || String(value || "待处理"); }
 
@@ -34,7 +34,7 @@ function renderCandidates(candidates, track = activeTrack()) {
     const independent=["wechat-experience","wechat-tutorial"].includes(String(item.output_mode||""));
     return articleType==="independent"?independent:!independent;
   });
-  // 成稿硬门槛 F≥55：低于门槛的候选即使完成编辑会也无法成稿，默认隐藏，可点开查看
+  // 自动入池筛选线 F≥55：低于评分线的候选默认隐藏；展开后经人工锁定简报仍可成稿
   const hiddenItems = track === "article" && !state.topicShowAll ? typeFiltered.filter((item) => !isDraftEligible(item)) : [];
   const visible = track === "article" && !state.topicShowAll ? typeFiltered.filter(isDraftEligible) : typeFiltered;
   const count = document.getElementById(elements.count);
@@ -85,16 +85,22 @@ function renderCandidates(candidates, track = activeTrack()) {
         const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
         const lane=distributionLane(item.distribution_lane);
         const distributionSummary=track==="article"?`<div class="candidate-distribution" aria-label="分发判断"><span class="distribution-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><p><b>读者利益</b>${escapeHtml(readerStakeText(item.reader_stake))}${item.reader_stake_score==null?'':` <small>（B 受众 ${Number(item.reader_stake_score).toFixed(1)}/5）</small>`}</p></div>`:"";
+        const routeSummary = track === "article" && item.content_route === "social_only"
+          ? `<p class="candidate-selection-reason"><b>内容路线</b>默认图文，不自动进入文章池</p>`
+          : item.score_status === "needs_source_data"
+            ? `<p class="candidate-selection-reason"><b>评分状态</b>${escapeHtml(item.score_warning || "缺少事件价值或事实资料，补齐后再评分")}</p>`
+            : "";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
           <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
           ${track==='article'&&!item.composite&&item.event_conclusion?`<p class="candidate-description">代表报道：${escapeHtml(item.hotspot_title)}</p>`:''}
           ${track==='social_cards'&&item.repository_description?`<p class="candidate-description">${escapeHtml(item.repository_description)}</p>`:''}
           ${track==='social_cards'&&item.social_selection_reason?`<p class="candidate-selection-reason"><b>入选理由</b>${escapeHtml(item.social_selection_reason)}</p>`:''}
           ${distributionSummary}
+          ${routeSummary}
           <div class="candidate-meta"><span>${escapeHtml(item.track_pool_role || item.pool_role)}</span><span>${item.composite ? `多源综合${item.hotspot_count ? ` · ${item.hotspot_count}条报道` : ""}` : escapeHtml(item.source_name || item.source_group || item.source)}</span><span>风险 ${escapeHtml(item.risk_level)}</span></div>
           ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map((name) => escapeHtml(name)).join("」「")}」共享事件素材</p>` : ""}
           ${scoreStrip}
-          <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster">${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
+          <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" && item.score_status === "needs_source_data" ? "needs_source_data" : track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster">${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
         </article>`;
         return card;
       }).join("")

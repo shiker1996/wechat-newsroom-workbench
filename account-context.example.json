@@ -63,10 +63,10 @@
     "weights": { "h": 0.6, "b": 0.25, "p": 0.15 },
     "eventValueWeight": 0.3,
     "accountFitBonus": 6,
-    "toolEngineeringBonus": 10,
-    "minimumToolCandidates": 2,
+    "toolEngineeringBonus": 0,
+    "minimumToolCandidates": 0,
     "categoryPreference": { "🏢 大厂战略": 6, "🤖 AI/技术动态": 4, "📈 行业趋势": 3, "📰 综合资讯": 1, "💼 职场生态": 0 },
     "pBase": { "🏢 大厂战略": 50, "🤖 AI/技术动态": 40, "📈 行业趋势": 30, "📰 综合资讯": 20, "💼 职场生态": 10 },
-    "hBase": { "worker_social": 48, "bigtech": 33, "owned_experience": 35, "controversial_return": 30, "key_person_move": 33, "github_tool": 25, "ai_tool_test": 25, "financing": 10, "career_anxiety": 5, "contrarian_bigtech": 35 }
+    "hBase": { "worker_social": 48, "bigtech": 33, "owned_experience": 35, "controversial_return": 30, "key_person_move": 33, "github_tool": 15, "ai_tool_test": 20, "financing": 10, "career_anxiety": 5, "contrarian_bigtech": 35 }
   }
 }

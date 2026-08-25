@@ -39,3 +39,4 @@ export { clusterItems as clusterResearchItems, isFreshForBatch as isResearchItem
 export { isResearchEligibleHotspot } from './domain/hotspot-pipeline-scope.mjs';
 export { buildHotspotAtlas } from './rendering/hotspot-atlas.mjs';
 export { dimensionPartsOf } from './domain/hotspot-dimensions.mjs';
+export { classifyContentRoute, isPureProjectEvent, scoreStatusForCard } from './domain/content-routing.mjs';
