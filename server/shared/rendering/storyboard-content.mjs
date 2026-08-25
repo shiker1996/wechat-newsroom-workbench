@@ -38,6 +38,10 @@ function legacyListContentItems(content) {
   if (!value) return [];
   const lines = value.split(/\r?\n+/).map((item) => item.trim()).filter(Boolean);
   if (lines.length > 1) return lines;
+  if (/[；;]/u.test(value)) {
+    const items = value.split(/[；;]/u).map((item) => item.trim()).filter(Boolean);
+    if (items.length > 1) return items;
+  }
   // 旧版重排器曾把列表数组 join 成逗号字符串。只有在同一字符串
   // 至少包含两个年份节点时才拆 ASCII 逗号，避免误拆普通句子里的逗号。
   if ((value.match(/\d{4}年/g) || []).length >= 2 && value.includes(',')) {

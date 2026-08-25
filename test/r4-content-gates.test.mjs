@@ -39,3 +39,11 @@ test('脑暴单卡连续失败写入台账并继续处理下一张',async()=>{
   const cards=await brainstorm(gateway,store,selected,[],'b1','mock',()=>{},process.cwd());
   assert.deepEqual(cards,[]);assert.equal(failures.length,2);assert.deepEqual(failures.map((item)=>item.objectKey),['C001','C002']);assert.equal(calls,5);
 });
+
+test('脑暴合法 JSON 但无有效 items 时重试并记录失败',async()=>{
+  const failures=[];let calls=0;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:8000}}},async complete(){calls+=1;return {callId:calls,content:'{"items":[]}',finishReason:'stop'};}};
+  const store={updateModelCall(){},recordPipelineFailure(input){failures.push(input);}};
+  const selected=[{title:'候选1'}];
+  const cards=await brainstorm(gateway,store,selected,[],'b1','mock',()=>{},process.cwd());
+  assert.deepEqual(cards,[]);assert.equal(failures.length,1);assert.equal(failures[0].errorCode,'empty_output');assert.equal(calls,2);
+});

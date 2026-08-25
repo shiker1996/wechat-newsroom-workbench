@@ -44,6 +44,14 @@ export const SOCIAL_CARD_ENTRY_DEFAULT_SKILLS=Object.freeze({
   'social-custom':'custom-card-storyboard',
 });
 
+export const SOCIAL_CARD_CONTENT_TYPE_DEFAULT_SKILLS=Object.freeze({
+  repository:'repository-card-storyboard',
+  event:'event-card-storyboard',
+  tutorial:'custom-card-storyboard',
+  list:'custom-card-storyboard',
+  opinion:'custom-card-storyboard',
+});
+
 // custom-card-storyboard 的 Manifest entryPoints 已与会话 Agent 对齐为 'custom-social'，
 // 而 API、前端视图与图文阶段契约仍使用历史入口名 'social-custom'；匹配技能时双向兼容两个入口名。
 // 阶段 6 裁定：'social-custom' 在技能 Manifest、fact-base schema、前端视图与历史数据中有大量持久化引用，
@@ -172,7 +180,7 @@ export async function resolveArticleStageSkills({workspaceRoot,entryPoint='hotsp
   return selections;
 }
 
-export async function listSocialCardStageSkillSlots({workspaceRoot,entryPoint,contentType=''}) {
+export async function listSocialCardStageSkillSlots({workspaceRoot,entryPoint,contentType='',recommendedSkillId=''}) {
   const expectedContentTypes=SOCIAL_CARD_ENTRY_CONTENT_TYPES[entryPoint];
   if(!expectedContentTypes)throw new Error('未知图文创作入口');
   const normalizedContentType=contentType||(expectedContentTypes.length===1?expectedContentTypes[0]:'');
@@ -211,19 +219,19 @@ export async function listSocialCardStageSkillSlots({workspaceRoot,entryPoint,co
     return {
       ...slot,contentType:normalizedContentType,
       configuredDefaultSkillId:catalog.stageDefaults?.[entryPoint]?.[slot.id]||'',
-      builtinDefaultSkillId:SOCIAL_CARD_ENTRY_DEFAULT_SKILLS[entryPoint],
-      defaultSkillId:catalog.stageDefaults?.[entryPoint]?.[slot.id]||SOCIAL_CARD_ENTRY_DEFAULT_SKILLS[entryPoint],
+      builtinDefaultSkillId:recommendedSkillId||SOCIAL_CARD_CONTENT_TYPE_DEFAULT_SKILLS[normalizedContentType]||SOCIAL_CARD_ENTRY_DEFAULT_SKILLS[entryPoint],
+      defaultSkillId:catalog.stageDefaults?.[entryPoint]?.[slot.id]||recommendedSkillId||SOCIAL_CARD_CONTENT_TYPE_DEFAULT_SKILLS[normalizedContentType]||SOCIAL_CARD_ENTRY_DEFAULT_SKILLS[entryPoint],
       items:items.sort((a,b)=>Number(b.available)-Number(a.available)
         ||Number(b.isDefault)-Number(a.isDefault)||a.name.localeCompare(b.name,'zh-CN')),
     };
   }));
-  return {entryPoint,contentType:normalizedContentType,slots};
+  return {entryPoint,contentType:normalizedContentType,recommendedSkillId,slots};
 }
 
 export async function resolveSocialCardStageSkills({
-  workspaceRoot,entryPoint,contentType='',requested={},
+  workspaceRoot,entryPoint,contentType='',requested={},recommendedSkillId='',
 }) {
-  const result=await listSocialCardStageSkillSlots({workspaceRoot,entryPoint,contentType});
+  const result=await listSocialCardStageSkillSlots({workspaceRoot,entryPoint,contentType,recommendedSkillId});
   const selections={};
   for(const slot of result.slots){
     const requestedSkill=String(requested?.[slot.id]||'').trim();

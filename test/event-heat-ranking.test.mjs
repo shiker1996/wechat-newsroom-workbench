@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreEventHeat, buildEventHeatRanking } from '../server/features/research/index.mjs';
+import { scoreClassifiedEvent, scoreEventHeat, buildEventHeatRanking } from '../server/features/research/index.mjs';
 
 const asOf = Date.parse('2026-08-23T12:00:00Z');
 
@@ -54,4 +54,20 @@ test('热榜以稳定事件为单位，不会因同一事件多条报道重复�
   assert.equal(ranking.items.length, 2);
   assert.equal(ranking.items[0].eventId, 'S1');
   assert.deepEqual(ranking.items[0].hotspotIds, [1, 2]);
+});
+
+test('不同内容类型使用独立评分模型，并生成四类榜单', () => {
+  const current = [membership('S1', 1, '2026-08-23T10:00:00Z', 1)];
+  const hotspotsById = new Map([[1, hotspot(1, { title: '开源架构发布', source: 'official', relevance: 7 })]]);
+  const common = { id: 'S1', title: '开源架构发布', event_state: 'new_event', confidence: 'high', first_seen_at: '2026-08-23T10:00:00Z', last_seen_at: '2026-08-23T10:00:00Z', tags: { preScores: { informationGain: 12, impact: 9 } } };
+  const technology = scoreClassifiedEvent({ event: { ...common, classification: { content_class: 'open_source_technology', status: 'model_validated', features: { independentSourceCount: 2, hasTechnicalDocs: true, hasPaper: true, hasBenchmark: true, hasAdoptionSignal: true, sourceEvidence: [{}, {}, {}] } } }, currentMemberships: current, historicalMemberships: current, hotspotsById, asOf });
+  const project = scoreClassifiedEvent({ event: { ...common, classification: { content_class: 'github_project', status: 'auto', features: { hasGithubRepository: true, repositoryCount: 1, projectCount: 1, sourceEvidence: [{}] } } }, currentMemberships: current, historicalMemberships: current, hotspotsById, asOf });
+  assert.equal(technology.scoreModel, 'open_source_technology');
+  assert.equal(project.scoreModel, 'github_project');
+  assert.notEqual(technology.scoreValue, project.scoreValue);
+  const rows = [membership('S1', 1, '2026-08-23T10:00:00Z')];
+  const store = { listEventHotspots: ({ batchId } = {}) => batchId ? rows : rows, listEventRecords: () => [{ ...common, id: 'S1' }] };
+  const ranking = buildEventHeatRanking({ store, batch: { id: 'B1', hotspots: [hotspot(1)] }, events: [{ event_id: 'S1', ...common, classification: { content_class: 'open_source_trend', status: 'model_validated', features: { independentSourceCount: 2, subjectCount: 2, hasTimeline: true, hasAdoptionSignal: true, sourceEvidence: [{}, {}] } } }], asOf });
+  assert.deepEqual(Object.keys(ranking.rankings), ['news_event', 'open_source_technology', 'open_source_trend', 'github_project']);
+  assert.equal(ranking.rankings.open_source_trend.items[0].scoreModel, 'open_source_trend');
 });

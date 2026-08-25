@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveEventShadow, structuredMatch, buildEventTitle } from '../server/features/research/index.mjs';
+import { materializeStableEvents, resolveEventShadow, structuredMatch, buildEventTitle } from '../server/features/research/index.mjs';
 
 function hotspot(id, title, { who, what, actionType = '争议回应', object = '', keywords = [], date = '2026-08-23' } = {}) {
   const eventKey = `${who}|${what}`;
@@ -72,4 +72,34 @@ test('事件标题来自主体、动作和对象，不继承报道噱头标题',
   assert.equal(result.events[0].title, 'OpenAI更新API 计费');
   assert.doesNotMatch(result.events[0].title, /震惊|吵翻/);
   assert.equal(buildEventTitle({ whoKey: 'Anthropic', actionType: '发布', objectLabel: '新模型' }), 'Anthropic发布新模型');
+});
+
+test('稳定事件装配保留 GitHub 仓库元数据供后续评分使用', () => {
+  const hotspots = [{
+    id: 10,
+    title: 'openai/codex',
+    source_group: 'github',
+    source: 'github',
+    source_type: 'trending',
+    url: 'https://github.com/openai/codex',
+    raw_json: JSON.stringify({
+      repository: 'openai/codex',
+      description: '轻量级终端编程代理',
+      language: 'Rust',
+      stars: 117765,
+      topics: ['ai', 'cli'],
+      createdAt: '2025-04-01T00:00:00Z',
+      updatedAt: '2026-08-25T00:00:00Z',
+      discoveryChannels: ['trending'],
+    }),
+  }];
+  const [event] = materializeStableEvents({
+    hotspots,
+    shadowEvents: [{ event_id: 'S-REPO-1', title: 'OpenAI发布Codex', hotspot_ids: [10], normalized: {} }],
+  });
+  assert.equal(event.repositoryMeta.repository, 'openai/codex');
+  assert.equal(event.repositoryMeta.language, 'Rust');
+  assert.equal(event.repositoryMeta.stars, 117765);
+  assert.deepEqual(event.repositoryMeta.topics, ['ai', 'cli']);
+  assert.equal(event.articles[0].repositoryMeta.description, '轻量级终端编程代理');
 });

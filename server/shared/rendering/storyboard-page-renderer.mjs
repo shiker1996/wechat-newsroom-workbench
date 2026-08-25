@@ -8,6 +8,8 @@ import { resolveSocialCardTemplate } from './social-card-template-resolver.mjs';
 const PAGE_LABELS = Object.freeze({
   repository: { cover: 'TOOL RADAR', problem: 'WHY IT MATTERS', capability: 'CORE FEATURES', quickstart: 'QUICK START', scenario: 'USE CASES', limitation: 'BEFORE YOU USE', ending: 'SAVE FOR LATER' },
   event: { cover: 'BREAKING FOCUS', 'what-happened': 'WHAT HAPPENED', timeline: 'TIMELINE', evidence: 'EVIDENCE CHECK', positions: 'DISCUSSION', impact: 'WHY IT MATTERS', risk: 'FACT BOUNDARY', ending: 'KEEP WATCHING' },
+  technology: { cover: 'TECH FOCUS', problem: 'WHY IT MATTERS', mechanism: 'MECHANISM', architecture: 'ARCHITECTURE', evidence: 'EVIDENCE', limitation: 'BOUNDARIES', ending: 'KEEP WATCHING' },
+  trend: { cover: 'TREND FOCUS', concept: 'TREND SIGNAL', timeline: 'TIME SIGNALS', compare: 'ECOSYSTEM CHECK', evidence: 'EVIDENCE', risk: 'WHAT TO WATCH', ending: 'KEEP WATCHING' },
   custom: { cover: 'NEW NOTE', highlight: 'KEY POINTS', step: 'HOW TO', item: 'THE LIST', boundary: 'FACT BOUNDARY', ending: 'SAVE FOR LATER' },
 });
 
@@ -44,6 +46,8 @@ function coverSupportMarkup(page, coverSupport) {
 
 function pageBrand({ contentType, channelMode, sourceLabel, repository, topic }) {
   if (contentType === 'event') return channelMode === 'xiaohongshu' ? `小红书 · ${sourceLabel || topic}` : `EVENT DESK / ${sourceLabel || topic}`;
+  if (contentType === 'technology') return channelMode === 'xiaohongshu' ? `小红书 · ${sourceLabel || topic}` : `OPEN SOURCE TECH / ${sourceLabel || topic}`;
+  if (contentType === 'trend') return channelMode === 'xiaohongshu' ? `小红书 · ${sourceLabel || topic}` : `OPEN SOURCE TREND / ${sourceLabel || topic}`;
   if (contentType === 'custom') return channelMode === 'xiaohongshu' ? `小红书 · ${sourceLabel || topic}` : `CUSTOM / ${sourceLabel || topic}`;
   return channelMode === 'xiaohongshu' ? `小红书 · ${repository || topic}` : `OPEN SOURCE / ${repository || topic}`;
 }
@@ -80,9 +84,9 @@ export function renderStoryboardSections({
     const evidence = (Array.isArray(page.evidence) ? page.evidence : []).map((item) => `<li>${renderTechnicalText(item)}</li>`).join('');
     const blocks = pageBlocks.map((block) => renderStoryboardBlock(block, { pageLayout, pageRole: compositionDecision.role })).join('');
     const labels = PAGE_LABELS[contentType] || PAGE_LABELS.repository;
-    const label = labels[page.kind] || (contentType === 'event' ? 'EVENT CARD' : contentType === 'custom' ? 'CUSTOM CARD' : 'TOOL CARD');
+    const label = labels[page.kind] || (contentType === 'event' ? 'EVENT CARD' : contentType === 'technology' ? 'TECH CARD' : contentType === 'trend' ? 'TREND CARD' : contentType === 'custom' ? 'CUSTOM CARD' : 'TOOL CARD');
     const brand = pageBrand({ contentType, channelMode, sourceLabel, repository, topic });
-    const footer = disclosure || (contentType === 'event' ? '据公开素材整理 · 未核实内容已标注' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
+    const footer = disclosure || (['event','technology','trend'].includes(contentType) ? '据公开素材整理 · 未核实内容已标注' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
     const densityAdjustment = selectedForPage(expandedDensityPages, index) ? 'expanded' : selectedForPage(relaxedDensityPages, index) ? 'relaxed' : 'none';
     const densityAdjustmentClass = densityAdjustment === 'none' ? '' : ` density-${densityAdjustment}`;
     const skeletonClass = skeleton === 'stacked' ? '' : ` skeleton-${skeleton}`;

@@ -451,6 +451,27 @@ function parseRaw(hotspot) {
 
 function sourceOf(article) { return article.source || article.channel || '未知来源'; }
 
+function repositoryMetaOfHotspot(hotspot) {
+  const raw = parseRaw(hotspot);
+  const isRepository = hotspot?.source_group === 'github'
+    || hotspot?.source === 'github'
+    || /^https:\/\/github\.com\//i.test(String(hotspot?.url || ''));
+  if (!isRepository) return null;
+  return {
+    repository: raw.repository || hotspot.title || '',
+    description: raw.description || '',
+    language: raw.language || '',
+    stars: Number.isFinite(Number(raw.stars)) ? Number(raw.stars) : null,
+    topics: Array.isArray(raw.topics) ? raw.topics : [],
+    createdAt: raw.createdAt || null,
+    updatedAt: raw.updatedAt || null,
+    discoveryChannels: Array.isArray(raw.discoveryChannels) ? raw.discoveryChannels : [],
+    primaryDiscovery: raw.primaryDiscovery || hotspot.source_type || '',
+    trendingPeriods: Array.isArray(raw.periods) ? raw.periods : raw.period ? [raw.period] : [],
+    mentionedBy: Array.isArray(raw.mentionedBy) ? raw.mentionedBy : [],
+  };
+}
+
 // 将稳定事件直接装配为研究用事件对象。它不读取 legacy cluster，旧结构只在迁移工具中保留。
 export function materializeStableEvents({ shadowEvents = [], hotspots = [], heatByEvent = new Map() } = {}) {
   const hotspotById = new Map(hotspots.map((hotspot) => [Number(hotspot.id), hotspot]));
@@ -459,9 +480,11 @@ export function materializeStableEvents({ shadowEvents = [], hotspots = [], heat
       const hotspot = hotspotById.get(Number(hotspotId));
       if (!hotspot) return null;
       const raw = parseRaw(hotspot); const tags = raw.aiTags || {};
+      const repositoryMeta = repositoryMetaOfHotspot(hotspot);
       return { category_id: `G${String(hotspotId).padStart(5, '0')}`, hotspot_id: Number(hotspotId), title: hotspot.title,
         source: hotspot.source_name || hotspot.source_group || hotspot.source || '未知来源', channel: hotspot.source || '', url: hotspot.url || null,
-        heat: hotspot.score ?? null, time: hotspot.published_at || hotspot.created_at || null, risk_level: tags.riskLevel || '待评估', summary: raw.summary || '', keywords: tags.keywords || [] };
+        heat: hotspot.score ?? null, time: hotspot.published_at || hotspot.created_at || null, risk_level: tags.riskLevel || '待评估', summary: raw.summary || '', keywords: tags.keywords || [],
+        ...(repositoryMeta ? { repositoryMeta } : {}) };
     }).filter(Boolean);
     const lead = members[0] || {}; const leadHotspot = hotspotById.get(Number(lead.hotspot_id));
     const leadTags = leadHotspot ? parseRaw(leadHotspot).aiTags || {} : {};
@@ -471,13 +494,15 @@ export function materializeStableEvents({ shadowEvents = [], hotspots = [], heat
     const tags = { ...leadTags, eventKey: normalized.eventKey || leadTags.eventKey || '', eventParts };
     const sourceSet = new Set(members.map(sourceOf).filter(Boolean));
     const latest = members.map((article) => article.time).filter(Boolean).sort().at(-1) || stableEvent.last_seen_at || null;
+    const repositoryMeta = members.find((article) => article.repositoryMeta)?.repositoryMeta || null;
     return { event_id: stableEvent.event_id, stable_event_id: stableEvent.event_id, representative_title: stableEvent.title || '未命名事件',
       representativeHotspotId: Number(lead.hotspot_id) || null, market_scope: leadHotspot?.market_scope || '待标注',
       china_relevance_score: Number(heat.chinaRelevanceScore ?? leadTags.chinaRelevance ?? 0), china_relevance_reason: leadTags.relevanceReason || '', global_exception: Boolean(leadTags.globalException),
       topic_category: leadHotspot?.category || '📰 综合资讯', keywords: [...new Set(members.flatMap((article) => article.keywords || []).concat(leadTags.keywords || []))].slice(0, 12),
       source_count: sourceSet.size, report_count: members.length, peak_source_percentile: null, latest_time: latest, cluster_confidence: members.length > 1 ? 'medium' : 'low',
-      articles: members, tags, repositoryMeta: null, eventHeatScore: heat.heatScore ?? null, eventValue: heat.eventValue ?? heat.heatScore ?? null, t: heat.t ?? heat.eventValue ?? heat.heatScore ?? null,
+      articles: members, tags, repositoryMeta, eventHeatScore: heat.heatScore ?? null, eventValue: heat.eventValue ?? heat.heatScore ?? null, t: heat.t ?? heat.eventValue ?? heat.heatScore ?? null,
       eventHeatRank: heat.rank ?? null, eventHeatState: heat.state || null, eventHistoryRepeatDays: Number(heat.repeatDays || 0), duplicatePenalty: duplicatePenaltyForHeat({ state: heat.state, repeatDays: heat.repeatDays }), card: null,
-      hotspot_ids: stableEvent.hotspot_ids || [], normalized: stableEvent.normalized || {}, legacy_event_ids: stableEvent.legacy_event_ids || [] };
+      hotspot_ids: stableEvent.hotspot_ids || [], normalized: stableEvent.normalized || {}, legacy_event_ids: stableEvent.legacy_event_ids || [],
+      classification: stableEvent.classification || null };
   });
 }

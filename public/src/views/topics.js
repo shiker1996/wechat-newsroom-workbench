@@ -25,6 +25,12 @@ const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
   DROP: "暂不推进", LOCKED: "简报已锁定", pooled: "已入池", scored: "已评分", analyzed: "已研判", needs_source_data: "待补评分资料",
 };
+const contentClassLabels = {
+  news_event: "新闻事件",
+  open_source_technology: "开源技术",
+  open_source_trend: "开源趋势",
+  github_project: "纯项目",
+};
 function statusLabel(value) { return editorialStatusLabels[String(value || "")] || String(value || "待处理"); }
 
 function renderCandidates(candidates, track = activeTrack()) {
@@ -57,9 +63,9 @@ function renderCandidates(candidates, track = activeTrack()) {
     : "";
   list.innerHTML = hiddenNotice + (visible.length
     ? visible.map((item) => {
-        // 自定义/事件图文候选不走 Social Fit 评分，编辑入口分别跳转到对应图文页
+        // 图文候选统一展示图文评分；编辑入口只按工具图文/事件图文分流。
         const isCustom = track === "social_cards" && String(item.output_mode||"").includes("custom-cards");
-        const isEvent = track === "social_cards" && String(item.output_mode||"").includes("event-cards");
+        const isEvent = track === "social_cards" && !isCustom && (String(item.output_mode||"").includes("event-cards") || ["news_event", "open_source_technology", "open_source_trend"].includes(String(item.content_class||"")));
         const socialTarget = isCustom ? "social-custom" : isEvent ? "social-event" : "social-editor";
         const socialLabel = isCustom ? "自定义" : isEvent ? "事件" : "工具";
         const isIndependentWriting = track === "article" && ["wechat-experience","wechat-tutorial"].includes(String(item.output_mode||""));
@@ -69,20 +75,30 @@ function renderCandidates(candidates, track = activeTrack()) {
             : `<button class="ink-button candidate-primary-action" data-editorial-id="${item.id}">进入热点事件创作 →</button>`
           : `<button class="ink-button candidate-primary-action" data-social-editor-id="${item.id}" data-social-target="${socialTarget}">进入${socialLabel}图文编辑室 →</button>`;
         const social=item.social_score?.score||{};
-        const socialParts=[['工具',social.toolClarity],['场景',social.scenarioValue],['演示',social.demonstrability],['拆页',social.visualPotential],['收藏',social.saveSearchValue],['来源',social.sourceCompleteness],['事实扣',social.factGapPenalty],['权限扣',social.permissionRiskPenalty],['FIT',social.finalScore]];
+        const socialParts=social.scoreModel==='g_social-v1'
+          ? [['事实',social.factSupport],['视觉',social.visualPotential],['读者',social.readerValue],['清晰',social.contentClarity],['就绪',social.productionReadiness],['扣分',Number(social.saturationPenalty||0)+Number(social.riskPenalty||0)+Number(social.missingEvidencePenalty||0)],['G',social.finalScore]]
+          : isEvent
+            ? [['信息',social.informationDensity],['叙事',social.visualNarrative],['冲突',social.conflictEmotion],['时效',social.timeliness],['受众',social.audienceRelevance],['证据',social.evidenceCompleteness],['评分',social.finalScore ?? item.track_score]]
+            : [['工具',social.toolClarity],['场景',social.scenarioValue],['演示',social.demonstrability],['拆页',social.visualPotential],['收藏',social.saveSearchValue],['来源',social.sourceCompleteness],['事实扣',social.factGapPenalty],['权限扣',social.permissionRiskPenalty],['FIT',social.finalScore ?? item.track_score]];
         const socialChannel = String(item.output_mode||"").startsWith("xiaohongshu") ? "小红书" : "公众号";
         const customChannel = item.output_mode === "wechat-custom-cards" ? "公众号" : "小红书";
+        const contentClass = String(item.content_class || social.contentClass || "");
+        const contentClassLabel = contentClassLabels[contentClass] || "";
         const scoreStrip=track==='social_cards'
           ? (isCustom
-            ? `<div class="score-strip"><span>类型<b>自定义图文</b></span><span>渠道<b>${customChannel}</b></span></div>`
-            : isEvent
-              ? `<div class="score-strip"><span>类型<b>事件图文</b></span><span>渠道<b>${socialChannel}</b></span></div>`
-              : `<div class="score-strip social-fit-strip">${socialParts.map(([label,value])=>`<span>${label}<b>${value==null?'—':Number(value).toFixed(Number(value)%1?1:0)}</b></span>`).join('')}</div>`)
+            ? `<div class="score-strip"><span>类型<b>自定义图文</b></span><span>评分<b>${social.finalScore ?? item.track_score ?? '—'}</b></span><span>渠道<b>${customChannel}</b></span></div>`
+            : `<div class="score-strip social-fit-strip">${socialParts.map(([label,value])=>`<span>${label}<b>${value==null?'—':Number(value).toFixed(Number(value)%1?1:0)}</b></span>`).join('')}</div>`)
           : `<div class="score-strip article-score-strip">${articleScoreFields.map(([field,label]) => `<span title="${label}">${label}<b>${item[field] == null ? "—" : Number(item[field]).toFixed(item[field] % 1 ? 1 : 0)}</b></span>`).join("")}</div>`;
         // 综合候选（维度组）展示组标题（如"腾讯近期动态"），单热点候选优先展示事件摘要，与编辑室口径一致
         const headline = track === "article" && !item.composite && item.event_conclusion ? item.event_conclusion : item.hotspot_title;
         const dimensionLabel = dimensionLabels[item.dimension] || "";
-        const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):"热点事件";
+        const articleTypeLabel=isIndependentWriting?(item.output_mode==="wechat-experience"?"心得经验":"使用教程"):contentClassLabel||"热点事件";
+        const articleTypeTagClass=isIndependentWriting
+          ? "dimension-tag"
+          : `dimension-tag content-class-tag content-class-${escapeHtml(contentClass)}`;
+        const contentClassTag=track==='social_cards'&&!isCustom&&contentClassLabel
+          ? ` <span class="dimension-tag content-class-tag content-class-${escapeHtml(contentClass)}">${contentClassLabel}</span>`
+          : "";
         const lane=distributionLane(item.distribution_lane);
         const distributionSummary=track==="article"?`<div class="candidate-distribution" aria-label="分发判断"><span class="distribution-lane distribution-lane-${distributionLaneClass(lane)}">${escapeHtml(lane)}</span><p><b>读者利益</b>${escapeHtml(readerStakeText(item.reader_stake))}${item.reader_stake_score==null?'':` <small>（B 受众 ${Number(item.reader_stake_score).toFixed(1)}/5）</small>`}</p></div>`:"";
         const routeSummary = track === "article" && item.content_route === "social_only"
@@ -91,7 +107,7 @@ function renderCandidates(candidates, track = activeTrack()) {
             ? `<p class="candidate-selection-reason"><b>评分状态</b>${escapeHtml(item.score_warning || "缺少事件价值或事实资料，补齐后再评分")}</p>`
             : "";
         const card = `<article class="candidate-card ${item.composite ? "composite" : ""}" data-id="${escapeHtml(item.candidate_id)}">
-          <h4>${escapeHtml(headline)}${track==="article"?` <span class="dimension-tag">${articleTypeLabel}</span>`:""}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
+          <h4>${escapeHtml(headline)}${track==="article"?` <span class="${articleTypeTagClass}">${articleTypeLabel}</span>`:""}${contentClassTag}${dimensionLabel ? ` <span class="dimension-tag dimension-${escapeHtml(item.dimension)}">${dimensionLabel}</span>` : ""}${item.composite ? ' <span class="composite-tag">综合</span>' : ""}</h4>
           ${track==='article'&&!item.composite&&item.event_conclusion?`<p class="candidate-description">代表报道：${escapeHtml(item.hotspot_title)}</p>`:''}
           ${track==='social_cards'&&item.repository_description?`<p class="candidate-description">${escapeHtml(item.repository_description)}</p>`:''}
           ${track==='social_cards'&&item.social_selection_reason?`<p class="candidate-selection-reason"><b>入选理由</b>${escapeHtml(item.social_selection_reason)}</p>`:''}
@@ -104,7 +120,7 @@ function renderCandidates(candidates, track = activeTrack()) {
         </article>`;
         return card;
       }).join("")
-    : `<div class="empty-state">${track === "article" ? (hiddenItems.length ? "当前没有高于成稿线的选题。" : "暂无文章候选。在热点全景创建选题后会进入这里。") : "暂无图文候选。完成事件研判后，Social Fit 前十会自动进入这里。"}</div>`);
+    : `<div class="empty-state">${track === "article" ? (hiddenItems.length ? "当前没有高于成稿线的选题。" : "暂无文章候选。在热点全景创建选题后会进入这里。") : "暂无图文候选。完成事件研判后，达到 G_social 入池线的候选会自动进入这里。"}</div>`);
 }
 
 // 文章/图文预选排行榜共用的展开收起：状态用 class 表达，按钮同步 aria-expanded

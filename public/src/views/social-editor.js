@@ -93,9 +93,10 @@ function updateSocialSkillSummary(){
 async function loadSocialSkillControls(data){
   const entryPoint=SOCIAL_ENTRY_POINTS[selectedContentType];
   const contentType=socialRoutingContentType(data);
+  const recommendedSkillId=selectedContentType==='event'?(data.candidate?.content_class==='open_source_technology'?'open-source-technology-storyboard':data.candidate?.content_class==='open_source_trend'?'open-source-trend-storyboard':'event-card-storyboard'):'';
   socialSkillSlots=await loadStageSkillControls(
     document.getElementById('social-stage-skills'),
-    `/api/creation-entry-points/${encodeURIComponent(entryPoint)}/social-card-stage-skills?contentType=${encodeURIComponent(contentType)}`,
+    `/api/creation-entry-points/${encodeURIComponent(entryPoint)}/social-card-stage-skills?contentType=${encodeURIComponent(contentType)}&recommendedSkillId=${encodeURIComponent(recommendedSkillId)}`,
   );
   updateSocialSkillSummary();
 }
@@ -255,7 +256,7 @@ export async function openSocialEditor(id) {
   document.querySelectorAll(".social-editor-candidate").forEach((item)=>item.classList.toggle("active",Number(item.dataset.socialCandidate)===selectedId));
   document.querySelector('.social-editor-candidate.active')?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});updateSocialTabControls();
   document.getElementById('social-facts-kicker').textContent=selectedContentType==='event'?'EVENT FACT BASE':selectedContentType==='custom'?'CUSTOM FACT BASE':'REPOSITORY FACTS';
-  document.getElementById('social-facts-title').textContent=selectedContentType==='event'?'突发事件事实基座':selectedContentType==='custom'?`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`:'仓库事实基座';
+  document.getElementById('social-facts-title').textContent=selectedContentType==='event'?'事件事实基座':selectedContentType==='custom'?`自定义事实基座（${selectedChannelMode==='xiaohongshu'?'小红书':'公众号'}）`:'仓库事实基座';
   const channelPicker=document.getElementById('social-channel')?.closest('label');
   const factsActions=document.getElementById('social-facts-title')?.closest('.workspace-head')?.querySelector(':scope>div:last-child');
   if(channelPicker&&factsActions&&!factsActions.contains(channelPicker))factsActions.prepend(channelPicker);
@@ -335,7 +336,7 @@ async function runStoryboard(){
   if(!selectedId)return;const candidateId=selectedId;const inspectButton=document.getElementById('inspect-repository');const analyzeButton=document.getElementById('analyze-card-editorial');
   const eventMode=selectedContentType==='event';const customMode=selectedContentType==='custom';const original=analyzeButton.textContent;
   inspectButton.disabled=true;analyzeButton.disabled=true;analyzeButton.textContent=currentCardPlan.length?'正在重新规划…':'正在生成故事板…';
-  renderStoryboardLoading(eventMode?'正在根据事实基座生成事件故事板':customMode?'正在根据自定义事实基座生成故事板':currentCardPlan.length?'正在根据已有事实重新生成故事板':'正在根据仓库事实生成故事板');
+  renderStoryboardLoading(eventMode?'正在根据事件事实基座生成对应故事板':customMode?'正在根据自定义事实基座生成故事板':currentCardPlan.length?'正在根据已有事实重新生成故事板':'正在根据仓库事实生成故事板');
   try{await analyzeEditorial(candidateId);}
   catch(error){toast(error.message,'error');if(candidateId===selectedId)renderCardPlan(currentCardPlan,currentLayoutDecisions);}
   finally{stopStoryboardProgress();inspectButton.disabled=false;analyzeButton.disabled=false;analyzeButton.textContent=original;syncStoryboardActionLabels();}
@@ -418,10 +419,10 @@ async function loadSocialEditor(view) {
   setupSocialTabNavigation();
   const batch=state.batches.find((item)=>item.id===state.activeBatchId); if(!batch)return;
   const all=await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=social_cards`);
-  const candidates=all.filter((item)=>candidateMode(item.output_mode)===currentMode);
+  const candidates=all.filter((item)=>candidateMode(item.output_mode,item.content_class)===currentMode);
   const layout=MODE_LAYOUT[currentMode]||MODE_LAYOUT.tools;
   const nav=document.getElementById("social-editor-candidates");
-  nav.innerHTML=candidates.length?candidates.map((item)=>{const modeLabel=isCustomOutput(item.output_mode)?(item.output_mode==='xiaohongshu-custom-cards'?'自定义 · 小红书':'自定义 · 公众号'):isEventOutput(item.output_mode)?'事件图文':'';return `<button type="button" class="social-editor-candidate" data-social-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)}</b><span>${escapeHtml(item.hotspot_title)}</span><em>${escapeHtml(modeLabel||item.repository_description||item.social_selection_reason||'暂无仓库描述')}</em><small>${escapeHtml(item.track_status||'pooled')}${item.social_selection_reason?` · ${escapeHtml(item.social_selection_reason)}`:''}</small></button>`;}).join(''):`<div class="empty-state">${layout.empty}</div>`;
+  nav.innerHTML=candidates.length?candidates.map((item)=>{const modeLabel=isCustomOutput(item.output_mode)?(item.output_mode==='xiaohongshu-custom-cards'?'自定义 · 小红书':'自定义 · 公众号'):item.content_class==='open_source_technology'?'事件图文 · 开源技术':item.content_class==='open_source_trend'?'事件图文 · 开源趋势':isEventOutput(item.output_mode)?'事件图文':'';return `<button type="button" class="social-editor-candidate" data-social-candidate="${item.id}"><b>${escapeHtml(item.candidate_id)}</b><span>${escapeHtml(item.hotspot_title)}</span><em>${escapeHtml(modeLabel||item.repository_description||item.social_selection_reason||'暂无仓库描述')}</em><small>${escapeHtml(item.track_status||'pooled')}${item.social_selection_reason?` · ${escapeHtml(item.social_selection_reason)}`:''}</small></button>`;}).join(''):`<div class="empty-state">${layout.empty}</div>`;
   requestAnimationFrame(updateSocialTabControls);
   if(candidates.length){await openSocialEditor(selectedId&&candidates.some((x)=>x.id===selectedId)?selectedId:candidates[0].id);}
   else{selectedId=null;document.getElementById("social-editor-fields").hidden=true;const empty=document.getElementById("social-editor-empty");empty.innerHTML=layout.empty;empty.hidden=false;}

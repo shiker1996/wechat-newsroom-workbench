@@ -6,6 +6,7 @@ function socialCandidatePresentation(rawJson, factSheet, socialScore) {
   let raw = {}; try { raw = JSON.parse(rawJson || '{}'); } catch {}
   let facts = {}; try { facts = JSON.parse(factSheet?.data_json || '{}'); } catch {}
   const eventProfile = socialScore?.score?.scoreProfile === 'event';
+  const scoreModel = socialScore?.score?.scoreModel || '';
   const description = plainSummary(raw.aiTags?.relevanceReason);
   const reasons = []; const channels = raw.discoveryChannels || []; const score = socialScore?.score || {};
   if (eventProfile) {
@@ -14,6 +15,13 @@ function socialCandidatePresentation(rawJson, factSheet, socialScore) {
     if (Number(score.conflictEmotion) >= 10) reasons.push('冲突明确');
     if (Number(score.evidenceCompleteness) >= 10) reasons.push('证据较完整');
     return { repository_description: description, social_selection_reason: reasons.slice(0, 4).join(' · ') || '突发事件图文' };
+  }
+  if (scoreModel === 'g_social-v1') {
+    const label = candidateClassLabel(socialScore?.score?.contentClass);
+    const reasons = [label, Number(score.factSupport) >= 60 ? '事实支撑充分' : null, Number(score.visualPotential) >= 60 ? '适合图文表达' : null,
+      Number(score.readerValue) >= 45 ? '读者价值明确' : null, Number(score.productionReadiness) >= 60 ? '生产资料较完整' : null,
+      score.qualificationReason && score.qualificationStatus !== 'auto_eligible' ? score.qualificationReason : null].filter(Boolean);
+    return { repository_description: description, social_selection_reason: reasons.slice(0, 4).join(' · ') || label };
   }
   if (channels.includes('trending') || raw.sourceType === 'trending') reasons.push('GitHub Trending');
   if (channels.includes('ai-search') || raw.sourceType === 'ai-search') reasons.push(raw.interestScore != null
@@ -27,6 +35,10 @@ function socialCandidatePresentation(rawJson, factSheet, socialScore) {
     .filter(([, value]) => Number(value) >= 12).sort((left, right) => Number(right[1]) - Number(left[1]));
   if (dimensions[0]) reasons.push(dimensions[0][0]);
   return { repository_description: description, social_selection_reason: reasons.slice(0, 4).join(' · ') };
+}
+
+function candidateClassLabel(contentClass) {
+  return { github_project: 'GitHub 项目图文', news_event: '事件图文', open_source_technology: '开源技术图文', open_source_trend: '开源趋势图文' }[String(contentClass || '')] || '图文候选';
 }
 
 function displayCompositeTitle(candidate, hotspots) {

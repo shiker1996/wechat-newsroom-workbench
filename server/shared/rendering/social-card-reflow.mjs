@@ -718,6 +718,117 @@ export function normalizeRepositoryStoryboardPages({ pages = [], capacityProfile
   return { pages: output, operations, changed: operations.length > 0 };
 }
 
+const TECHNOLOGY_MERGE_RULES = Object.freeze([
+  { first: 'problem', second: 'mechanism', role: 'feature', kind: 'mechanism', title: '问题与机制', op: 'merge_technology_problem_mechanism' },
+  { first: 'mechanism', second: 'evidence', role: 'evidence', kind: 'evidence', title: '机制与证据', op: 'merge_technology_mechanism_evidence' },
+  { first: 'evidence', second: 'boundary', role: 'risk', kind: 'boundary', title: '证据与适用边界', op: 'merge_technology_evidence_boundary' },
+  { first: 'timeline', second: 'boundary', role: 'risk', kind: 'boundary', title: '演进与适用边界', op: 'merge_technology_timeline_boundary' },
+  { first: 'boundary', second: 'ending', role: 'ending', kind: 'ending', title: null, op: 'merge_technology_boundary_ending' },
+]);
+
+function technologyPageRole(page) {
+  const role = eventPageRole(page);
+  const kind = String(page?.kind || '').toLowerCase();
+  const title = String(page?.title || '');
+  if (kind === 'problem' || /问题|痛点/.test(title)) return 'problem';
+  if (kind === 'mechanism' || /机制|架构|原理|如何工作|模型定位|核心能力/.test(title)) return 'mechanism';
+  if (role === 'evidence' || role === 'data' || kind === 'evidence' || /证据|官方|实测|基准|性能|数据/.test(title)) return 'evidence';
+  if (role === 'risk' || kind === 'boundary' || /边界|限制|风险|适用|注意/.test(title)) return 'boundary';
+  if (role === 'timeline' || kind === 'timeline') return 'timeline';
+  if (role === 'ending' || kind === 'ending') return 'ending';
+  if (role === 'concept') return 'mechanism';
+  return role;
+}
+
+const TREND_MERGE_RULES = Object.freeze([
+  { first: 'trend', second: 'actors', role: 'feature', kind: 'actors', title: '趋势与推动主体', op: 'merge_trend_judgment_actors' },
+  { first: 'actors', second: 'timeline', role: 'timeline', kind: 'timeline', title: '主体与变化路径', op: 'merge_trend_actors_timeline' },
+  { first: 'timeline', second: 'comparison', role: 'compare', kind: 'positions', title: '变化信号与生态对比', op: 'merge_trend_timeline_comparison' },
+  { first: 'comparison', second: 'watch', role: 'risk', kind: 'boundary', title: '生态对比与待观察', op: 'merge_trend_comparison_watch' },
+  { first: 'watch', second: 'ending', role: 'ending', kind: 'ending', title: null, op: 'merge_trend_watch_ending' },
+]);
+
+function trendPageRole(page) {
+  const role = eventPageRole(page);
+  const kind = String(page?.kind || '').toLowerCase();
+  const title = String(page?.title || '');
+  if (kind === 'trend' || /趋势判断|趋势信号|变化判断/.test(title)) return 'trend';
+  if (kind === 'actors' || /推动主体|主体|参与方|主要玩家/.test(title)) return 'actors';
+  if (role === 'timeline' || kind === 'timeline') return 'timeline';
+  if (role === 'compare' || role === 'data' || kind === 'positions' || kind === 'compare' || /生态对比|对比|比较/.test(title)) return 'comparison';
+  if (role === 'risk' || kind === 'boundary' || /待观察|不确定|边界|限制|风险/.test(title)) return 'watch';
+  if (role === 'ending' || kind === 'ending') return 'ending';
+  if (role === 'concept') return 'trend';
+  if (role === 'feature') return 'actors';
+  return role;
+}
+
+function normalizeClassifiedStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04, pageRole, rules, source } = {}) {
+  const output = (Array.isArray(pages) ? pages : []).map(clone);
+  const operations = [];
+  let index = 0;
+  while (index < output.length - 1) {
+    const first = output[index];
+    const second = output[index + 1];
+    const rule = rules.find((item) => item.first === pageRole(first) && item.second === pageRole(second));
+    if (!rule || first.kind === 'cover' || second.kind === 'cover') {
+      index += 1;
+      continue;
+    }
+    const candidate = {
+      ...first,
+      kind: rule.kind,
+      role: rule.role,
+      title: rule.title || second.title || first.title,
+      content_blocks: [
+        ...(Array.isArray(first.content_blocks) ? first.content_blocks : []),
+        ...(Array.isArray(second.content_blocks) ? second.content_blocks : []),
+      ],
+      evidence: [...new Set([
+        ...(Array.isArray(first.evidence) ? first.evidence : []),
+        ...(Array.isArray(second.evidence) ? second.evidence : []),
+      ].map(String))],
+    };
+    if (!eventMergeFits(candidate, capacityProfile, rule.role, mergeSlack)) {
+      index += 1;
+      continue;
+    }
+    output.splice(index, 2, candidate);
+    operations.push({
+      op: rule.op,
+      pages: [index + 1, index + 2],
+      targetRole: rule.role,
+      source,
+    });
+    if (index > 0) index -= 1;
+  }
+  return { pages: output, operations, changed: operations.length > 0 };
+}
+
+/** 开源技术图文的相邻职责合并：问题/机制/证据/边界各自保留语义，避免套用事件争议页。 */
+export function normalizeOpenSourceTechnologyStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04 } = {}) {
+  return normalizeClassifiedStoryboardPages({
+    pages,
+    capacityProfile,
+    mergeSlack,
+    pageRole: technologyPageRole,
+    rules: TECHNOLOGY_MERGE_RULES,
+    source: 'open-source-technology-storyboard-narrative-normalizer',
+  });
+}
+
+/** 开源趋势图文的相邻职责合并：趋势判断/主体/变化信号/对比/待观察保持趋势叙事。 */
+export function normalizeOpenSourceTrendStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04 } = {}) {
+  return normalizeClassifiedStoryboardPages({
+    pages,
+    capacityProfile,
+    mergeSlack,
+    pageRole: trendPageRole,
+    rules: TREND_MERGE_RULES,
+    source: 'open-source-trend-storyboard-narrative-normalizer',
+  });
+}
+
 /**
  * 将同一故事板页产生的过短续页重新装箱。
  *

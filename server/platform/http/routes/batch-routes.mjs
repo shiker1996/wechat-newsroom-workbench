@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isFreshForBatch, clusterItems, preselection, selectSocialCandidates, buildHotspotAtlas, loadStableBatchEvents } from '../../../features/research/index.mjs';
+import { G_SOCIAL_CLASS_CAPS, isFreshForBatch, clusterItems, preselection, selectSocialCandidates, selectSocialPool, buildHotspotAtlas, loadStableBatchEvents } from '../../../features/research/index.mjs';
 import { buildEventHeatRanking, loadPreviousEventHeatItems, materializeStableEvents, isResearchEligibleHotspot } from '../../../features/research/index.mjs';
 import { buildBatchPipelineStatus } from '../../../features/batches/index.mjs';
 import { getBatchDeleteImpact, deleteBatchPermanently } from '../../../features/batches/index.mjs';
@@ -127,7 +127,11 @@ export async function handleBatchRoutes({ request, response, pathname, searchPar
     if (!items.length) {
       const eligible = batch.hotspots.filter(isResearchEligibleHotspot).filter((item) => isFreshForBatch(item, batch.batch_date, batchMaxAgeHours(batch)));
       const tagged = eligible.filter((item) => { try { const tags = JSON.parse(item.raw_json || '{}').aiTags; return tags?.eventKey && tags?.preScores; } catch { return false; } });
-      if (tagged.length) items = selectSocialCandidates(preselection(loadStableBatchEvents({ workspaceRoot: root, batch, hotspots: tagged }), batch.batch_date), tagged.length, true).map((item, index) => ({ ...item, socialRank: index + 1, selected: index < 10 && item.eligible }));
+      if (tagged.length) {
+        const scored = selectSocialCandidates(preselection(loadStableBatchEvents({ workspaceRoot: root, batch, hotspots: tagged }), batch.batch_date), tagged.length, true);
+        const selectedKeys = new Set(selectSocialPool(scored, 10, G_SOCIAL_CLASS_CAPS).map((item) => item.eventId ?? item.hotspotId ?? item.title));
+        items = scored.map((item, index) => ({ ...item, socialRank: index + 1, selected: selectedKeys.has(item.eventId ?? item.hotspotId ?? item.title) }));
+      }
     }
     const inPoolIds = new Set(store.listCandidates(batchId, 'social_cards').map((item) => item.hotspot_id));
     return respond(json, response, 200, items.map((item) => ({ ...item, inPool: inPoolIds.has(item.hotspotId) })));
@@ -178,10 +182,23 @@ export async function handleBatchRoutes({ request, response, pathname, searchPar
       membershipsByEvent.get(membership.event_id).push(membership);
     }
     const recordsById = new Map((store.listEventRecords?.({ limit: 100000 }) || []).map((record) => [record.id, record]));
+    const classificationFromRecord = (record) => record?.content_class ? {
+      content_class: record.content_class,
+      confidence: record.classification_confidence,
+      status: record.classification_status || 'needs_review',
+      reason: record.classification_reason || '',
+      evidence: record.classification_evidence || [],
+      article_eligible: Boolean(record.article_eligible),
+      social_eligible: Boolean(record.social_eligible),
+      default_route: record.default_route || 'editorial_review',
+      missing_evidence: record.classification_missing_evidence || [],
+      features: record.classification_features || {},
+    } : null;
     const stableEvents = [...membershipsByEvent.entries()].map(([eventId, eventMemberships]) => {
       const record = recordsById.get(eventId) || {};
       return { event_id: eventId, title: record.title || '', normalized: record.normalized || {}, hotspot_ids: eventMemberships.map((item) => Number(item.hotspot_id)),
-        legacy_event_ids: record.legacy_ids || [], first_seen_at: record.first_seen_at || null, last_seen_at: record.last_seen_at || null };
+        legacy_event_ids: record.legacy_ids || [], first_seen_at: record.first_seen_at || null, last_seen_at: record.last_seen_at || null,
+        classification: classificationFromRecord(record) };
     });
     const heatByEvent = new Map((eventHeatRanking.items || []).map((item) => [item.eventId, item]));
     const atlasClusters = stableEvents.length ? materializeStableEvents({ shadowEvents: stableEvents, hotspots: eligible, heatByEvent }) : [];
@@ -195,7 +212,18 @@ export async function handleBatchRoutes({ request, response, pathname, searchPar
         if (heat) event.event_heat = { rank: heat.rank, heatScore: heat.heatScore, state: heat.state, rankDelta: heat.rankDelta };
       }
     }
-    atlas.eventHotlist = eventHeatRanking.items || [];
+    const classificationByEvent = new Map(stableEvents.map((event) => [event.event_id, event.classification]).filter(([, classification]) => classification));
+    const withClassification = (item) => ({
+      ...item,
+      content_class: classificationByEvent.get(item.eventId)?.content_class || item.contentClass || null,
+      classification_status: classificationByEvent.get(item.eventId)?.status || null,
+      default_route: classificationByEvent.get(item.eventId)?.default_route || null,
+    });
+    atlas.eventHotlist = (eventHeatRanking.items || []).map(withClassification);
+    atlas.eventHeatRankings = Object.fromEntries(Object.entries(eventHeatRanking.rankings || {}).map(([contentClass, board]) => [contentClass, {
+      ...board,
+      items: (board.items || []).map(withClassification),
+    }]));
     atlas.eventHotlistGeneratedAt = eventHeatRanking.generatedAt || null;
     try {
       const cardFile = path.join(batchWorkdir(batch), 'sources', 'event-cards.json');
@@ -206,7 +234,9 @@ export async function handleBatchRoutes({ request, response, pathname, searchPar
           const card = cardMap.get(String(event.event_id));
           if (card) {
             event.card = { ...card, event_id: event.event_id };
+            event.classification = card.classification || event.classification || null;
           }
+          if (!event.classification && classificationByEvent.has(event.event_id)) event.classification = classificationByEvent.get(event.event_id);
         }
         for (const node of atlas.graph?.nodes || []) if (node.type === 'event') { const card = cardMap.get(String(node.id).replace(/^event:/, '')); if (card?.conclusion) node.summary = card.conclusion; }
       }

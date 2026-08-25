@@ -169,3 +169,8 @@ test('事实基座全部事实性主张未核实时给出拦截信息', () => {
   assert.equal(unverifiedFactBaseIssue({claims:[{claim:'作者判断',status:'opinion'}]}),null);
   assert.equal(unverifiedFactBaseIssue({}),null);
 });
+
+test('文章成稿路线门禁兼容 SQLite 的数值型 article_eligible', () => {
+  const source = fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs', import.meta.url), 'utf8');
+  assert.match(source, /Number\(candidate\.article_eligible\) === 0/);
+});

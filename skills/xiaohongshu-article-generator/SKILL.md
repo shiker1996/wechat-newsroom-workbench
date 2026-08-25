@@ -29,6 +29,8 @@ description: 接收已锁定的图文故事板与事实基座，生成公众号�
 读取 `COPY_GUIDE.md`、`TITLE_GUIDE.md` 以及当前内容类型 reference：
 
 - 工具图文：`references/copy-tool.md`
+- 开源技术图文：`references/copy-technology.md`
+- 开源趋势图文：`references/copy-trend.md`
 - 事件图文：`references/copy-event.md`
 - 自定义图文：`references/copy-custom.md`
 

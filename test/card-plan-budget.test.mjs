@@ -8,7 +8,8 @@ test('封面超出块数上限时优先从尾部删除辅助块',()=>{
   const plan=[{kind:'cover',title:'封面',content_blocks:[textBlock('要点'),{type:'note',title:'提示',content:'补充'},{type:'highlight',title:'强调',content:'补充'}]}];
   const {pages,trims}=budgetCardPlan(plan);
   assert.equal(pages[0].content_blocks.length,CARD_PLAN_BLOCK_BUDGET.cover);
-  assert.deepEqual(pages[0].content_blocks.map((block)=>block.type),['text','note']);
+  assert.deepEqual(pages[0].content_blocks.map((block)=>block.type),['text']);
+  assert.ok(trims.some((item)=>item.includes('P1')&&item.includes('提示')));
   assert.ok(trims.some((item)=>item.includes('P1')&&item.includes('强调')));
 });
 

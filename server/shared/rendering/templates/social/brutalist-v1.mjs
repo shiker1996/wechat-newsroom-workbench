@@ -7,6 +7,8 @@ const BRUTALIST_TEMPLATE_IDS = new Set(['poster-cover', 'thesis-split', 'feature
 const LABELS = Object.freeze({
   repository: { cover: 'TOOL / POSTER', concept: 'THESIS / FIRST', feature: 'FEATURE / GRID', steps: 'HOW / NUMBERED', data: 'DATA / STAMP', compare: 'VERSUS / BOARD', evidence: 'PROOF / LEDGER', timeline: 'EVENT / STRIP', risk: 'RISK / NOTICE', ending: 'NEXT / ACTION' },
   event: { cover: 'EVENT / POSTER', concept: 'SIGNAL / FIRST', feature: 'FACT / GRID', steps: 'RESPONSE / NUMBERED', data: 'DATA / STAMP', compare: 'DISCUSSION / BOARD', evidence: 'PROOF / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
+  technology: { cover: 'TECH / POSTER', concept: 'WHY / FIRST', feature: 'ARCH / GRID', steps: 'HOW / NUMBERED', data: 'BENCH / STAMP', compare: 'TRADEOFF / BOARD', evidence: 'PROOF / LEDGER', timeline: 'VERSION / STRIP', risk: 'LIMIT / NOTICE', ending: 'NEXT / ACTION' },
+  trend: { cover: 'TREND / POSTER', concept: 'SIGNAL / FIRST', feature: 'ECOSYSTEM / GRID', steps: 'ADOPTION / NUMBERED', data: 'SIGNALS / STAMP', compare: 'PLAYERS / BOARD', evidence: 'PROOF / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
   custom: { cover: 'NOTE / POSTER', concept: 'POINT / FIRST', feature: 'POINT / GRID', steps: 'HOW / NUMBERED', data: 'DATA / STAMP', compare: 'VERSUS / BOARD', evidence: 'SOURCE / LEDGER', timeline: 'TIME / STRIP', risk: 'BOUNDARY / NOTICE', ending: 'NEXT / ACTION' },
 });
 
@@ -23,6 +25,8 @@ function titleMarkup(page, topic, coverTitleLines) {
 function pageBrand({ contentType, channelMode, sourceLabel, repository, topic }) {
   const source = sourceLabel || repository || topic;
   if (contentType === 'event') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `EVENT DESK / ${source}`;
+  if (contentType === 'technology') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `TECH DESK / ${source}`;
+  if (contentType === 'trend') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `TREND DESK / ${source}`;
   if (contentType === 'custom') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `CUSTOM / ${source}`;
   return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `OPEN SOURCE / ${source}`;
 }
@@ -40,7 +44,7 @@ export function renderBrutalistStoryboardSections({ topic, repository, pages, co
     const densityAdjustment = selected(expandedDensityPages, index) ? 'expanded' : selected(relaxedDensityPages, index) ? 'relaxed' : 'none';
     const fitContentClass = selected(fitContentPages, index) && pageKind === 'content' ? ' fit-content-stack' : '';
     const label = labels[role] || 'CARD / NOTE'; const brand = pageBrand({ contentType, channelMode, sourceLabel, repository, topic });
-    const footer = disclosure || (contentType === 'event' ? '据公开素材整理 · 未核实内容已标注' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
+    const footer = disclosure || (contentType === 'event' ? '据公开素材整理 · 未核实内容已标注' : contentType === 'technology' ? '据开源技术资料整理 · 机制与性能以来源为准' : contentType === 'trend' ? '据公开开源信号整理 · 趋势判断不等同于事实' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
     const fallbackTemplate = ({ cover: 'poster-cover', concept: 'thesis-split', feature: 'feature-grid', steps: 'numbered-steps', data: 'stat-stamp', compare: 'versus-board', evidence: 'proof-ledger', timeline: 'event-strip', risk: 'warning-panel', ending: 'hard-cta' }[role] || 'thesis-split');
     const requested = String(page.layout_intent || '').trim(); const templateId = BRUTALIST_TEMPLATE_IDS.has(requested) ? requested : fallbackTemplate;
     const content = blocks.map((block) => renderStoryboardBlock(block, { pageLayout: role === 'steps' ? 'steps' : role, pageRole: role })).join('');

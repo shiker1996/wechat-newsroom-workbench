@@ -37,7 +37,22 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
       onProgress(`单张分析卡 ${candidate?.candidateId || label} 失败，已记录并继续其余候选`);
       return;
     }
-    for (const raw of parsed.items ?? []) {
+    const outputItems = Array.isArray(parsed?.items) ? parsed.items : [];
+    const matchedItems = outputItems.filter((raw) => group.some((item) => item.candidateId === raw?.candidateId));
+    if (!matchedItems.length) {
+      const reason = '模型返回的 items 为空，或 candidateId 与输入候选不匹配';
+      if (!retry) {
+        onProgress('脑暴返回空候选，切换极简结构重试');
+        await processGroup(group, `${label}.R`, true);
+        return;
+      }
+      const candidate = group[0];
+      store.recordPipelineFailure?.({ batchId, stage: 'research', objectType: 'brainstorm-card', objectKey: candidate?.candidateId || label,
+        title: candidate?.title || candidate?.hotspot_title || '', errorCode: 'empty_output', errorMessage: reason, detail: { label, retry: true, outputItemCount: outputItems.length } });
+      onProgress(`单张分析卡 ${candidate?.candidateId || label} 返回空候选，已记录并继续其余候选`);
+      return;
+    }
+    for (const raw of matchedItems) {
       const source = group.find((item) => item.candidateId === raw.candidateId);
       if (source) cards.push({ ...raw, source });
     }

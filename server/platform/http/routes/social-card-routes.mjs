@@ -1,5 +1,5 @@
 import { bindGenerationSnapshot, prepareSkillRun, resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
-import { buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, toLegacySocialCardPromptInput } from '../../../features/social-cards/index.mjs';
+import { buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, socialStoryboardSkillForContentClass, toLegacySocialCardPromptInput } from '../../../features/social-cards/index.mjs';
 import { listSocialCardStageSkillSlots, resolveSocialCardStageSkills } from '../../skills/entry-routing.mjs';
 import { requestGitHubJson } from '../../plugin-sdk/github-client.mjs';
 import { pipeFile } from '../route-helpers.mjs';
@@ -18,6 +18,7 @@ const SOCIAL_CARD_ENTRY_POINTS=Object.freeze({
   event:'social-event',
   custom:'social-custom',
 });
+const eventBackedContentType=(contentType)=>contentType==='event';
 
 function socialTemplateContext(store, editorial, channelMode, contentType) {
   const themeId=editorial?.visual_style||'ice-blue';
@@ -46,7 +47,7 @@ export async function handleSocialCardRoutes(context) {
     try{
       const entryPoint=decodeURIComponent(socialCardStageSkillsMatch[1]);
       return json(response,200,await listSocialCardStageSkillSlots({
-        workspaceRoot:root,entryPoint,contentType:searchParams.get('contentType')||'',
+        workspaceRoot:root,entryPoint,contentType:searchParams.get('contentType')||'',recommendedSkillId:searchParams.get('recommendedSkillId')||'',
       }));
     }catch(error){return json(response,400,{error:error.message});}
   }
@@ -85,7 +86,7 @@ export async function handleSocialCardRoutes(context) {
     try{const reflowPath=path.join(workspace.dir,'card-plan-reflow.json');if(fs.existsSync(reflowPath)){const raw=JSON.parse(fs.readFileSync(reflowPath,'utf8'));reflowState={schemaVersion:raw.schemaVersion||1,source:raw.source||'',changed:Boolean(raw.changed),originalPageCount:Number(raw.originalPageCount)||0,finalPageCount:Number(raw.finalPageCount)||0,operations:Array.isArray(raw.operations)?raw.operations:[],warnings:Array.isArray(raw.warnings)?raw.warnings:[],unresolved:Array.isArray(raw.unresolved)?raw.unresolved:[]};}}catch{}
     try{const adjustmentPath=path.join(workspace.dir,'social-card-content-plan-adjustments.json');if(fs.existsSync(adjustmentPath))contentPlanAdjustments=JSON.parse(fs.readFileSync(adjustmentPath,'utf8'));}catch{}
     try{const factIndexPath=path.join(workspace.dir,'social-card-fact-index.json');if(fs.existsSync(factIndexPath))factIndex=JSON.parse(fs.readFileSync(factIndexPath,'utf8'));}catch{}
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    const contentType=socialContentType(candidate),eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
     const cardPlan=JSON.parse(editorial.card_plan_json||'[]');const channelMode=socialChannelMode(candidate);
     const themeContext=socialTemplateContext(store,editorial,channelMode,contentType);
@@ -111,9 +112,9 @@ export async function handleSocialCardRoutes(context) {
     let cardPlan;try{cardPlan=JSON.parse(current.card_plan_json||'[]');}catch{cardPlan=[];}
     const previousPage=cardPlan[pageIndex];if(!previousPage)return json(response,404,{error:'故事板页面不存在'});
     const contentType=socialContentType(candidate),facts=store.getRepositoryFactSheet(candidate.id);
-    const eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    const eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     if(contentType==='repository'&&!facts?.data?.sourceUrl)return json(response,409,{error:'请先完成仓库事实核验'});
-    if(contentType==='event'&&!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该事件尚无事件卡，请先完成事件研判'});
+    if(eventBackedContentType(contentType)&&!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该分类尚无事件卡事实基座，请先完成事件研判'});
     if(contentType==='custom'&&facts?.data?.kind!=='custom')return json(response,409,{error:'请先填写自定义事实基座'});
     const channelMode=socialChannelMode(candidate);
     const templateContext=socialTemplateContext(store,current,channelMode,contentType);
@@ -122,7 +123,8 @@ export async function handleSocialCardRoutes(context) {
     try{
       const entryPoint=SOCIAL_CARD_ENTRY_POINTS[contentType];
       const routingContentType=contentType==='custom'?String(facts?.data?.content_type||''):contentType;
-      const stageSelections=await resolveSocialCardStageSkills({workspaceRoot:root,entryPoint,contentType:routingContentType,requested:input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{}});
+      const recommendedSkillId=contentType==='event'?socialStoryboardSkillForContentClass(candidate.content_class):'';
+      const stageSelections=await resolveSocialCardStageSkills({workspaceRoot:root,entryPoint,contentType:routingContentType,recommendedSkillId,requested:input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{}});
       const storyboardSelection=stageSelections.storyboard;const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
       if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
       const storyboardSystem=buildSocialCardStoryboardSystemPrompt({workspaceRoot:root,skillId:storyboardSelection.selectedSkill,skillPrompt:socialSkill.prompt,contentType,channelMode,templateCapabilities:templateContext.capabilities});
@@ -213,7 +215,7 @@ export async function handleSocialCardRoutes(context) {
     };
     const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
     const facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
-    const eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    const eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     const channelMode=socialChannelMode(candidate);
     return json(response,200,{editorial,cardPlan,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
@@ -224,7 +226,7 @@ export async function handleSocialCardRoutes(context) {
     if(input.layout_style&&!SOCIAL_CARD_LAYOUTS.includes(input.layout_style))return json(response,400,{error:'不支持的图文版式'});
     if(input.composition_mode&&!SOCIAL_CARD_COMPOSITION_MODES.includes(input.composition_mode))return json(response,400,{error:'不支持的构图模式'});
     let editorial=store.saveCardEditorial(candidate.id,input); const facts=store.getRepositoryFactSheet(candidate.id);
-    const contentType=socialContentType(candidate),eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    const contentType=socialContentType(candidate),eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     let cardPlan=[];try{cardPlan=JSON.parse(editorial.card_plan_json||'[]');}catch{}
     const channelMode=socialChannelMode(candidate);
     const themeContext=socialTemplateContext(store,editorial,channelMode,contentType);
@@ -263,10 +265,10 @@ export async function handleSocialCardRoutes(context) {
   if (cardEditorialAiMatch && request.method === 'POST') {
     const candidate=store.getCandidate(Number(cardEditorialAiMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
     const contentType=socialContentType(candidate),facts=store.getRepositoryFactSheet(candidate.id);
-    let eventAnalysis=contentType==='event'?resolveEventAnalysisFor(candidate):null;
+    let eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     if(contentType==='repository'&&!facts?.data?.sourceUrl)return json(response,409,{error:'请先完成仓库事实核验'});
-    if(contentType==='event'){
-      if(!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该事件尚无事件卡，请先在热点全景运行事件研判'});
+    if(eventBackedContentType(contentType)){
+      if(!eventAnalysis?.analysis?.eventSummary)return json(response,409,{error:'该分类尚无事件卡事实基座，请先在热点全景运行事件研判'});
       // 日常批次事件候选可能尚未抓取来源，生成故事板前自动补抓
       if(!(eventAnalysis.analysis.sources||[]).some((item)=>item.status==='ok')){
         const hotspots=candidateEventGroups(candidate).flatMap((group)=>group.hotspots);
@@ -289,8 +291,9 @@ export async function handleSocialCardRoutes(context) {
       const entryPoint=SOCIAL_CARD_ENTRY_POINTS[contentType];
       const routingContentType=contentType==='custom'?String(facts?.data?.content_type||''):contentType;
       const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
+      const recommendedSkillId=contentType==='event'?socialStoryboardSkillForContentClass(candidate.content_class):'';
       const stageSelections=await resolveSocialCardStageSkills({
-        workspaceRoot:root,entryPoint,contentType:routingContentType,requested:requestedStages,
+        workspaceRoot:root,entryPoint,contentType:routingContentType,recommendedSkillId,requested:requestedStages,
       });
       const storyboardSelection=stageSelections.storyboard;
       const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
@@ -358,7 +361,7 @@ export async function handleSocialCardRoutes(context) {
   if (repositoryInspectMatch && request.method === 'POST') {
     const candidate=store.getCandidate(Number(repositoryInspectMatch[1]));
     if(!candidate)return json(response,404,{error:'候选不存在'});
-    if(socialContentType(candidate)==='event')return json(response,409,{error:'事件型图文使用突发事实基座，不执行仓库核验'});
+    if(eventBackedContentType(socialContentType(candidate)))return json(response,409,{error:'事件、开源技术和开源趋势图文使用分类事实基座，不执行仓库核验'});
     if(socialContentType(candidate)==='custom')return json(response,409,{error:'自定义图文使用自定义事实基座，不执行仓库核验'});
     const sourceUrl=candidateRepositoryUrl(candidate); if(!sourceUrl)return json(response,409,{error:'该候选没有可核验的 GitHub 仓库地址'});
     try {
@@ -379,7 +382,7 @@ export async function handleSocialCardRoutes(context) {
   if (cardLockMatch && request.method === 'POST') {
     const candidate=store.getCandidate(Number(cardLockMatch[1])); if(!candidate)return json(response,404,{error:'候选不存在'});
     const editorial=store.getCardEditorial(candidate.id),facts=store.getRepositoryFactSheet(candidate.id),contentType=socialContentType(candidate);
-    const gate=socialCardGate(candidate,contentType,facts,editorial,contentType==='event'?resolveEventAnalysisFor(candidate):null);
+    const gate=socialCardGate(candidate,contentType,facts,editorial,eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null);
     if(!gate.ready)return json(response,409,{error:`CARD GATE 未通过：${gate.issues.join('；')}`,gate});
     store.saveCardEditorial(candidate.id,{...editorial,status:'LOCKED'});
     store.updateCandidateTrack(candidate.id,'social_cards',{status:'locked',locked_at:new Date().toISOString()});

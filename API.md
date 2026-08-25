@@ -308,6 +308,7 @@ curl.exe -X POST http://127.0.0.1:4317/api/system/backup/restore ^
 ### POST /api/batches/:id/candidates/composite
 创建综合选题 { hotspotIds, title, poolRole }
 tracks 含 social_cards 时按内容分流：含 GitHub 仓库 → wechat-tool-cards（工具图文）；纯新闻事件 → wechat-event-cards（事件图文，事实基座由事件卡+来源快照合成，见 server/domain/event-fact-base.mjs）
+也可按事件卡 `content_class` 分流：`github_project` → 工具图文，`news_event` → 事件图文，`open_source_technology` → 开源技术图文，`open_source_trend` → 开源趋势图文；分类快照写入候选，已锁定候选不被自动改路由。
 → 热点全景（事件卡片 → 创建综合选题）
 
 ### POST /api/batches/:id/custom-social-chat/stream
@@ -327,7 +328,7 @@ URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工�
 
 ### GET /api/creation-entry-points/:entryPoint/social-card-stage-skills
 查询图文故事板技能槽位。`entryPoint` 为 `social-tool`、`social-event` 或 `social-custom`；
-`contentType` 查询参数分别使用 `repository`、`event` 或 `tutorial|list|opinion`。
+`contentType` 查询参数使用 `repository`、`technology`、`trend`、`event` 或 `tutorial|list|opinion`。
 命名说明：`social-custom` 是图文阶段管线的历史入口名，会话 Agent 层使用 `custom-social`，两者指同一自定义图文通道，
 `server/platform/skills/entry-routing.mjs` 的别名机制双向兼容；新增代码应使用 `custom-social`，`social-custom` 仅为兼容保留（阶段 6 起弃用，不删除）。
 返回默认实现、兼容候选、可用状态和不可用原因。
@@ -346,7 +347,7 @@ URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工�
 
 未显式选择时使用入口默认实现，并在默认不可用时按入口回退：
 
-- `social-tool` → `repository-card-storyboard`
+- `social-tool` → 按内容类型选择 `repository-card-storyboard` 或 `open-source-technology/trend-storyboard`
 - `social-event` → `event-card-storyboard`
 - `social-custom` → `custom-card-storyboard`
 
@@ -416,6 +417,10 @@ URL 规范化为裸仓库地址（https://github.com/owner/repo）；经手工�
 ### POST /api/candidates/:id/lock
 锁定简报（写入 article-brief.md）
 → 编辑室（确认简报）
+
+### POST /api/candidates/:id/promote-article
+人工将开源项目候选晋级文章路线。请求体：`{ contentClass: "open_source_technology"|"open_source_trend", reason, evidence: [{ claim, role, sourceId }], features? }`；必须提供分类理由和至少一条可核验证据，晋级后仍需通过事实基座门禁。
+→ 选题池（人工晋级）
 
 ### POST /api/candidates/:id/source
 抓取候选原文 { force }

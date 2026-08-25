@@ -7,7 +7,7 @@
     "schemaVersion": { "const": 1 },
     "contract": { "const": "social_card_fact_base" },
     "entryPoint": { "enum": ["social-tool", "social-event", "social-custom"] },
-    "contentType": { "enum": ["repository", "event", "custom"] },
+    "contentType": { "enum": ["repository", "event", "technology", "trend", "custom"] },
     "channelMode": { "enum": ["wechat", "xiaohongshu"] },
     "topic": { "type": "string", "minLength": 1 },
     "facts": { "type": "object" },

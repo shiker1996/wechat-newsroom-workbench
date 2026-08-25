@@ -72,6 +72,46 @@ test('事件热榜加入事件图文时写入事件图文输出模式', async ()
   assert.equal(editorial.output_mode, 'wechat-event-cards');
 });
 
+test('纯项目手动加入文章轨道时返回人工晋级提示', async () => {
+  const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
+  let payload = null; let added = false;
+  const handled = await handleCandidateRoutes({
+    request: { method: 'POST' }, response: {}, pathname: '/api/batches/b1/candidates', searchParams: new URLSearchParams(),
+    store: {
+      getBatch() { return { hotspots: [{ id: 7, title: 'GitHub repository 发布新项目', url: 'https://github.com/acme/demo', source: 'github' }] }; },
+      addCandidates() { added = true; return []; },
+    },
+    body: async () => ({ hotspotIds: [7], tracks: ['article'] }),
+    json(_response, status, data) { payload = { status, data }; },
+  });
+  assert.equal(handled, true);
+  assert.equal(payload.status, 409);
+  assert.equal(payload.data.code, 'ARTICLE_ROUTE_REQUIRES_PROMOTION');
+  assert.equal(added, false);
+});
+
+test('人工晋级文章路线写入分类快照并创建文章轨道', async () => {
+  const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
+  let payload = null; const calls = [];
+  const candidate = { id: 8, candidate_id: 'C008', batch_id: 'b1' };
+  const db = { prepare() { return { run(...args) { calls.push(args); } }; } };
+  const handled = await handleCandidateRoutes({
+    request: { method: 'POST' }, response: {}, pathname: '/api/candidates/8/promote-article', searchParams: new URLSearchParams(),
+    store: {
+      db,
+      getCandidate() { return candidate; },
+      addCandidateTracks(id, tracks, options) { calls.push([id, tracks, options]); },
+      getCandidate() { return { ...candidate, content_class: 'open_source_technology' }; },
+    },
+    body: async () => ({ contentClass: 'open_source_technology', reason: '补充架构文档', evidence: [{ claim: '官方架构说明', role: 'technical_mechanism', sourceId: 'hotspot:7' }] }),
+    json(_response, status, data) { payload = { status, data }; },
+  });
+  assert.equal(handled, true);
+  assert.equal(payload.status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1][2].pool_role, '人工晋级文章');
+});
+
 test('服务端路由模块均可通过 Node 语法编译', () => {
   const routeDirectory=new URL('../server/platform/http/routes/',import.meta.url);
   const routeFiles=fs.readdirSync(routeDirectory).filter((name)=>name.endsWith('.mjs'));

@@ -273,6 +273,18 @@
       "optionalCapabilities": []
     },
     {
+      "id": "open-source-technology-storyboard",
+      "name": "开源技术图文故事板",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "open-source-trend-storyboard",
+      "name": "开源趋势图文故事板",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
       "id": "repository-card-storyboard",
       "name": "工具图文故事板",
       "requiredCapabilities": [],

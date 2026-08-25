@@ -228,16 +228,16 @@ test('阶段3最终 P 直接读取账号契合，不再读取旧 pBase', () => {
   assert.equal(result.p,63);
 });
 
-test('GitHub、开源和开发工具使用独立配置加分，不依赖泛 AI 分类', () => {
+test('旧工具加分配置不再影响维度池，内容分类负责路线', () => {
   const clusters=clusterItems([dimensionHotspot(1,{who:'tool',what:'开源开发工具',actionType:'开源',object:'开发工具',labels:{who:'Tool'}})]);
   const ranking=preselection(clusters);
   const pool=selectDimensionPool(clusters,ranking,{accountContext:{contentPillars:[],scoring:{toolEngineeringBonus:12}}});
   assert.equal(pool.groups[0].accountFit,0);
-  assert.equal(pool.groups[0].toolEngineeringBonus,12);
-  assert.equal(resolveScoring({scoring:{toolEngineeringBonus:14}}).toolEngineeringBonus,14);
+  assert.equal('toolEngineeringBonus' in pool.groups[0],false);
+  assert.equal('toolEngineeringBonus' in resolveScoring({scoring:{toolEngineeringBonus:14}}),false);
 });
 
-test('核心候选按配置保留最低工具工程席位，工具不足时不伪造补位', () => {
+test('维度池不再按配置强制保留工具工程席位', () => {
   const generic=Array.from({length:6},(_,index)=>dimensionHotspot(index+1,{who:`主体${index}`,what:'行业动态',actionType:'争议回应'}));
   const tools=[
     dimensionHotspot(20,{who:'tool-a',what:'开源开发工具',actionType:'开源',object:'开发工具'}),
@@ -246,7 +246,7 @@ test('核心候选按配置保留最低工具工程席位，工具不足时不�
   const clusters=clusterItems([...generic,...tools]);
   const ranking=preselection(clusters).map((item)=>({...item,finalPreScore:item.hotspotId>=20?35:90}));
   const pool=selectDimensionPool(clusters,ranking,{coreLimit:4,blackLimit:0,backupLimit:0,accountContext:{contentPillars:[],scoring:{toolEngineeringBonus:5,minimumToolCandidates:2}}});
-  assert.equal(pool.selected.filter((group)=>group.toolEngineering).length,2);
+  assert.equal(pool.selected.filter((group)=>group.toolEngineering).length,0);
 });
 
 test('选题评分贯通分发池与读者利益并拦截伪通知', () => {
@@ -292,6 +292,15 @@ test('纯项目按内容路线进入图文，评分字段可识别为项目属�
   assert.equal(isPureProjectEvent({ representative_title:'某开源项目发布', keywords:[], articles:[] }), true);
 });
 
+test('稳定事件分类优先于旧 format/materialType 路由字段', () => {
+  const news = classifyContentRoute({ contentClass: 'news_event', format: '贴图', materialType: 'GitHub 工具项目' });
+  assert.equal(news.contentRoute, 'article');
+  assert.equal(news.pureProject, false);
+  const project = classifyContentRoute({ contentClass: 'github_project', format: '文章', materialType: '行业新闻' });
+  assert.equal(project.contentRoute, 'social_only');
+  assert.equal(project.articleEligible, false);
+});
+
 test('缺少事件价值时不再把综合选题静默算成 0 分', () => {
   const base={candidateId:'COMPOSITE-1',status:'PASS',source:{title:'综合选题',category:'🏢 大厂战略',poolRole:'综合选题',riskLevel:'待评估',composite:true},
     bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,readerStakeScore:4,factSupport:4},hProfile:{historicalType:'bigtech'}};
@@ -316,7 +325,7 @@ test('纯项目不再被文章池的工具席位强行补入', () => {
 test('图文预选从全量事件独立选择 GitHub 工具，不受文章前十限制', () => {
   const ranking = [
     { hotspotId:1,title:'普通行业新闻',riskLevel:'低',category:'📈 行业趋势',keywords:[],articles:[{hotspot_id:1,title:'普通行业新闻',url:'https://example.com/news'}],preScores:{informationGain:15},chinaRelevance:10,saturationPenalty:0,finalPreScore:95 },
-    { hotspotId:2,title:'Useful open source workflow',riskLevel:'低',category:'🤖 AI/技术动态',keywords:['GitHub trending','开源工具'],articles:[{hotspot_id:2,title:'Useful open source workflow',url:'https://github.com/example/tool'}],preScores:{informationGain:8},chinaRelevance:4,saturationPenalty:2,finalPreScore:55 },
+    { hotspotId:2,title:'Useful open source workflow',contentClass:'github_project',riskLevel:'低',category:'🤖 AI/技术动态',keywords:['GitHub trending','开源工具'],articles:[{hotspot_id:2,title:'Useful open source workflow',url:'https://github.com/example/tool'}],repositoryMeta:{description:'AI workflow CLI for developers',language:'TypeScript',stars:1800,topics:['agent','cli'],createdAt:'2026-07-10',discoveryChannels:['search','mentioned']},preScores:{informationGain:8},chinaRelevance:4,saturationPenalty:2,finalPreScore:55 },
   ];
   const selected = selectSocialCandidates(ranking);
   assert.equal(selected.length, 1);

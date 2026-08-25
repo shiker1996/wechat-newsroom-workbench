@@ -1,6 +1,8 @@
 const PAGE_BUDGETS = Object.freeze({
   repository: Object.freeze({ recommended: 7, absolute: 12 }),
   event: Object.freeze({ recommended: 10, absolute: 16 }),
+  technology: Object.freeze({ recommended: 7, absolute: 12 }),
+  trend: Object.freeze({ recommended: 8, absolute: 12 }),
   custom: Object.freeze({ recommended: 10, absolute: 16 }),
 });
 
@@ -32,4 +34,3 @@ export function socialCardPageBudgetMessage(pageCount, contentType = 'repository
   if (status.withinAbsolute) return '';
   return `${status.contentType} 图文当前需要 ${status.pageCount} 页，超过绝对安全上限 ${status.absolute} 页；为避免静默丢失事实，已停止生成，请回到故事板合并或重新组织内容。`;
 }
-

@@ -302,7 +302,7 @@ test('refactoring stage 4: typeset output cleanup and theme selection are pure r
 
 test('refactoring stage 4: storyboard density budgeting is a pure rendering function', () => {
   const result = budgetCardPlan([{ kind: 'cover', content_blocks: [{ type: 'text' }, { type: 'note' }, { type: 'highlight' }] }]);
-  assert.equal(result.pages[0].content_blocks.length, 2);
+  assert.equal(result.pages[0].content_blocks.length, 1);
   assert.equal(result.trims.length, 1);
 });
 

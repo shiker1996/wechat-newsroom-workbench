@@ -19,6 +19,7 @@ export {
   selectArticlePool,
   selectBriefPool,
   selectDimensionPool,
+  selectSocialPool,
   selectSocialCandidates,
   topicValueForEvent,
   runResearchPipeline,
@@ -31,7 +32,7 @@ export { buildEventResolutionOperationsMetrics, readEventResolutionReview } from
 export { buildTopicScoreOperationsMetrics } from './application/topic-score-operations.mjs';
 export { CandidateSelectionService } from './application/candidate-selection-service.mjs';
 export { classifyResearchFailure, recordResearchFailure } from './application/research-failure.mjs';
-export { buildEventHeatRanking, loadPreviousEventHeatItems, scoreEventHeat } from './domain/event-heat-ranking.mjs';
+export { buildEventHeatRanking, loadPreviousEventHeatItems, scoreClassifiedEvent, scoreEventHeat } from './domain/event-heat-ranking.mjs';
 export { projectStableEvents } from './domain/event-resolution-cluster-projection.mjs';
 export { duplicatePenaltyForHeat, EVENT_RESOLUTION_POLICY } from './domain/event-resolution-policy.mjs';
 export { loadShadowHistory, materializeStableEvents, resolveEventShadow, structuredMatch, buildEventTitle } from './domain/event-resolution-shadow.mjs';
@@ -39,4 +40,5 @@ export { clusterItems as clusterResearchItems, isFreshForBatch as isResearchItem
 export { isResearchEligibleHotspot } from './domain/hotspot-pipeline-scope.mjs';
 export { buildHotspotAtlas } from './rendering/hotspot-atlas.mjs';
 export { dimensionPartsOf } from './domain/hotspot-dimensions.mjs';
-export { classifyContentRoute, isPureProjectEvent, scoreStatusForCard } from './domain/content-routing.mjs';
+export { classifyContentRoute, deriveClassificationFeatures, isPureProjectEvent, normalizeEventClassification, scoreStatusForCard } from './domain/content-routing.mjs';
+export { G_SOCIAL_CLASS_CAPS, G_SOCIAL_THRESHOLDS, G_SOCIAL_WEIGHTS, scoreSocialCandidate } from './domain/social-scoring.mjs';

@@ -170,6 +170,14 @@ test('旧版逗号拼接列表在最终入口恢复为独立条目', () => {
   assert.equal(pages[0].content_blocks[0].content, '2019年：上市\n2025年：配售金额800亿港元\n所得款项投入AI基础设施');
 });
 
+test('旧版分号拼接列表在最终入口恢复为独立条目', () => {
+  const pages = sanitizeCardPlan([{ kind:'content', role:'timeline', content_blocks:[
+    { type:'list', title:'迭代路径', content:'2025年9月：实验版；2025年11月：正式版；2026年8月：新模型', items:[] },
+  ] }]);
+  assert.deepEqual(pages[0].content_blocks[0].items, ['2025年9月：实验版', '2025年11月：正式版', '2026年8月：新模型']);
+  assert.equal(pages[0].content_blocks[0].content, '2025年9月：实验版\n2025年11月：正式版\n2026年8月：新模型');
+});
+
 test('list 块支持 items 字符串数组兜底', () => {
   const pages=[{kind:'content',title:'列表页',goal:'目标',content_blocks:[
     {type:'list',title:'各方立场',content:'',items:['甲方：指控','乙方：否认'],headers:[],rows:[]},

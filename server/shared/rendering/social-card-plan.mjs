@@ -4,6 +4,10 @@ export const listBlockValues = (block) => {
   if (Array.isArray(block?.items) && block.items.length) return block.items;
   if (Array.isArray(block?.content)) return block.content;
   const lines = String(block?.content || '').split(/\n+/).filter((item) => item.trim());
+  if (lines.length === 1 && /[；;]/u.test(lines[0])) {
+    const items = lines[0].split(/[；;]/u).map((item) => item.trim()).filter(Boolean);
+    if (items.length > 1) return items;
+  }
   if (lines.length === 1 && (lines[0].match(/、/g) || []).length >= 2) return lines[0].split('、').map((item) => item.trim()).filter(Boolean);
   if (lines.length === 1 && (lines[0].match(/\d{4}年/g) || []).length >= 2 && lines[0].includes(',')) {
     return lines[0].split(',').map((item) => item.trim()).filter(Boolean);
@@ -18,7 +22,7 @@ export function cardPageDensity(page) {
   return itemCount > 8 || textLength > 520 ? 'compact' : 'normal';
 }
 
-export const CARD_PLAN_BLOCK_BUDGET = Object.freeze({ cover: 2, content: 3, ending: 2 });
+export const CARD_PLAN_BLOCK_BUDGET = Object.freeze({ cover: 1, content: 3, ending: 2 });
 export const CARD_PLAN_PAGE_ITEM_BUDGET = 9;
 
 const COVER_TITLE_MAX_WIDTH = 8;

@@ -38,6 +38,15 @@ test('事件归并双写：事件记录和报道归属可幂等写入并保留 l
     const record = store.getEventRecord('S-EVENT-1');
     assert.equal(record.event_state, 'new_event');
     assert.deepEqual(record.legacy_ids, ['E-OLD-1', 'E-OLD-2']);
+    const classified = store.saveEventClassification('S-EVENT-1', {
+      content_class: 'github_project', confidence: 0.96, status: 'auto', reason: '仓库项目资料',
+      evidence: [{ sourceId: 'hotspot:1', role: 'project_signal', claim: 'GitHub 仓库' }],
+      features: { hasGithubRepository: true }, missing_evidence: ['技术机制证据'],
+      article_eligible: false, social_eligible: true, default_route: 'social_cards',
+    });
+    assert.equal(classified.content_class, 'github_project');
+    assert.equal(classified.article_eligible, false);
+    assert.deepEqual(classified.classification_missing_evidence, ['技术机制证据']);
     assert.equal(store.listEventRecords().length, 1);
     assert.equal(store.listEventHotspots({ batchId: batch.id }).length, 2);
   } finally {

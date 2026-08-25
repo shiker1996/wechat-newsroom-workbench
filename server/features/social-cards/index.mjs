@@ -14,9 +14,10 @@ export {
   runSocialCardPipeline,
 } from './application/social-card-pipeline.mjs';
 
-export { CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS, evaluateCardGate, evaluateCustomCardGate, evaluateEventCardGate } from './domain/social-card-gate.mjs';
+export { CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS, evaluateCardGate, evaluateClassifiedCardGate, evaluateCustomCardGate, evaluateEventCardGate } from './domain/social-card-gate.mjs';
 export { buildCustomFactSheet, customFactMarkdown, customSourceUrl, parseLines, parsePointLine } from './application/custom-fact-service.mjs';
 export { createRepositoryCandidate } from './application/repository-candidate.mjs';
 export { BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS, SOCIAL_CARD_STORYBOARD_CONTRACTS, buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, toLegacySocialCardPromptInput } from './application/storyboard-contracts.mjs';
+export { SOCIAL_CONTENT_TYPES, SOCIAL_ROUTE_VERSION, contentTypeForSocialRoute, normalizeSocialContentClass, socialRouteForContentClass, socialRouteForContentType, socialStoryboardClassForContentClass, socialStoryboardSkillForContentClass } from './domain/social-routing.mjs';
 export { CUSTOM_SOCIAL_AGENT_CAPABILITIES, runCustomSocialAgentTurn } from './application/agent/custom-social-adapter.mjs';
 export { eventGroupsForCandidate, resolveEventAnalysis } from '../research/index.mjs';

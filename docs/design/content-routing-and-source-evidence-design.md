@@ -162,7 +162,7 @@ content_class：稳定事件最终属于什么内容类型
 
 - 具体单项目：`github_project`；
 - 非项目型新闻：`news_event`；
-- 证据不足但编辑认为值得继续观察：保留 `classification_status: "needs_review"`，不自动进入文章池。
+- 证据不足但编辑认为值得继续观察：保留 `classification_status: "needs_review"`；这表示分类升级仍待复核，不会阻断普通事件、技术和趋势的文章路线，后续仍由事实门禁决定能否成稿。
 
 ## 5. 分类执行方式
 
@@ -197,7 +197,7 @@ content_class：稳定事件最终属于什么内容类型
    - `hasAdoptionSignal`、`hasMigrationSignal`、`hasCompatibilitySignal`、`hasPolicyOrStandardSignal`；
    - 来源的 `sourceId`、`source_class`、状态和可引用事实摘要。
 2. 扩展现有事件卡的结构化输出，让同一次模型调用同时返回事实卡和分类结果。分类只允许引用本次输入中的 `sourceId`，不能凭标题或常识补造证据。
-3. 事件卡写入前由服务端做确定性校验：趋势证据不足时降为 `needs_review`，技术机制证据不足时降为 `github_project` 或 `needs_review`，项目类不得自动获得文章资格。
+3. 事件卡写入前由服务端做确定性校验：趋势证据不足时降为 `needs_review`，技术机制证据不足时降为 `github_project` 或 `needs_review`；`github_project` 不得自动获得文章资格，其余三类仍保留文章路线资格，项目类不得自动获得文章资格。
 4. 校验后的分类结果和事件事实卡一起持久化，再由文章池、图文池和热点全景分别消费。候选生成时保存路线快照，避免事件后续重新分类影响已经锁定的候选。
 
 当前代码对应的实施位置是：
@@ -247,7 +247,9 @@ content_class：稳定事件最终属于什么内容类型
 
 - `open_source_trend` 没有足够独立来源或主体时降级为 `needs_review`；
 - `open_source_technology` 没有技术机制证据时降级为 `github_project` 或 `needs_review`；
+- 只有 GitHub Search/Trending 项目来源、没有外部技术或生态证据时，即使 README 声称存在技术机制、开放标准、兼容性或采用情况，也降级为 `github_project`；
 - `github_project` 不得自动获得 `articleEligible: true`；
+- `needs_review` 只表示分类证据待复核，不等于文章路线禁用；普通事件、开源技术、开源趋势仍可进入脑暴和事实门禁；
 - 证据来源不存在、来源状态不是 `ok` 或 claim 为空时，拒绝写入分类证据。
 
 ### 5.4 人工覆盖
@@ -274,14 +276,25 @@ content_class：稳定事件最终属于什么内容类型
 [事件文章/图文] news_event
 ```
 
-事件热榜可以统一展示四类，但排序时不直接把 GitHub 的 Star、Trending 分数和新闻事件 T 当作同一个原始量纲。建议保存：
+事件热榜现在按内容类型生成四套独立榜单，不再把 GitHub 的 Star、Trending 分数和新闻事件 T 当作同一个原始量纲。接口保留兼容用的 `items`，正式展示和选题池消费 `rankings[content_class]`：
 
 - `eventValue`：文章事件使用的事件价值 T；
 - `projectDiscoveryScore`：GitHub 项目的发现分；
 - `socialFitScore`：图文路线评分；
 - `contentClass`：展示和分流依据。
 
-全景默认可以统一浏览，也可以提供“全部 / 文章资格 / 项目图文 / 技术 / 趋势”筛选。
+当前四类 T/发现分的确定性组成如下：
+
+| 类型 | 独立评分模型 | 主要组成 |
+|---|---|---|
+| `news_event` | `T_news` | 时效、事实增量、来源扩散、短期动量、国内相关度、证据、历史衰减 |
+| `open_source_technology` | `T_technology` | 技术新颖度、机制深度、工程影响、可复现性、技术时效 |
+| `open_source_trend` | `T_trend` | 多主体/多来源广度、跨时间轨迹、生态影响、证据质量、趋势时效 |
+| `github_project` | `projectDiscoveryScore` | 项目清晰度、可演示性、发现时效、来源完整度、视觉潜力 |
+
+技术和趋势榜的分数不再依赖新闻事件的“新增报道数/扩散速度”作为核心价值；项目发现分只服务图文候选，不进入文章 F。
+
+全景默认仍可统一浏览，也可以提供“普通事件 / 开源技术 / 开源趋势 / 项目图文”分榜筛选。
 
 ## 7. 文章与图文路线
 
@@ -407,11 +420,13 @@ score_warning
 - 输出分类证据和缺失证据报告；
 - 统计 GitHub 项目误入文章池的数量。
 
-### Phase 2：文章资格前置
+### Phase 2：文章资格和分类榜前置
 
 - `github_project` 不再进入文章脑暴和文章预选；
 - 项目继续进入独立图文预选；
 - 其他三类保留文章和图文双资格；
+- 事件卡和分类结果生成后，再计算对应类型的事件价值分；
+- 事件热榜输出四个独立榜单，文章池按三个文章榜分别取候选，避免项目榜挤占文章榜前 50；
 - 旧的文章池纯项目排除逻辑保留为兜底。
 
 ### Phase 3：文章事实门禁
@@ -428,6 +443,8 @@ score_warning
 - 将旧候选的 `format/materialType/historicalType` 转为审计字段；
 - 对已锁定候选保留历史路线快照，不强制重分类。
 
+实施状态：已完成。事件卡分类优先于旧字段；旧字段仍写入候选用于历史审计，已锁定候选的 `content_route`、分类快照和轨道状态不会被新一轮研判覆盖。
+
 ## 11. 验收标准
 
 1. 只有 README 和仓库元数据的项目分类为 `github_project`，不进入文章池。
@@ -437,7 +454,7 @@ score_warning
 5. 其他三类可以分别进入文章池或图文池，不因一个路线的分数影响另一条路线。
 6. `github_project` 手动尝试成稿时，服务端明确提示需要先人工晋级，而不是静默生成低质量文章。
 7. 文章事实基座至少存在可追溯的 `verified` 事实，不能只靠编辑底稿里的空泛描述通过。
-8. 文章评分仍使用 H/B/P/T/F，图文评分仍使用 Social Fit/事件图文评分，两者不混排。
+8. 文章评分仍使用 H/B/P/T/F，但 T 按内容类型取对应模型；图文评分仍使用 Social Fit/事件图文评分，两者不混排。
 
 ## 12. 评审结论待确认项
 

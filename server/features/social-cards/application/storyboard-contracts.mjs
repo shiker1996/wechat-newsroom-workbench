@@ -20,6 +20,11 @@ const CONTENT_TYPE_LIMITS = Object.freeze({
   custom:{minPages:4,maxPages:10},
 });
 
+function normalizeContentType(contentType) {
+  if (contentType === 'technology' || contentType === 'trend') return 'event';
+  return CONTENT_ENTRY_POINTS[contentType] ? contentType : 'repository';
+}
+
 export function buildSocialCardFactEnvelope({
   contentType,
   channelMode,
@@ -28,10 +33,12 @@ export function buildSocialCardFactEnvelope({
   eventAnalysis,
   outputMode,
 }) {
-  const normalizedType=CONTENT_ENTRY_POINTS[contentType]?contentType:'repository';
+  const normalizedType=normalizeContentType(contentType);
   const limits=CONTENT_TYPE_LIMITS[normalizedType];
   const channel=channelMode==='xiaohongshu'?'xiaohongshu':'wechat';
-  const payload=normalizedType==='event'?eventAnalysis:facts;
+  const payload=normalizedType==='event'
+    ? { ...(eventAnalysis?.factBase || {}), eventSummary:eventAnalysis?.eventSummary || '', sources:eventAnalysis?.sources || [], sourceAudit:eventAnalysis?.sourceAudit || {}, ...(facts || {}) }
+    : facts;
   return {
     schemaVersion:1,
     contract:SOCIAL_CARD_STORYBOARD_CONTRACTS.factBase,
@@ -71,6 +78,8 @@ export function toLegacySocialCardPromptInput(envelope) {
 export const BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS=Object.freeze({
   repository:'repository-card-storyboard',
   event:'event-card-storyboard',
+  technology:'open-source-technology-storyboard',
+  trend:'open-source-trend-storyboard',
   custom:'custom-card-storyboard',
 });
 
@@ -95,7 +104,7 @@ export function buildSocialCardStoryboardSystemPrompt({
   channelMode,
   templateCapabilities=null,
 }) {
-  const normalizedType=CONTENT_ENTRY_POINTS[contentType]?contentType:'repository';
+  const normalizedType=normalizeContentType(contentType);
   const xhs=channelMode==='xiaohongshu';
   const cardBlockTypes=xhs?'text|list|note|stats|compare|steps|timeline|scenes|highlight':'text|list|note';
   const repoBlockTypes=xhs?'text|list|code|note|stats|compare|steps|timeline|scenes|highlight':'text|list|code|note';
@@ -104,9 +113,15 @@ export function buildSocialCardStoryboardSystemPrompt({
     REPOSITORY_BLOCK_TYPES:repoBlockTypes,
     BLOCK_TYPES:normalizedType==='repository'?repoBlockTypes:cardBlockTypes,
   };
-  const builtinSkillId=BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS[normalizedType];
+  const embeddedContractSkillIds=new Set([
+    BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS.repository,
+    BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS.event,
+    BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS.custom,
+  ]);
   const methodPrompt=replaceTokens(skillPrompt,values);
-  const runtimeContract=skillId===builtinSkillId?'':replaceTokens(readPromptReference(workspaceRoot,'runtime-contract.md'),values);
+  // 新增的技术/趋势故事板只写方法，不自带旧事件故事板的 JSON 字段契约；
+  // 必须注入同一份运行契约，确保三类事件故事板都输出 card_plan/content_blocks。
+  const runtimeContract=embeddedContractSkillIds.has(skillId)?'':replaceTokens(readPromptReference(workspaceRoot,'runtime-contract.md'),values);
   const channel=readPromptReference(workspaceRoot,xhs?'channel-xiaohongshu.md':'channel-wechat.md');
   const composition=readPromptReference(workspaceRoot,'composition-contract.md');
   const template=buildSocialCardTemplateCapabilityPrompt(templateCapabilities);

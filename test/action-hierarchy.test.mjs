@@ -21,6 +21,14 @@ test("选题卡突出编辑入口，移出操作收进更多菜单", () => {
   assert.match(topics, /class="candidate-more"[\s\S]*data-remove-track/);
 });
 
+test("文章池和图文池展示统一的事件类型标签", () => {
+  assert.match(topics, /const contentClassLabels = \{/);
+  assert.match(topics, /open_source_technology: "开源技术"/);
+  assert.match(topics, /open_source_trend: "开源趋势"/);
+  assert.match(topics, /github_project: "纯项目"/);
+  assert.match(topics, /content-class-tag/);
+});
+
 test("成稿门禁通过后降低继续对话按钮权重", () => {
   assert.match(editorial, /replyButton\.classList\.toggle\("ink-button", !ready\)/);
   assert.match(editorial, /replyButton\.classList\.toggle\("ghost-button", ready\)/);

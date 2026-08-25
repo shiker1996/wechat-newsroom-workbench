@@ -21,7 +21,7 @@ import { fetchCandidateSource } from './server/platform/integrations/source-fetc
 import { getImageWorkspace, saveImageMetadata, saveLocalImage, uploadImageToCdn,
   planImagePlaceholders, imageManifestFile } from './server/features/articles/index.mjs';
 import { inspectRepositoryViaRegistry as inspectRepository, repositoryFactMarkdown } from './server/platform/integrations/repository-inspector.mjs';
-import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate, eventGroupsForCandidate, resolveEventAnalysis } from './server/features/social-cards/index.mjs';
+import { evaluateCardGate, evaluateClassifiedCardGate, evaluateEventCardGate, evaluateCustomCardGate, eventGroupsForCandidate, resolveEventAnalysis, socialStoryboardClassForContentClass } from './server/features/social-cards/index.mjs';
 import { loadSkillBundle, setSkillConfigurationResolver } from './server/platform/llm/skill-runtime.mjs';
 import { createZip } from './server/platform/artifacts/zip-bundle.mjs';
 import { batchArticlesDir, batchTopicsDir, candidateArticleDir, candidateSocialCardDir } from './server/platform/core/workspace-paths.mjs';
@@ -201,9 +201,14 @@ function candidateRepositoryUrl(candidate) {
 }
 
 function socialContentType(candidate) {
+  const classified = String(candidate?.content_class || '').trim();
+  if (classified === 'open_source_technology' || classified === 'open_source_trend' || classified === 'news_event') return 'event';
+  if (classified === 'github_project') return 'repository';
   const mode=candidate?.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
   if(mode.includes('event-cards'))return 'event';
   if(mode.includes('custom-cards'))return 'custom';
+  if(mode.includes('technology-cards'))return 'event';
+  if(mode.includes('trend-cards'))return 'event';
   return 'repository';
 }
 // 渠道与内容形态都编码在 candidate_tracks.output_mode：xiaohongshu-* 走小红书渲染分支，其余走公众号
@@ -212,7 +217,11 @@ function socialChannelMode(candidate) {
   return mode.startsWith('xiaohongshu')?'xiaohongshu':'wechat';
 }
 function socialCardGate(candidate, contentType, facts, editorial, eventAnalysis) {
-  if(contentType==='event')return evaluateEventCardGate(candidate,eventAnalysis,editorial);
+  if(contentType==='event') {
+    const storyboardClass=socialStoryboardClassForContentClass(candidate?.content_class);
+    if(storyboardClass==='technology'||storyboardClass==='trend')return evaluateClassifiedCardGate(candidate,storyboardClass,eventAnalysis,editorial);
+    return evaluateEventCardGate(candidate,eventAnalysis,editorial);
+  }
   if(contentType==='custom')return evaluateCustomCardGate(candidate,facts,editorial);
   return evaluateCardGate(candidate,facts,editorial);
 }

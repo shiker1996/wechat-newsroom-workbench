@@ -6,6 +6,20 @@ function mergeIds(previous, next) {
   return [...new Set([...(Array.isArray(previous) ? previous : []), ...(Array.isArray(next) ? next : [])].map(String).filter(Boolean))];
 }
 
+function withClassification(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    legacy_ids: parseJson(row.legacy_ids_json, []),
+    normalized: parseJson(row.normalized_json, {}),
+    classification_evidence: parseJson(row.classification_evidence_json, []),
+    classification_features: parseJson(row.classification_features_json, {}),
+    classification_missing_evidence: parseJson(row.classification_missing_evidence_json, []),
+    article_eligible: Boolean(row.article_eligible),
+    social_eligible: Boolean(row.social_eligible),
+  };
+}
+
 function confidenceOf(event) {
   if (event.historical_match?.method === 'exact') return 'high';
   if (Number(event.historical_match?.score || 0) >= 90) return 'high';
@@ -28,8 +42,8 @@ export class EventResolutionRepository {
         this.db.prepare(`DELETE FROM event_hotspots WHERE batch_id=? AND hotspot_id IN (${placeholders})`).run(batchId, ...hotspotIds);
       }
       const upsertEvent = this.db.prepare(`INSERT INTO event_records
-        (id,canonical_key,title,who,action_type,object,first_seen_at,last_seen_at,last_update_at,status,confidence,event_state,legacy_ids_json,normalized_json,resolver_version,algorithm_version,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        (id,canonical_key,title,who,action_type,object,first_seen_at,last_seen_at,last_update_at,status,confidence,event_state,legacy_ids_json,normalized_json,resolver_version,algorithm_version,content_class,classification_confidence,classification_reason,classification_evidence_json,classification_features_json,classification_missing_evidence_json,article_eligible,social_eligible,default_route,classification_status,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET canonical_key=excluded.canonical_key,title=excluded.title,who=excluded.who,
         action_type=excluded.action_type,object=excluded.object,first_seen_at=CASE
           WHEN event_records.first_seen_at IS NULL THEN excluded.first_seen_at
@@ -61,7 +75,8 @@ export class EventResolutionRepository {
         upsertEvent.run(event.event_id, event.canonical_key || '', event.title || '', normalized.whoKey || '', normalized.actionType || '其他',
           normalized.objectKey || '', event.first_seen_at || null, event.last_seen_at || null,
           eventState === 'new_update' || eventState === 'new_event' ? event.last_seen_at || null : null, 'active', confidenceOf(event), eventState,
-          JSON.stringify(legacyIds), JSON.stringify(normalized), shadow.resolver_version || '', shadow.algorithm_version || '', now, now);
+          JSON.stringify(legacyIds), JSON.stringify(normalized), shadow.resolver_version || '', shadow.algorithm_version || '',
+          'news_event', null, '', '[]', '{}', '[]', 1, 1, 'editorial_review', 'needs_review', now, now);
         const method = historicalMatch?.method || ((event.hotspot_ids || []).length > 1 ? 'structured' : 'exact');
         const matchConfidence = historicalMatch ? Math.min(1, Math.max(0, Number(historicalMatch.score || 0) / 100)) : ((event.hotspot_ids || []).length > 1 ? 0.82 : 0.5);
         const newInformationIds = new Set((event.new_information_hotspot_ids || []).map(Number));
@@ -84,15 +99,35 @@ export class EventResolutionRepository {
 
   get(eventId) {
     const row = this.db.prepare('SELECT * FROM event_records WHERE id=?').get(eventId);
-    if (!row) return null;
-    return { ...row, legacy_ids: parseJson(row.legacy_ids_json, []), normalized: parseJson(row.normalized_json, {}) };
+    return withClassification(row);
+  }
+
+  saveClassification(eventId, classification = {}) {
+    if (!eventId) return null;
+    const now = new Date().toISOString();
+    this.db.prepare(`UPDATE event_records SET
+      content_class=?, classification_confidence=?, classification_reason=?, classification_evidence_json=?,
+      classification_features_json=?, classification_missing_evidence_json=?, article_eligible=?, social_eligible=?,
+      default_route=?, classification_status=?, updated_at=? WHERE id=?`).run(
+      String(classification.content_class || classification.contentClass || 'news_event'),
+      Number.isFinite(Number(classification.confidence)) ? Number(classification.confidence) : null,
+      String(classification.reason || ''),
+      JSON.stringify(classification.evidence || []),
+      JSON.stringify(classification.features || {}),
+      JSON.stringify(classification.missing_evidence || classification.missingEvidence || []),
+      classification.article_eligible ?? classification.articleEligible ? 1 : 0,
+      classification.social_eligible ?? classification.socialEligible ? 1 : 0,
+      String(classification.default_route || classification.defaultRoute || 'editorial_review'),
+      String(classification.status || classification.classification_status || 'needs_review'),
+      now, String(eventId));
+    return this.get(eventId);
   }
 
   list({ status = null, limit = 200 } = {}) {
     const rows = status
       ? this.db.prepare('SELECT * FROM event_records WHERE status=? ORDER BY COALESCE(last_update_at,last_seen_at) DESC LIMIT ?').all(status, limit)
       : this.db.prepare('SELECT * FROM event_records ORDER BY COALESCE(last_update_at,last_seen_at) DESC LIMIT ?').all(limit);
-    return rows.map((row) => ({ ...row, legacy_ids: parseJson(row.legacy_ids_json, []), normalized: parseJson(row.normalized_json, {}) }));
+    return rows.map(withClassification);
   }
 
   listHotspots({ eventId = null, batchId = null, limit = 100000 } = {}) {

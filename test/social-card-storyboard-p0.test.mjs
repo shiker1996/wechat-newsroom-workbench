@@ -33,6 +33,17 @@ test('步骤块兼容字符串 items，避免只渲染序号而丢失步骤正�
   assert.doesNotMatch(html,/<h3><\/h3><p><\/p>/);
 });
 
+test('列表块的分号串按列表条目渲染，不降级成单段落',()=>{
+  const html=renderStoryboardBlock({
+    type:'list',
+    title:'关键节点',
+    content:'2025年9月：发布实验版本；两个多月后：发布正式版；2026年8月：发布视觉理解模型。',
+  });
+  assert.equal((html.match(/<li/g)||[]).length,3);
+  assert.match(html,/class="content-block list-block"/);
+  assert.doesNotMatch(html,/class="content-block text-block"/);
+});
+
 test('完整 fenced code 不受内容块类型影响，统一渲染为代码块',()=>{
   const html=renderStoryboardBlock({type:'list',title:'安装命令',content:'```bash\ncurl -fsSl https://example.com/install | bash\n```'});
   assert.match(html,/class="content-block code-block"/);
@@ -93,8 +104,8 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'f5c751c173488a41bb14c5600b2d124e63ee99e4a412a412d89a09ff031bfe6c',
-    'repository/xiaohongshu':'480e884fca0cd7a9f3b6267db48b3f0603a4f278b78aa1b3c8d82fffa9282665',
+    'repository/wechat':'634eff048c59194716556b9c136f4859429e7ba7b82f874d92b53ada0b5630d2',
+    'repository/xiaohongshu':'3fa5cacd51991027f85bc32724b0bba1db19ba77df705a2153bac030a4936803',
     'event/wechat':'83f0cd37b135297a73d14cbf4258f35bd776cbcbc98432f9078e90854e5f16e5',
     'event/xiaohongshu':'15045ead8eb8b5ad610886a511ee192b6c7c8b656d321c0eb014efa8789e1901',
     'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
@@ -148,6 +159,25 @@ test('P2 图文编辑室展示故事板技能选择并随请求提交',()=>{
   assert.match(skills,/storyboard: "故事板规划"/);
 });
 
+test('新增开源技术与趋势故事板复用事件图文输出契约',()=>{
+  for(const [skillName,requiredMethod] of [
+    ['open-source-technology-storyboard','机制'],
+    ['open-source-trend-storyboard','趋势判断'],
+  ]){
+    const bundle=loadSkillBundle({workspaceRoot:root,skillName});
+    const prompt=buildSocialCardStoryboardSystemPrompt({
+      workspaceRoot:root,skillId:skillName,skillPrompt:bundle.prompt,contentType:'event',channelMode:'wechat',
+    });
+    assert.match(prompt,new RegExp(requiredMethod));
+    assert.match(prompt,/顶层必须直接返回 `card_plan` 数组/);
+    assert.match(prompt,/"content_blocks"/);
+    assert.match(prompt,/不要返回 `storyboard\.pages` 或 `blocks`/);
+    assert.match(prompt,/`list`.*`items`/);
+    assert.match(prompt,/禁止在列表块写 `content`/);
+    assert.match(prompt,/封面最多 1 个核心内容块/);
+  }
+});
+
 test('图文创作页以事实、故事板和交付三阶段组织主路径',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
@@ -188,6 +218,7 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.match(repository.prompt,/awesome\/list\/catalog/);
   assert.match(repository.prompt,/禁止所有仓库机械套用/);
   assert.match(repository.prompt,/不单设信息贫乏的“适用场景”页/);
+  assert.match(repository.prompt,/list 必须使用 items 字符串数组|内容必须逐条写入 `items`/);
   assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);
   assert.match(repository.prompt,/不用“点赞、收藏、转发”代替内容结论/);
   assert.match(event.prompt,/传播张力不得高于证据强度/);

@@ -11,6 +11,7 @@ import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skill
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { batchTopicsDir, candidateArticleDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveArticleLength } from '../../../platform/core/config.mjs';
+import { evaluateArticleFactEligibility } from '../domain/article-fact-eligibility.mjs';
 import {
   ARTICLE_LENGTH_RANGE, articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief,
   buildDraftUserPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill,
@@ -122,6 +123,14 @@ ${current}`,maxOutputTokens);
 
 export async function runArticlePipeline({gateway,store,batchId,candidateId,provider,workspaceRoot,snapshotId=null,skillSelection=null,stageSelections=null,articleLength=null,onProgress=()=>{}}) {
   const candidate=store.getCandidate(candidateId); if(!candidate||candidate.batch_id!==batchId)throw new Error('候选不存在或不属于当前批次');
+  const parseSnapshot = (value, fallback) => { try { const parsed = JSON.parse(value || ''); return parsed && typeof parsed === 'object' ? parsed : fallback; } catch { return fallback; } };
+  const classification = { content_class: candidate.content_class || 'news_event', status: candidate.classification_status || 'needs_review', confidence: candidate.classification_confidence,
+    reason: candidate.classification_reason || '', evidence: parseSnapshot(candidate.classification_evidence_json, []), features: parseSnapshot(candidate.classification_features_json, {}) };
+  const routeSnapshot = String(candidate.content_route || '').trim();
+  const routeGate = (candidate.article_eligible === false || Number(candidate.article_eligible) === 0 || (routeSnapshot && routeSnapshot !== 'article'))
+    ? { eligible: false, reason: candidate.article_eligibility_reason || '候选尚未取得文章路线资格' }
+    : evaluateArticleFactEligibility({ classification });
+  if (!routeGate.eligible) throw new Error(`文章路线门禁未通过：${routeGate.reason}`);
   const editorial=candidate.editorial;
   if(editorial.brief_status!=='LOCKED')throw new Error('必须先完成编辑会并锁定 article-brief.md');
   const editorialReadiness=evaluateEditorialReadiness({candidate,editorial});
@@ -219,6 +228,9 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   recordStage('fact-base',orchestratorSkill,['00-article-brief.md','source-cache'],'02-fact-base.json');
   const factIssue=unverifiedFactBaseIssue(factBase);
   if(factIssue)throw new Error(factIssue);
+  const factGate = evaluateArticleFactEligibility({ classification, factBase });
+  writeFile(path.join(workdir,'02-fact-gate.json'), JSON.stringify(factGate, null, 2));
+  if (!factGate.eligible) throw new Error(`文章事实门禁未通过：${factGate.reason}`);
   onProgress('Step 2 建立事实基座、大纲与标题候选');
   const PLAN_SYSTEM = `${buildArticleStageSystem(orchestratorSkill,'planning')}\n\n## 账号上下文\n${formatAccountContext({workspaceRoot})}`;
   const planningResult=await gateway.complete({provider,purpose:'article-planning',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { scoreCards } from '../../../features/research/index.mjs';
+import { isPureProjectEvent, scoreCards } from '../../../features/research/index.mjs';
 import { routeBreakingAnalysis } from '../../../features/articles/index.mjs';
-import { buildCustomFactSheet, customFactMarkdown, customSourceUrl } from '../../../features/social-cards/index.mjs';
+import { buildCustomFactSheet, customFactMarkdown, customSourceUrl, socialRouteForContentClass } from '../../../features/social-cards/index.mjs';
 import { createRepositoryCandidate } from '../../../features/social-cards/index.mjs';
 import { extractLocalProjectPath, readLocalProjectViaRegistry as readLocalProject } from '../../integrations/local-project-reader.mjs';
 import { resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
@@ -17,6 +17,12 @@ import { runWithThinkingSink } from '../../llm/gateway.mjs';
 
 function readJsonFile(filePath) {
   try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
+}
+
+function saveSocialClassification(store, candidateId, route) {
+  const values = [route.contentClass, 'snapshot', '手动从事件热榜加入图文池', new Date().toISOString(), candidateId];
+  if (store.db?.prepare) store.db.prepare('UPDATE candidates SET content_class=?, classification_status=?, classification_reason=?, updated_at=? WHERE id=?').run(...values);
+  else store.updateCandidate?.(candidateId, { content_class: route.contentClass, classification_status: 'snapshot', classification_reason: '手动从事件热榜加入图文池' });
 }
 
 function compositeScoreContext({ root, batchId, hotspots, store }) {
@@ -71,6 +77,25 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
       return respond(json, response, 200, candidates);
     } catch (error) { return respond(json, response, 400, { error: error.message }); }
   }
+  const promoteArticleMatch = pathname.match(/^\/api\/candidates\/(\d+)\/promote-article$/);
+  if (promoteArticleMatch && request.method === 'POST') {
+    const candidate = store.getCandidate(Number(promoteArticleMatch[1]));
+    if (!candidate) return respond(json, response, 404, { error: '候选不存在' });
+    const input = await body(request);
+    const contentClass = String(input.contentClass || input.content_class || '').trim();
+    if (!['open_source_technology', 'open_source_trend'].includes(contentClass)) {
+      return respond(json, response, 400, { error: '人工晋级只能选择 open_source_technology 或 open_source_trend' });
+    }
+    const evidence = Array.isArray(input.evidence) ? input.evidence.filter((item) => item && String(item.claim || '').trim()) : [];
+    if (!evidence.length) return respond(json, response, 400, { error: '人工晋级必须提供至少一条可核验的技术或趋势证据' });
+    const features = input.features && typeof input.features === 'object' ? input.features : {};
+    const reason = String(input.reason || '').trim();
+    if (!reason) return respond(json, response, 400, { error: '人工晋级必须填写分类理由' });
+    store.db.prepare(`UPDATE candidates SET content_class=?, classification_status='manual', classification_confidence=1, classification_reason=?, classification_evidence_json=?, classification_features_json=?, article_eligible=1, article_eligibility_reason=?, content_route='article', score_status='ready', score_warning='', status='pooled', updated_at=? WHERE id=?`)
+      .run(contentClass, reason, JSON.stringify(evidence), JSON.stringify(features), '人工晋级后仍需通过事实基座门禁', new Date().toISOString(), candidate.id);
+    store.addCandidateTracks(candidate.id, ['article'], { status: 'pooled', pool_role: '人工晋级文章' });
+    return respond(json, response, 200, store.getCandidate(candidate.id));
+  }
   const breakingAnalysisMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/breaking-analysis$/);
   if (breakingAnalysisMatch && request.method === 'POST') {
     const input = await body(request); const batchId = decodeURIComponent(breakingAnalysisMatch[1]); const batch = store.getBatch(batchId);
@@ -93,12 +118,22 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
   if (candidatesMatch && request.method === 'POST') {
     const batchId = decodeURIComponent(candidatesMatch[1]); const input = await body(request);
     if (!Array.isArray(input.hotspotIds)) return respond(json, response, 400, { error: 'hotspotIds 必须是数组' });
-    const tracks = Array.isArray(input.tracks) && input.tracks.length ? input.tracks : ['article']; const added = store.addCandidates(batchId, input.hotspotIds, { tracks });
-    if (tracks.includes('social_cards') && input.socialOutputMode === 'wechat-event-cards') {
+    const tracks = Array.isArray(input.tracks) && input.tracks.length ? input.tracks : ['article'];
+    if (tracks.includes('article')) {
+      const batch = store.getBatch(batchId);
+      const projects = (batch?.hotspots || []).filter((hotspot) => input.hotspotIds.some((id) => Number(id) === Number(hotspot.id)))
+        .filter((hotspot) => isPureProjectEvent({ representative_title: hotspot.title, title: hotspot.title, articles: [hotspot] }));
+      if (projects.length) return respond(json, response, 409, { error: '纯项目默认只能进入图文池；如需写文章，请先补充技术机制或生态趋势证据并人工晋级分类', code: 'ARTICLE_ROUTE_REQUIRES_PROMOTION', hotspotIds: projects.map((item) => item.id) });
+    }
+    const added = store.addCandidates(batchId, input.hotspotIds, { tracks });
+    if (tracks.includes('social_cards') && (input.socialContentClass || input.socialOutputMode)) {
+      const contentClass = String(input.socialContentClass || (String(input.socialOutputMode || '').includes('technology') ? 'open_source_technology' : String(input.socialOutputMode || '').includes('trend') ? 'open_source_trend' : 'news_event'));
+      const route = socialRouteForContentClass(contentClass);
       const socialCandidates = store.listCandidates(batchId, 'social_cards').filter((candidate) => input.hotspotIds.some((hotspotId) => Number(hotspotId) === Number(candidate.hotspot_id)));
       for (const candidate of socialCandidates) {
-        store.updateCandidateTrack(candidate.id, 'social_cards', { output_mode: 'wechat-event-cards', pool_role: input.poolRole || '事件热榜图文' });
-        store.saveCardEditorial(candidate.id, { ...store.getCardEditorial(candidate.id), output_mode: 'wechat-event-cards' });
+        saveSocialClassification(store, candidate.id, route);
+        store.updateCandidateTrack(candidate.id, 'social_cards', { output_mode: route.outputMode, pool_role: input.poolRole || route.poolRole });
+        store.saveCardEditorial(candidate.id, { ...store.getCardEditorial(candidate.id), output_mode: route.outputMode });
       }
     }
     if (tracks.includes('social_cards') && input.socialScoreDetails && input.hotspotIds.length === 1) { const candidate = added.find((item) => Number(item.hotspot_id) === Number(input.hotspotIds[0])); if (candidate) store.saveSocialScore(candidate.id, input.socialScoreDetails); }
@@ -108,10 +143,18 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
   if (compositeMatch && request.method === 'POST') {
     const batchId = decodeURIComponent(compositeMatch[1]); const input = await body(request);
     if (!Array.isArray(input.hotspotIds) || input.hotspotIds.length < 2) return respond(json, response, 400, { error: '综合选题至少需要 2 个热点' });
+    const compositeBatch = store.getBatch(batchId);
+    const compositeProjects = (compositeBatch?.hotspots || []).filter((hotspot) => input.hotspotIds.some((id) => Number(id) === Number(hotspot.id)))
+      .filter((hotspot) => isPureProjectEvent({ representative_title: hotspot.title, title: hotspot.title, articles: [hotspot] }));
+    if ((Array.isArray(input.tracks) ? input.tracks : ['article']).includes('article') && compositeProjects.length) {
+      return respond(json, response, 409, { error: '综合选题包含纯项目，不能直接进入文章路线；请先人工晋级项目分类或仅选择非项目事件', code: 'ARTICLE_ROUTE_REQUIRES_PROMOTION', hotspotIds: compositeProjects.map((item) => item.id) });
+    }
     const composite = store.createCompositeCandidate(batchId, input.hotspotIds, input);
-    if ((Array.isArray(input.tracks) ? input.tracks : []).includes('social_cards') && composite && !candidateRepositoryUrl(composite)) {
-      store.updateCandidateTrack(composite.id, 'social_cards', { output_mode: 'wechat-event-cards' });
-      store.saveCardEditorial(composite.id, { ...store.getCardEditorial(composite.id), output_mode: 'wechat-event-cards' });
+    if ((Array.isArray(input.tracks) ? input.tracks : []).includes('social_cards') && composite && (input.socialContentClass || !candidateRepositoryUrl(composite))) {
+      const route = socialRouteForContentClass(input.socialContentClass || 'news_event');
+      saveSocialClassification(store, composite.id, route);
+      store.updateCandidateTrack(composite.id, 'social_cards', { output_mode: route.outputMode, pool_role: input.poolRole || route.poolRole });
+      store.saveCardEditorial(composite.id, { ...store.getCardEditorial(composite.id), output_mode: route.outputMode });
     }
     try {
       if (composite && models) {

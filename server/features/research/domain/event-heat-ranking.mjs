@@ -53,6 +53,101 @@ function reasonList({ state, newReportCount, sourceCount, repeatDays, currentCou
   return reasons.length ? reasons : ['等待更多可核验信息'];
 }
 
+function classificationOf(event = {}) {
+  const raw = event.classification || event.card?.classification || event.event_card?.classification || {};
+  const contentClass = String(raw.contentClass || raw.content_class || event.content_class || '').trim();
+  const features = raw.features || event.classification_features || {};
+  return {
+    contentClass: ['github_project', 'open_source_technology', 'open_source_trend', 'news_event'].includes(contentClass)
+      ? contentClass : 'news_event',
+    status: String(raw.status || raw.classification_status || event.classification_status || 'needs_review'),
+    features: features && typeof features === 'object' ? features : {},
+  };
+}
+
+function eventText(event = {}) {
+  return [event.title, event.representative_title, event.normalized?.description, event.keywords,
+    event.tags?.eventParts, event.eventParts, ...(event.articles || []).map((article) => [article.title, article.summary, article.source])]
+    .flat(4).filter(Boolean).join(' ');
+}
+
+function preScoresOf(event = {}) {
+  return event.tags?.preScores || event.preScores || {};
+}
+
+function sourceStats({ currentHotspots, currentMemberships, features }) {
+  const sourceCount = new Set(currentHotspots.map((hotspot) => hotspot.source_name || hotspot.source_group || hotspot.source).filter(Boolean)).size;
+  const sourceEvidenceCount = Array.isArray(features.sourceEvidence) ? features.sourceEvidence.length : 0;
+  return {
+    sourceCount: Math.max(sourceCount, Number(features.independentSourceCount) || 0),
+    sourceEvidenceCount,
+    reportCount: currentMemberships.length,
+  };
+}
+
+function scorePartsForClass(contentClass, { event, currentHotspots, currentMemberships, base, asOf }) {
+  const features = classificationOf(event).features;
+  const scores = preScoresOf(event);
+  const stats = sourceStats({ currentHotspots, currentMemberships, features });
+  const repositoryMeta = event.repositoryMeta || event.articles?.find((article) => article.repositoryMeta)?.repositoryMeta || null;
+  const text = eventText(event);
+  const freshness = Math.round(15 * decay(base.lastUpdateAt ? timeValue(base.lastUpdateAt) : timeValue(base.lastSeenAt), asOf, 240));
+  if (contentClass === 'open_source_technology') {
+    const novelty = clamp((Number(scores.informationGain) || 0) / 15 * 15 + (features.hasPaper ? 5 : 0) + (features.hasBenchmark ? 5 : 0), 0, 25);
+    const mechanismDepth = clamp((features.hasTechnicalDocs ? 8 : 0) + (features.hasPaper ? 7 : 0) + (features.hasBenchmark ? 5 : 0), 0, 20);
+    const engineeringImpact = clamp((Number(scores.impact) || 0) / 10 * 12 + (features.hasAdoptionSignal ? 4 : 0) + (features.hasCompatibilitySignal ? 4 : 0), 0, 20);
+    const reproducibility = clamp((features.hasBenchmark ? 9 : 0) + (features.hasPaper ? 4 : 0) + (features.hasTechnicalDocs ? 4 : 0) + (repositoryMeta ? 3 : 0), 0, 15);
+    const timeliness = clamp(Math.round(20 * decay(base.lastUpdateAt ? timeValue(base.lastUpdateAt) : timeValue(base.lastSeenAt), asOf, 168)), 0, 20);
+    return { novelty: Number(novelty.toFixed(1)), mechanismDepth: Number(mechanismDepth.toFixed(1)), engineeringImpact: Number(engineeringImpact.toFixed(1)), reproducibility: Number(reproducibility.toFixed(1)), timeliness, sourceCount: stats.sourceCount, scoreValue: Number(clamp(novelty + mechanismDepth + engineeringImpact + reproducibility + timeliness, 0, 100).toFixed(1)) };
+  }
+  if (contentClass === 'open_source_trend') {
+    const breadth = clamp((stats.sourceCount * 4) + ((Number(features.subjectCount) || 0) * 4), 0, 25);
+    const trajectory = clamp((features.hasTimeline ? 8 : 0) + (features.hasAdoptionSignal ? 5 : 0) + (features.hasMigrationSignal ? 5 : 0) + (base.repeatDays > 1 ? 2 : 0), 0, 20);
+    const ecosystemImpact = clamp((features.hasAdoptionSignal ? 7 : 0) + (features.hasMigrationSignal ? 5 : 0) + (features.hasCompatibilitySignal ? 4 : 0) + (features.hasPolicyOrStandardSignal ? 4 : 0), 0, 20);
+    const evidenceQuality = clamp((stats.sourceCount * 4) + (features.hasTechnicalDocs ? 2 : 0) + (stats.sourceEvidenceCount > 2 ? 2 : 0), 0, 20);
+    const timeliness = clamp(Math.round(15 * decay(base.lastUpdateAt ? timeValue(base.lastUpdateAt) : timeValue(base.lastSeenAt), asOf, 240)), 0, 15);
+    return { breadth: Number(breadth.toFixed(1)), trajectory: Number(trajectory.toFixed(1)), ecosystemImpact: Number(ecosystemImpact.toFixed(1)), evidenceQuality: Number(evidenceQuality.toFixed(1)), timeliness, sourceCount: stats.sourceCount, scoreValue: Number(clamp(breadth + trajectory + ecosystemImpact + evidenceQuality + timeliness, 0, 100).toFixed(1)) };
+  }
+  if (contentClass === 'github_project') {
+    const projectClarity = clamp((repositoryMeta ? 18 : 8) + (features.hasTechnicalDocs ? 5 : 0) + (/工具|框架|插件|workflow|cli|sdk/i.test(text) ? 7 : 0), 0, 30);
+    const demonstrability = clamp((features.hasGithubRepository ? 12 : 4) + (features.hasRelease ? 5 : 0) + (repositoryMeta?.language ? 4 : 0) + (repositoryMeta?.topics?.length ? 4 : 0), 0, 25);
+    const discoveryFreshness = clamp(Math.round(20 * decay(base.lastUpdateAt ? timeValue(base.lastUpdateAt) : timeValue(base.lastSeenAt), asOf, 96)), 0, 20);
+    const sourceCompleteness = clamp(stats.sourceCount * 4 + (stats.sourceEvidenceCount > 1 ? 4 : 0) + (Number(features.repositoryCount) > 0 ? 4 : 0), 0, 15);
+    const visualPotential = clamp((features.hasGithubRepository ? 6 : 2) + (repositoryMeta?.topics?.length ? 4 : 0), 0, 10);
+    return { projectClarity: Number(projectClarity.toFixed(1)), demonstrability: Number(demonstrability.toFixed(1)), discoveryFreshness, sourceCompleteness: Number(sourceCompleteness.toFixed(1)), visualPotential: Number(visualPotential.toFixed(1)), sourceCount: stats.sourceCount, scoreValue: Number(clamp(projectClarity + demonstrability + discoveryFreshness + sourceCompleteness + visualPotential, 0, 100).toFixed(1)) };
+  }
+  return {
+    freshness: base.freshnessScore,
+    increment: base.incrementScore,
+    sourceSpread: base.sourceSpreadScore,
+    momentum: base.momentumScore,
+    chinaRelevance: base.chinaRelevanceScore,
+    evidence: base.evidenceScore,
+    historyDecay: base.historyDecayScore,
+    scoreValue: base.heatScore,
+  };
+}
+
+/** Score a classified stable event without forcing project/technology/trend into news heat semantics. */
+export function scoreClassifiedEvent({ event, currentMemberships = [], historicalMemberships = [], hotspotsById = new Map(), asOf = Date.now() }) {
+  const base = scoreEventHeat({ event, currentMemberships, historicalMemberships, hotspotsById, asOf });
+  const { contentClass, status } = classificationOf(event);
+  const scoreParts = scorePartsForClass(contentClass, { event, currentHotspots: currentMemberships.map((membership) => hotspotsById.get(Number(membership.hotspot_id))).filter(Boolean), currentMemberships, base, asOf });
+  const scoreValue = Number.isFinite(Number(scoreParts.scoreValue)) ? Number(scoreParts.scoreValue) : base.heatScore;
+  return {
+    ...base,
+    contentClass,
+    classificationStatus: status,
+    scoreModel: contentClass,
+    scoreValue,
+    heatScore: scoreValue,
+    eventValue: scoreValue,
+    t: scoreValue,
+    scoreParts,
+    scoreComparable: false,
+  };
+}
+
 /**
  * Build a deterministic event-level heat ranking. The model/resolver supplies
  * event identity; this function only scores persisted evidence and recency.
@@ -128,7 +223,7 @@ export function scoreEventHeat({ event, currentMemberships = [], historicalMembe
   };
 }
 
-export function buildEventHeatRanking({ store, batch, previousItems = [], asOf = Date.now() }) {
+export function buildEventHeatRanking({ store, batch, previousItems = [], events = [], asOf = Date.now() }) {
   if (!store || !batch) return { schemaVersion: 2, titleVersion: 2, generatedAt: new Date(asOf).toISOString(), batchId: batch?.id || null, items: [] };
   const currentMemberships = store.listEventHotspots?.({ batchId: batch.id, limit: 100000 }) || [];
   if (!currentMemberships.length) return { schemaVersion: 2, titleVersion: 2, generatedAt: new Date(asOf).toISOString(), batchId: batch.id, items: [] };
@@ -145,25 +240,41 @@ export function buildEventHeatRanking({ store, batch, previousItems = [], asOf =
     historyByEvent.get(membership.event_id).push(membership);
   }
   const records = new Map((store.listEventRecords?.({ limit: 100000 }) || []).map((event) => [event.id, event]));
-  const previous = new Map((previousItems || []).map((item) => [item.eventId, item.rank]));
+  const eventInputs = new Map((events || []).map((event) => [event.event_id || event.id, event]));
+  const previous = new Map((previousItems || []).map((item) => [item.eventId, item]));
   const items = [...currentByEvent.entries()].map(([eventId, memberships]) => {
-    const event = records.get(eventId) || { id: eventId, title: memberships[0]?.title || eventId, event_state: 'continuing' };
-    return scoreEventHeat({ event, currentMemberships: memberships, historicalMemberships: historyByEvent.get(eventId) || memberships, hotspotsById, asOf });
-  }).sort((left, right) => right.heatScore - left.heatScore
+    const record = records.get(eventId) || { id: eventId, title: memberships[0]?.title || eventId, event_state: 'continuing' };
+    const input = eventInputs.get(eventId) || record;
+    const classification = input.classification || (record.content_class ? { content_class: record.content_class, status: record.classification_status, features: record.classification_features } : null);
+    return scoreClassifiedEvent({ event: { ...record, ...input, id: eventId, classification }, currentMemberships: memberships, historicalMemberships: historyByEvent.get(eventId) || memberships, hotspotsById, asOf });
+  }).sort((left, right) => right.scoreValue - left.scoreValue
     || right.incrementScore - left.incrementScore
     || right.sourceCount - left.sourceCount
     || right.reportCount - left.reportCount
     || String(left.lastSeenAt || '').localeCompare(String(right.lastSeenAt || ''))
     || left.eventId.localeCompare(right.eventId));
-  const ranked = items.map((item, index) => ({ ...item, rank: index + 1, previousRank: previous.get(item.eventId) ?? null,
-    rankDelta: previous.has(item.eventId) ? previous.get(item.eventId) - (index + 1) : null }));
+  const ranked = items.map((item, index) => {
+    const prior = previous.get(item.eventId);
+    const priorRank = Number.isFinite(Number(prior?.rank)) ? Number(prior.rank) : null;
+    return { ...item, rank: index + 1, previousRank: priorRank, rankDelta: priorRank == null ? null : priorRank - (index + 1) };
+  });
+  const rankings = Object.fromEntries(['news_event', 'open_source_technology', 'open_source_trend', 'github_project'].map((contentClass) => {
+    const board = ranked.filter((item) => item.contentClass === contentClass).map((item, index) => {
+      const prior = previous.get(item.eventId);
+      const priorRank = prior?.contentClass === contentClass && Number.isFinite(Number(prior.rank)) ? Number(prior.rank) : null;
+      return { ...item, rank: index + 1, boardRank: index + 1, rankScope: contentClass, previousRank: priorRank, rankDelta: priorRank == null ? null : priorRank - (index + 1) };
+    });
+    return [contentClass, { contentClass, scoreModel: contentClass, scoreComparable: false, totalEvents: board.length, items: board }];
+  }));
   return {
     schemaVersion: 2,
     titleVersion: 2,
     generatedAt: new Date(asOf).toISOString(),
     batchId: batch.id,
     scoring: { freshness: 25, increment: 25, sourceSpread: 15, momentum: 15, chinaRelevance: 10, evidence: 10, historyDecay: -20, eventValue: 100 },
+    scoringModels: { news_event: 'T_news', open_source_technology: 'T_technology', open_source_trend: 'T_trend', github_project: 'projectDiscoveryScore' },
     totalEvents: ranked.length,
+    rankings,
     items: ranked,
   };
 }

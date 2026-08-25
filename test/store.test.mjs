@@ -626,6 +626,29 @@ test('多报道事件研判落池为事件级综合候选并携带评分，重�
   }
 });
 
+test('已锁定候选保留历史内容路线快照，不被新一轮分类覆盖', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-locked-route-snapshot-'));
+  let store;
+  try {
+    store = new Store(path.join(tempRoot, 'test.db'));
+    const batch = store.createBatch({ date: '2026-07-23', title: '历史路线快照' });
+    store.addHotspots(batch.id, 'github', [{ title: '历史项目', url: 'https://github.com/acme/demo' }]);
+    const hotspot = store.getBatch(batch.id).hotspots[0];
+    store.saveAnalyzedCandidates(batch.id, [{ hotspotId: hotspot.id, poolRole: '核心8条', riskLevel: '低', angle: '项目角度', thesis: '项目命题', contentClass: 'github_project', contentRoute: 'social_only', articleEligible: false, h: 20, b: 20, p: 20, f: 20 }]);
+    const candidate = store.listCandidates(batch.id, 'article')[0];
+    store.updateCandidateTrack(candidate.id, 'article', { status: 'locked' });
+    store.saveAnalyzedCandidates(batch.id, [{ hotspotId: hotspot.id, poolRole: '核心8条', riskLevel: '低', angle: '新闻角度', thesis: '新闻命题', contentClass: 'news_event', contentRoute: 'article', articleEligible: true, h: 80, b: 80, p: 80, f: 80 }]);
+    const preserved = store.getCandidate(candidate.id);
+    assert.equal(preserved.content_class, 'github_project');
+    assert.equal(preserved.content_route, 'social_only');
+    assert.equal(preserved.article_eligible, 0);
+    assert.equal(preserved.tracks.find((track) => track.track === 'article').status, 'locked');
+  } finally {
+    store?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('议题综合候选按标题去重、刷新成员并优先展示自身标题', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-topic-dedup-'));
   let store;

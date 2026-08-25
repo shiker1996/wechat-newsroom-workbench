@@ -6,6 +6,7 @@ import { isFreshForBatch, tagsOf } from '../../domain/hotspot-clustering.mjs';
 import { resolveStableBatchEvents } from '../stable-event-service.mjs';
 import { parseModelJson as parseSharedModelJson } from '../../../../platform/llm/model-json.mjs';
 import { selectionPrompt } from '../../llm/selection-prompts.mjs';
+import { deriveClassificationFeatures, normalizeEventClassification } from '../../domain/content-routing.mjs';
 
 function parseModelJson(result, store) {
   return parseSharedModelJson(result, { store, label: '事件卡模型' });
@@ -25,9 +26,26 @@ export function overviewHtml(clusters) {
   return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>热点全量事件聚类</title><style>body{font:14px/1.65 system-ui;background:#f4f0e6;color:#17201e;margin:0;padding:32px}main{max-width:1100px;margin:auto}h1{font:700 34px Georgia,serif}.note{border-left:5px solid #e44b3f;padding:12px;background:#fff}.event{background:#fff;border:1px solid #d8d0c0;margin:12px 0;padding:18px}.event b{color:#c53b31}.links a{display:block;color:#355f55;margin:4px 0}</style><main><h1>热点全量事件聚类</h1><p class="note">展示本批采集覆盖结构，不等于真实舆情热度或事实可信度。共 ${payload.reduce((s,e)=>s+e.report_count,0)} 条报道、${payload.length} 个事件。</p>${payload.sort((a,b)=>b.source_count-a.source_count||b.report_count-a.report_count).map((e)=>`<article class="event"><b>${e.source_count} 个来源 / ${e.report_count} 条报道</b><h2>${esc(e.representative_title)}</h2><p>${esc(e.topic_category)} · ${esc(e.market_scope)} · 国内相关度 ${e.china_relevance_score}/12</p><p>${esc(e.china_relevance_reason)}</p><div class="links">${e.articles.map((a)=>a.url?`<a href="${esc(a.url)}">${esc(a.source)} · ${esc(a.title)}</a>`:`<span>${esc(a.source)} · ${esc(a.title)}</span>`).join('')}</div></article>`).join('')}</main></html>`;
 }
 
-function normalizeEventCard(raw) {
+function classificationArtifact(value) {
+  return {
+    content_class: value.contentClass,
+    confidence: value.confidence,
+    status: value.status,
+    reason: value.reason,
+    evidence: value.evidence,
+    article_eligible: value.articleEligible,
+    social_eligible: value.socialEligible,
+    default_route: value.defaultRoute,
+    article_eligibility_reason: value.articleEligibilityReason,
+    missing_evidence: value.missingEvidence,
+    features: value.features,
+  };
+}
+
+function normalizeEventCard(raw, event = {}) {
   const text = (value, max = 120) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
   const list = (value, max = 5) => (Array.isArray(value) ? value : []).map((item) => text(item)).filter(Boolean).slice(0, max);
+  const classification = normalizeEventClassification(raw.classification || raw, { event, features: deriveClassificationFeatures(event) });
   return {
     conclusion: text(raw.conclusion, 160),
     background: text(raw.background, 120),
@@ -37,6 +55,7 @@ function normalizeEventCard(raw) {
     timeline: (Array.isArray(raw.timeline) ? raw.timeline : []).map((item) => ({ time: text(item?.time, 30), fact: text(item?.fact, 120) })).filter((item) => item.fact).slice(0, 5),
     unverified: list(raw.unverified, 4),
     angles: list(raw.angles, 3),
+    classification: classificationArtifact(classification),
   };
 }
 
@@ -56,7 +75,17 @@ export async function generateEventCards({ gateway, store, clusters, batchId, pr
       representative_title: event.representative_title,
       keywords: event.keywords,
       latest_time: event.latest_time,
-      articles: event.articles.map((article) => ({ title: article.title, source: article.source, time: article.time, summary: article.summary || '' })),
+      classification_features: deriveClassificationFeatures(event),
+      articles: event.articles.map((article, index) => ({
+        source_id: article.source_id || (article.hotspot_id != null ? `hotspot:${article.hotspot_id}` : `source:${index + 1}`),
+        title: article.title,
+        source: article.source,
+        source_class: deriveClassificationFeatures(event).sourceEvidence.find((item) => item.sourceId === (article.source_id || (article.hotspot_id != null ? `hotspot:${article.hotspot_id}` : `source:${index + 1}`)))?.sourceClass || 'media_report',
+        source_status: article.source_status || 'ok',
+        url: article.url || null,
+        time: article.time,
+        summary: article.summary || '',
+      })),
     }));
     const result = await gateway.complete({ provider, purpose: 'event-card', batchId, jsonMode: true,
       maxOutputTokens: Math.min(retry ? 2500 : 4500, providerConfig.maxOutputTokens),
@@ -84,7 +113,7 @@ export async function generateEventCards({ gateway, store, clusters, batchId, pr
       const event = chunk.find((item) => item.event_id === rawCard.event_id);
       if (!event || !String(rawCard.conclusion || '').trim()) continue;
       returned.add(event.event_id);
-      cards.set(event.event_id, normalizeEventCard(rawCard));
+      cards.set(event.event_id, normalizeEventCard(rawCard, event));
     }
     const missing = chunk.filter((event) => !returned.has(event.event_id));
     if (missing.length && !retry) {
@@ -154,8 +183,12 @@ export async function ensureBatchEventCards({ gateway, store, batchId, provider,
   } else {
     onProgress(`事件事实卡已存在，直接复用（${clusters.length} 个事件）`);
   }
-  for (const event of clusters) { const card = cachedCards.get(event.event_id); if (card) event.card = card; }
-  const items = clusters.filter((event) => event.card).map((event) => ({ event_id: event.event_id, title: event.representative_title, ...normalizeEventCard(event.card) }));
+  for (const event of clusters) {
+    const card = cachedCards.get(event.event_id);
+    if (card) event.card = normalizeEventCard(card, event);
+    if (event.card?.classification) store.saveEventClassification?.(event.event_id, event.card.classification);
+  }
+  const items = clusters.filter((event) => event.card).map((event) => ({ event_id: event.event_id, title: event.representative_title, ...event.card }));
   writeFile(eventCardsPath, JSON.stringify({ generated_at: new Date().toISOString(), total_events: clusters.length, failed, items }, null, 2));
   try {
     const stat = fs.statSync(eventCardsPath);

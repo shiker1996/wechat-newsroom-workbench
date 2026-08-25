@@ -32,7 +32,17 @@ export function cardBlockEditorHtml(block, index) {
 
 export function isCustomOutput(mode) { return String(mode || '').includes('custom-cards'); }
 export function isEventOutput(mode) { return String(mode || '').includes('event-cards'); }
-export function candidateMode(outputMode) { return isCustomOutput(outputMode) ? 'custom' : isEventOutput(outputMode) ? 'event' : 'tools'; }
+export function socialContentTypeFromOutput(mode, contentClass = '') {
+  if (contentClass === 'open_source_technology' || contentClass === 'open_source_trend' || String(mode || '').includes('technology-cards') || String(mode || '').includes('trend-cards')) return 'event';
+  if (contentClass === 'github_project' || String(mode || '').includes('tool-cards')) return 'repository';
+  if (isCustomOutput(mode)) return 'custom';
+  if (isEventOutput(mode)) return 'event';
+  return 'repository';
+}
+export function candidateMode(outputMode, contentClass = '') {
+  const type = socialContentTypeFromOutput(outputMode, contentClass);
+  return type === 'custom' ? 'custom' : type === 'event' ? 'event' : 'tools';
+}
 
 export function socialFactsHtml({ contentType, channelMode, facts, eventAnalysis }) {
   const fact = facts?.data;
@@ -51,13 +61,15 @@ export function socialFactsHtml({ contentType, channelMode, facts, eventAnalysis
     const materialsHtml = materials.length ? `<ul>${materials.map((item) => `<li>${escapeHtml(item.url)}（${item.status === 'ok' ? `抓取成功 ${item.content_chars} 字` : `抓取失败：${escapeHtml(item.error || '未知原因')}`}）</li>`).join('')}</ul>` : '';
     return `<div class="repository-fact-grid"><span><b>${escapeHtml(CUSTOM_TYPE_LABELS[fact.content_type] || fact.content_type)}</b>内容类型</span><span><b>${points.length}</b>核心要点</span><span><b>${materials.filter((item) => item.status === 'ok').length}/${materials.length}</b>素材抓取</span><span><b>${channelMode === 'xiaohongshu' ? '小红书' : '公众号'}</b>渠道</span></div><p>${escapeHtml(fact.topic || '')}</p><ul>${points.map((item) => `<li>[${escapeHtml(CUSTOM_LEVEL_LABELS[item.source_level] || item.source_level)}] ${escapeHtml(item.text)}</li>`).join('')}</ul>${materialsHtml}${fact.limitations ? `<small>限制：${escapeHtml(fact.limitations)}</small>` : ''}`;
   }
-  if (!fact) return facts?.error ? `<div class="pipeline-error">${escapeHtml(facts.error)}</div>` : '<div class="empty-state">尚未核验仓库。点击“核验 / 刷新仓库”。</div>';
+  if (!fact) return facts?.error ? `<div class="pipeline-error">${escapeHtml(facts.error)}</div>` : contentType === 'event' ? '<div class="empty-state">事件事实基座尚未生成，请先完成事件研判。</div>' : '<div class="empty-state">尚未核验仓库。点击“核验 / 刷新仓库”。</div>';
   return `<div class="repository-fact-grid"><span><b>${Number(fact.stars?.value || 0).toLocaleString()}</b>Stars</span><span><b>${escapeHtml(fact.license?.type || 'UNKNOWN')}</b>License</span><span><b>${escapeHtml(fact.latestRelease?.version || '未发现')}</b>Release</span><span><b>${escapeHtml(fact.maturity || 'unknown')}</b>成熟度</span></div><p>${escapeHtml(fact.description || '仓库未提供简介')}</p><small>核验时间：${escapeHtml(fact.stars?.checkedAt || facts.checked_at || '')}</small>${(fact.warnings || []).length ? `<ul>${fact.warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}`;
 }
 
 export function socialScoreView(score, contentType) {
   const data = score?.score || {};
-  const labels = contentType === 'event'
+  const labels = data.scoreModel === 'g_social-v1'
+    ? { factSupport: '事实支撑', visualPotential: '图文表现', readerValue: '读者价值', contentClarity: '内容清晰', productionReadiness: '生产就绪', saturationPenalty: '饱和扣分', riskPenalty: '风险扣分', missingEvidencePenalty: '证据扣分' }
+    : contentType === 'event'
     ? { informationDensity: '信息密度', visualNarrative: '视觉叙事', conflictEmotion: '冲突情绪', timeliness: '时效性', audienceRelevance: '受众相关', evidenceCompleteness: '证据完整', singleSource: '单源扣分', unverifiedAllegation: '未核实扣分' }
     : contentType === 'custom' ? {}
       : { toolClarity: '工具明确', scenarioValue: '场景价值', demonstrability: '可演示', visualPotential: '拆页潜力', saveSearchValue: '收藏搜索', sourceCompleteness: '来源完整', factGapPenalty: '事实扣分', permissionRiskPenalty: '权限扣分' };

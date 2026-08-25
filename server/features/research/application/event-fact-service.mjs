@@ -53,6 +53,10 @@ export function eventGroupsForCandidate({ store, workspaceRoot, candidate, conte
 export function synthesizeEventAnalysis(groups) {
   const list = Array.isArray(groups) ? groups : [];
   const cards = list.map((group) => group.card).filter(Boolean);
+  const classificationEvidence = cards.flatMap((card) => card.classification?.evidence || card.classification_evidence || []);
+  const timeline = cards.flatMap((card) => card.timeline || []);
+  const technicalEvidence = classificationEvidence.filter((item) => /technical|mechanism|architecture|benchmark|performance|机制|架构|性能|基准/i.test(`${item?.role || ''} ${item?.claim || ''}`));
+  const trendEvidence = classificationEvidence.filter((item) => /trend|adoption|migration|ecosystem|signal|趋势|采用|迁移|生态|变化/i.test(`${item?.role || ''} ${item?.claim || ''}`));
   const sources = list.flatMap((group) => (group.hotspots || []).map((hotspot) => {
     const doc = hotspot.sourceDoc;
     return doc
@@ -65,6 +69,13 @@ export function synthesizeEventAnalysis(groups) {
     factBase: {
       confirmedFacts: cards.flatMap((card) => card.confirmed_facts || []),
       claims: cards.flatMap((card) => card.unverified || []),
+      classificationEvidence,
+      mechanisms: technicalEvidence.filter((item) => /mechanism|机制/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
+      architecture: technicalEvidence.filter((item) => /architecture|架构/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
+      benchmarks: technicalEvidence.filter((item) => /benchmark|performance|性能|基准/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
+      signals: trendEvidence,
+      timeline,
+      actors: trendEvidence.filter((item) => /actor|主体|参与方/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
     },
     sources,
     sourceAudit: {

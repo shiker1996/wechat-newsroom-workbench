@@ -6,6 +6,8 @@ import { continuationBadge, escapeHtml, renderStoryboardBlock, renderTechnicalTe
 const LABELS = Object.freeze({
   repository: { cover: 'TOOL / RADAR', concept: 'PROBLEM / SIGNAL', feature: 'FEATURE / STACK', steps: 'FLOW / STEPS', data: 'DATA / BOARD', compare: 'COMPARE / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'RISK / BOUNDARY', ending: 'NEXT / MOVE' },
   event: { cover: 'EVENT / RADAR', concept: 'EVENT / SIGNAL', feature: 'FACT / STACK', steps: 'RESPONSE / FLOW', data: 'DATA / BOARD', compare: 'DISCUSSION / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'RISK / BOUNDARY', ending: 'NEXT / MOVE' },
+  technology: { cover: 'TECH / RADAR', concept: 'WHY / SIGNAL', feature: 'ARCH / STACK', steps: 'HOW / FLOW', data: 'BENCH / BOARD', compare: 'TRADEOFF / MODE', evidence: 'EVIDENCE / LOG', timeline: 'VERSION / LINE', risk: 'LIMIT / BOUNDARY', ending: 'NEXT / MOVE' },
+  trend: { cover: 'TREND / RADAR', concept: 'SIGNAL / FIRST', feature: 'ECOSYSTEM / STACK', steps: 'ADOPTION / FLOW', data: 'SIGNALS / BOARD', compare: 'PLAYERS / MODE', evidence: 'EVIDENCE / LOG', timeline: 'TIME / LINE', risk: 'BOUNDARY / CHECK', ending: 'NEXT / MOVE' },
   custom: { cover: 'NOTE / RADAR', concept: 'NOTE / SIGNAL', feature: 'POINT / STACK', steps: 'HOW / TO', data: 'DATA / BOARD', compare: 'COMPARE / MODE', evidence: 'SOURCE / LOG', timeline: 'TIME / LINE', risk: 'BOUNDARY / CHECK', ending: 'NEXT / MOVE' },
 });
 const NEON_TEMPLATE_IDS = new Set(['hero-metrics', 'problem-stack', 'feature-stack', 'steps-rail', 'metric-board', 'comparison-board', 'evidence-ledger', 'timeline-rail', 'risk-frame', 'closing-cta']);
@@ -17,6 +19,8 @@ function selected(selection, index) {
 function pageBrand({ contentType, channelMode, sourceLabel, repository, topic }) {
   const source = sourceLabel || repository || topic;
   if (contentType === 'event') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `EVENT DESK / ${source}`;
+  if (contentType === 'technology') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `TECH DESK / ${source}`;
+  if (contentType === 'trend') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `TREND DESK / ${source}`;
   if (contentType === 'custom') return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `CUSTOM / ${source}`;
   return channelMode === 'xiaohongshu' ? `小红书 · ${source}` : `OPEN SOURCE / ${source}`;
 }
@@ -62,7 +66,7 @@ export function renderNeonStoryboardSections({
     const densityAdjustment = selected(expandedDensityPages, index) ? 'expanded' : selected(relaxedDensityPages, index) ? 'relaxed' : 'none';
     const label = labels[role] || (pageKind === 'ending' ? 'NEXT / MOVE' : 'TOOL / CARD');
     const brand = pageBrand({ contentType, channelMode, sourceLabel, repository, topic });
-    const footer = disclosure || (contentType === 'event' ? '据公开素材整理 · 未核实内容已标注' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
+    const footer = disclosure || (contentType === 'event' ? '据公开素材整理 · 未核实内容已标注' : contentType === 'technology' ? '据开源技术资料整理 · 机制与性能以来源为准' : contentType === 'trend' ? '据公开开源信号整理 · 趋势判断不等同于事实' : contentType === 'custom' ? '内容整理自作者素材 · 建议性内容未实测' : '基于项目文档整理 · 未实际运行');
     const defaultTemplateId = ({ cover: 'hero-metrics', concept: 'problem-stack', feature: 'feature-stack', steps: 'steps-rail', data: 'metric-board', compare: 'comparison-board', evidence: 'evidence-ledger', timeline: 'timeline-rail', risk: 'risk-frame', ending: 'closing-cta' }[role] || 'problem-stack');
     const requestedTemplateId = String(page.layout_intent || '').trim();
     const templateId = NEON_TEMPLATE_IDS.has(requestedTemplateId) ? requestedTemplateId : defaultTemplateId;

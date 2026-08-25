@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { loadSkillBundle, selectSkillPromptReferences } from '../../../platform/llm/skill-runtime.mjs';
-import { evaluateCardGate, evaluateEventCardGate, evaluateCustomCardGate } from '../domain/social-card-gate.mjs';
+import { evaluateCardGate, evaluateClassifiedCardGate, evaluateEventCardGate, evaluateCustomCardGate } from '../domain/social-card-gate.mjs';
 import { customFactMarkdown } from './custom-fact-service.mjs';
 import { candidateSocialCardDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveEventAnalysis } from '../../research/index.mjs';
@@ -13,7 +13,7 @@ import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../plat
 import { compileSocialTheme, socialThemeDefinition } from '../../../shared/themes/social-theme-compiler.mjs';
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
 import { budgetCardPlan, layoutAuditFailureMessage, normalizeCoverTitleLines, underfilledDensityTier } from '../../../shared/rendering/social-card-plan.mjs';
-import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages, rebalanceContinuationPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
+import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeOpenSourceTechnologyStoryboardPages, normalizeOpenSourceTrendStoryboardPages, normalizeRepositoryStoryboardPages, rebalanceContinuationPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
 import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, socialCardRepairStateSignature, structuralLayoutPages } from '../../../shared/rendering/social-card-repair-policy.mjs';
 import { applySocialCardContentPlannerOperations, applySocialCardContentPlannerOperationsPartial, buildSocialCardContentPlannerPrompt, buildSocialCardPlannerComponentPool, partitionSocialCardContentPlannerOperationsBySchema, validateSocialCardContentPlannerSchema } from './social-card-content-planner.mjs';
 import { buildSocialCardFactIndex } from '../../../shared/rendering/social-card-fact-index.mjs';
@@ -30,6 +30,7 @@ import { assessSocialCardDensityTargets } from '../../../shared/rendering/social
 import { getSocialCardPlanRolloutProfile } from '../../../shared/rendering/social-card-plan-rollout.mjs';
 import { socialCardPageBudget, socialCardPageBudgetMessage } from '../../../shared/rendering/social-card-page-budget.mjs';
 import { acceptSoftDensityOnlyLayoutReport, adaptiveContentPageIndexes, buildSocialCardPlannerFactScope, buildSocialCardPlannerPageScope, layoutAuditPageSummary, softDensityPageIndexes, templateAuditFailurePayload, validateSocialCardDelivery } from '../../../shared/rendering/social-card-pipeline-contracts.mjs';
+import { socialStoryboardClassForContentClass, socialStoryboardSkillForContentClass } from '../domain/social-routing.mjs';
 // 交付门禁继续报告“配套文案话题标签不足”，实现已下沉到渲染契约模块。
 import { NEON_V1_CSS, renderNeonStoryboardSections } from '../../../shared/rendering/templates/social/neon-v1.mjs';
 import { BRUTALIST_V1_CSS, renderBrutalistStoryboardSections } from '../../../shared/rendering/templates/social/brutalist-v1.mjs';
@@ -44,7 +45,7 @@ export { SOCIAL_CARD_LAYOUTS };
 export { inferCardPageRole, SOCIAL_CARD_COMPOSITION_MODES, SOCIAL_CARD_PAGE_ROLES, stableCardCompositionSeed } from '../../../shared/rendering/social-card-role.mjs';
 export { describeCardLayouts, normalizeCardComposition, resolveCardCompositionDecision } from '../../../shared/rendering/social-card-composition.mjs';
 export { cardPlanRepairStructureIssues } from '../../../shared/rendering/storyboard-content.mjs';
-export { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
+export { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeOpenSourceTechnologyStoryboardPages, normalizeOpenSourceTrendStoryboardPages, normalizeRepositoryStoryboardPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
 export { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, buildDeterministicSocialCardPageCapOperations, cardPlanHash, classifySocialCardLayoutIssue, socialCardRepairStateSignature, structuralLayoutPages, validateSocialCardRestructureOperations } from '../../../shared/rendering/social-card-repair-policy.mjs';
 export { socialCardPageBudget, socialCardPageBudgetMessage, socialCardPageBudgetStatus } from '../../../shared/rendering/social-card-page-budget.mjs';
 export { applySocialCardContentPlannerOperations, applySocialCardContentPlannerOperationsPartial, buildSocialCardContentPlannerPrompt, buildSocialCardPlannerComponentPool, partitionSocialCardContentPlannerOperationsBySchema, validateSocialCardContentPlannerOperations, validateSocialCardContentPlannerSchema } from './social-card-content-planner.mjs';
@@ -221,7 +222,8 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const candidate = store.getCandidate(candidateId);
   if (!candidate || candidate.batch_id !== batchId) throw new Error('候选不存在或不属于当前批次');
   const outputMode=candidate.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
-  const contentType=outputMode.includes('event-cards')?'event':outputMode.includes('custom-cards')?'custom':'repository';
+  const contentType=candidate.content_class==='github_project'?'repository':outputMode.includes('custom-cards')?'custom':'event';
+  const storyboardClass=contentType==='event'?socialStoryboardClassForContentClass(candidate.content_class):contentType;
   const channelMode=outputMode.startsWith('xiaohongshu')?'xiaohongshu':'wechat';
   const facts = store.getRepositoryFactSheet(candidateId);
   const eventAnalysisRecord=contentType==='event'?resolveEventAnalysis({store,workspaceRoot,candidate}):null;
@@ -231,7 +233,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const templateCapabilities=getSocialCardTemplateCapabilities({themeDefinition,channelMode,contentType});
   const rolloutProfile=getSocialCardPlanRolloutProfile(templateCapabilities.templatePack.id);
   store.recordThemeUsage?.({themeId:themeDefinition.id,version:themeDefinition.version,target:'social',source:themeDefinition.source,batchId,candidateId});
-  const gate = contentType==='event'?evaluateEventCardGate(candidate,eventAnalysisRecord,editorial):contentType==='custom'?evaluateCustomCardGate(candidate,facts,editorial):evaluateCardGate(candidate, facts, editorial);
+  const gate = contentType==='event'?(storyboardClass==='technology'||storyboardClass==='trend'?evaluateClassifiedCardGate(candidate,storyboardClass,eventAnalysisRecord,editorial):evaluateEventCardGate(candidate,eventAnalysisRecord,editorial)):contentType==='custom'?evaluateCustomCardGate(candidate,facts,editorial):evaluateCardGate(candidate, facts, editorial);
   if (!gate.ready) throw new Error(`卡片故事板尚未就绪：${gate.issues.join('；')}`);
   store.saveCardEditorial?.(candidateId,{...editorial,storyboard_theme_snapshot_json:JSON.stringify(createSocialCardStoryboardThemeSnapshot({themeDefinition,channelMode,contentType}))});
   const batch = store.getBatch(batchId);
@@ -254,7 +256,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   });
   const storyboardSkillId=storyboardSnapshot?.snapshot?.selection?.stages?.storyboard?.selectedSkill
     ||storyboardSnapshot?.snapshot?.selection?.selectedSkill
-    ||(contentType==='event'?'event-card-storyboard':contentType==='custom'?'custom-card-storyboard':'repository-card-storyboard');
+    ||(contentType==='event'?socialStoryboardSkillForContentClass(candidate.content_class):contentType==='custom'?'custom-card-storyboard':'repository-card-storyboard');
   const storyboardSkillHash=storyboardSnapshot?.snapshot?.skills?.find((item)=>item.id===storyboardSkillId)?.promptHash||'';
   store.updateCandidateTrack(candidateId, 'social_cards', { status:'drafting' });
   const record = (stage, skill, output, detail='') => {
@@ -273,17 +275,17 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     loadedAt:new Date().toISOString(),
   }, null, 2));
 
-  onProgress(contentType==='event'?'图文 1/6：读取突发事件事实基座':contentType==='custom'?'图文 1/6：读取自定义事实基座':'图文 1/6：读取已核验仓库事实');
+  onProgress(contentType==='event'?(storyboardClass==='technology'?'图文 1/6：读取开源技术事件事实基座':storyboardClass==='trend'?'图文 1/6：读取开源趋势事件事实基座':'图文 1/6：读取事件事实基座'):contentType==='custom'?'图文 1/6：读取自定义事实基座':'图文 1/6：读取已核验仓库事实');
   const factPath = path.join(workdir, 'fact-sheet.md');
   if(contentType==='event')writeFile(factPath,eventFactMarkdown(eventAnalysisRecord.analysis));
   if(contentType==='custom'){
     if(facts?.data?.kind!=='custom')throw new Error('自定义事实基座不存在，请重新创建自定义图文');
     writeFile(factPath,customFactMarkdown(facts.data));
   }
-  if (!fs.existsSync(factPath)) throw new Error(contentType==='event'?'事件事实清单不存在，请重新执行突发分析':'fact-sheet.md 不存在，请重新核验仓库');
+  if (!fs.existsSync(factPath)) throw new Error(contentType==='event'?'事件事实清单不存在，请重新执行事件研判':'fact-sheet.md 不存在，请重新核验仓库');
   record('facts', 'fixed-program', factPath);
 
-  const factPayload = contentType === 'event' ? eventAnalysisRecord.analysis : facts?.data || {};
+  const factPayload = contentType==='event' ? eventAnalysisRecord.analysis : facts?.data || {};
   const factIndex = buildSocialCardFactIndex(factPayload, { contentType });
   const rawCardPlan = sanitizeCardPlan(JSON.parse(editorial.card_plan_json || '[]'));
   const factBindingSanitized = sanitizeSocialCardPlanFactBindings(rawCardPlan, factIndex);
@@ -306,7 +308,11 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   };
   // 各类故事板先做相邻职责归一化，再进入通用模板容量预检。
   const storyboardNormalization = contentType === 'event'
-    ? normalizeEventStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
+    ? storyboardClass === 'technology'
+      ? normalizeOpenSourceTechnologyStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
+      : storyboardClass === 'trend'
+        ? normalizeOpenSourceTrendStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
+        : normalizeEventStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
     : contentType === 'repository'
       ? normalizeRepositoryStoryboardPages({ pages: originalCardPlan, capacityProfile: templateCapabilities.capacityProfile, mergeSlack: 1.04 })
     : { pages: originalCardPlan, operations: [], changed: false };
@@ -403,7 +409,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   let planOperations = reflowOperations.map((item) => ({ ...item, source: item.source || 'deterministic-preflight' }));
   const planningMeta = { schemaVersion: 3, channel_mode:outputMode||editorial.output_mode || 'xiaohongshu', composition_mode:editorial.composition_mode||'template', layout_style:editorial.layout_style||'auto', template:{pack:templateCompatibility.templatePack.id,version:templateCompatibility.templatePack.version,source:templateCompatibility.source,fallback:templateCompatibility.fallback}, capacityProfileVersion:templateCapabilities.capacityProfileVersion, capacityProfile:templateCapabilities.capacityProfile, rolloutProfile, pageBudget: pageBudget, topic:candidate.hotspot_title, source_page_count: originalCardPlan.length, reflow: { changed: reflowChanged, operations: reflowOperations, warnings: reflowResult.warnings, unresolved: reflowResult.unresolved, history: reflowHistory }, pages:cardPlan };
   writeFile(planPath, JSON.stringify(planningMeta, null, 2));
-  record('planning', storyboardSkillId, planPath, reflowChanged ? `模板感知重排：${reflowOperations.map((item)=>item.op==='merge_event_auxiliary_pages'?`事件辅助页合并为争议讨论页（${item.sourcePages.map((page)=>`P${page}`).join('、')}）`:item.op==='merge_event_timeline_into_summary'?`P${item.pages.join('/')} 合并主事实与时间线`:item.op==='merge_repository_problem_capability'?`P${item.pages.join('/')} 合并痛点与核心能力`:item.op==='merge_repository_capability_quickstart'?`P${item.pages.join('/')} 合并能力与上手路径`:item.op==='merge_repository_limitations_ending'?`P${item.pages.join('/')} 合并限制与结尾`:item.op==='split_block'?`P${item.page} ${item.blockType} 拆为 ${item.createdChunks} 页`:item.op==='merge_pages'?`P${item.pages.join('/')} 合并过短续页`:item.op==='dedupe_duplicate_block'?`P${item.page} 去除与 P${item.duplicateOfPage} 重复的 ${item.blockType}`:item.op==='coalesce_code_blocks'?`P${item.page} 合并相关代码块`:item.op==='move_block'&&item.from_page?`P${item.from_page} ${item.blockType} 移至 P${item.to_page}`:`P${item.page} 移动 ${item.blockType}`).join('；')}${reflowResult.warnings.length?`；${reflowResult.warnings.join('；')}`:''}` : '模板容量预检通过，未触发续页');
+  record('planning', storyboardSkillId, planPath, reflowChanged ? `模板感知重排：${reflowOperations.map((item)=>item.op==='merge_event_auxiliary_pages'?`事件辅助页合并为争议讨论页（${item.sourcePages.map((page)=>`P${page}`).join('、')}）`:item.op==='merge_event_timeline_into_summary'?`P${item.pages.join('/')} 合并主事实与时间线`:item.op==='merge_repository_problem_capability'?`P${item.pages.join('/')} 合并痛点与核心能力`:item.op==='merge_repository_capability_quickstart'?`P${item.pages.join('/')} 合并能力与上手路径`:item.op==='merge_repository_limitations_ending'?`P${item.pages.join('/')} 合并限制与结尾`:item.op.startsWith('merge_technology_')?`P${item.pages.join('/')} 开源技术职责合并`:item.op.startsWith('merge_trend_')?`P${item.pages.join('/')} 开源趋势职责合并`:item.op==='split_block'?`P${item.page} ${item.blockType} 拆为 ${item.createdChunks} 页`:item.op==='merge_pages'?`P${item.pages.join('/')} 合并过短续页`:item.op==='dedupe_duplicate_block'?`P${item.page} 去除与 P${item.duplicateOfPage} 重复的 ${item.blockType}`:item.op==='coalesce_code_blocks'?`P${item.page} 合并相关代码块`:item.op==='move_block'&&item.from_page?`P${item.from_page} ${item.blockType} 移至 P${item.to_page}`:`P${item.page} 移动 ${item.blockType}`).join('；')}${reflowResult.warnings.length?`；${reflowResult.warnings.join('；')}`:''}` : '模板容量预检通过，未触发续页');
 
   const providerConfig = skillRuntime.providerConfig;
   // 强调色块封面的标题断行交给 AI 做语义切分（英文单词、专有名词不拆开）；
@@ -426,7 +432,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
       }
     }catch(error){ onProgress(`封面标题 AI 断行调用失败（${error.message}），使用确定性断行兜底`); coverTitleLines=null; }
   }
-  const copyReference=contentType==='event'?'references\\copy-event.md'
+  const copyReference=contentType==='event'?(storyboardClass==='technology'?'references\\copy-technology.md':storyboardClass==='trend'?'references\\copy-trend.md':'references\\copy-event.md')
     :contentType==='custom'?'references\\copy-custom.md':'references\\copy-tool.md';
   const legacyCopyReference=contentType==='event'?'references\\wechat-event-cards.md'
     :contentType==='custom'?'references\\custom-cards.md':'references\\wechat-tool-cards.md';
@@ -438,7 +444,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   });
   const input = {
     channel_mode:outputMode||editorial.output_mode || 'xiaohongshu', topic:candidate.hotspot_title,
-    content_type:contentType,custom_content_type:contentType==='custom'?facts.data.content_type:undefined,source_url:contentType==='event'?(eventAnalysisRecord.analysis.sources||[]).map((item)=>item.url):contentType==='custom'?(facts.data.materials||[]).map((item)=>item.url):facts.source_url,
+    content_type:contentType,storyboard_class:contentType==='event'?storyboardClass:undefined,custom_content_type:contentType==='custom'?facts.data.content_type:undefined,source_url:contentType==='event'?(eventAnalysisRecord.analysis.sources||[]).map((item)=>item.url):contentType==='custom'?(facts.data.materials||[]).map((item)=>item.url):facts.source_url,
     repository_facts:contentType==='repository'?facts.data:undefined,event_analysis:contentType==='event'?eventAnalysisRecord.analysis:undefined,custom_facts:contentType==='custom'?facts.data:undefined,
     editorial_decisions:editorial,card_plan:cardPlan,
     disclosure:contentType==='event'?'据公开素材整理；未核实主张必须保留边界表达':contentType==='custom'?'体验性表述来自作者确认；建议性内容未实测':'基于项目文档整理，未实际运行', workdir,
@@ -446,7 +452,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   onProgress('图文 2/6：按项目技能生成配套文案');
   const copyResult = await gateway.complete({ provider, purpose:'social-card-copy', batchId, candidateId,
     maxOutputTokens:Math.min(2400, providerConfig.maxOutputTokens), messages:[
-      { role:'system', protected:true, content:`${copySkillPrompt}\n\n## 当前运行阶段\n只生成可直接发布的配套文案。输出纯文本，不要 JSON、Markdown 围栏、页码或布局指令；严格遵守事实与禁用表达。${channelMode==='xiaohongshu'?' 小红书渠道：文案口语化、段落短，适度使用 emoji，末尾带 6–8 个话题标签，标签不得含夸大功效词。':' 公众号渠道：文案信息密度优先，结构清晰，末尾带 6–8 个准确话题标签，标签须与内容严格相关。'}${contentType==='event'?' 未核实主张必须注明说话者和“尚未获独立证实”等边界；不得号召网暴或把争议定性为事实。':''}${contentType==='custom'?' 体验性表述只能来自 source_level=author_experience 的要点；user_material 必须保留来源归属；model_suggestion 只能写成建议或参考，禁止写成亲测、效果或收益。':''}` },
+      { role:'system', protected:true, content:`${copySkillPrompt}\n\n## 当前运行阶段\n只生成可直接发布的配套文案。输出纯文本，不要 JSON、Markdown 围栏、页码或布局指令；严格遵守事实与禁用表达。${channelMode==='xiaohongshu'?' 小红书渠道：文案口语化、段落短，适度使用 emoji，末尾带 6–8 个话题标签，标签不得含夸大功效词。':' 公众号渠道：文案信息密度优先，结构清晰，末尾带 6–8 个准确话题标签，标签须与内容严格相关。'}${contentType==='event'?' 未核实主张必须注明说话者和“尚未获独立证实”等边界；不得把技术能力、趋势判断或争议定性为超出证据的结论。':''}${contentType==='custom'?' 体验性表述只能来自 source_level=author_experience 的要点；user_material 必须保留来源归属；model_suggestion 只能写成建议或参考，禁止写成亲测、效果或收益。':''}` },
       { role:'user', protected:true, content:JSON.stringify(input) },
     ] });
   let copy = String(copyResult.content || '').trim().replace(/^```(?:text)?\s*/i, '').replace(/\s*```$/i, '');
@@ -475,7 +481,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     // fitContentPages 仍保留在状态中，用于记录“补充后仍偏空”的额外处理。
     const adaptiveContentPages=adaptiveContentPageIndexes(cardPlan,fitContentPages);
     return renderStoryboardHtml({ topic:candidate.hotspot_title, repository:facts?.data?.repository, pages:cardPlan, visualStyle:editorial.visual_style, themeDefinition, layoutStyle:editorial.layout_style, compositionMode:editorial.composition_mode||'template',
-      compositionSeed:`${candidate.batch_id}|${candidate.id}`,forceSafeComposition:safeCompositionApplied?(safeCompositionPageKeys.size?resolveSafeCompositionPages():safeCompositionPages.size?[...safeCompositionPages]:true):false,relaxedDensityPages,expandedDensityPages,fitContentPages:adaptiveContentPages,contentType,channelMode,coverTitleLines,sourceLabel:contentType==='event'?'事件专题':contentType==='custom'?facts?.data?.content_type_label||'自定义':'',disclosure:contentType==='event'?'据公开素材整理 · 未核实内容已标注':'' });
+      compositionSeed:`${candidate.batch_id}|${candidate.id}`,forceSafeComposition:safeCompositionApplied?(safeCompositionPageKeys.size?resolveSafeCompositionPages():safeCompositionPages.size?[...safeCompositionPages]:true):false,relaxedDensityPages,expandedDensityPages,fitContentPages:adaptiveContentPages,contentType,channelMode,coverTitleLines,sourceLabel:contentType==='event'?(storyboardClass==='technology'?'事件专题 · 开源技术':storyboardClass==='trend'?'事件专题 · 开源趋势':'事件专题'):contentType==='custom'?facts?.data?.content_type_label||'自定义':'',disclosure:contentType==='event'?'据公开素材整理 · 未核实内容已标注':'' });
   };
   let html = renderCurrentStoryboard();
   if (!copy || !/<html\b/i.test(html) || !/class=["'][^"']*\bpage\b/i.test(html)) throw new Error('图文生成产物缺少文案、完整 HTML 或 .page');

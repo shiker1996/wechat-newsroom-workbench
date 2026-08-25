@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 18;
+export const WORKBENCH_SCHEMA_VERSION = 20;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -145,6 +145,36 @@ export function runDatabaseMigrations(db, migrateSchema) {
       if(!columns.has('material_type'))db.exec("ALTER TABLE candidates ADD COLUMN material_type TEXT NOT NULL DEFAULT ''");
       if(!columns.has('historical_type'))db.exec("ALTER TABLE candidates ADD COLUMN historical_type TEXT NOT NULL DEFAULT ''");
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(18,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v19：稳定事件保存内容分类、分类证据和文章/图文资格，供事件热榜与热点全景读取。
+    if(applied<19){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(event_records)').all().map((column)=>column.name));
+      if(!columns.has('content_class'))db.exec("ALTER TABLE event_records ADD COLUMN content_class TEXT NOT NULL DEFAULT 'news_event'");
+      if(!columns.has('classification_confidence'))db.exec('ALTER TABLE event_records ADD COLUMN classification_confidence REAL');
+      if(!columns.has('classification_reason'))db.exec("ALTER TABLE event_records ADD COLUMN classification_reason TEXT NOT NULL DEFAULT ''");
+      if(!columns.has('classification_evidence_json'))db.exec("ALTER TABLE event_records ADD COLUMN classification_evidence_json TEXT NOT NULL DEFAULT '[]'");
+      if(!columns.has('classification_features_json'))db.exec("ALTER TABLE event_records ADD COLUMN classification_features_json TEXT NOT NULL DEFAULT '{}'");
+      if(!columns.has('classification_missing_evidence_json'))db.exec("ALTER TABLE event_records ADD COLUMN classification_missing_evidence_json TEXT NOT NULL DEFAULT '[]'");
+      if(!columns.has('article_eligible'))db.exec('ALTER TABLE event_records ADD COLUMN article_eligible INTEGER NOT NULL DEFAULT 1');
+      if(!columns.has('social_eligible'))db.exec('ALTER TABLE event_records ADD COLUMN social_eligible INTEGER NOT NULL DEFAULT 1');
+      if(!columns.has('default_route'))db.exec("ALTER TABLE event_records ADD COLUMN default_route TEXT NOT NULL DEFAULT 'editorial_review'");
+      if(!columns.has('classification_status'))db.exec("ALTER TABLE event_records ADD COLUMN classification_status TEXT NOT NULL DEFAULT 'needs_review'");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(19,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v20：候选保存内容分类快照和文章事实门禁结果，避免锁定后依赖事件重新分类。
+    if(applied<20){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(candidates)').all().map((column)=>column.name));
+      if(!columns.has('content_class'))db.exec("ALTER TABLE candidates ADD COLUMN content_class TEXT NOT NULL DEFAULT 'news_event'");
+      if(!columns.has('classification_status'))db.exec("ALTER TABLE candidates ADD COLUMN classification_status TEXT NOT NULL DEFAULT 'needs_review'");
+      if(!columns.has('classification_confidence'))db.exec('ALTER TABLE candidates ADD COLUMN classification_confidence REAL');
+      if(!columns.has('classification_reason'))db.exec("ALTER TABLE candidates ADD COLUMN classification_reason TEXT NOT NULL DEFAULT ''");
+      if(!columns.has('classification_evidence_json'))db.exec("ALTER TABLE candidates ADD COLUMN classification_evidence_json TEXT NOT NULL DEFAULT '[]'");
+      if(!columns.has('classification_features_json'))db.exec("ALTER TABLE candidates ADD COLUMN classification_features_json TEXT NOT NULL DEFAULT '{}'");
+      if(!columns.has('article_eligible'))db.exec('ALTER TABLE candidates ADD COLUMN article_eligible INTEGER NOT NULL DEFAULT 1');
+      if(!columns.has('article_eligibility_reason'))db.exec("ALTER TABLE candidates ADD COLUMN article_eligibility_reason TEXT NOT NULL DEFAULT ''");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(20,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

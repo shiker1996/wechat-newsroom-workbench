@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSocialCardTemplatePack } from '../server/shared/rendering/social-card-template-registry.mjs';
 import { resolveSocialCardCapacityProfile } from '../server/shared/rendering/social-card-capacity.mjs';
-import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeRepositoryStoryboardPages } from '../server/shared/rendering/social-card-reflow.mjs';
+import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeOpenSourceTechnologyStoryboardPages, normalizeOpenSourceTrendStoryboardPages, normalizeRepositoryStoryboardPages } from '../server/shared/rendering/social-card-reflow.mjs';
 
 function profile(pack = 'brutalist-v1') {
   return resolveSocialCardCapacityProfile({
@@ -96,6 +96,59 @@ test('工具故事板按相邻职责白名单合并，不跨封面和快速上�
   assert.equal(result.pages[3].content_blocks.length, 2);
   assert.ok(result.operations.some((operation) => operation.op === 'merge_repository_problem_capability'));
   assert.ok(result.operations.some((operation) => operation.op === 'merge_repository_limitations_ending'));
+});
+
+test('开源技术故事板按问题、机制、证据和边界合并，不套用事件争议页', () => {
+  const capacityProfile = profile('clean-v1');
+  const pages = [
+    { kind: 'cover', role: 'cover', title: '封面', content_blocks: [] },
+    { kind: 'problem', role: 'concept', title: '技术问题', content_blocks: [{ type: 'text', content: '现有方案在复杂场景下存在明显限制。' }] },
+    { kind: 'mechanism', role: 'feature', title: '核心机制', content_blocks: [{ type: 'text', content: '方案通过新的架构路径处理关键环节。' }] },
+    { kind: 'evidence', role: 'data', title: '实测证据', content_blocks: [{ type: 'note', content: '公开测试给出了可核验的结果。' }] },
+    { kind: 'boundary', role: 'risk', title: '适用边界', content_blocks: [{ type: 'note', content: '实验版本仍有使用限制。' }] },
+    { kind: 'ending', role: 'ending', title: '后续观察', content_blocks: [{ type: 'list', items: ['等待更多验证'] }] },
+  ];
+  const result = normalizeOpenSourceTechnologyStoryboardPages({ pages, capacityProfile });
+  assert.equal(result.pages.length, 4);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'feature', 'risk', 'ending']);
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_technology_problem_mechanism'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_technology_evidence_boundary'));
+  assert.doesNotMatch(JSON.stringify(result.pages), /争议焦点/);
+  const mechanismEvidence = normalizeOpenSourceTechnologyStoryboardPages({
+    pages: [
+      { kind: 'mechanism', role: 'feature', title: '机制', content_blocks: [{ type: 'text', content: '短事实' }] },
+      { kind: 'evidence', role: 'data', title: '证据', content_blocks: [{ type: 'note', content: '短事实' }] },
+    ],
+    capacityProfile,
+  });
+  assert.ok(mechanismEvidence.operations.some((operation) => operation.op === 'merge_technology_mechanism_evidence'));
+});
+
+test('开源趋势故事板按趋势、主体、变化信号、对比和待观察合并', () => {
+  const capacityProfile = profile('clean-v1');
+  const pages = [
+    { kind: 'cover', role: 'cover', title: '封面', content_blocks: [] },
+    { kind: 'trend', role: 'concept', title: '趋势判断', content_blocks: [{ type: 'text', content: '多个来源显示生态正在发生变化。' }] },
+    { kind: 'actors', role: 'feature', title: '推动主体', content_blocks: [{ type: 'list', items: ['主体甲', '主体乙'] }] },
+    { kind: 'timeline', role: 'timeline', title: '变化路径', content_blocks: [{ type: 'timeline', items: [{ time: '2025', content: '出现早期信号' }, { time: '2026', content: '扩展到更多场景' }] }] },
+    { kind: 'positions', role: 'compare', title: '生态对比', content_blocks: [{ type: 'compare', rows: [['维度', '方案甲', '方案乙']] }] },
+    { kind: 'boundary', role: 'risk', title: '待观察', content_blocks: [{ type: 'note', content: '后续采用情况仍需观察。' }] },
+    { kind: 'ending', role: 'ending', title: '后续观察', content_blocks: [{ type: 'list', items: ['继续跟踪'] }] },
+  ];
+  const result = normalizeOpenSourceTrendStoryboardPages({ pages, capacityProfile });
+  assert.equal(result.pages.length, 4);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'timeline', 'risk', 'ending']);
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_judgment_actors'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_actors_timeline'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_comparison_watch'));
+  const timelineComparison = normalizeOpenSourceTrendStoryboardPages({
+    pages: [
+      { kind: 'timeline', role: 'timeline', title: '变化路径', content_blocks: [{ type: 'timeline', items: [{ time: '现在', content: '短事实' }] }] },
+      { kind: 'positions', role: 'compare', title: '生态对比', content_blocks: [{ type: 'compare', rows: [['A', 'B']] }] },
+    ],
+    capacityProfile,
+  });
+  assert.ok(timelineComparison.operations.some((operation) => operation.op === 'merge_trend_timeline_comparison'));
 });
 
 test('拆页不可用时，程序化压缩以省略号作为最后兜底且不触碰命令', () => {

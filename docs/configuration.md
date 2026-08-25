@@ -86,8 +86,6 @@
   - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`。
   - `eventValueWeight`（0.30，限制在 0.25–0.40）：事件价值 T 在最终分中的权重；当前公式为 `F = A×(1-eventValueWeight) + T×eventValueWeight - S - D`。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
-  - `toolEngineeringBonus`（0）：工具/工程信号不再直接加分；纯项目默认进入独立图文池。
-  - `minimumToolCandidates`（0）：文章核心池不再强制塞入工具项目；需要写方法论文章时由编辑人工申请文章路线。
   - `categoryPreference`：预排序分类偏好分（大厂 6 / AI 4 / 行业 3 / 综合 1 / 职场 0）。调低或调负可让泛热点沉底。
   - `pBase`：P 分类基分（大厂 50 / AI 40 / 行业 30 / 综合 20 / 职场 10）。
   - `hBase`：H 爆款画像基分（worker_social 48、bigtech 33 等，完整键见示例文件）。
