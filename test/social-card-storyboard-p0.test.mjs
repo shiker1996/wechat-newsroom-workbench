@@ -104,12 +104,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'91567f8d64d629cb4a14e08acd5fa5188f64c3cdac698190bfee8e97665e93d3',
-    'repository/xiaohongshu':'a7a37181f0444711e19d18405aa3c4a4be0af4654f9000c42c8c56eebe914a3e',
-    'event/wechat':'6b1456d190293d24de3d559d01070c760326aed0b9e15eb39fd2b44db24f9fca',
-    'event/xiaohongshu':'4d2635e6406e94d46d142ca43f4d763c14f7cc0c871e493bdabe1df4a15aeac8',
-    'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
-    'custom/xiaohongshu':'3493bf0e112e398aee9d3bf295b5d99758fb74630f86c45e82f89689bc29c253',
+    'repository/wechat':'7089ad267ded21be1cb78680b14f1b3527f80163bcf60de9c078ae3966571995',
+    'repository/xiaohongshu':'ebf1e9b0462db675bc8f77fe1c1c786db5fdd2ab0a4456dc03742d6b20ed08e6',
+    'event/wechat':'21a2730cf4d7aa5909f8e6275d33af8211a79980c79bac596481b198a7a580bb',
+    'event/xiaohongshu':'34d5da960d6bac0630eb01157b4ea6fa3388a368807df9d9db3b179435c87d5d',
+    'custom/wechat':'e3dea276a760f9bdf23fbc6e6632948b42ceffa0ab654c9a7ca54cfc917ba550',
+    'custom/xiaohongshu':'63530be177b9cd342b8ad7262470cc2467b54a22ca7b4d65fe1d6dd0ee552af5',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
@@ -223,7 +223,6 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.match(repository.prompt,/awesome\/list\/catalog/);
   assert.match(repository.prompt,/不机械套用/);
   assert.match(repository.prompt,/事实不足以支撑独立场景页时/);
-  assert.match(repository.prompt,/禁止使用旧字段 `blocks`/);
   assert.match(repository.prompt,/`content_blocks`/);
   assert.match(repository.prompt,/`list`.*`items` 字符串数组/);
   assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);

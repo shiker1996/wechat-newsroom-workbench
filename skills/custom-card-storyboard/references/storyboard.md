@@ -19,10 +19,11 @@
   "must_disclose": "来源等级与体验边界",
   "getting_started": "",
   "forbidden_claims": "",
-  "recommended_pages": 4到10,
+  "recommended_pages": 4,
   "card_plan": [
     {
       "kind": "cover|highlight|step|item|boundary|ending",
+      "role": "cover|concept|feature|steps|risk|ending",
       "title": "简短的核心页标题（8–14字，不写解释句）",
       "goal": "用一句话说明本页的生成目标（仅供内部生成阶段使用，不会展示在卡片上），不要写成学习目标。错误示例：'读者能...'、'本页旨在...'；正确示例：'三步完成配置，第二步最容易漏。'",
       "evidence": ["事实基座中支持本页的要点，标注来源等级"],
@@ -31,6 +32,31 @@
       ]
     }
   ]
+}
+```
+
+教程步骤块示例：
+
+```json
+{
+  "type": "steps",
+  "title": "配置步骤",
+  "items": [
+    {"title": "准备配置", "content": "填写事实基座中明确要求的参数。"},
+    {"title": "执行操作", "content": "运行事实基座提供的真实命令或操作。"}
+  ],
+  "source_refs": ["事实基座中的教程来源"]
+}
+```
+
+清单块示例：
+
+```json
+{
+  "type": "list",
+  "title": "筛选标准",
+  "items": ["标准一：具体条件", "标准二：具体边界"],
+  "source_refs": ["事实基座中的清单来源"]
 }
 ```
 
