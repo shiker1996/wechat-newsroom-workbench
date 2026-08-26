@@ -104,8 +104,8 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'598bdd90ac60114507bea629d5fc23fc505c2e9c366e346668b7e99258c79e01',
-    'repository/xiaohongshu':'d1607fe7b82e8a2b574c49b0dab6f8deefd6b39380ab5bc8bbec9c7a7e691137',
+    'repository/wechat':'91567f8d64d629cb4a14e08acd5fa5188f64c3cdac698190bfee8e97665e93d3',
+    'repository/xiaohongshu':'a7a37181f0444711e19d18405aa3c4a4be0af4654f9000c42c8c56eebe914a3e',
     'event/wechat':'6b1456d190293d24de3d559d01070c760326aed0b9e15eb39fd2b44db24f9fca',
     'event/xiaohongshu':'4d2635e6406e94d46d142ca43f4d763c14f7cc0c871e493bdabe1df4a15aeac8',
     'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
@@ -223,6 +223,8 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.match(repository.prompt,/awesome\/list\/catalog/);
   assert.match(repository.prompt,/不机械套用/);
   assert.match(repository.prompt,/事实不足以支撑独立场景页时/);
+  assert.match(repository.prompt,/禁止使用旧字段 `blocks`/);
+  assert.match(repository.prompt,/`content_blocks`/);
   assert.match(repository.prompt,/`list`.*`items` 字符串数组/);
   assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);
   assert.match(repository.prompt,/不使用“点赞、收藏、转发”等传播口号替代内容结论/);

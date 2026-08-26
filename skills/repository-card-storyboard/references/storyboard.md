@@ -14,7 +14,44 @@
 适合谁，哪些权限、环境和成熟度边界需要先确认
 ```
 
-只输出严格 JSON，不输出 Markdown、发布文案、HTML、CSS 或截图指令。每个页面必须同时返回明确的 `kind` 和 `role`，每个内容块必须带 `source_refs`。
+只输出严格 JSON，不输出 Markdown、发布文案、HTML、CSS 或截图指令。每个页面必须同时返回明确的 `kind` 和 `role`，每个内容块必须带 `source_refs`。内容必须放在 `content_blocks` 中，不得使用旧字段 `blocks`。
+
+输出结构必须遵循以下完整 JSON 形状；没有内容时使用空数组或空字符串，不要省略字段，也不要新增未定义的顶层字段：
+
+```json
+{
+  "target_reader": "",
+  "pain_point": "",
+  "tool_positioning": "开源工具/项目内容定位",
+  "must_highlight": "必须突出的一条已核验能力或使用价值",
+  "must_disclose": "版本、权限、环境、证据来源和事实边界",
+  "getting_started": "读者开始使用项目的最短真实路径",
+  "forbidden_claims": "不得越过仓库事实基座证据边界的判断",
+  "recommended_pages": 5,
+  "card_plan": [
+    {
+      "kind": "cover|problem|capability|quickstart|scenario|limitation|ending",
+      "role": "cover|concept|feature|steps|risk|ending",
+      "title": "8–14 字的页面标题",
+      "goal": "本页唯一要完成的事实或判断",
+      "evidence": ["事实基座中支持本页的证据摘要"],
+      "content_blocks": [
+        {
+          "type": "{{REPOSITORY_BLOCK_TYPES}}",
+          "title": "可选小标题",
+          "content": "单一结论、事实摘要、边界说明或代码/命令片段",
+          "items": [],
+          "headers": [],
+          "rows": [],
+          "source_refs": ["事实基座中的来源标识"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+字段规则：块类型为 `list` 时使用字符串数组 `items`；`stats` 使用统计项数组 `items`；`steps`、`timeline`、`scenes` 使用对象数组 `items`；`compare` 使用 `headers` 和 `rows`；`text`、`note`、`highlight`、`code` 使用 `content`。具体可用类型由运行时注入的 `REPOSITORY_BLOCK_TYPES` 决定。未使用的字段保留为空数组或空字符串。不要把结构化条目塞进块级 `content`，不要在页面中返回 `blocks`。
 
 ## 一、页面结构
 
