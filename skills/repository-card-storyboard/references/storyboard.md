@@ -51,7 +51,7 @@
 }
 ```
 
-字段规则：块类型为 `list` 时使用字符串数组 `items`；`stats` 使用统计项数组 `items`；`steps`、`timeline`、`scenes` 使用对象数组 `items`；`compare` 使用 `headers` 和 `rows`；`text`、`note`、`highlight`、`code` 使用 `content`。具体可用类型由运行时注入的 `REPOSITORY_BLOCK_TYPES` 决定。未使用的字段保留为空数组或空字符串。不要把结构化条目塞进块级 `content`，不要在页面中返回 `blocks`。
+字段规则：块类型为 `list` 时使用字符串数组 `items`；`stats` 使用统计项数组 `items`；`steps`、`timeline`、`scenes` 使用对象数组 `items`，其中步骤项统一使用 `{ "title": "步骤名称", "content": "命令、参数、验证条件或说明" }`；`compare` 使用 `headers` 和 `rows`；`text`、`note`、`highlight`、`code` 使用 `content`。具体可用类型由运行时注入的 `REPOSITORY_BLOCK_TYPES` 决定。未使用的字段保留为空数组或空字符串。不要把结构化条目塞进块级 `content`，不要在页面中返回 `blocks`。
 
 ## 一、页面结构
 
@@ -71,9 +71,26 @@
 ### 3. 快速上手：保留真实路径
 
 - `kind: quickstart`、`role: steps`。
+
 - 只有事实基座提供真实命令或完整操作路径时才生成；没有完整命令时写操作说明，不补造安装、初始化或验证命令。
+
 - 保留用户参数、环境依赖和权限要求。`<commit>`、`YOUR_TOKEN`、`$API_KEY` 等占位符必须说明替换位置和用途。
+
 - 不得宣称“复制即用”“无需配置”或“已跑通”，除非输入中有明确运行记录。
+
+- 输出示例为：
+
+  ```json
+  {
+     "type": "steps",
+     "items": [
+        {
+          "title": "安装项目",
+          "content": "npm install ..."
+        }
+      ]
+  }
+  ```
 
 ### 4. 场景：说明何时使用
 
