@@ -35,6 +35,9 @@ jobs:
       - name: 安装依赖（含技能级联）
         run: npm ci
 
+      - name: 生成样式 bundle
+        run: npm run build:styles
+
       - name: 构建校验
         run: npm run build
 
