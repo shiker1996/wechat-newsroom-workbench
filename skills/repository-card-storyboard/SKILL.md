@@ -5,21 +5,14 @@ description: 将已核验的 GitHub 仓库、产品资料或工具事实规划�
 
 # 工具图文故事板
 
-只负责 `social-tool` 入口的故事板规划。
+只负责 `social-tool` 入口的 `repository` 内容。故事板把已核验的仓库事实转换成“读者任务—项目能力—上手路径—适用边界”，不把项目介绍升级成技术趋势或深度文章。
 
 ## 输入
 
-输入契约为 `social_card_fact_base`，内容类型必须是 `repository`。只使用已核验仓库事实、README、来源 URL 和明确的未知项。
+输入契约为 `social_card_fact_base`，内容类型必须是 `repository`。只使用已核验的仓库事实、README、来源 URL、实际运行记录（如有）和明确未知项。
 
 ## 输出
 
-输出契约为 `social_card_storyboard`。故事板必须回答：
+输出契约为 `social_card_storyboard`。必须返回严格 JSON；每个页面都要同时包含 `kind` 和 `role`，每个内容块都要包含 `source_refs`。故事板至少回答：工具解决什么任务、核心能力如何工作、如何开始、适合谁以及有什么限制。
 
-- 工具是什么，解决什么具体问题。
-- 核心能力怎样工作。
-- 用户怎样开始。
-- 适合谁，有哪些限制、权限和成熟度边界。
-
-不得虚构实际体验、效果、性能、价格、权限、Star、开源协议或安装命令。只输出严格 JSON，不输出发布文案、HTML、CSS 或截图指令。
-
-具体页序与字段规则见 `references/storyboard.md`。渠道、Schema 和构图安全约束由固定运行时注入。
+不得虚构体验、效果、性能、价格、权限、Star、开源协议或安装命令。不得输出发布文案、HTML、CSS 或截图指令。公共输出、证据、密度和降级规则由固定运行时注入，类型页序与仓库原型规则见 `references/storyboard.md`。

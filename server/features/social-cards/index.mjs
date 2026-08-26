@@ -20,4 +20,4 @@ export { createRepositoryCandidate } from './application/repository-candidate.mj
 export { BUILTIN_SOCIAL_CARD_STORYBOARD_SKILLS, SOCIAL_CARD_STORYBOARD_CONTRACTS, buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, toLegacySocialCardPromptInput } from './application/storyboard-contracts.mjs';
 export { SOCIAL_CONTENT_TYPES, SOCIAL_ROUTE_VERSION, contentTypeForSocialRoute, normalizeSocialContentClass, socialRouteForContentClass, socialRouteForContentType, socialStoryboardClassForContentClass, socialStoryboardSkillForContentClass } from './domain/social-routing.mjs';
 export { CUSTOM_SOCIAL_AGENT_CAPABILITIES, runCustomSocialAgentTurn } from './application/agent/custom-social-adapter.mjs';
-export { eventGroupsForCandidate, resolveEventAnalysis } from '../research/index.mjs';
+export { enrichEventAnalysis, eventGroupsForCandidate, resolveEventAnalysis } from '../research/index.mjs';

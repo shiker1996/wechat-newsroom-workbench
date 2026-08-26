@@ -25,11 +25,19 @@ export function eventGroupsForCandidate({ store, workspaceRoot, candidate, conte
       event_id: event.event_id,
       title: event.representative_title,
       card: cardMap.get(String(event.event_id)) || null,
-      hotspots: event.articles.map((article) => {
+      hotspots: event.articles.flatMap((article) => {
         const doc = store.getHotspotSource(article.hotspot_id);
-        return { id: article.hotspot_id, title: article.title, url: article.url, source: article.source, time: article.time,
-          representative: wanted.has(article.hotspot_id),
-          sourceDoc: doc ? { ...doc, content: String(doc.content || '').slice(0, contentLimit) } : null };
+        const materials = !doc && typeof store.listHotspotMaterials === 'function'
+          ? store.listHotspotMaterials(article.hotspot_id).filter((item) => item?.status === 'ok' && String(item.content || item.description || '').trim())
+          : [];
+        const docs = doc ? [doc] : materials.length ? materials : [null];
+        return docs.map((sourceDoc,index) => {
+          const materialId=sourceDoc?.id||sourceDoc?.material_id;
+          const sourceId=doc ? (article.hotspot_id ? `hotspot:${article.hotspot_id}` : '') : materialId ? `material:${materialId}` : article.hotspot_id ? `hotspot:${article.hotspot_id}` : '';
+          return { id: article.hotspot_id, source_id: sourceId, title: sourceDoc?.title || article.title, url: sourceDoc?.final_url || sourceDoc?.url || article.url, source: sourceDoc?.source || article.source, time: sourceDoc?.fetched_at || article.time,
+            representative: wanted.has(article.hotspot_id)&&index===0,
+            sourceDoc: sourceDoc ? { ...sourceDoc, content: String(sourceDoc.content || sourceDoc.description || '').slice(0, contentLimit) } : null };
+        });
       }),
     });
   }
@@ -41,6 +49,7 @@ export function eventGroupsForCandidate({ store, workspaceRoot, candidate, conte
       title: '用户补充来源',
       card: null,
       hotspots: supplied.map((row) => ({ id: 0, title: row.title || row.url, url: row.url, source: '用户补充', time: row.fetched_at,
+        source_id: row.url ? `candidate:${row.url}` : '',
         representative: true,
         sourceDoc: { ...row, content: String(row.content || '').slice(0, contentLimit) } })),
     });
@@ -52,7 +61,8 @@ export function eventGroupsForCandidate({ store, workspaceRoot, candidate, conte
 // 与突发分析（store.getBreakingAnalysis）相同的 analysis 形状，供事件门禁、故事板与渲染管线复用
 export function synthesizeEventAnalysis(groups) {
   const list = Array.isArray(groups) ? groups : [];
-  const cards = list.map((group) => group.card).filter(Boolean);
+  const cardGroups = list.filter((group) => group?.card);
+  const cards = cardGroups.map((group) => group.card).filter(Boolean);
   const classificationEvidence = cards.flatMap((card) => card.classification?.evidence || card.classification_evidence || []);
   const timeline = cards.flatMap((card) => card.timeline || []);
   const technicalEvidence = classificationEvidence.filter((item) => /technical|mechanism|architecture|benchmark|performance|机制|架构|性能|基准/i.test(`${item?.role || ''} ${item?.claim || ''}`));
@@ -60,15 +70,37 @@ export function synthesizeEventAnalysis(groups) {
   const sources = list.flatMap((group) => (group.hotspots || []).map((hotspot) => {
     const doc = hotspot.sourceDoc;
     return doc
-      ? { status: doc.status, url: doc.final_url || doc.url || hotspot.url, title: doc.title || hotspot.title, error: doc.error || null }
-      : { status: 'missing', url: hotspot.url || '', title: hotspot.title || '', error: '尚未抓取原文' };
+      ? { source_id: hotspot.source_id || (hotspot.id ? `hotspot:${hotspot.id}` : ''), status: doc.status, url: doc.final_url || doc.url || hotspot.url, title: doc.title || hotspot.title, source: hotspot.source || '', time: hotspot.time || '', content_excerpt: String(doc.content || '').trim(), error: doc.error || null }
+      : { source_id: hotspot.source_id || (hotspot.id ? `hotspot:${hotspot.id}` : ''), status: 'missing', url: hotspot.url || '', title: hotspot.title || '', source: hotspot.source || '', time: hotspot.time || '', content_excerpt: '', error: '尚未抓取原文' };
   }));
   if (!cards.length && !sources.length) return null;
+  const sourceIdsByGroup = (group) => (group.hotspots || []).map((item) => item.source_id || (item.id ? `hotspot:${item.id}` : '')).filter(Boolean);
+  const cardField = (field) => cardGroups.flatMap((group) => {
+    const value = group.card?.[field];
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => ({
+      value: item,
+      source_ids: sourceIdsByGroup(group),
+      event_id: group.event_id,
+    }));
+  });
+  const backgrounds = cardField('background');
+  const sourceIncrements = cardGroups.flatMap((group) => (Array.isArray(group.card?.source_increment) ? group.card.source_increment : []).map((item) => ({
+    source: item?.source || '', adds: item?.adds || '', source_ids: sourceIdsByGroup(group), event_id: group.event_id,
+  })));
+  const angles = cardGroups.flatMap((group) => (Array.isArray(group.card?.angles) ? group.card.angles : []).map((item) => ({
+    angle: item, source_ids: sourceIdsByGroup(group), event_id: group.event_id,
+  })));
   return {
+    schemaVersion: 2,
     eventSummary: cards.map((card) => card.conclusion).filter(Boolean).join('\n'),
     factBase: {
       confirmedFacts: cards.flatMap((card) => card.confirmed_facts || []),
       claims: cards.flatMap((card) => card.unverified || []),
+      backgrounds,
+      sourceIncrements,
+      angles,
+      disagreements: cards.flatMap((card) => card.disagreements || []),
       classificationEvidence,
       mechanisms: technicalEvidence.filter((item) => /mechanism|机制/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
       architecture: technicalEvidence.filter((item) => /architecture|架构/i.test(`${item?.role || ''} ${item?.claim || ''}`)),
@@ -90,7 +122,7 @@ export function synthesizeEventAnalysis(groups) {
 export function resolveEventAnalysis({ store, workspaceRoot, candidate, defaultMaxAgeHours = 24 }) {
   const breaking = store.getBreakingAnalysis(candidate.batch_id);
   if (breaking?.analysis?.eventSummary) return breaking;
-  const groups = eventGroupsForCandidate({ store, workspaceRoot, candidate, contentLimit: 4000, defaultMaxAgeHours });
+  const groups = eventGroupsForCandidate({ store, workspaceRoot, candidate, contentLimit: 9000, defaultMaxAgeHours });
   const analysis = synthesizeEventAnalysis(groups);
   return analysis ? { analysis, synthesized: true } : null;
 }

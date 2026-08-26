@@ -11,6 +11,7 @@ import { compileSocialTheme, resolveSocialCoverTitleShadowRole, socialThemeDefin
 import { compileThemePreview } from '../server/platform/application/themes/theme-preview.mjs';
 import { renderStoryboardHtml, deterministicCoverTitleLines, normalizeCoverTitleLines } from '../server/features/social-cards/application/social-card-pipeline.mjs';
 import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
+import { colorContrast } from '../server/shared/themes/color-utils.mjs';
 import { skipBrowser } from './helpers/tiers.mjs';
 
 const recipes=['classic','editorial','poster','highlight-block'];
@@ -77,14 +78,43 @@ test('四种配方形成可辨认的标题版式语言',()=>{
   assert.match(css.classic,/border-left:2px solid var\(--accent\)/);assert.match(css.classic,/max-width:96%/);
   assert.match(css.editorial,/border-top:4px double var\(--ink\)/);assert.match(css.editorial,/font-family:Georgia/);
   assert.match(css.poster,/text-shadow:3px 3px 0 var\(--cover-title-shadow\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
-  assert.equal(resolveSocialCoverTitleShadowRole(themeWithCoverTitle('poster')), 'accentSecondary');
-  assert.equal(resolveSocialCoverTitleShadowRole(socialThemeDefinition('brutalist')), 'accent');
+  assert.equal(resolveSocialCoverTitleShadowRole(themeWithCoverTitle('poster')), 'accent');
+  assert.equal(resolveSocialCoverTitleShadowRole(socialThemeDefinition('brutalist')), 'codeBackground');
   assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--ink\)/);
   const html=compileThemePreview({target:'social',definition:themeWithCoverTitle('highlight-block')}).html;
   assert.equal((html.match(/class="cover-title-line"/g)||[]).length,3);
   const twoLine=renderStoryboardHtml({topic:'封面标题十一个字刚好',visualStyle:'neon',pages:[{kind:'cover',title:'封面标题十一个字刚好',content_blocks:[]}]});
   assert.equal((twoLine.match(/class="cover-title-line"/g)||[]).length,2);
   assert.match(html.replace(/<[^>]+>/g,''),/如何把复杂的技术内容讲得清楚又准确/);
+});
+
+test('大字阴影只使用深色角色并保持可辨识度',()=>{
+  for(const id of builtinAssignments.poster){
+    const definition=socialThemeDefinition(id),role=resolveSocialCoverTitleShadowRole(definition),colors=definition.tokens.colors;
+    assert.ok(colorContrast(colors[role],'#FFFFFF')>=4.5,`${id} 的阴影角色 ${role} 不能是亮色`);
+    const titleRole=definition.social.components?.coverTitle?.colorRole||'text';
+    assert.ok(Math.max(colorContrast(colors[role],colors[titleRole]),colorContrast(colors[role],colors.surface))>=3,`${id} 的阴影与标题/封面背景对比度不足`);
+    assert.notEqual(role,'inverseText',`${id} 不应使用浅色反色角色作为阴影`);
+    assert.doesNotMatch(compileSocialTheme(definition).css,/var\(undefined\)/,`${id} 的阴影角色必须映射到有效 CSS 变量`);
+  }
+});
+
+test('图文模板包尊重主题封面标题配方',()=>{
+  const cases=[
+    ['ice-blue','classic','clean-title-line'],
+    ['bone-white','editorial','clean-title-line'],
+    ['brutalist','poster','brutalist-title-line'],
+    ['neon','highlight-block','cover-title-line'],
+  ];
+  for(const [visualStyle,recipe,lineClass] of cases){
+    const html=renderStoryboardHtml({topic:'把复杂技术内容讲清楚',visualStyle,pages:[{kind:'cover',title:'把复杂技术内容讲清楚',content_blocks:[]} ]});
+    assert.match(html,new RegExp(`class="${lineClass}"`),`${visualStyle} 应保留封面标题行`);
+    if(recipe==='highlight-block'){
+      assert.match(html,/\.theme-neon \.page-cover h1 \.cover-title-line:nth-child\(even\)\{[^}]*background:var\(--code\)/);
+    }else{
+      assert.match(html,new RegExp(`\\.theme-${visualStyle} \\.page-cover h1 \\.${lineClass}[^{}]*\\{[^}]*background:transparent`),`${visualStyle} 不应被模板包渲染为色块标题`);
+    }
+  }
 });
 
 test('封面标题 AI 语义断行：校验、优先使用与代码兜底',()=>{

@@ -229,6 +229,12 @@
       "optionalCapabilities": []
     },
     {
+      "id": "event-research-analyzer",
+      "name": "事件深度分析",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
       "id": "hotspot-brainstorm",
       "name": "热点探索脑暴",
       "requiredCapabilities": [],

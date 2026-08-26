@@ -7,7 +7,7 @@ import { loadSkillBundle, selectSkillPromptReferences } from '../../../platform/
 import { evaluateCardGate, evaluateClassifiedCardGate, evaluateEventCardGate, evaluateCustomCardGate } from '../domain/social-card-gate.mjs';
 import { customFactMarkdown } from './custom-fact-service.mjs';
 import { candidateSocialCardDir } from '../../../platform/core/workspace-paths.mjs';
-import { resolveEventAnalysis } from '../../research/index.mjs';
+import { enrichEventAnalysis, eventGroupsForCandidate, resolveEventAnalysis } from '../../research/index.mjs';
 import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { compileSocialTheme, socialThemeDefinition } from '../../../shared/themes/social-theme-compiler.mjs';
@@ -210,10 +210,22 @@ export function reconcileSocialCardDynamicFillAuditsWithFinalReport(history, rep
 }
 
 function eventFactMarkdown(analysis) {
-  const facts=analysis.factBase||{},lines=['# 事件图文事实清单','',analysis.eventSummary||'','',
-    '## 已确认事实','',...(facts.confirmedFacts||[]).map((item)=>`- ${item.claim}（来源 ${(item.sourceIds||[]).join('、')||'待补'}）`),
-    '','## 尚未核实的主张','',...(facts.claims||[]).map((item)=>`- ${item.speaker?`${item.speaker}：`:''}${item.claim}（${item.status||'unverified'}；来源 ${(item.sourceIds||[]).join('、')||'待补'}）`),
-    '','## 时间线','',...(facts.timeline||[]).map((item)=>`- ${item.time||'时间待核'}：${item.event}（来源 ${(item.sourceIds||[]).join('、')||'待补'}）`),
+  const facts=analysis.factBase||{};
+  const claimText=(item)=>typeof item==='string'?item:String(item?.claim??item?.fact??item?.event??item?.value??item?.angle??item?.adds??item?.content??'').trim();
+  const claimRefs=(item)=>[...(item?.source_ids||item?.sourceIds||[])].map(String).filter(Boolean);
+  const renderClaims=(items, suffix='')=>(Array.isArray(items)?items:[]).map((item)=>{
+    const refs=claimRefs(item); const status=item?.status&&item.status!=='supported'?`；${item.status}`:'';
+    return `- ${claimText(item)}${suffix||status}（来源 ${refs.join('、')||'待补'}）`;
+  }).filter((line)=>!/- \(来源/.test(line));
+  const renderTimeline=(items)=>(Array.isArray(items)?items:[]).map((item)=>`- ${item?.time||'时间待核'}：${claimText(item)}（来源 ${claimRefs(item).join('、')||'待补'}）`);
+  const lines=['# 事件图文事实清单','',analysis.eventSummary||'','',
+    '## 背景','',...renderClaims(facts.context||facts.backgrounds),
+    '','## 已确认事实','',...renderClaims(facts.confirmedFacts),
+    '','## 来源增量','',...(Array.isArray(facts.sourceIncrements)?facts.sourceIncrements:[]).map((item)=>`- ${item.source||'来源'}：${item.adds||claimText(item)}（来源 ${claimRefs(item).join('、')||'待补'}）`),
+    '','## 技术机制与影响','',...renderClaims([...(facts.mechanisms||[]),...(facts.architecture||[]),...(facts.impacts||[]) ]),
+    '','## 尚未核实的主张','',...renderClaims(facts.claims||facts.openQuestions, '；待核'),
+    '','## 时间线','',...renderTimeline(facts.timeline),
+    '','## 风险、分歧与后续观察','',...renderClaims([...(facts.disagreements||[]),...(facts.risks||[]),...(facts.followUpSignals||[]) ]),
     '','## 来源风险与缺口','',...(analysis.sourceAudit?.issues||[]).map((item)=>`- ${item}`),...(analysis.sourceAudit?.neededMaterials||[]).map((item)=>`- 待补：${item}`)];
   return lines.join('\n').trim()+'\n';
 }
@@ -226,30 +238,36 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const storyboardClass=contentType==='event'?socialStoryboardClassForContentClass(candidate.content_class):contentType;
   const channelMode=outputMode.startsWith('xiaohongshu')?'xiaohongshu':'wechat';
   const facts = store.getRepositoryFactSheet(candidateId);
-  const eventAnalysisRecord=contentType==='event'?resolveEventAnalysis({store,workspaceRoot,candidate}):null;
+  let eventAnalysisRecord=contentType==='event'?resolveEventAnalysis({store,workspaceRoot,candidate}):null;
   const editorial = store.getCardEditorial(candidateId);
   const themeDefinition=resolveWorkspaceTheme(store,editorial.visual_style||'ice-blue','social')||socialThemeDefinition(editorial.visual_style||'ice-blue',{fallback:false});
   if(!themeDefinition)throw new Error(`未知图文视觉主题：${editorial.visual_style}`);
   const templateCapabilities=getSocialCardTemplateCapabilities({themeDefinition,channelMode,contentType});
   const rolloutProfile=getSocialCardPlanRolloutProfile(templateCapabilities.templatePack.id);
   store.recordThemeUsage?.({themeId:themeDefinition.id,version:themeDefinition.version,target:'social',source:themeDefinition.source,batchId,candidateId});
-  const gate = contentType==='event'?(storyboardClass==='technology'||storyboardClass==='trend'?evaluateClassifiedCardGate(candidate,storyboardClass,eventAnalysisRecord,editorial):evaluateEventCardGate(candidate,eventAnalysisRecord,editorial)):contentType==='custom'?evaluateCustomCardGate(candidate,facts,editorial):evaluateCardGate(candidate, facts, editorial);
-  if (!gate.ready) throw new Error(`卡片故事板尚未就绪：${gate.issues.join('；')}`);
-  store.saveCardEditorial?.(candidateId,{...editorial,storyboard_theme_snapshot_json:JSON.stringify(createSocialCardStoryboardThemeSnapshot({themeDefinition,channelMode,contentType}))});
   const batch = store.getBatch(batchId);
   const workdir = candidateSocialCardDir(workspaceRoot, batch, candidate);
   fs.mkdirSync(workdir, { recursive:true });
   const themeSnapshotPath=path.join(workdir,'social-theme-snapshot.json');
-  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,templatePack:templateCapabilities.templatePack,templateSource:templateCapabilities.source,templateFallback:templateCapabilities.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
-
   const generator = loadSkillBundle({ workspaceRoot, skillName:'xiaohongshu-article-generator' });
   const screenshotSkill = loadSkillBundle({ workspaceRoot, skillName:'html-pages-to-images' });
+  const eventAnalysisSkill = contentType==='event' ? loadSkillBundle({ workspaceRoot, skillName:'event-research-analyzer' }) : null;
   if (generator.fallback) throw new Error('项目图文生成技能缺失');
   if (screenshotSkill.fallback) throw new Error('项目 HTML 截图技能缺失');
-  const skillRuntime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:`social-cards-${contentType}`,bundles:[generator,screenshotSkill],provider,snapshotId});
+  if (eventAnalysisSkill?.fallback) throw new Error('事件深度分析技能缺失');
+  const skillRuntime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:`social-cards-${contentType}`,bundles:[generator,screenshotSkill,...(eventAnalysisSkill?[eventAnalysisSkill]:[])],provider,snapshotId});
   gateway=bindGenerationSnapshot(gateway,skillRuntime.snapshotId);
   provider=skillRuntime.provider;
   const maxLayoutAttempts=configuredRepairAttempts(skillRuntime.config,4)+1;
+  if(contentType==='event'&&eventAnalysisRecord?.analysis){
+    const groups=eventGroupsForCandidate({store,workspaceRoot,candidate,contentLimit:9000});
+    eventAnalysisRecord=await enrichEventAnalysis({gateway,store,batchId,candidateId,provider,workspaceRoot,baseRecord:eventAnalysisRecord,groups,skillBundle:eventAnalysisSkill,cachePath:path.join(workdir,'event-analysis.json'),onProgress});
+  }
+  const gate = contentType==='event'?(storyboardClass==='technology'||storyboardClass==='trend'?evaluateClassifiedCardGate(candidate,storyboardClass,eventAnalysisRecord,editorial):evaluateEventCardGate(candidate,eventAnalysisRecord,editorial)):contentType==='custom'?evaluateCustomCardGate(candidate,facts,editorial):evaluateCardGate(candidate, facts, editorial);
+  if (!gate.ready) throw new Error(`卡片故事板尚未就绪：${gate.issues.join('；')}`);
+  store.saveCardEditorial?.(candidateId,{...editorial,storyboard_theme_snapshot_json:JSON.stringify(createSocialCardStoryboardThemeSnapshot({themeDefinition,channelMode,contentType}))});
+  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,templatePack:templateCapabilities.templatePack,templateSource:templateCapabilities.source,templateFallback:templateCapabilities.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
+
   const stages = [];
   const storyboardSnapshot=store.findLatestGenerationSnapshot?.({
     batchId,candidateId,purposes:[`social-card-editorial-${contentType}`],
@@ -272,6 +290,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   writeFile(path.join(workdir, 'social-card-skill-manifest.json'), JSON.stringify({
     generator:{ hash:generator.hash, files:generator.files, fallback:generator.fallback },
     screenshots:{ hash:screenshotSkill.hash, files:screenshotSkill.files, fallback:screenshotSkill.fallback },
+    ...(eventAnalysisSkill ? { eventAnalysis:{ hash:eventAnalysisSkill.hash, files:eventAnalysisSkill.files, fallback:eventAnalysisSkill.fallback } } : {}),
     loadedAt:new Date().toISOString(),
   }, null, 2));
 
@@ -294,11 +313,13 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     // 只清理模型错误绑定的 supplement block，不修改核心故事板内容。
     store.saveCardEditorial?.(candidateId, { ...editorial, card_plan_json: JSON.stringify(originalCardPlan), status: 'AI_READY' });
   }
-  const pageBudget = socialCardPageBudget(contentType);
+  // technology/trend 仍复用 event 事实基座和模板，但页数预算按实际故事板类型计算。
+  const pageBudgetType = contentType === 'event' ? storyboardClass : contentType;
+  const pageBudget = socialCardPageBudget(pageBudgetType);
   const recommendedPagesForContent = pageBudget.recommended;
   const absoluteMaxPagesForContent = pageBudget.absolute;
   const assertAbsolutePageBudget = (pages) => {
-    const message = socialCardPageBudgetMessage(Array.isArray(pages) ? pages.length : 0, contentType);
+    const message = socialCardPageBudgetMessage(Array.isArray(pages) ? pages.length : 0, pageBudgetType);
     if (!message) return;
     const error = new Error(message);
     error.code = 'SOCIAL_CARD_PAGE_BUDGET_EXCEEDED';

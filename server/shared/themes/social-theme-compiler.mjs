@@ -5,14 +5,15 @@ import { colorContrast, mixHex } from './color-utils.mjs';
 
 const SHADOWS={none:'none',soft:'0 20px 45px rgba(36,91,122,.14)',hard:'9px 9px 0 var(--accent)',glow:'0 0 30px color-mix(in srgb,var(--accent) 30%,transparent)'};
 const lower=(value)=>String(value).toLowerCase();
-const COLOR_VARS={text:'--ink',muted:'--muted',accent:'--accent',accentSecondary:'--accent2',inverseText:'--inverse',line:'--line'};
+const COLOR_VARS={text:'--ink',muted:'--muted',accent:'--accent',accentSecondary:'--accent2',inverseText:'--inverse',line:'--line',codeBackground:'--code',page:'--page'};
 const colorVar=(role)=>`var(${COLOR_VARS[role]})`;
 const SURFACE_VARS={surface:'--surface',page:'--page',accent:'--accent',accentSecondary:'--accent2',codeBackground:'--code'};
 const surfaceValue=(role)=>role==='transparent'?'transparent':SURFACE_VARS[role]?`var(${SURFACE_VARS[role]})`:'';
 const borderWidth=(weight)=>({none:'0',thin:'1px',medium:'2px',heavy:'4px'}[weight]||'');
 const scaledSize=(base,scale,{compactDelta=-2,displayDelta=4,min=8,max=40}={})=>Math.min(max,Math.max(min,base+(scale==='compact'?compactDelta:scale==='display'?displayDelta:0)));
 const DEFAULT_EFFECTS=Object.freeze({texture:'none',decorationOpacity:.35,contentTiltDeg:0});
-const COVER_TITLE_SHADOW_ROLES=Object.freeze(['accentSecondary','accent','text','inverseText','codeBackground','line','page']);
+const COVER_TITLE_SHADOW_ROLES=Object.freeze(['accentSecondary','accent','codeBackground','text','line','page','inverseText']);
+const DARK_SHADOW_MIN_CONTRAST=4.5;
 
 function socialContentBackground(definition){
   const colors=definition.tokens.colors,page=colors.page||colors.surface;
@@ -20,20 +21,23 @@ function socialContentBackground(definition){
 }
 
 /**
- * Poster 标题的阴影不能固定使用 accentSecondary：不同主题的次强调色
- * 可能与标题文字或封面内容表面对比不足。编译时选择同时区别于两者
- * 的语义色；对比度足够时保留 poster 原有的次强调色视觉语言。
+ * Poster 标题的阴影不能固定使用 accentSecondary：高饱和强调色会形成
+ * 发亮的彩色光晕。只从相对深的语义色中选择，并优先保证阴影和标题
+ * 有足够对比；即使没有理想候选，也回退到最深色，而不是浅色角色。
  */
 export function resolveSocialCoverTitleShadowRole(definition,components=resolveSocialComponents(definition)){
   const colors=definition?.tokens?.colors||{},titleRole=components?.coverTitle?.colorRole||'text';
   const titleColor=colors[titleRole]||colors.text,background=socialContentBackground(definition);
-  const score=(role)=>{
+  const metrics=(role)=>{
     const value=colors[role];
-    return value?Math.min(colorContrast(value,titleColor),colorContrast(value,background)):0;
+    if(!value)return {dark:false,title:0,background:0,score:0};
+    const title=colorContrast(value,titleColor),backgroundContrast=colorContrast(value,background);
+    return {dark:colorContrast(value,'#FFFFFF')>=DARK_SHADOW_MIN_CONTRAST,title,background:backgroundContrast,score:title*100+backgroundContrast};
   };
-  const secondaryScore=score('accentSecondary');
-  if(secondaryScore>=3)return 'accentSecondary';
-  return COVER_TITLE_SHADOW_ROLES.reduce((best,role)=>score(role)>score(best)?role:best,'accentSecondary');
+  const darkRoles=COVER_TITLE_SHADOW_ROLES.filter((role)=>metrics(role).dark);
+  const readableDarkRoles=darkRoles.filter((role)=>metrics(role).title>=3);
+  const candidates=readableDarkRoles.length?readableDarkRoles:darkRoles;
+  return candidates.reduce((best,role)=>metrics(role).score>metrics(best).score?role:best,candidates[0]||'text');
 }
 
 export function socialThemeDefinition(themeId,{fallback=false}={}){
@@ -89,9 +93,16 @@ export function compileSocialTheme(theme){
   if(recipes.eyebrow==='accent')css+=`${scope} .eyebrow{color:var(--accent2)}`;
   if(recipes.eyebrow==='stamp')css+=`${scope} .eyebrow{width:max-content;padding:4px 7px;border:1px solid currentColor;transform:rotate(-2deg)}`;
   if(recipes.eyebrow==='underline')css+=`${scope} .eyebrow{border-bottom:1px solid var(--accent);padding-bottom:5px}`;
-  if(recipes.coverTitle==='classic')css+=`${scope} .page-cover h1{max-width:96%;padding-left:14px;border-left:2px solid var(--accent);line-height:1.2;letter-spacing:-.025em;text-wrap:balance}`;
-  if(recipes.coverTitle==='editorial')css+=`${scope} .page-cover h1{font-family:${fontStack('serif')};font-weight:700;line-height:1.14;letter-spacing:-.025em;padding:14px 0 12px;border-top:4px double var(--ink);border-bottom:1px solid var(--accent);text-wrap:balance}`;
-  if(recipes.coverTitle==='poster')css+=`${scope} .page-cover h1{font-weight:900;line-height:.98;letter-spacing:-.06em;padding-bottom:8px;border-bottom:4px solid var(--accent);text-wrap:balance;text-shadow:3px 3px 0 var(--cover-title-shadow)}`;
+  // Specialized template packs render every cover title as line spans. Reset their
+  // block treatment for non-highlight recipes so the theme's title recipe remains
+  // visible instead of being silently replaced by alternating color blocks.
+  // The specialized packs use their own line class names. The generic
+  // cover-title-line is intentionally left to the highlight-block recipe.
+  const coverLine=`${scope} .page-cover h1 .clean-title-line,${scope} .page-cover h1 .editorial-title-line,${scope} .page-cover h1 .brutalist-title-line`;
+  const resetCoverLine=`display:block;width:auto;max-width:100%;margin:0;padding:0;background:transparent;color:inherit;box-shadow:none;transform:none;overflow-wrap:anywhere`;
+  if(recipes.coverTitle==='classic')css+=`${scope} .page-cover h1{max-width:96%;padding-left:14px;border-left:2px solid var(--accent);line-height:1.2;letter-spacing:-.025em;text-wrap:balance}${coverLine}{${resetCoverLine}}`;
+  if(recipes.coverTitle==='editorial')css+=`${scope} .page-cover h1{font-family:${fontStack('serif')};font-weight:700;line-height:1.14;letter-spacing:-.025em;padding:14px 0 12px;border-top:4px double var(--ink);border-bottom:1px solid var(--accent);text-wrap:balance}${coverLine}{${resetCoverLine}}`;
+  if(recipes.coverTitle==='poster')css+=`${scope} .page-cover h1{font-weight:900;line-height:.98;letter-spacing:-.06em;padding-bottom:8px;border-bottom:4px solid var(--accent);text-wrap:balance;text-shadow:3px 3px 0 var(--cover-title-shadow)}${coverLine}{${resetCoverLine}}`;
   if(recipes.coverTitle==='highlight-block')css+=`${scope} .page-cover h1{width:100%;max-width:100%;padding:0;background:transparent;color:var(--inverse);font-weight:850;line-height:1.04;letter-spacing:-.04em}${scope} .page-cover h1 .cover-title-line{display:block;width:fit-content;max-width:100%;margin:3px 0;padding:5px 10px;background:var(--accent);color:inherit;box-shadow:4px 0 0 var(--accent2);transform:translateX(0);overflow-wrap:anywhere}${scope} .page-cover h1 .cover-title-line:nth-child(even){margin-left:8px;background:var(--code);color:var(--ink);box-shadow:-4px 0 0 var(--accent2)}${scope} .page-cover h1 .cover-title-line:nth-child(3n){margin-left:3px}`;
   if(recipes.skeleton==='editorial-split'){const splitPage=`${scope} .skeleton-editorial-split:not(.page-cover):not(.blocks-1):not(.blocks-3):not(.comp-cols-single)`;css+=`${splitPage} .page-content-stack{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);align-content:center;gap:calc(var(--card-gap) + 2px) var(--section-gap)}${scope} .skeleton-editorial-split:not(.page-cover) .eyebrow,${scope} .skeleton-editorial-split:not(.page-cover) h1,${scope} .skeleton-editorial-split:not(.page-cover) .cover-support{grid-column:1/-1}${splitPage} .content-block:nth-child(odd){grid-column:1}${splitPage} .content-block:nth-child(even){grid-column:2}${splitPage} .content-block.stats-block,${splitPage} .content-block.compare-block,${splitPage} .content-block.code-block{grid-column:1/-1}`;}
   if(recipes.skeleton==='terminal-rail')css+=`${scope} .skeleton-terminal-rail .page-content-stack{border-left:max(3px,var(--border-width)) solid var(--accent);padding-left:calc(var(--section-gap) - 4px)}${scope} .skeleton-terminal-rail .content-block{padding-left:8px;border-left:1px dashed var(--line)}`;

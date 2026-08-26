@@ -5,6 +5,8 @@ import { socialCardPageBudget, socialCardPageBudgetMessage, socialCardPageBudget
 test('Social 页数预算区分推荐值和绝对安全上限', () => {
   assert.deepEqual(socialCardPageBudget('repository'), { contentType: 'repository', recommended: 7, absolute: 12 });
   assert.deepEqual(socialCardPageBudget('event'), { contentType: 'event', recommended: 10, absolute: 16 });
+  assert.deepEqual(socialCardPageBudget('technology'), { contentType: 'technology', recommended: 5, absolute: 10 });
+  assert.deepEqual(socialCardPageBudget('trend'), { contentType: 'trend', recommended: 6, absolute: 10 });
   assert.deepEqual(socialCardPageBudget('unknown'), { contentType: 'unknown', recommended: 7, absolute: 12 });
 });
 

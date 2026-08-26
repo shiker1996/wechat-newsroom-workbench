@@ -730,13 +730,19 @@ function technologyPageRole(page) {
   const role = eventPageRole(page);
   const kind = String(page?.kind || '').toLowerCase();
   const title = String(page?.title || '');
-  if (kind === 'problem' || /问题|痛点/.test(title)) return 'problem';
-  if (kind === 'mechanism' || /机制|架构|原理|如何工作|模型定位|核心能力/.test(title)) return 'mechanism';
-  if (role === 'evidence' || role === 'data' || kind === 'evidence' || /证据|官方|实测|基准|性能|数据/.test(title)) return 'evidence';
-  if (role === 'risk' || kind === 'boundary' || /边界|限制|风险|适用|注意/.test(title)) return 'boundary';
+  if (kind === 'problem' || role === 'problem') return 'problem';
+  // 故事板已经给出 role/kind 时，以结构化字段为准；标题里的“性能”等词
+  // 只能作为缺少结构化字段时的降级推断，否则“性能边界”会被误判成 evidence。
+  if (kind === 'mechanism' || role === 'mechanism' || role === 'feature') return 'mechanism';
+  if (kind === 'boundary' || kind === 'risk' || role === 'risk') return 'boundary';
+  if (kind === 'evidence' || role === 'evidence' || role === 'data') return 'evidence';
   if (role === 'timeline' || kind === 'timeline') return 'timeline';
   if (role === 'ending' || kind === 'ending') return 'ending';
   if (role === 'concept') return 'mechanism';
+  if (/问题|痛点/.test(title)) return 'problem';
+  if (/机制|架构|原理|如何工作|模型定位|核心能力/.test(title)) return 'mechanism';
+  if (/边界|限制|风险|适用|注意/.test(title)) return 'boundary';
+  if (/证据|官方|实测|基准|性能|数据/.test(title)) return 'evidence';
   return role;
 }
 
@@ -752,15 +758,64 @@ function trendPageRole(page) {
   const role = eventPageRole(page);
   const kind = String(page?.kind || '').toLowerCase();
   const title = String(page?.title || '');
-  if (kind === 'trend' || /趋势判断|趋势信号|变化判断/.test(title)) return 'trend';
-  if (kind === 'actors' || /推动主体|主体|参与方|主要玩家/.test(title)) return 'actors';
+  // 与技术故事板一致：先信任结构化角色，再用标题作为缺省推断。
+  if (kind === 'trend' || role === 'trend') return 'trend';
+  if (kind === 'actors' || role === 'actors' || role === 'feature') return 'actors';
+  if (kind === 'boundary' || kind === 'risk' || role === 'risk') return 'watch';
+  if (kind === 'positions' || kind === 'compare' || role === 'compare' || role === 'data') return 'comparison';
   if (role === 'timeline' || kind === 'timeline') return 'timeline';
-  if (role === 'compare' || role === 'data' || kind === 'positions' || kind === 'compare' || /生态对比|对比|比较/.test(title)) return 'comparison';
-  if (role === 'risk' || kind === 'boundary' || /待观察|不确定|边界|限制|风险/.test(title)) return 'watch';
   if (role === 'ending' || kind === 'ending') return 'ending';
   if (role === 'concept') return 'trend';
-  if (role === 'feature') return 'actors';
+  if (/趋势判断|趋势信号|变化判断/.test(title)) return 'trend';
+  if (/推动主体|主体|参与方|主要玩家/.test(title)) return 'actors';
+  if (/生态对比|对比|比较/.test(title)) return 'comparison';
+  if (/待观察|不确定|边界|限制|风险/.test(title)) return 'watch';
   return role;
+}
+
+function mergeBlockMetadata(first, second, { title = null, content = null, items = null } = {}) {
+  const merged = {
+    ...clone(first),
+    ...(title ? { title } : {}),
+    source_refs: [...new Set([
+      ...(Array.isArray(first?.source_refs) ? first.source_refs : []),
+      ...(Array.isArray(second?.source_refs) ? second.source_refs : []),
+    ].map(String))],
+    fact_ids: [...new Set([
+      ...(Array.isArray(first?.fact_ids) ? first.fact_ids : []),
+      ...(Array.isArray(second?.fact_ids) ? second.fact_ids : []),
+    ].map(String))],
+  };
+  if (items) {
+    merged.items = items;
+    delete merged.content;
+  }
+  if (content !== null) merged.content = content;
+  return merged;
+}
+
+/**
+ * 相邻职责合并前，先把同类型内容块压成一个块。这样“规格列表 + 价格列表”
+ * 不会因为两个块标题和间距重复而被容量预检拒绝，同时保留全部条目与来源。
+ */
+function coalesceAdjacentStoryboardBlocks(blocks = []) {
+  const output = [];
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    const previous = output.at(-1);
+    const type = String(block?.type || '');
+    if (previous && String(previous?.type || '') === type && type === 'list') {
+      const firstItems = Array.isArray(previous.items) ? previous.items : [];
+      const secondItems = Array.isArray(block.items) ? block.items : [];
+      const titles = [previous.title, block.title].map((value) => String(value || '').trim()).filter(Boolean);
+      output[output.length - 1] = mergeBlockMetadata(previous, block, {
+        title: titles.length > 1 ? titles.join('｜') : titles[0] || null,
+        items: [...firstItems, ...secondItems],
+      });
+      continue;
+    }
+    output.push(clone(block));
+  }
+  return output;
 }
 
 function normalizeClassifiedStoryboardPages({ pages = [], capacityProfile = null, mergeSlack = 1.04, pageRole, rules, source } = {}) {
@@ -789,11 +844,20 @@ function normalizeClassifiedStoryboardPages({ pages = [], capacityProfile = null
         ...(Array.isArray(second.evidence) ? second.evidence : []),
       ].map(String))],
     };
-    if (!eventMergeFits(candidate, capacityProfile, rule.role, mergeSlack)) {
+    const compactCandidate = {
+      ...candidate,
+      content_blocks: coalesceAdjacentStoryboardBlocks(candidate.content_blocks),
+    };
+    const fitCandidate = eventMergeFits(candidate, capacityProfile, rule.role, mergeSlack)
+      ? candidate
+      : eventMergeFits(compactCandidate, capacityProfile, rule.role, mergeSlack)
+        ? compactCandidate
+        : null;
+    if (!fitCandidate) {
       index += 1;
       continue;
     }
-    output.splice(index, 2, candidate);
+    output.splice(index, 2, fitCandidate);
     operations.push({
       op: rule.op,
       pages: [index + 1, index + 2],

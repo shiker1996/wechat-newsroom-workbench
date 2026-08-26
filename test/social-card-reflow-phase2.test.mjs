@@ -109,8 +109,8 @@ test('开源技术故事板按问题、机制、证据和边界合并，不套�
     { kind: 'ending', role: 'ending', title: '后续观察', content_blocks: [{ type: 'list', items: ['等待更多验证'] }] },
   ];
   const result = normalizeOpenSourceTechnologyStoryboardPages({ pages, capacityProfile });
-  assert.equal(result.pages.length, 4);
-  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'feature', 'risk', 'ending']);
+  assert.equal(result.pages.length, 3);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'risk', 'ending']);
   assert.ok(result.operations.some((operation) => operation.op === 'merge_technology_problem_mechanism'));
   assert.ok(result.operations.some((operation) => operation.op === 'merge_technology_evidence_boundary'));
   assert.doesNotMatch(JSON.stringify(result.pages), /争议焦点/);
@@ -122,6 +122,26 @@ test('开源技术故事板按问题、机制、证据和边界合并，不套�
     capacityProfile,
   });
   assert.ok(mechanismEvidence.operations.some((operation) => operation.op === 'merge_technology_mechanism_evidence'));
+
+  const explicitRiskWinsOverTitle = normalizeOpenSourceTechnologyStoryboardPages({
+    pages: [
+      { kind: 'evidence', role: 'evidence', title: '性能证据', content_blocks: [{ type: 'note', content: '公开测试结果' }] },
+      { kind: 'risk', role: 'risk', title: '需要验证的性能边界', content_blocks: [{ type: 'list', items: ['仍需更多样本验证'] }] },
+    ],
+    capacityProfile,
+  });
+  assert.ok(explicitRiskWinsOverTitle.operations.some((operation) => operation.op === 'merge_technology_evidence_boundary'));
+
+  const denseListMerge = normalizeOpenSourceTechnologyStoryboardPages({
+    pages: [
+      { kind: 'concept', role: 'concept', title: 'M6芯片', content_blocks: [{ type: 'list', title: 'M6芯片规格', items: ['2纳米制程', '12核CPU', '12核GPU', '双16核神经网络引擎'] }] },
+      { kind: 'data', role: 'data', title: '价格对比', content_blocks: [{ type: 'list', title: '价格列表', items: ['M6版Mac mini：6999元起', 'M5 Pro版Mac mini：12999元起', 'Mac Studio M5 Max：19999元起', 'Mac Studio M5 Ultra：46999元起'] }] },
+    ],
+    capacityProfile,
+  });
+  assert.equal(denseListMerge.pages.length, 1);
+  assert.equal(denseListMerge.pages[0].content_blocks.length, 1);
+  assert.equal(denseListMerge.pages[0].content_blocks[0].items.length, 8);
 });
 
 test('开源趋势故事板按趋势、主体、变化信号、对比和待观察合并', () => {
@@ -136,11 +156,11 @@ test('开源趋势故事板按趋势、主体、变化信号、对比和待观�
     { kind: 'ending', role: 'ending', title: '后续观察', content_blocks: [{ type: 'list', items: ['继续跟踪'] }] },
   ];
   const result = normalizeOpenSourceTrendStoryboardPages({ pages, capacityProfile });
-  assert.equal(result.pages.length, 4);
-  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'timeline', 'risk', 'ending']);
+  assert.equal(result.pages.length, 3);
+  assert.deepEqual(result.pages.map((page) => page.role), ['cover', 'compare', 'ending']);
   assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_judgment_actors'));
   assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_actors_timeline'));
-  assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_comparison_watch'));
+  assert.ok(result.operations.some((operation) => operation.op === 'merge_trend_watch_ending'));
   const timelineComparison = normalizeOpenSourceTrendStoryboardPages({
     pages: [
       { kind: 'timeline', role: 'timeline', title: '变化路径', content_blocks: [{ type: 'timeline', items: [{ time: '现在', content: '短事实' }] }] },

@@ -6,6 +6,7 @@
 
 - `hotspot-tagging`：热点语义标注与全量预评估（选题链打标阶段）
 - `event-card-generator`：事件事实卡生成（选题链事件研判阶段）
+- `event-research-analyzer`：读取事件关联报道正文，形成故事板和图文共用的深度事件事实基座（事件图文自动前置阶段）
 - `hotspot-brainstorm`：热点探索脑暴，生成临时探索卡（选题链脑暴阶段）
 - `hotspot-synthesis`：热点综合研判与竞争修正（选题链复排阶段）
 - `editorial-room-chat`：公众号编辑会主持人，锁定简报前的对话式决策（选题链编辑会阶段）

@@ -1,5 +1,5 @@
 import { bindGenerationSnapshot, prepareSkillRun, resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
-import { buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, socialStoryboardSkillForContentClass, toLegacySocialCardPromptInput } from '../../../features/social-cards/index.mjs';
+import { buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, enrichEventAnalysis, eventGroupsForCandidate, socialStoryboardSkillForContentClass, toLegacySocialCardPromptInput } from '../../../features/social-cards/index.mjs';
 import { listSocialCardStageSkillSlots, resolveSocialCardStageSkills } from '../../skills/entry-routing.mjs';
 import { requestGitHubJson } from '../../plugin-sdk/github-client.mjs';
 import { pipeFile } from '../route-helpers.mjs';
@@ -298,6 +298,8 @@ export async function handleSocialCardRoutes(context) {
       const storyboardSelection=stageSelections.storyboard;
       const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
       if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
+      const eventAnalysisSkill=contentType==='event'?loadSkillBundle({workspaceRoot:root,skillName:'event-research-analyzer'}):null;
+      if(eventAnalysisSkill?.fallback)throw new Error('事件深度分析技能缺失');
       const channelMode=socialChannelMode(candidate);
       const templateContext=socialTemplateContext(store,current,channelMode,contentType);
       const storyboardSystem=buildSocialCardStoryboardSystemPrompt({
@@ -307,7 +309,7 @@ export async function handleSocialCardRoutes(context) {
       const storyboardBundle={...socialSkill,prompt:storyboardSystem,hash:''};
       const skillRuntime=await prepareSkillRun({
         gateway:models,store,batchId:candidate.batch_id,candidateId:candidate.id,
-        purpose:`social-card-editorial-${contentType}`,bundles:[storyboardBundle],provider:input.provider,
+        purpose:`social-card-editorial-${contentType}`,bundles:[storyboardBundle,...(eventAnalysisSkill?[eventAnalysisSkill]:[])],provider:input.provider,
         selection:{
           requestedSkill:storyboardSelection.requestedSkill,
           selectedSkill:storyboardSelection.selectedSkill,
@@ -316,6 +318,10 @@ export async function handleSocialCardRoutes(context) {
         },
       });
       const selectedProvider=skillRuntime.provider,providerConfig=skillRuntime.providerConfig;
+      if(contentType==='event'&&eventAnalysis?.analysis){
+        const groups=eventGroupsForCandidate({store,workspaceRoot:root,candidate,contentLimit:9000});
+        eventAnalysis=await enrichEventAnalysis({gateway:bindGenerationSnapshot(models,skillRuntime.snapshotId),store,batchId:candidate.batch_id,candidateId:candidate.id,provider:selectedProvider,workspaceRoot:root,baseRecord:eventAnalysis,groups,skillBundle:eventAnalysisSkill,cachePath:path.join(socialCardFiles(store.getBatch(candidate.batch_id),candidate).dir,'event-analysis.json')});
+      }
       const factEnvelope=buildSocialCardFactEnvelope({
         contentType,channelMode,topic:candidate.hotspot_title,facts:facts?.data,
         eventAnalysis:eventAnalysis?.analysis,outputMode:current.output_mode,

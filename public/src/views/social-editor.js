@@ -67,7 +67,10 @@ function syncStoryboardActionLabels() {
     inspect.hidden=selectedContentType!=='repository';
     inspect.textContent='分析仓库';
   }
-  if(generate&&storyboardThemeState?.status!=='needs-storyboard')generate.textContent=currentCardPlan.length?'重新生成故事板':'生成故事板';
+  if(generate){
+    generate.disabled=storyboardThemeState?.status==='needs-storyboard';
+    if(storyboardThemeState?.status!=='needs-storyboard')generate.textContent=currentCardPlan.length?'重新生成故事板':'生成故事板';
+  }
 }
 
 function syncCompositionControls(){

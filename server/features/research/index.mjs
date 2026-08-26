@@ -26,6 +26,7 @@ export {
 } from './application/research-pipeline.mjs';
 
 export { eventGroupsForCandidate, resolveEventAnalysis, synthesizeEventAnalysis } from './application/event-fact-service.mjs';
+export { enrichEventAnalysis, readEventAnalysisCache, sourceInput as eventResearchSourceInput, sourceSignature as eventResearchSourceSignature } from './application/event-research-analysis.mjs';
 export { loadStableBatchEvents, resolveStableBatchEvents } from './application/stable-event-service.mjs';
 export { runEventResolutionBackfill, writeEventResolutionBackfillReport } from './application/event-resolution-backfill.mjs';
 export { buildEventResolutionOperationsMetrics, readEventResolutionReview } from './application/event-resolution-operations.mjs';

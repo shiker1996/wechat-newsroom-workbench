@@ -8,7 +8,7 @@ import {
 
 export const SOCIAL_CARD_FACT_INDEX_SCHEMA_VERSION = 1;
 
-const SKIP_KEYS = new Set(['readmeMarkdown', 'markdown', 'html', 'raw', 'contentHtml']);
+const SKIP_KEYS = new Set(['readmeMarkdown', 'markdown', 'html', 'raw', 'contentHtml', 'content_excerpt', 'contentExcerpt']);
 const UNVERIFIED_PATH = /\b(?:claims?|unverified|openQuestions?|unknowns?)\b/i;
 const TAG_RULES = Object.freeze([
   ['install', /install|installation|setup|getting.?started|quick.?start|安装|配置|部署/i],

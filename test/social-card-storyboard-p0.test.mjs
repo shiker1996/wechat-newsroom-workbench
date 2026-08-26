@@ -104,10 +104,10 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'634eff048c59194716556b9c136f4859429e7ba7b82f874d92b53ada0b5630d2',
-    'repository/xiaohongshu':'3fa5cacd51991027f85bc32724b0bba1db19ba77df705a2153bac030a4936803',
-    'event/wechat':'83f0cd37b135297a73d14cbf4258f35bd776cbcbc98432f9078e90854e5f16e5',
-    'event/xiaohongshu':'15045ead8eb8b5ad610886a511ee192b6c7c8b656d321c0eb014efa8789e1901',
+    'repository/wechat':'598bdd90ac60114507bea629d5fc23fc505c2e9c366e346668b7e99258c79e01',
+    'repository/xiaohongshu':'d1607fe7b82e8a2b574c49b0dab6f8deefd6b39380ab5bc8bbec9c7a7e691137',
+    'event/wechat':'6b1456d190293d24de3d559d01070c760326aed0b9e15eb39fd2b44db24f9fca',
+    'event/xiaohongshu':'4d2635e6406e94d46d142ca43f4d763c14f7cc0c871e493bdabe1df4a15aeac8',
     'custom/wechat':'0d1a2642513ee752fe3413019485e4ef9c5f0d84c94ac91a3a4c02d54969c045',
     'custom/xiaohongshu':'3493bf0e112e398aee9d3bf295b5d99758fb74630f86c45e82f89689bc29c253',
   };
@@ -164,6 +164,11 @@ test('新增开源技术与趋势故事板复用事件图文输出契约',()=>{
     ['open-source-technology-storyboard','机制'],
     ['open-source-trend-storyboard','趋势判断'],
   ]){
+    assert.equal(fs.existsSync(path.join(root,'skills',skillName,'references','storyboard.md')),true);
+    const skillSource=fs.readFileSync(path.join(root,'skills',skillName,'SKILL.md'),'utf8');
+    assert.match(skillSource,/^## 输入/m);
+    assert.match(skillSource,/^## 输出/m);
+    assert.match(skillSource,/references\/storyboard\.md/);
     const bundle=loadSkillBundle({workspaceRoot:root,skillName});
     const prompt=buildSocialCardStoryboardSystemPrompt({
       workspaceRoot:root,skillId:skillName,skillPrompt:bundle.prompt,contentType:'event',channelMode:'wechat',
@@ -212,18 +217,34 @@ test('三类故事板规划与图文生成交付拆成四个内置技能',()=>{
   assert.equal(delivery.manifest.kind,'stage');
   assert.equal(delivery.manifest.inputContract,'social_card_storyboard');
   assert.equal(delivery.manifest.outputContract,'social_card_delivery');
-  assert.match(repository.prompt,/核心能力怎样工作/);
-  assert.match(repository.prompt,/Star、Trending 和项目知名度只作为证据/);
-  assert.match(repository.prompt,/推荐用 4～7 页/);
+  assert.match(repository.prompt,/核心能力如何工作/);
+  assert.match(repository.prompt,/Star 或 Trending 排名当标题主张/);
+  assert.match(repository.prompt,/工具图文推荐 4–7 页/);
   assert.match(repository.prompt,/awesome\/list\/catalog/);
-  assert.match(repository.prompt,/禁止所有仓库机械套用/);
-  assert.match(repository.prompt,/不单设信息贫乏的“适用场景”页/);
-  assert.match(repository.prompt,/list 必须使用 items 字符串数组|内容必须逐条写入 `items`/);
+  assert.match(repository.prompt,/不机械套用/);
+  assert.match(repository.prompt,/事实不足以支撑独立场景页时/);
+  assert.match(repository.prompt,/`list`.*`items` 字符串数组/);
   assert.match(repository.prompt,/<commit>.*YOUR_TOKEN.*\$API_KEY/);
-  assert.match(repository.prompt,/不用“点赞、收藏、转发”代替内容结论/);
+  assert.match(repository.prompt,/不使用“点赞、收藏、转发”等传播口号替代内容结论/);
   assert.match(event.prompt,/传播张力不得高于证据强度/);
   assert.match(custom.prompt,/author_experience/);
   assert.match(delivery.prompt,/不负责选择故事线或首次规划故事板/);
+});
+
+test('四个内置故事板统一章节、页面角色和类型化降级规则',()=>{
+  const cases=[
+    ['repository-card-storyboard',['当前运行阶段：','一、页面结构','二、页面选择规则','三、事实分配与防重复','四、证据边界与降级规则','五、内容块、来源与密度规则','六、合并与禁止合并规则','七、常见错误'],/`kind` 和 `role`/],
+    ['event-card-storyboard',['当前运行阶段：','一、页面结构','二、页面选择规则','三、事实分配与防重复要求','四、事实与表达边界','五、证据门槛与降级规则','六、密度、合并与模板边界','七、常见错误'],/证据不足时缩短故事板/],
+    ['open-source-technology-storyboard',['当前运行阶段：','一、页面结构','二、页面选择规则','三、事实分配与防重复','四、内容块与来源规则','五、技术边界与密度','六、合并与禁止合并规则','七、证据门槛、降级与常见错误'],/没有机制、架构或工作路径证据时/],
+    ['open-source-trend-storyboard',['当前运行阶段：','一、页面结构','二、页面选择规则','三、事实分配与防重复','四、内容块与来源规则','五、趋势边界与密度','六、合并与禁止合并规则','七、证据门槛、降级与常见错误'],/跨来源、跨主体、跨时间中的两类变化信号/],
+  ];
+  for(const [skillName,headings,marker] of cases){
+    const prompt=loadSkillBundle({workspaceRoot:root,skillName}).prompt;
+    for(const heading of headings) assert.match(prompt,new RegExp(`^## ${heading}`,'m'),`${skillName}: ${heading}`);
+    assert.match(prompt,/每个页面必须同时返回明确的 `kind` 和 `role`/);
+    assert.match(prompt,/每个内容块必须带 `source_refs`/);
+    assert.match(prompt,marker);
+  }
 });
 
 test('第三方故事板使用自身方法且只叠加固定运行契约',()=>{

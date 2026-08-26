@@ -1,8 +1,8 @@
 const PAGE_BUDGETS = Object.freeze({
   repository: Object.freeze({ recommended: 7, absolute: 12 }),
   event: Object.freeze({ recommended: 10, absolute: 16 }),
-  technology: Object.freeze({ recommended: 7, absolute: 12 }),
-  trend: Object.freeze({ recommended: 8, absolute: 12 }),
+  technology: Object.freeze({ recommended: 5, absolute: 10 }),
+  trend: Object.freeze({ recommended: 6, absolute: 10 }),
   custom: Object.freeze({ recommended: 10, absolute: 16 }),
 });
 
