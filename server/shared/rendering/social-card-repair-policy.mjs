@@ -12,7 +12,7 @@ import { getSocialCardFactRenderCandidates, isSocialCardFactComponentCompatibleW
 
 export const SOCIAL_CARD_STRUCTURAL_ISSUES = Object.freeze([
   'overflow', 'clipped', 'horizontal_overflow',
-  'invalid_page_grid_structure', 'missing_content_stack', 'empty_page_body',
+  'invalid_page_grid_structure', 'missing_content_stack', 'empty_page_body', 'text_invisible',
 ]);
 
 const SPLITTABLE_BLOCKS = new Set(['list', 'steps', 'timeline', 'scenes', 'stats', 'compare']);

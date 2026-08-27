@@ -80,7 +80,7 @@ test('四种配方形成可辨认的标题版式语言',()=>{
   assert.match(css.poster,/text-shadow:3px 3px 0 var\(--cover-title-shadow\)/);assert.match(css.poster,/border-bottom:4px solid var\(--accent\)/);
   assert.equal(resolveSocialCoverTitleShadowRole(themeWithCoverTitle('poster')), 'accent');
   assert.equal(resolveSocialCoverTitleShadowRole(socialThemeDefinition('brutalist')), 'codeBackground');
-  assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--ink\)/);
+  assert.match(css['highlight-block'],/\.cover-title-line:nth-child\(even\)/);assert.match(css['highlight-block'],/background:var\(--code\);color:var\(--(?:ink|inverse)\)/);
   const html=compileThemePreview({target:'social',definition:themeWithCoverTitle('highlight-block')}).html;
   assert.equal((html.match(/class="cover-title-line"/g)||[]).length,3);
   const twoLine=renderStoryboardHtml({topic:'封面标题十一个字刚好',visualStyle:'neon',pages:[{kind:'cover',title:'封面标题十一个字刚好',content_blocks:[]}]});

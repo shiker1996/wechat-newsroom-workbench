@@ -54,6 +54,54 @@ try {
       ending: { min: 0.20, max: 0.90 },
     };
     const round = (value) => Math.round(value * 10) / 10;
+    const parseColor = (value) => {
+      const raw = String(value || '').trim().toLowerCase();
+      const hex = raw.match(/^#([0-9a-f]{3,8})$/i);
+      if (hex) {
+        const value = hex[1].length <= 4 ? hex[1].split('').map((item) => item + item).join('') : hex[1];
+        return {
+          r: Number.parseInt(value.slice(0, 2), 16),
+          g: Number.parseInt(value.slice(2, 4), 16),
+          b: Number.parseInt(value.slice(4, 6), 16),
+          a: value.length === 8 ? Number.parseInt(value.slice(6, 8), 16) / 255 : 1,
+        };
+      }
+      const rgb = raw.match(/^rgba?\(([^)]+)\)$/i);
+      if (!rgb) return null;
+      const parts = rgb[1].split(',').map((part) => part.trim());
+      if (parts.length < 3) return null;
+      const alpha = parts[3] == null ? 1 : Number(parts[3]);
+      return {
+        r: Number(parts[0]),
+        g: Number(parts[1]),
+        b: Number(parts[2]),
+        a: Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1,
+      };
+    };
+    const composite = (foreground, background) => {
+      if (!foreground) return background;
+      const alpha = Math.max(0, Math.min(1, Number(foreground.a)));
+      if (alpha >= 0.999) return { ...foreground, a: 1 };
+      const base = background || { r: 255, g: 255, b: 255, a: 1 };
+      return {
+        r: foreground.r * alpha + base.r * (1 - alpha),
+        g: foreground.g * alpha + base.g * (1 - alpha),
+        b: foreground.b * alpha + base.b * (1 - alpha),
+        a: 1,
+      };
+    };
+    const luminance = (color) => {
+      const channel = (value) => {
+        const normalized = Math.max(0, Math.min(255, Number(value))) / 255;
+        return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+    };
+    const contrast = (foreground, background) => {
+      if (!foreground || !background) return 0;
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return (values[0] + 0.05) / (values[1] + 0.05);
+    };
     const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
@@ -154,6 +202,38 @@ try {
       });
       if (tooSmallText) issues.push('text_too_small');
 
+      // 结构和尺寸都可能正常，但文字前景色与其实际承载背景相同，
+      // 例如封面色块标题的偶数行。只检查直接承载文字的元素，避免父级
+      // h1 与内部 span 的不同背景被重复计算；背景按祖先层级合成。
+      const textVisibilityIssues = [];
+      const directTextElements = descendants.filter((element) => [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()));
+      for (const element of directTextElements) {
+        const style = getComputedStyle(element);
+        const textColor = parseColor(style.color);
+        let background = null;
+        const chain = [];
+        for (let current = element; current && current !== document.documentElement; current = current.parentElement) {
+          chain.unshift(current);
+          if (current === pageElement) break;
+        }
+        for (const current of chain) {
+          background = composite(parseColor(getComputedStyle(current).backgroundColor), background);
+        }
+        const effectiveText = composite(textColor, background);
+        const ratio = contrast(effectiveText, background);
+        const opacity = [...chain].reduce((value, current) => value * Number(getComputedStyle(current).opacity || 1), 1);
+        if (opacity <= 0.05 || !textColor || ratio < 1.2) {
+          textVisibilityIssues.push({
+            selector: element.tagName.toLowerCase() + (element.className && typeof element.className === 'string' ? `.${element.className.trim().split(/\s+/).filter(Boolean).join('.')}` : ''),
+            text: element.textContent.trim().slice(0, 80),
+            foreground: style.color,
+            background: background ? `rgb(${Math.round(background.r)}, ${Math.round(background.g)}, ${Math.round(background.b)})` : 'transparent',
+            contrast: round(ratio),
+          });
+        }
+      }
+      if (textVisibilityIssues.length) issues.push('text_invisible');
+
       return {
         page: index + 1,
         kind,
@@ -168,6 +248,7 @@ try {
         overflowPixels: round(scrollOverflow),
         clippedPixels: round(clippedPixels),
         horizontalOverflowPixels: round(horizontalOverflowPixels),
+        textVisibilityIssues,
         issues: [...new Set(issues)],
       };
     });

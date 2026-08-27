@@ -642,6 +642,11 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     persistPlanBaseline();
     if (attempt === 0) writeFile(initialReportPath, JSON.stringify({ schemaVersion: 1, template: { id: templateCompatibility.templatePack.id, version: templateCompatibility.templatePack.version, source: templateCompatibility.source }, report }, null, 2));
     const structuralPages=structuralLayoutPages(report);
+    const textVisibilityPages=structuralPages.filter((item)=>item.structural.includes('text_invisible'));
+    if(textVisibilityPages.length){
+      const details=textVisibilityPages.map((item)=>`P${item.page}`).join('、');
+      failStrictLayout(`文字可见性门禁未通过：${details} 存在与背景不可区分的文字。请检查主题文字色、色块背景和模板覆盖规则。`);
+    }
     if(pendingBrowserCandidate){
       if(structuralPages.length){
         const rejected=pendingBrowserCandidate;

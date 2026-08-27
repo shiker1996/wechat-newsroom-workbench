@@ -585,6 +585,20 @@ test('布局审计以真实内容边界测量，稀疏内容页标记 underfille
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('布局审计拦截文字与实际背景不可区分的封面标题',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'invisible-text-audit-'));
+  try{
+    const htmlPath=path.join(dir,'invisible.html'),reportPath=path.join(dir,'report.json');
+    fs.writeFileSync(htmlPath,`<!doctype html><style>*{box-sizing:border-box}body{margin:0}.page{width:375px;height:667px;background:#111;color:#111}.page-inner{height:100%;padding:20px}.page-body{height:580px}.page-content-stack{background:#222;padding:20px}.page h1{margin:0}.bad-title{display:block;background:#333;color:#333;padding:10px}</style><section class="page" data-page-kind="cover"><div class="page-inner"><header></header><main class="page-body"><div class="page-content-stack"><h1><span class="bad-title">看不见的标题</span></h1></div></main><footer></footer></div></section>`,'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.equal(report.valid,false,JSON.stringify(report.pages));
+    assert.ok(report.pages[0].issues.includes('text_invisible'),JSON.stringify(report.pages[0]));
+    assert.equal(report.pages[0].textVisibilityIssues[0].text,'看不见的标题');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('copy stage requires topic tags on both channels and delivery validation flags missing tags', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'server/features/social-cards/application/social-card-pipeline.mjs'), 'utf8');
   assert.ok(source.includes('末尾带 6–8 个话题标签'), 'xiaohongshu channel should require tags');
@@ -626,6 +640,12 @@ test('布局审计轮次穷尽的失败信息带逐页明细与故事板编辑�
   assert.match(message,/02 卡片故事板/);
   assert.match(message,/内容不足的页：补充内容块、增加列表条目或扩写段落/);
   assert.match(message,/内容放不下的页：删减、拆分或缩短文字/);
+});
+
+test('文字不可见属于独立硬门禁并给出颜色修复提示',()=>{
+  const message=layoutAuditFailureMessage({pages:[{page:1,valid:false,kind:'cover',utilization:62,issues:['text_invisible']}]},1);
+  assert.match(message,/P1 文字不可见/);
+  assert.match(message,/检查主题文字色、色块背景和页面内容块的颜色配置/);
 });
 
 test('智能构图中的四项同级指标使用二乘二网格',()=>{
