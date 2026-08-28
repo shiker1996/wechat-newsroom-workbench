@@ -40,13 +40,15 @@ const REQUIRED_CSS_CHUNKS = 1;
 const MAX_CSS_CHUNKS = 3;
 const GENERATION_CSS_CHUNK_MAX_CHARS = 3_500;
 const GENERATION_OUTPUT_MAX_TOKENS = 5_000;
+const CSS_OUTPUT_MAX_TOKENS = 5_000;
+const CSS_RECOVERY_OUTPUT_MAX_TOKENS = 3_000;
 
 function cssGenerationInstruction(cssChunkCount) {
   if (cssChunkCount <= 0) {
-    return `当前尚未建立视觉样式。只使用 filesystem.project.write 的 set_head 写入主题变量、画布和基础排版；本次 CSS 分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内。不要生成页面，也不要返回 final。`;
+    return `当前尚未建立视觉样式。只使用 filesystem.project.write 的 set_head 写入精简的全局基础 CSS：主题变量、画布、页面壳、公共排版、页眉和页脚。不要在本片生成封面、尾页或内容组件 CSS；这些样式必须留给后续 append_head_css。当前分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内。不要生成页面，也不要返回 final。`;
   }
   if (cssChunkCount < MAX_CSS_CHUNKS) {
-    return `基础 CSS 已写入。如仍有组件 CSS 未覆盖，可使用 append_head_css 继续追加，每个分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内；如果 CSS 已完整，直接返回 CSS 阶段 final，不要生成页面。`;
+    return `精简全局基础 CSS 已写入。现在使用 append_head_css 追加封面、尾页和实际页面所需的内容组件 CSS，每个分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内；不要重复全局基础规则。如果全部实际组件均已覆盖，直接返回 CSS 阶段 final，不要生成页面。`;
   }
   return 'CSS 分片已达到上限，禁止继续追加 CSS；直接返回 CSS 阶段 final，不要生成页面。';
 }
@@ -63,8 +65,9 @@ function cssStageOverride() {
 这是独立的 CSS Agent 循环。上文中的全量生成说明不能改变本阶段约束。
 
 - 当前只允许调用 filesystem.project.read 和 filesystem.project.write；
-- 先用 set_head 写基础 CSS，单个 CSS 分片不超过 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符；
-- 如需组件 CSS，只能用 append_head_css 继续追加，每个分片不超过 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符；最多 ${MAX_CSS_CHUNKS} 个 CSS 分片；
+- 先用 set_head 只写精简的全局基础 CSS：主题变量、画布、页面壳、公共排版、页眉和页脚；禁止在 set_head 中展开封面、尾页或内容组件样式；
+- 封面、尾页和内容组件 CSS 只能用 append_head_css 继续追加，每个分片不超过 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符；最多 ${MAX_CSS_CHUNKS} 个 CSS 分片；
+- append_head_css 不得重复主题变量、画布、页面壳、公共排版、页眉或页脚规则；
 - 本阶段禁止 append_body、replace_pages、浏览器审计和完整 HTML 输出；
 - 基础 CSS 和需要的组件 CSS 写完后，返回简短 final，表示 CSS 阶段完成；
 - 如果基础 CSS 尚未写入，不能返回 final，必须继续提交 set_head；
@@ -138,15 +141,17 @@ export async function runSocialCardAiVisualGenerationAgent({
   const allowedCapabilities = [PROJECT_READ, PROJECT_WRITE];
   const baseMessages = [{ role: 'user', protected: true, content: JSON.stringify({ render_request: renderRequest }) }];
   const toolContextFor = (phase) => ({ ...toolContext, skillId: 'social-card-ai-visual-generator', generationPhase: phase, allowedCapabilities, toolHandlers: { [PROJECT_WRITE]: toolHandlers?.[PROJECT_WRITE] } });
-  const complete = async ({ phase, history, step, signal, instruction }) => gateway.complete({
+  const complete = async ({ phase, history, step, signal, instruction, outputMaxTokens }) => gateway.complete({
     provider,
     purpose: `social-card-ai-visual-${phase}-generation-agent`,
     batchId,
     candidateId,
     thinking: false,
     temperature: step ? 0.35 : 0.25,
-    maxOutputTokens: Math.min(GENERATION_OUTPUT_MAX_TOKENS, maxOutputTokens),
-    adaptiveOutput: true,
+    maxOutputTokens: Math.min(outputMaxTokens || GENERATION_OUTPUT_MAX_TOKENS, maxOutputTokens),
+    // Agent 自己掌握分片恢复。关闭 Gateway 的截断扩容重试，避免模型在更大
+    // token 预算里重复整段 CSS，最终仍把工具 JSON 写断。
+    adaptiveOutput: false,
     jsonMode: true,
     signal,
     messages: [...history, { role: 'user', protected: true, content: instruction }],
@@ -173,16 +178,19 @@ export async function runSocialCardAiVisualGenerationAgent({
       modelStep: async ({ messages: history, step, signal }) => {
         const cssChunkCount = Number(getCssChunkCount()) || 0;
         if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_css_read_${step + 1}`, files), { maxRequests: 1 });
-        let result = await complete({ phase: 'css', history, step, signal, instruction: cssGenerationInstruction(cssChunkCount) });
+        let result = await complete({ phase: 'css', history, step, signal, instruction: cssGenerationInstruction(cssChunkCount), outputMaxTokens: CSS_OUTPUT_MAX_TOKENS });
         lastModelResult = result;
         const parsed = await parseModelJsonWithRepair(result, {
           store,
           label: 'AI CSS Agent',
           repair: async (error) => {
             const mode = cssChunkCount <= 0 ? 'set_head' : 'append_head_css';
-            const recoveryInstruction = `上一条响应 JSON 不完整（${error.code || 'JSON_FORMAT_ERROR'}）。只返回一个 ${mode} 工具请求；content 必须包含完整 style，CSS 分片控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内；不要返回页面或解释。`;
+            const scopeInstruction = mode === 'set_head'
+              ? '本片只包含主题变量、画布、页面壳、公共排版、页眉和页脚，不得包含封面、尾页或内容组件 CSS。'
+              : '本片只追加尚未覆盖的封面、尾页或内容组件 CSS，不得重复全局基础规则。';
+            const recoveryInstruction = `上一条响应 JSON 不完整（${error.code || 'JSON_FORMAT_ERROR'}）。重新生成一个更短的新分片，不要复制或修补上一条响应。只返回一个 ${mode} 工具请求；content 必须包含完整 style，CSS 分片控制在 2400 字符以内；${scopeInstruction}不要重复 CSS，不要返回页面或解释。`;
             onProgress('AI CSS Agent 输出结构异常，反馈模型缩短并重交 CSS 分片…');
-            result = await complete({ phase: 'css', history, step, signal, instruction: recoveryInstruction });
+            result = await complete({ phase: 'css', history, step, signal, instruction: recoveryInstruction, outputMaxTokens: CSS_RECOVERY_OUTPUT_MAX_TOKENS });
             lastModelResult = result;
             return result;
           },

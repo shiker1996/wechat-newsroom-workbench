@@ -299,6 +299,22 @@ test('正文 *-body 字号问题只记录 warning 不阻断布局审计',async(t
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('封面利用率 90% 到 96% 只提示密度偏高，不阻断布局审计',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-cover-density-warning-'));
+  try{
+    const htmlPath=path.join(dir,'cover.html'),reportPath=path.join(dir,'report.json');
+    const html='<!doctype html><html><head><style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}.page{width:375px;height:667px;background:#fff}.page-inner{height:100%}.cover-center{height:100%}.cover-card{height:635px;background:#eee}</style></head><body data-render-mode="ai-visual"><section class="page page-cover" data-page-kind="cover"><div class="page-inner"><main class="cover-center"><div class="cover-card">封面内容</div></main></div></section></body></html>';
+    fs.writeFileSync(htmlPath,html,'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.equal(report.valid,true,JSON.stringify(report.pages));
+    assert.equal(report.pages[0].issues.includes('overfilled'),false);
+    assert.equal(report.pages[0].warnings.includes('density_high'),true);
+    assert.equal(report.pages[0].target,'45-90%');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('图文编辑室可以独立选择版式和视觉主题',()=>{
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');

@@ -51,9 +51,9 @@ try {
 
   const pages = await page.evaluate((targetPage) => {
     const thresholds = {
-      cover: { min: 0.45, max: 0.90 },
+      cover: { min: 0.45, preferredMax: 0.90, max: 0.96 },
       content: { min: 0.50, max: 0.96 },
-      ending: { min: 0.20, max: 0.90 },
+      ending: { min: 0.20, preferredMax: 0.90, max: 0.96 },
     };
     const round = (value) => Math.round(value * 10) / 10;
     const parseColor = (value) => {
@@ -200,6 +200,7 @@ try {
       if (horizontalOverflowPixels > 2) issues.push('horizontal_overflow');
       if (utilization < limits.min && direct.length) issues.push('underfilled');
       if (utilization > limits.max && scrollOverflow <= 1 && clippedPixels <= 1) issues.push('overfilled');
+      else if (limits.preferredMax && utilization > limits.preferredMax && scrollOverflow <= 1 && clippedPixels <= 1) warnings.push('density_high');
       const stackStyle = stack && visible(stack) ? getComputedStyle(stack) : (aiShell ? getComputedStyle(body) : null);
       // grid 构图看 align-content，flex 构图看 justify-content；
       // 刻意顶部/底部锚定的构图（hero、data、comp-align-start/end）不做居中平衡要求
@@ -350,7 +351,7 @@ try {
         valid: issues.length === 0,
         warnings: [...new Set(warnings)],
         utilization: round(utilization * 100),
-        target: `${Math.round(limits.min * 100)}-${Math.round(limits.max * 100)}%`,
+        target: `${Math.round(limits.min * 100)}-${Math.round((limits.preferredMax || limits.max) * 100)}%`,
         bodyHeight: round(bodyRect.height),
         usedHeight: round(usedHeight),
         topWhitespace: round(topWhitespace),
