@@ -197,11 +197,11 @@ function aiVisualStatusHtml(report,stages,repairReport){
   const stageItems=Array.isArray(stages?.stages)?stages.stages:[];
   const stageText=stageItems.map((stage)=>`${aiVisualStageLabel(stage.stage)}：${stage.status==='completed'?'完成':stage.status==='running'?'进行中':stage.status==='blocked'?'未通过':stage.status==='failed'?'失败':'等待'}`).join(' · ');
   const status=String(report?.status||'').trim();
-  const title=status==='passed'?'AI 视觉生成已交付':status==='layout-review-required'?'AI 视觉页面已生成，最终布局审计未通过':status==='screenshots-failed'?'AI 视觉页面已生成，PNG 截图失败':status==='delivery-blocked'?'AI 视觉交付门禁未通过':'AI 视觉运行记录';
+  const statusText=status==='layout-review-required'?'AI 视觉页面已生成，最终布局审计未通过':status==='screenshots-failed'?'AI 视觉页面已生成，PNG 截图失败':status==='delivery-blocked'?'AI 视觉交付门禁未通过':'';
   const detail=report?.finalAudit?.issues?.length?report.finalAudit.issues.slice(0,4).join('；'):report?.screenshots?.issues?.length?report.screenshots.issues.slice(0,4).join('；'):report?.deliveryGate?.reason||'';
   const lastRepair=Array.isArray(repairReport?.agentRuns)&&repairReport.agentRuns.length?repairReport.agentRuns.at(-1):null;
   const repairText=lastRepair?`最近修复：P${lastRepair.page||'?'} · 第${lastRepair.attempt||'?'}轮${lastRepair.wrotePage===false?' · 未写入':''}`:'';
-  return `<strong>${escapeHtml(title)}</strong>${stageText?`<span>${escapeHtml(stageText)}</span>`:''}${repairText?`<span>${escapeHtml(repairText)}</span>`:''}${detail?`<small>${escapeHtml(detail)}</small>`:''}`;
+  return `${statusText?`<span>${escapeHtml(statusText)}</span>`:''}${stageText?`<span>${escapeHtml(stageText)}</span>`:''}${repairText?`<span>${escapeHtml(repairText)}</span>`:''}${detail?`<small>${escapeHtml(detail)}</small>`:''}`;
 }
 
 function socialBeautifyProgressLabel(progress=''){
@@ -229,6 +229,10 @@ function syncBeautifyButton(){
   button.textContent=active?(job.status==='queued'?'排队等待执行…':socialBeautifyProgressLabel(job.progress)):delivery?.beautifiedHtmlUrl?'重新 AI 视觉生成':'AI 视觉生成';
   button.title=active?'正在根据故事板生成 AI 页面并截图…':storyboardReady?'根据当前故事板和主题契约独立生成 AI 图文':'请先生成故事板';
   const status=document.getElementById('social-beautify-status');
+  const meta=document.getElementById('social-delivery-meta');
+  const showAiStatus=Boolean(active||delivery?.beautifyReport||delivery?.beautifiedHtmlUrl);
+  if(meta)meta.hidden=showAiStatus;
+  if(status)status.hidden=!showAiStatus;
   if(status&&active){status.hidden=false;status.classList.add('is-running');status.textContent=`AI 视觉生成进行中 · ${socialBeautifyProgressLabel(job.progress)} · 执行完成后将自动切换到 AI 视觉版`;}
   if(status&&!active)status.classList.remove('is-running');
 }
@@ -286,6 +290,8 @@ async function loadDelivery(candidateId=selectedId){
   document.getElementById('social-delivery-meta').textContent=`${deliveryCount} · 程序化布局审计${data.layout?.valid?'通过':'待确认'}${metricLabel}${metricSummary}${planSummary}`;
   syncCurrentHtmlLink();
   const beautifyStatus=document.getElementById('social-beautify-status');
+  const deliveryMeta=document.getElementById('social-delivery-meta');
+  if(deliveryMeta)deliveryMeta.hidden=hasAiDiagnostics;
   if(beautifyStatus){beautifyStatus.hidden=!hasAiDiagnostics;beautifyStatus.classList.toggle('is-failed',Boolean(data.beautifyReport&&data.beautifyReport.status!=='passed'));beautifyStatus.innerHTML=aiVisualStatusHtml(data.beautifyReport,data.beautifyStages,data.beautifyRepairReport);}
   document.getElementById('social-download-all').href=data.bundleUrl;
   renderDeliveryVersions();
