@@ -13,6 +13,12 @@ export {
   runAudit,
   runSocialCardPipeline,
 } from './application/social-card-pipeline.mjs';
+export { SOCIAL_CARD_BEAUTIFY_DELIVERY_GATE, SOCIAL_CARD_BEAUTIFY_HTML, SOCIAL_CARD_BEAUTIFY_OUTPUT, SOCIAL_CARD_BEAUTIFY_REPORT, applyBeautifyShellPatch, buildBeautifyShell, extractBeautifiedHtml, extractBeautifyPatch, runSocialCardBeautify, validateAiVisualScreenshotSet, validateBeautifiedHtml, validateBeautifyPatch } from './application/social-card-beautify.mjs';
+export { buildSocialCardCopyInput, buildSocialCardCopySkillPrompt, buildSocialCardCopySystemPrompt, generateSocialCardCopy, validateSocialCardCopy } from './application/social-card-copy.mjs';
+export { SOCIAL_CARD_AI_VISUAL_ARTIFACTS, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES, classifySocialCardAiVisualFailure, collectSocialCardAiVisualArtifacts, writeSocialCardAiVisualBaseline } from './application/social-card-ai-visual-baseline.mjs';
+export { SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT, createSocialCardAiVisualStageRecorder, writeSocialCardAiVisualSkillManifest } from './application/social-card-ai-visual-pipeline.mjs';
+export { filterAiVisualGenerationCatalog, runSocialCardAiVisualGenerationAgent } from './application/social-card-ai-visual-agent.mjs';
+export { filterAiVisualRepairCatalog, runSocialCardAiVisualRepairAgent } from './application/social-card-ai-visual-repair-agent.mjs';
 
 export { CUSTOM_CONTENT_TYPES, CUSTOM_SOURCE_LEVELS, evaluateCardGate, evaluateClassifiedCardGate, evaluateCustomCardGate, evaluateEventCardGate } from './domain/social-card-gate.mjs';
 export { buildCustomFactSheet, customFactMarkdown, customSourceUrl, parseLines, parsePointLine } from './application/custom-fact-service.mjs';

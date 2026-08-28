@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 function usage() {
-  console.log('Usage: node layout-audit.mjs <design.html> [--json report.json]');
+  console.log('Usage: node layout-audit.mjs <design.html> [--json report.json] [--page pageNumber]');
 }
 
 const args = process.argv.slice(2);
@@ -15,6 +15,8 @@ if (args.includes('--help') || args.includes('-h')) {
 const inputArg = args.find((arg) => !arg.startsWith('--'));
 const jsonIndex = args.indexOf('--json');
 const reportArg = jsonIndex >= 0 ? args[jsonIndex + 1] : null;
+const pageIndex = args.indexOf('--page');
+const requestedPage = pageIndex >= 0 ? Number.parseInt(args[pageIndex + 1], 10) : null;
 if (!inputArg || (jsonIndex >= 0 && !reportArg)) {
   usage();
   process.exit(2);
@@ -47,7 +49,7 @@ try {
   await page.goto(pathToFileURL(input).href, { waitUntil: 'networkidle0' });
   await page.evaluate(async () => { if (document.fonts?.ready) await document.fonts.ready; });
 
-  const pages = await page.evaluate(() => {
+  const pages = await page.evaluate((targetPage) => {
     const thresholds = {
       cover: { min: 0.45, max: 0.90 },
       content: { min: 0.50, max: 0.96 },
@@ -111,27 +113,53 @@ try {
     return [...document.querySelectorAll('.page')].map((pageElement, index) => {
       const kind = pageElement.dataset.pageKind || (pageElement.classList.contains('page-cover') ? 'cover' : 'content');
       const limits = thresholds[kind] || thresholds.content;
-      const body = pageElement.querySelector('.page-body');
+      // AI 图文使用技能通用页面壳：封面把 ai-page-slot 放在 cover-center，
+      // 内页把它放在 page-inner > page-body；布局审计以该插槽作为可视内容区。
+      const aiPageSlot = pageElement.querySelector(':scope > .ai-page-slot, :scope > .page-inner > .page-body.ai-page-slot');
+      const aiShell = Boolean(aiPageSlot);
+      const aiFullDocument = document.body?.dataset.renderMode === 'ai-visual';
+      // 完整 AI 封面没有 page-body：以 page-inner 作为可用画布，
+      // 再从 cover-center 与 cover-bottom 的真实子元素计算内容边界。
+      const existingPageBody = pageElement.querySelector(':scope > .page-inner > .page-body, :scope > .page-body, .page-body');
+      const body = aiShell
+        ? aiPageSlot
+        : kind === 'cover'
+          ? (existingPageBody || pageElement.querySelector(':scope > .page-inner, :scope > .cover-center'))
+          : pageElement.querySelector(':scope > .page-inner > .page-body, :scope > .page-body, .page-body');
       const issues = [];
       if (!body) return { page: index + 1, kind, valid: false, issues: ['missing_page_body'] };
 
       const inner = pageElement.querySelector(':scope > .page-inner');
-      if (kind === 'content' && (!inner || inner.children.length !== 3)) {
+      if (!aiShell && !aiFullDocument && kind === 'content' && (!inner || inner.children.length !== 3)) {
         issues.push('invalid_page_grid_structure');
       }
 
       const pageRect = pageElement.getBoundingClientRect();
       const bodyRect = body.getBoundingClientRect();
       const descendants = [...body.querySelectorAll('*')].filter(visible);
+      const warnings = [];
       const stack = body.querySelector(':scope > .page-content-stack');
-      if (kind === 'content' && !stack) issues.push('missing_content_stack');
+      if (!aiShell && !aiFullDocument && kind === 'content' && !stack) issues.push('missing_content_stack');
       const direct = stack && visible(stack) ? [stack] : [...body.children].filter(visible);
       if (!direct.length && kind === 'content') issues.push('empty_page_body');
 
       // stack 自身可能带 min-height 等装饰性高度，直接测其边界会掩盖稀疏内容；
-      // 已用区域改测 stack 内可见子元素（eyebrow/标题/内容块）的并集，装饰均为伪元素不参与测量
+      // 已用区域改测 stack 内可见子元素（eyebrow/标题/内容块）的并集，装饰均为伪元素不参与测量。
+      // 封面的 cover-center 同样是占满剩余空间的 flex 容器，不能把它自己的
+      // 全高边界当成内容；改测其实际子元素，并把 cover-bottom 的实际子元素纳入构图。
       const stackChildren = stack && visible(stack) ? [...stack.children].filter(visible) : [];
-      const measured = stackChildren.length ? stackChildren : direct;
+      const coverCenter = kind === 'cover'
+        ? pageElement.querySelector(':scope > .page-inner > .cover-center')
+        : null;
+      const coverBottom = kind === 'cover'
+        ? pageElement.querySelector(':scope > .page-inner > .cover-bottom')
+        : null;
+      const coverCenterChildren = coverCenter ? [...coverCenter.children].filter(visible) : [];
+      const coverBottomChildren = coverBottom ? [...coverBottom.children].filter(visible) : [];
+      const coverMeasured = coverCenterChildren.concat(coverBottomChildren.length ? coverBottomChildren : (coverBottom && visible(coverBottom) ? [coverBottom] : []));
+      const measured = coverMeasured.length
+        ? coverMeasured
+        : (stackChildren.length ? stackChildren : direct);
       const directRects = measured.map((element) => element.getBoundingClientRect());
       const firstTop = directRects.length ? Math.min(...directRects.map((rect) => rect.top)) : bodyRect.top;
       const lastBottom = directRects.length ? Math.max(...directRects.map((rect) => rect.bottom)) : bodyRect.top;
@@ -172,7 +200,7 @@ try {
       if (horizontalOverflowPixels > 2) issues.push('horizontal_overflow');
       if (utilization < limits.min && direct.length) issues.push('underfilled');
       if (utilization > limits.max && scrollOverflow <= 1 && clippedPixels <= 1) issues.push('overfilled');
-      const stackStyle = stack && visible(stack) ? getComputedStyle(stack) : null;
+      const stackStyle = stack && visible(stack) ? getComputedStyle(stack) : (aiShell ? getComputedStyle(body) : null);
       // grid 构图看 align-content，flex 构图看 justify-content；
       // 刻意顶部/底部锚定的构图（hero、data、comp-align-start/end）不做居中平衡要求
       const stackValign = stackStyle
@@ -184,8 +212,11 @@ try {
         issues.push('vertical_imbalance');
       }
 
+      // AI 视觉组件约定：正文承载元素统一使用 *-body；.page-body 只是布局插槽。
       const tooSmallText = descendants.some((element) => {
         if (!element.textContent?.trim()) return false;
+        const hasBodyRole = [...element.classList].some((name) => /-body$/i.test(name) && name !== 'page-body');
+        if (!hasBodyRole) return false;
         const style = getComputedStyle(element);
 
         const isCode =
@@ -196,35 +227,92 @@ try {
         }
 
         const size = Number.parseFloat(style.fontSize);
-        const auxiliary = element.matches('small, [data-text-role="auxiliary"]')
-          || [...element.classList].some((name) => /(?:tag|label|caption|meta|date|sub|hint|eyebrow)/i.test(name));
-        return size < (auxiliary ? 9 : 11);
+        const decorative = element.matches('[aria-hidden="true"], [role="img"]')
+          || [...element.classList].some((name) => /(?:icon|mark|glyph|bullet|symbol|ornament|decoration)/i.test(name));
+        if (decorative) {
+          return false;
+        }
+        const auxiliary = element.matches('small, [data-text-role="auxiliary"], .page-footer, .cover-bottom, .visual-badge, .continuation-badge')
+          || [...element.classList].some((name) => /(?:tag|label|caption|meta|date|sub|hint|eyebrow|glass)/i.test(name));
+        return size < (auxiliary ? 10 : 11);
       });
-      if (tooSmallText) issues.push('text_too_small');
+      if (tooSmallText) warnings.push('text_too_small');
 
       // 结构和尺寸都可能正常，但文字前景色与其实际承载背景相同，
       // 例如封面色块标题的偶数行。只检查直接承载文字的元素，避免父级
       // h1 与内部 span 的不同背景被重复计算；背景按祖先层级合成。
       const textVisibilityIssues = [];
       const directTextElements = descendants.filter((element) => [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()));
-      for (const element of directTextElements) {
-        const style = getComputedStyle(element);
-        const textColor = parseColor(style.color);
-        let background = null;
+      const selectorFor = (element) => element.tagName.toLowerCase()
+        + (element.id ? `#${element.id}` : '')
+        + (element.className && typeof element.className === 'string'
+          ? `.${element.className.trim().split(/\s+/).filter(Boolean).slice(0, 3).join('.')}`
+          : '');
+      // 渐变背景：background-color 是透明的，但 background-image 会实际着色，
+      // 例如封面的 radial-gradient。这里提取渐变所有色标作为候选背景，否则
+      // 透明 background-color 会一路合成到白色画布，把深色渐变封面误判成白底。
+      const gradientStops = (backgroundImage) => {
+        const images = String(backgroundImage || '');
+        if (!/gradient\(/i.test(images)) return [];
+        const colors = [];
+        for (const match of images.matchAll(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi)) {
+          const parsed = parseColor(match[0]);
+          if (parsed && parsed.a > 0) colors.push(parsed);
+        }
+        return colors;
+      };
+      const backgroundFor = (element) => {
         const chain = [];
         for (let current = element; current && current !== document.documentElement; current = current.parentElement) {
           chain.unshift(current);
           if (current === pageElement) break;
         }
+        // 从最远祖先向元素逐层合成。每个元素自身的 background-color 作为底层，
+        // background-image 渐变叠在其上（透明色标最终露出底色）；渐变会给出多个
+        // 候选背景（每个色标一个），更近层的不透明背景覆盖下方候选，
+        // 因此不能碰到不透明层就提前返回。
+        let candidates = [null];
         for (const current of chain) {
-          background = composite(parseColor(getComputedStyle(current).backgroundColor), background);
+          const style = getComputedStyle(current);
+          const stops = gradientStops(style.backgroundImage);
+          const bgColor = parseColor(style.backgroundColor);
+          if (stops.length) {
+            const base = bgColor && bgColor.a > 0
+              ? candidates.map((candidate) => composite(bgColor, candidate))
+              : candidates;
+            candidates = base.flatMap((background) => stops.map((stop) => composite(stop, background)));
+          } else if (bgColor && bgColor.a > 0) {
+            candidates = candidates.map((candidate) => composite(bgColor, candidate));
+          }
+          if (candidates.length > 12) candidates = candidates.slice(0, 12);
         }
-        const effectiveText = composite(textColor, background);
-        const ratio = contrast(effectiveText, background);
+        return candidates;
+      };
+      const worstBackground = (foreground, backgrounds) => {
+        let worst = null;
+        let worstRatio = Infinity;
+        for (const background of backgrounds) {
+          const ratio = contrast(composite(foreground, background), background);
+          if (ratio < worstRatio) {
+            worstRatio = ratio;
+            worst = background;
+          }
+        }
+        return { background: worst, ratio: worstRatio === Infinity ? 0 : worstRatio };
+      };
+      for (const element of directTextElements) {
+        const style = getComputedStyle(element);
+        const textColor = parseColor(style.color);
+        const { background, ratio } = worstBackground(textColor, backgroundFor(element));
+        const chain = [];
+        for (let current = element; current && current !== document.documentElement; current = current.parentElement) {
+          chain.unshift(current);
+          if (current === pageElement) break;
+        }
         const opacity = [...chain].reduce((value, current) => value * Number(getComputedStyle(current).opacity || 1), 1);
         if (opacity <= 0.05 || !textColor || ratio < 1.2) {
           textVisibilityIssues.push({
-            selector: element.tagName.toLowerCase() + (element.className && typeof element.className === 'string' ? `.${element.className.trim().split(/\s+/).filter(Boolean).join('.')}` : ''),
+            selector: selectorFor(element),
             text: element.textContent.trim().slice(0, 80),
             foreground: style.color,
             background: background ? `rgb(${Math.round(background.r)}, ${Math.round(background.g)}, ${Math.round(background.b)})` : 'transparent',
@@ -232,12 +320,35 @@ try {
           });
         }
       }
-      if (textVisibilityIssues.length) issues.push('text_invisible');
+      if (textVisibilityIssues.length) warnings.push('text_invisible');
+
+      // 给 Agent 的浏览器工具返回少量真实计算样式，而不是整份 DOM/CSS，
+      // 让它能判断“文字太小/颜色不对/卡片挤压”究竟发生在哪个元素。
+      const styleSamples = directTextElements.slice(0, 32).map((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const foreground = parseColor(style.color);
+        const { background, ratio } = worstBackground(foreground, backgroundFor(element));
+        return {
+          selector: selectorFor(element),
+          text: element.textContent.trim().slice(0, 80),
+          rect: { x: round(rect.x - pageRect.x), y: round(rect.y - pageRect.y), width: round(rect.width), height: round(rect.height) },
+          display: style.display,
+          position: style.position,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          lineHeight: style.lineHeight,
+          color: style.color,
+          background: background ? `rgb(${Math.round(background.r)}, ${Math.round(background.g)}, ${Math.round(background.b)})` : 'transparent',
+          contrast: round(ratio),
+        };
+      });
 
       return {
         page: index + 1,
         kind,
         valid: issues.length === 0,
+        warnings: [...new Set(warnings)],
         utilization: round(utilization * 100),
         target: `${Math.round(limits.min * 100)}-${Math.round(limits.max * 100)}%`,
         bodyHeight: round(bodyRect.height),
@@ -249,10 +360,11 @@ try {
         clippedPixels: round(clippedPixels),
         horizontalOverflowPixels: round(horizontalOverflowPixels),
         textVisibilityIssues,
+        styleSamples,
         issues: [...new Set(issues)],
       };
-    });
-  });
+    }).filter((item) => !Number.isInteger(targetPage) || targetPage < 1 || item.page === targetPage);
+  }, requestedPage);
   report = {
     file: input,
     pageCount: pages.length,

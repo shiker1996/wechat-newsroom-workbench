@@ -83,7 +83,7 @@ test('图文生成任务结束后按故事板门禁恢复生成按钮',()=>{
   const editor=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
   assert.match(editor,/generate\.disabled=!gate\.ready\|\|themeBlocked/);
   assert.match(editor,/const ready=generate\.dataset\.ready!=='false';[\s\S]*generate\.disabled=!ready;/);
-  assert.match(editor,/job && job\.status === 'completed'\) \{ generate\.textContent = '重新生成整组图文'; return; \}/);
+  assert.match(editor,/job && job\.status === 'completed'\) \{ generate\.textContent = '重新程序化生成'; return; \}/);
 });
 
 test('项目图文技能加载完整文案、标题、设计与布局契约', () => {
@@ -248,6 +248,57 @@ test('四种图文模板的对比表正文保持 11px 以上并通过真实浏�
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('clean-v1 的页脚与视觉徽章不被文字字号门禁误判',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-clean-text-floor-'));
+  try{
+    const htmlPath=path.join(dir,'clean.html'),reportPath=path.join(dir,'report.json');
+    const pages=[
+      {kind:'cover',title:'事件简报',content_blocks:[]},
+      {kind:'evidence',role:'timeline',title:'关键事实',content_blocks:[
+        {type:'text',title:'发生了什么',content:'马云连续增持阿里港股，总额超过 6 亿港元。',visual:{icon:'↗',badge:'核心事件',emphasis:'strong',tone:'accent'}},
+        {type:'list',title:'已核验信息',content:'公开公告已披露\n关键日期已记录\n未披露细节单独标注'},
+      ]},
+      {kind:'ending',title:'继续观察',content_blocks:[{type:'highlight',content:'后续披露与业务表现'}]},
+    ];
+    const html=renderStoryboardHtml({topic:'清爽模板字号审计',contentType:'event',channelMode:'wechat',visualStyle:'solarized',themeDefinition:socialThemeDefinition('solarized'),pages});
+    fs.writeFileSync(htmlPath,html,'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.doesNotMatch(JSON.stringify(report.pages),/text_too_small/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('列表装饰标记不被正文最小字号门禁误判',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-decorative-mark-floor-'));
+  try{
+    const htmlPath=path.join(dir,'decorative.html'),reportPath=path.join(dir,'report.json');
+    const html='<!doctype html><html><head><style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}.page{width:375px;height:667px;background:#2d0b14;color:#fff}.page-inner{height:100%;padding:36px 16px 32px;display:flex;flex-direction:column}.topbar{font-size:12px}.page-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px}.list{padding:18px;background:#ff2d55}.item{display:flex;gap:8px}.mark{font-size:10px}.item-body{font-size:11px;line-height:1.5}.bottom-strip{font-size:10px}</style></head><body><section class="page"><div class="page-inner"><div class="topbar">功能清单</div><main class="page-body"><div class="list"><div class="item"><span class="mark" aria-hidden="true">✦</span><span class="item-body">装饰标记旁的正文内容</span></div><div class="item"><span class="mark">✦</span><span class="item-body">另一段正文内容</span></div></div></main><footer class="bottom-strip">继续阅读</footer></div></section></body></html>';
+    fs.writeFileSync(htmlPath,html,'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.doesNotMatch(JSON.stringify(report.pages),/text_too_small/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('正文 *-body 字号问题只记录 warning 不阻断布局审计',async(t)=>{
+  if (skipBrowser(t)) return;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'social-card-body-text-warning-'));
+  try{
+    const htmlPath=path.join(dir,'warning.html'),reportPath=path.join(dir,'report.json');
+    const html='<!doctype html><html><head><style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}.page{width:375px;height:667px;background:#fff;color:#111}.page-inner{height:100%;padding:36px 16px 32px;display:flex;flex-direction:column}.page-body{flex:1;display:flex;flex-direction:column;justify-content:center}.page-content-stack{height:320px}.item-body{height:320px;font-size:10px;color:#fff}.bottom-strip{font-size:10px}</style></head><body><section class="page"><div class="page-inner"><div>页眉</div><main class="page-body"><div class="page-content-stack"><div class="item-body">这是正文字号提示</div></div></main><footer class="bottom-strip">页脚</footer></div></section></body></html>';
+    fs.writeFileSync(htmlPath,html,'utf8');
+    await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
+    const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
+    assert.equal(report.valid,true,JSON.stringify(report.pages));
+    assert.equal(report.pages[0].issues.includes('text_too_small'),false);
+    assert.equal(report.pages[0].warnings.includes('text_too_small'),true);
+    assert.equal(report.pages[0].issues.includes('text_invisible'),false);
+    assert.equal(report.pages[0].warnings.includes('text_invisible'),true);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('图文编辑室可以独立选择版式和视觉主题',()=>{
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
@@ -329,8 +380,8 @@ test('图文执行器严格声明六阶段技能契约', () => {
 });
 
 test('图文文案由模型生成，HTML 根据故事板确定性组装', () => {
-  const source = fs.readFileSync(path.join(root, 'server', 'features', 'social-cards', 'application', 'social-card-pipeline.mjs'), 'utf8');
-  assert.match(source, /purpose:'social-card-copy'/);
+  const source = fs.readFileSync(path.join(root, 'server', 'features', 'social-cards', 'application', 'social-card-copy.mjs'), 'utf8');
+  assert.match(source, /purpose:\s*['"]social-card-copy['"]/);
   assert.doesNotMatch(source, /purpose:'social-card-html'/);
   assert.doesNotMatch(source, /purpose:'social-card-generation'/);
   const html = renderStoryboardHtml({ visualStyle:'peach', topic:'测试工具', repository:'org/repo', pages:[
@@ -376,6 +427,22 @@ test('整组图文下载生成标准 ZIP 结构', () => {
 
 test('图文编辑室包含画廊、证据预览、下载和任务完成恢复', () => {
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');for(const id of ['social-gallery-image','social-gallery-film','social-proof-content','social-download-all'])assert.match(html,new RegExp(`id="${id}"`));assert.match(source,/loadDelivery/);assert.match(source,/重新生成图文/);
+});
+
+test('AI 视觉失败时编辑室展示阶段诊断而不是隐藏整个交付区', () => {
+  const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
+  const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
+  const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');
+  const route=fs.readFileSync(path.join(root,'server','platform','http','routes','social-card-routes.mjs'),'utf8');
+  assert.match(html,/social-gallery-empty/);
+  assert.match(html,/data-social-proof="ai-visual"/);
+  assert.match(source,/hasAiDiagnostics/);
+  assert.match(source,/beautifyStages/);
+  assert.match(source,/watchSocialBeautifyJob[\s\S]*await loadDelivery\(candidateId\)/);
+  assert.match(source,/screenshots-failed/);
+  assert.match(styles,/\.social-beautify-status\.is-failed/);
+  assert.match(route,/ai-beautified-delivery-gate\.json/);
+  assert.match(route,/social-card-ai-visual-stage-executions\.json/);
 });
 
 test('图文候选使用顶部滚动 Tab 与两端箭头', () => {
@@ -520,6 +587,9 @@ test('安全回退优先单列稳定变体且支持按页启用',()=>{
 test('暗色主题下标题卡对比度与步骤文本断行有保障',()=>{
   const html=renderStoryboardHtml({topic:'暗色主题',pages:[{kind:'cover',title:'封面',content_blocks:[{type:'text',content:'说明'}]}],visualStyle:'neon',compositionMode:'smart'});
   assert.match(html,/\.composition-smart\.overlap-title-card h1\{[^}]*color:var\(--ink\)/);
+  assert.match(html,/\.composition-smart\.page-ending\.overlap-title-card h1\{color:var\(--inverse\)\}/);
+  assert.match(html,/\.composition-smart\.page-ending \.scene h3/);
+  assert.match(html,/\.composition-smart\.page-ending \.stat b/);
   assert.match(html,/\.step p\{[^}]*overflow-wrap:anywhere/);
   assert.match(html,/\.step h3\{[^}]*overflow-wrap:anywhere/);
   assert.match(html,/\.theme-neon\{--bg:#050809;--page:#07100e;--surface:#0c1c17;--ink:#eafff7;--muted:#9bd8c2;--accent:#55ffb6/);
@@ -590,17 +660,17 @@ test('布局审计拦截文字与实际背景不可区分的封面标题',async(
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'invisible-text-audit-'));
   try{
     const htmlPath=path.join(dir,'invisible.html'),reportPath=path.join(dir,'report.json');
-    fs.writeFileSync(htmlPath,`<!doctype html><style>*{box-sizing:border-box}body{margin:0}.page{width:375px;height:667px;background:#111;color:#111}.page-inner{height:100%;padding:20px}.page-body{height:580px}.page-content-stack{background:#222;padding:20px}.page h1{margin:0}.bad-title{display:block;background:#333;color:#333;padding:10px}</style><section class="page" data-page-kind="cover"><div class="page-inner"><header></header><main class="page-body"><div class="page-content-stack"><h1><span class="bad-title">看不见的标题</span></h1></div></main><footer></footer></div></section>`,'utf8');
+    fs.writeFileSync(htmlPath,`<!doctype html><style>*{box-sizing:border-box}body{margin:0}.page{width:375px;height:667px;background:#111;color:#111}.page-inner{height:100%;padding:20px}.page-body{height:580px}.page-content-stack{height:300px;background:#222;padding:20px}.page h1{margin:0}.bad-title{display:block;height:300px;background:#333;color:#333;padding:10px}</style><section class="page" data-page-kind="cover"><div class="page-inner"><header></header><main class="page-body"><div class="page-content-stack"><h1><span class="bad-title">看不见的标题</span></h1></div></main><footer></footer></div></section>`,'utf8');
     await execFileAsync(process.execPath,[path.join(root,'skills','xiaohongshu-article-generator','scripts','layout-audit.mjs'),htmlPath,'--json',reportPath],{cwd:dir,windowsHide:true}).catch(()=>{});
     const report=JSON.parse(fs.readFileSync(reportPath,'utf8'));
-    assert.equal(report.valid,false,JSON.stringify(report.pages));
-    assert.ok(report.pages[0].issues.includes('text_invisible'),JSON.stringify(report.pages[0]));
+    assert.equal(report.valid,true,JSON.stringify(report.pages));
+    assert.ok(report.pages[0].warnings.includes('text_invisible'),JSON.stringify(report.pages[0]));
     assert.equal(report.pages[0].textVisibilityIssues[0].text,'看不见的标题');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('copy stage requires topic tags on both channels and delivery validation flags missing tags', () => {
-  const source = fs.readFileSync(path.join(process.cwd(), 'server/features/social-cards/application/social-card-pipeline.mjs'), 'utf8');
+  const source = fs.readFileSync(path.join(process.cwd(), 'server/features/social-cards/application/social-card-copy.mjs'), 'utf8');
   assert.ok(source.includes('末尾带 6–8 个话题标签'), 'xiaohongshu channel should require tags');
   assert.ok(source.includes('末尾带 6–8 个准确话题标签'), 'wechat channel should require tags');
   assert.ok(!source.includes('不使用话题标签'), 'wechat channel must not forbid tags');

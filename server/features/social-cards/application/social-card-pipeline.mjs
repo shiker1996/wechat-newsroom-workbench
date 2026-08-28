@@ -31,6 +31,7 @@ import { getSocialCardPlanRolloutProfile } from '../../../shared/rendering/socia
 import { socialCardPageBudget, socialCardPageBudgetMessage } from '../../../shared/rendering/social-card-page-budget.mjs';
 import { acceptSoftDensityOnlyLayoutReport, adaptiveContentPageIndexes, buildSocialCardPlannerFactScope, buildSocialCardPlannerPageScope, layoutAuditPageSummary, softDensityPageIndexes, templateAuditFailurePayload, validateSocialCardDelivery } from '../../../shared/rendering/social-card-pipeline-contracts.mjs';
 import { socialStoryboardClassForContentClass, socialStoryboardSkillForContentClass } from '../domain/social-routing.mjs';
+import { generateSocialCardCopy } from './social-card-copy.mjs';
 // 交付门禁继续报告“配套文案话题标签不足”，实现已下沉到渲染契约模块。
 import { NEON_V1_CSS, renderNeonStoryboardSections } from '../../../shared/rendering/templates/social/neon-v1.mjs';
 import { BRUTALIST_V1_CSS, renderBrutalistStoryboardSections } from '../../../shared/rendering/templates/social/brutalist-v1.mjs';
@@ -77,10 +78,12 @@ function addArtifact(store, batchId, candidateId, kind, filePath) {
   store.upsertArtifact({ batchId, candidateId, track:'social_cards', kind, name:path.basename(filePath), path:filePath, size:stat.size, modifiedAt:stat.mtime.toISOString() });
 }
 
-export async function runAudit(script, htmlPath, reportPath, cwd) {
+export async function runAudit(script, htmlPath, reportPath, cwd, { page = null } = {}) {
   if(fs.existsSync(reportPath))fs.unlinkSync(reportPath);
   try {
-    await execFileAsync(process.execPath, [script, htmlPath, '--json', reportPath], { cwd, windowsHide:true, timeout:120000, maxBuffer:2_000_000 });
+    const args = [script, htmlPath, '--json', reportPath];
+    if(Number.isInteger(page) && page > 0) args.push('--page', String(page));
+    await execFileAsync(process.execPath, args, { cwd, windowsHide:true, timeout:120000, maxBuffer:2_000_000 });
   } catch (error) {
     // 审计脚本对"布局未通过"以退出码 1 返回、但会先写出报告文件：
     // 报告已生成时不算执行失败，交给修复循环处理；只有连报告都没产出才是真失败
@@ -234,7 +237,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const candidate = store.getCandidate(candidateId);
   if (!candidate || candidate.batch_id !== batchId) throw new Error('候选不存在或不属于当前批次');
   const outputMode=candidate.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
-  const contentType=candidate.content_class==='github_project'?'repository':outputMode.includes('custom-cards')?'custom':'event';
+  const contentType=candidate.content_class==='github_project'||outputMode.includes('tool-cards')?'repository':outputMode.includes('custom-cards')?'custom':'event';
   const storyboardClass=contentType==='event'?socialStoryboardClassForContentClass(candidate.content_class):contentType;
   const channelMode=outputMode.startsWith('xiaohongshu')?'xiaohongshu':'wechat';
   const facts = store.getRepositoryFactSheet(candidateId);
@@ -453,30 +456,19 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
       }
     }catch(error){ onProgress(`封面标题 AI 断行调用失败（${error.message}），使用确定性断行兜底`); coverTitleLines=null; }
   }
-  const copyReference=contentType==='event'?(storyboardClass==='technology'?'references\\copy-technology.md':storyboardClass==='trend'?'references\\copy-trend.md':'references\\copy-event.md')
-    :contentType==='custom'?'references\\copy-custom.md':'references\\copy-tool.md';
-  const legacyCopyReference=contentType==='event'?'references\\wechat-event-cards.md'
-    :contentType==='custom'?'references\\custom-cards.md':'references\\wechat-tool-cards.md';
-  const copySkillPrompt=selectSkillPromptReferences(generator.prompt,{
-    include:['COPY_GUIDE.md',copyReference,legacyCopyReference],
-  });
   const repairSkillPrompt=selectSkillPromptReferences(generator.prompt,{
-    include:['DESIGN_SYSTEM.md','references\\layout-contract.md',copyReference,legacyCopyReference],
+    include:['DESIGN_SYSTEM.md','references\\layout-contract.md',...(contentType==='event'
+      ? [storyboardClass==='technology'?'references\\copy-technology.md':storyboardClass==='trend'?'references\\copy-trend.md':'references\\copy-event.md','references\\wechat-event-cards.md']
+      : contentType==='custom' ? ['references\\copy-custom.md','references\\custom-cards.md']
+        : ['references\\copy-tool.md','references\\wechat-tool-cards.md'])],
   });
-  const input = {
-    channel_mode:outputMode||editorial.output_mode || 'xiaohongshu', topic:candidate.hotspot_title,
-    content_type:contentType,storyboard_class:contentType==='event'?storyboardClass:undefined,custom_content_type:contentType==='custom'?facts.data.content_type:undefined,source_url:contentType==='event'?(eventAnalysisRecord.analysis.sources||[]).map((item)=>item.url):contentType==='custom'?(facts.data.materials||[]).map((item)=>item.url):facts.source_url,
-    repository_facts:contentType==='repository'?facts.data:undefined,event_analysis:contentType==='event'?eventAnalysisRecord.analysis:undefined,custom_facts:contentType==='custom'?facts.data:undefined,
-    editorial_decisions:editorial,card_plan:cardPlan,
-    disclosure:contentType==='event'?'据公开素材整理；未核实主张必须保留边界表达':contentType==='custom'?'体验性表述来自作者确认；建议性内容未实测':'基于项目文档整理，未实际运行', workdir,
-  };
   onProgress('图文 2/6：按项目技能生成配套文案');
-  const copyResult = await gateway.complete({ provider, purpose:'social-card-copy', batchId, candidateId,
-    maxOutputTokens:Math.min(2400, providerConfig.maxOutputTokens), messages:[
-      { role:'system', protected:true, content:`${copySkillPrompt}\n\n## 当前运行阶段\n只生成可直接发布的配套文案。输出纯文本，不要 JSON、Markdown 围栏、页码或布局指令；严格遵守事实与禁用表达。${channelMode==='xiaohongshu'?' 小红书渠道：文案口语化、段落短，适度使用 emoji，末尾带 6–8 个话题标签，标签不得含夸大功效词。':' 公众号渠道：文案信息密度优先，结构清晰，末尾带 6–8 个准确话题标签，标签须与内容严格相关。'}${contentType==='event'?' 未核实主张必须注明说话者和“尚未获独立证实”等边界；不得把技术能力、趋势判断或争议定性为超出证据的结论。':''}${contentType==='custom'?' 体验性表述只能来自 source_level=author_experience 的要点；user_material 必须保留来源归属；model_suggestion 只能写成建议或参考，禁止写成亲测、效果或收益。':''}` },
-      { role:'user', protected:true, content:JSON.stringify(input) },
-    ] });
-  let copy = String(copyResult.content || '').trim().replace(/^```(?:text)?\s*/i, '').replace(/\s*```$/i, '');
+  const copyResult = await generateSocialCardCopy({ gateway, provider, providerConfig, batchId, candidateId,
+    skillPrompt: generator.prompt, channelMode, outputMode, topic: candidate.hotspot_title, contentType, storyboardClass,
+    factData: factPayload, sourceUrl: facts?.source_url || facts?.sourceUrl || '', eventAnalysis: contentType==='event' ? eventAnalysisRecord.analysis : null,
+    editorial, cardPlan, disclosure: contentType==='event' ? '据公开素材整理；未核实主张必须保留边界表达' : contentType==='custom' ? '体验性表述来自作者确认；建议性内容未实测' : '基于项目文档整理，未实际运行',
+  });
+  const copy = copyResult.copy;
   const configuredGate=evaluateConfiguredGates(skillRuntime.config,{factBase:contentType==='event'?eventAnalysisRecord.analysis:facts?.data||{},output:copy});
   if(!configuredGate.pass)throw new Error(`图文配置门禁未通过：${configuredGate.issues.map((item)=>item.message).join('；')}`);
 
