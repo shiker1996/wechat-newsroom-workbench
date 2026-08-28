@@ -53,6 +53,39 @@
 
 字段规则：块类型为 `list` 时使用字符串数组 `items`；`stats` 使用统计项数组 `items`；`steps`、`timeline`、`scenes` 使用对象数组 `items`，其中步骤项统一使用 `{ "title": "步骤名称", "content": "命令、参数、验证条件或说明" }`；`compare` 使用 `headers` 和 `rows`；`text`、`note`、`highlight`、`code` 使用 `content`。具体可用类型由运行时注入的 `REPOSITORY_BLOCK_TYPES` 决定。未使用的字段保留为空数组或空字符串。不要把结构化条目塞进块级 `content`，不要在页面中返回 `blocks`。
 
+### 视觉意图示例
+
+视觉字段只表达“应该突出什么”，不写 CSS。优先标记已有事实中的关键数字、关键能力或使用边界；不要让每个块都高亮。结构化条目也可以单独标记：
+
+```json
+{
+  "type": "stats",
+  "title": "关键变化",
+  "items": [
+    {"num": "3 个", "label": "核心模块", "visual": {"emphasis": "strong", "tone": "accent", "icon": "metric"}},
+    {"num": "需配置", "label": "访问凭证", "visual": {"tone": "warning", "icon": "warning"}}
+  ],
+  "visual": {"badge": "事实摘要"},
+  "source_refs": ["事实基座中的项目说明来源"]
+}
+```
+
+普通文本需要突出句内数字时，保留完整 `content`，并按原文顺序提供 `content_runs`：
+
+```json
+{
+  "type": "highlight",
+  "content": "首次运行需要配置访问凭证。",
+  "content_runs": [
+    {"text": "首次运行需要配置 ", "role": "normal"},
+    {"text": "访问凭证", "role": "warning", "tone": "warning", "emphasis": "strong"},
+    {"text": "。", "role": "normal"}
+  ],
+  "visual": {"icon": "warning", "badge": "使用前确认"},
+  "source_refs": ["事实基座中的配置说明来源"]
+}
+```
+
 ## 一、页面结构
 
 ### 1. 封面：提出具体任务或问题

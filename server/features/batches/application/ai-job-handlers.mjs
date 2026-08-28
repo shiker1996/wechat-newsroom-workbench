@@ -1,10 +1,10 @@
 import { tagBatch } from '../../research/llm/tasks.mjs';
 import { runResearchPipeline, ensureBatchEventCards } from '../../research/index.mjs';
 import { runArticlePipeline, runTypesetPipeline, runBreakingAnalysisPipeline, runDailyPipeline, runTutorialPipeline, runCoverImageJob } from '../../articles/index.mjs';
-import { runSocialCardPipeline } from '../../social-cards/index.mjs';
+import { runSocialCardBeautify, runSocialCardPipeline } from '../../social-cards/index.mjs';
 import { runAutoPipeline } from './auto-pipeline.mjs';
 
-export const AI_JOB_TYPES = Object.freeze(['tag', 'retag', 'event-cards', 'research', 'breaking-analysis', 'article', 'daily', 'tutorial', 'typeset', 'social-card', 'cover-image', 'auto']);
+export const AI_JOB_TYPES = Object.freeze(['tag', 'retag', 'event-cards', 'research', 'breaking-analysis', 'article', 'daily', 'tutorial', 'typeset', 'social-card', 'social-card-beautify', 'cover-image', 'auto']);
 export const BATCH_LEVEL_AI_JOB_TYPES = new Set(['tag', 'retag', 'event-cards', 'research', 'breaking-analysis', 'auto', 'daily']);
 
 export function createAiJobHandlers({ store, gateway, config, log }) {
@@ -20,6 +20,7 @@ export function createAiJobHandlers({ store, gateway, config, log }) {
     ['tutorial', ({ job, options }) => runTutorialPipeline({ gateway, store, batchId: job.batchId, candidateId: options.candidateId, provider: job.requestedProvider, workspaceRoot: config.workspaceRoot, snapshotId: job.snapshotId, skillSelection: job.skillSelection, stageSelections: job.stageSelections, articleLength: config.articleLength, onProgress: progress(job) })],
     ['typeset', ({ job, options }) => runTypesetPipeline({ gateway, store, batchId: job.batchId, candidateId: options.candidateId, provider: job.requestedProvider, workspaceRoot: config.workspaceRoot, snapshotId: job.snapshotId, documentKind: options.documentKind, theme: job.theme || 'auto', onProgress: progress(job) })],
     ['social-card', ({ job, options }) => runSocialCardPipeline({ gateway, store, batchId: job.batchId, candidateId: options.candidateId, provider: job.requestedProvider, workspaceRoot: config.workspaceRoot, snapshotId: job.snapshotId, onProgress: progress(job) })],
+    ['social-card-beautify', ({ job, options }) => runSocialCardBeautify({ gateway, store, batchId: job.batchId, candidateId: options.candidateId, provider: job.requestedProvider, workspaceRoot: config.workspaceRoot, styleBrief: options.styleBrief, onProgress: progress(job) })],
     ['cover-image', ({ job }) => runCoverImageJob({ gateway, store, batchId: job.batchId, candidateId: job.candidateId, provider: job.requestedProvider, workspaceRoot: config.workspaceRoot, theme: job.theme || '', onProgress: progress(job) })],
     ['auto', async ({ job, batch, maxAgeHours }) => { const result = await runAutoPipeline({ gateway, store, config, job, batch, maxAgeHours, onProgress: progress(job) }); for (const failure of store.listPipelineFailures(job.batchId, { statuses: ['open', 'retrying'], stages: ['research'] })) store.resolvePipelineFailure(failure.id); return result; }],
   ]);

@@ -40,16 +40,22 @@ export const CONVERSATION_AGENT_BUDGET_DEFAULTS = Object.freeze({
   maxParallelToolCalls: 3,
   maxToolResultChars: 8000,
   maxTotalToolResultChars: 24000,
+  maxHistoryChars: 120000,
   timeoutMs: 90000,
   maxDuplicateCalls: 1,
 });
 
 export const CONVERSATION_AGENT_BUDGET_LIMITS = Object.freeze({
-  maxModelSteps: 5,
-  maxToolCalls: 8,
+  // 视觉 Agent 需要一次完整读取、整组初审和若干“修复后再审计”轮次；
+  // 24 步仍是异常循环的上限，但不会把正常的整组修复截断在 16 步。
+  maxModelSteps: 24,
+  maxToolCalls: 24,
   maxParallelToolCalls: 4,
-  maxToolResultChars: 16000,
-  maxTotalToolResultChars: 48000,
-  timeoutMs: 90000,
+  // 文件读取类 Agent 需要把多个候选资料文件交给模型；16KB 会把
+  // card-plan.json 截成前缀，导致事实文件后半段无法进入模型上下文。
+  maxToolResultChars: 80000,
+  maxTotalToolResultChars: 320000,
+  maxHistoryChars: 300000,
+  timeoutMs: 300000,
   maxDuplicateCalls: 1,
 });

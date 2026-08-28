@@ -35,6 +35,24 @@
 }
 ```
 
+### 视觉意图示例
+
+视觉意图不能改变作者体验、用户素材和模型建议的来源等级，只能突出已有内容中的关键步骤、关键判断和边界：
+
+```json
+{
+  "type": "steps",
+  "title": "配置步骤",
+  "items": [
+    {"title": "准备配置", "content": "填写已确认的参数。", "visual": {"emphasis": "strong", "icon": "source"}},
+    {"title": "确认边界", "content": "模型建议尚未实测。", "visual": {"tone": "warning", "icon": "warning", "badge": "未实测"}}
+  ],
+  "source_refs": ["事实基座中的教程来源"]
+}
+```
+
+需要突出一句话时，保留完整 `content`，并按原文顺序提供 `content_runs`；不得把模型建议标成作者亲历。
+
 教程步骤块示例：
 
 ```json

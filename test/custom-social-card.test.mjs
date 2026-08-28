@@ -111,7 +111,7 @@ test('小红书渠道渲染数据卡、对比卡、步骤卡、时间卡、场�
   assert.match(html,/<div class="stat"><b>2\.8万亿<\/b><span data-text-role="auxiliary">参数规模<\/span><\/div>/);
   assert.match(html,/<th data-text-role="auxiliary">K3<\/th>/);
   assert.match(html,/<td>MIT<\/td>/);
-  assert.match(html,/<div class="step"><b>1<\/b>/);
+  assert.match(html,/<div class="step(?: [^"]+)?"><b>1<\/b>/);
   assert.match(html,/class="tl-time" data-text-role="auxiliary">7月16日/);
   assert.match(html,/<div class="scene"><h3>写作<\/h3>/);
   assert.match(html,/highlight-block/);

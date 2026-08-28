@@ -14,7 +14,7 @@ Phase 0 只回答三个问题：
 
 1. 当前仓库工具图文和事件图文实际生成了什么；
 2. 渲染器声明支持什么，但故事板实际命中了什么；
-3. 后续“来源准备 → 事实基座 → 叙事提炼 → 故事板 → 视觉渲染”改造应以哪些产物作为回归基线。
+3. 后续“来源准备 → 事实基座 → 故事板（内部完成事实提炼） → 视觉渲染”改造应以哪些产物作为回归基线。
 
 本阶段只读取既有产物，没有修改生成逻辑，也没有把手工制作的技能对比页面计入统计。
 
@@ -103,21 +103,21 @@ text、list、code、note、stats、compare、steps、timeline、scenes、highli
 | `code/steps` | 已渲染，仓库样本有命中 | 可作为仓库回归能力 |
 | `timeline/compare` | 已渲染，事件样本有命中 | 需要统一故事板触发规则 |
 | `stats` | 有渲染分支，固定样本未命中 | 首要补齐 C004 回归 |
-| `scenes/highlight` | 有渲染分支，固定样本未命中 | 需要叙事提炼提供明确意图 |
+| `scenes/highlight` | 有渲染分支，固定样本未命中 | 需要故事板提供明确事实意图 |
 | `compare.variant=flow` | 尚无专门关系流实现 | 下一阶段新增受控变体 |
 | 语义图标/徽章 | 尚无统一字段和白名单渲染 | 下一阶段新增受控协议 |
 | 证据口径徽章 | 部分存在于事实校验，不稳定呈现于页面 | 需要绑定 `claim_type/source_refs` |
 
-结论是：第一步不应重写整个渲染器，而应先让叙事提炼和故事板稳定产出正确的视觉意图；随后再补齐关系流、图标和徽章的确定性渲染。
+结论是：第一步不应重写整个渲染器，而应先让故事板在事实基座内稳定产出正确的页面职责和视觉意图；随后再补齐关系流、图标和徽章的确定性渲染。
 
 ## 5. 对后续阶段的回归要求
 
-### Phase 1：叙事提炼
+### Phase 1：故事板事实提炼
 
-- 三类样本都生成 `social-card-narrative-focus.json`；
-- C004 必须有可回溯的 `hook`、`reader_question`、`tension` 和 `visual_motifs`；
+- 三类样本都在 `card-plan.json` 中生成可回溯的页面职责和视觉意图；
+- C004 必须从事实基座中提炼可回溯的核心问题、价格/性能关系和视觉结构；
 - 仓库样本必须能表达痛点—机制—结果，不能只生成泛化标题；
-- 无足够证据时允许 `tension.type=none`。
+- 无足够证据时不得强行制造矛盾或因果关系。
 
 ### Phase 2：故事板结构命中
 
@@ -136,7 +136,7 @@ text、list、code、note、stats、compare、steps、timeline、scenes、highli
 ### Phase 4：合并、修复和渠道降级
 
 - `stats`、`compare.variant=flow`、时间线和核心 `highlight` 视为不可随意拆散的叙事组件；
-- 页面合并必须检查 `narrative_role`、`narrative_group`、`fact_ids` 和 `source_refs`；
+- 页面合并必须检查页面职责、事实关系、`fact_ids` 和 `source_refs`；
 - 小红书优先支持完整视觉组件，公众号按模板能力安全降级；
 - 所有降级、拆页和修复要写入调整记录。
 
@@ -146,4 +146,4 @@ text、list、code、note、stats、compare、steps、timeline、scenes、highli
 - [统一流程设计方案](./social-card-unified-editorial-visual-pipeline-design.md)
 - [现有实现基线](./social-card-generation-current-flow.md)
 
-Phase 0 完成后，下一步应进入 Phase 1：冻结叙事提炼契约，并让仓库与事件故事板消费同一份叙事主线数据。
+说明：本文件是 2026-08-26 的历史基线，不再作为下一阶段实施指令。当前不新增独立叙事提炼；后续内容侧改造直接围绕故事板事实取舍、结构化内容块和视觉渲染展开。

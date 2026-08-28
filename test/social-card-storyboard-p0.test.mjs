@@ -12,6 +12,7 @@ import {
   toLegacySocialCardPromptInput,
 } from '../server/features/social-cards/index.mjs';
 import { continuationBadge, renderStoryboardBlock, renderTechnicalText } from '../server/shared/rendering/storyboard-html-content.mjs';
+import { sanitizeCardPlan } from '../server/shared/rendering/storyboard-content.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sha256=(value)=>crypto.createHash('sha256').update(value).digest('hex');
@@ -59,6 +60,73 @@ test('阶段 2 字体放大变体通过内联样式覆盖主题 CSS',()=>{
   assert.match(html,/line-height:/);
 });
 
+test('故事板视觉意图安全渲染为强调、图标、徽章和句内重点',()=>{
+  const html=renderStoryboardBlock({
+    type:'highlight',
+    title:'关键变化',
+    content:'净利润下降 75%。',
+    content_runs:[
+      {text:'净利润下降 ',role:'normal'},
+      {text:'75%',role:'metric',tone:'danger',emphasis:'strong'},
+      {text:'。',role:'normal'},
+    ],
+    visual:{icon:'warning',badge:'关键变化',tone:'danger',emphasis:'strong'},
+  });
+  assert.match(html,/class="content-block highlight-block visual-emphasis-strong visual-tone-danger visual-icon-warning"/);
+  assert.match(html,/class="visual-icon"[^>]*>!</);
+  assert.match(html,/class="visual-badge"[^>]*>关键变化</);
+  assert.match(html,/class="visual-run visual-role-metric visual-tone-danger visual-emphasis-strong">75%<\/span>/);
+  assert.doesNotMatch(html,/<script|<img|style=/i);
+});
+
+test('不完整 content_runs 回退为原文，避免视觉标记吞掉内容',()=>{
+  const html=renderStoryboardBlock({
+    type:'text',
+    content:'完整事实句。',
+    content_runs:[{text:'不完整',role:'metric',emphasis:'strong'}],
+  });
+  assert.match(html,/>完整事实句。<\/p>/);
+  assert.doesNotMatch(html,/visual-run/);
+});
+
+test('故事板遗漏 visual 时，从关键事实和内容块职责生成保守视觉意图',()=>{
+  const pages=sanitizeCardPlan([{kind:'cover',role:'cover',title:'事件',content_blocks:[
+    {type:'text',title:'核心事件',content:'马云增持阿里超6亿港元，净利润下降75%'}
+  ]},{kind:'content',role:'compare',title:'讨论',content_blocks:[
+    {type:'compare',title:'价格变化',headers:['此前','现在'],rows:[['旧价','4499元'],['新价','6999元']]},
+    {type:'note',title:'事实边界',content:'具体动机尚未公开'}
+  ]}]);
+  const cover=pages[0].content_blocks[0];
+  assert.deepEqual(cover.visual,{emphasis:'hero',tone:'accent',icon:'rocket',badge:'核心事件'});
+  assert.equal(cover.content_runs.map((run)=>run.text).join(''),cover.content);
+  assert.ok(cover.content_runs.some((run)=>run.text==='马云'&&run.role==='label'));
+  assert.ok(cover.content_runs.some((run)=>run.text==='阿里'&&run.role==='label'));
+  assert.ok(cover.content_runs.some((run)=>run.text==='6亿港元'&&run.role==='metric'));
+  assert.deepEqual(pages[1].content_blocks[0].visual,{emphasis:'strong',tone:'danger',icon:'price',badge:'价格变化'});
+  assert.deepEqual(pages[1].content_blocks[1].visual,{tone:'warning',icon:'warning',badge:'事实边界'});
+});
+
+test('故事板把列表、时间线和对比表中的关键事实细化为条目级 visual',()=>{
+  const pages=sanitizeCardPlan([
+    {kind:'content',title:'事实',content_blocks:[{type:'list',title:'增持与配售',items:['马云连续增持阿里港股，总额超6亿港元','普通背景事实']}]},
+    {kind:'content',title:'时间线',content_blocks:[{type:'timeline',title:'事件时间线',items:[
+      {time:'2026-08-20',title:'发布财报',content:'净利润同比降75%'},
+      {time:'2026-08-23',title:'宣布配售',content:'配售800亿港元用于AI投资'},
+    ]}]},
+    {kind:'content',title:'对比',content_blocks:[{type:'compare',title:'市场与公司',headers:['视角','信息'],rows:[['市场','股价一度跌近10%']]}]},
+  ]);
+  const list=pages[0].content_blocks[0];
+  const timeline=pages[1].content_blocks[0];
+  const compare=pages[2].content_blocks[0];
+  assert.deepEqual(list.items[1],'普通背景事实');
+  assert.deepEqual(list.items[0].visual,{emphasis:'strong',tone:'accent'});
+  assert.equal(list.items[0].content_runs.map((run)=>run.text).join(''),list.items[0].content);
+  assert.deepEqual(timeline.items[0].visual,{emphasis:'strong',tone:'danger'});
+  assert.ok(timeline.items[0].content_runs.some((run)=>run.text==='75%'&&run.tone==='danger'));
+  assert.deepEqual(compare.rows[0][1].visual,{emphasis:'strong',tone:'danger'});
+  assert.match(renderStoryboardBlock(list),/visual-run visual-role-metric/);
+});
+
 test('P0 固化图文故事板三项 JSON Schema 契约',()=>{
   assert.deepEqual(SOCIAL_CARD_STORYBOARD_CONTRACTS,{
     factBase:'social_card_fact_base',
@@ -104,12 +172,12 @@ test('迁移后的故事板提示词保持六种入口和渠道组合的语义�
     custom:'custom-card-storyboard',
   };
   const snapshots={
-    'repository/wechat':'7089ad267ded21be1cb78680b14f1b3527f80163bcf60de9c078ae3966571995',
-    'repository/xiaohongshu':'ebf1e9b0462db675bc8f77fe1c1c786db5fdd2ab0a4456dc03742d6b20ed08e6',
-    'event/wechat':'21a2730cf4d7aa5909f8e6275d33af8211a79980c79bac596481b198a7a580bb',
-    'event/xiaohongshu':'34d5da960d6bac0630eb01157b4ea6fa3388a368807df9d9db3b179435c87d5d',
-    'custom/wechat':'e3dea276a760f9bdf23fbc6e6632948b42ceffa0ab654c9a7ca54cfc917ba550',
-    'custom/xiaohongshu':'63530be177b9cd342b8ad7262470cc2467b54a22ca7b4d65fe1d6dd0ee552af5',
+    'repository/wechat':'1a17e3d1b8e15b807b58d59179d4d074e99f27464d2d9ac2b44c89a5cd0aee00',
+    'repository/xiaohongshu':'b1cc51a81d4f872aa6966cd67892000033d6f8700586255915471219e675332c',
+    'event/wechat':'562dcf58e85e3895c12673e91f84ae08e22ccc5bc9659a19aa7a22a5f3d190bd',
+    'event/xiaohongshu':'2ae6c572fb4dcfbc24e22423d69e601733572abfc6cc0a731c244ae6a1ec7f46',
+    'custom/wechat':'becae18bd7506d49f5c51594491aea48a124cdbd4edf22a9290852fc1cbccf43',
+    'custom/xiaohongshu':'6d6f247a89e96ea711c1b83311af8de28612b9f253f4437c4689e1184c0ca6d4',
   };
   for(const [key,expected] of Object.entries(snapshots)){
     const [contentType,channelMode]=key.split('/');
@@ -246,6 +314,27 @@ test('四个内置故事板统一章节、页面角色和类型化降级规则',
     assert.match(prompt,/每个内容块必须带 `source_refs`/);
     assert.match(prompt,marker);
   }
+});
+
+test('五类故事板声明语义视觉意图且不暴露渲染细节',()=>{
+  for(const skillName of [
+    'repository-card-storyboard',
+    'event-card-storyboard',
+    'open-source-technology-storyboard',
+    'open-source-trend-storyboard',
+    'custom-card-storyboard',
+  ]){
+    const prompt=loadSkillBundle({workspaceRoot:root,skillName}).prompt;
+    assert.match(prompt,/语义化 `visual` 意图/);
+    assert.match(prompt,/content_runs/);
+    assert.match(prompt,/不得输出字号、颜色值、HTML 或 CSS/);
+  }
+  const schema=JSON.parse(fs.readFileSync(path.join(root,'server','shared','domain','schemas','social-card-storyboard.schema.json'),'utf8'));
+  const block=schema.properties.card_plan.items.properties.content_blocks.items;
+  assert.deepEqual(block.properties.visual.properties.icon.enum,[
+    'none','metric','ai','price','warning','source','user','timeline','rocket',
+  ]);
+  assert.deepEqual(block.properties.content_runs.items.properties.role.enum,['normal','metric','label','warning','source']);
 });
 
 test('第三方故事板使用自身方法且只叠加固定运行契约',()=>{

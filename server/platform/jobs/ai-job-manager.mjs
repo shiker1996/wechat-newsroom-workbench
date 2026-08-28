@@ -18,7 +18,7 @@ export class AiJobManager {
     return this.batchLevelTypes.has(job.type) ? `batch:${job.batchId}` : `candidate:${job.candidateId ?? 'none'}`;
   }
 
-  start({ batchId, type, provider, force = false, candidateId = null, documentKind = null, theme = undefined, focus = null, focuses = [], snapshotId = null, skillSelection = null, stageSelections = null }) {
+  start({ batchId, type, provider, force = false, candidateId = null, documentKind = null, theme = undefined, focus = null, focuses = [], snapshotId = null, skillSelection = null, stageSelections = null, styleBrief = '' }) {
     if (!this.store.getBatch(batchId)) throw new Error('批次不存在');
     if (!this.handlers.has(type)) throw new Error('未知 AI 任务');
     const pending = [...this.jobs.values()].find((job) => job.batchId === batchId && job.type === type
@@ -27,7 +27,7 @@ export class AiJobManager {
     this.gateway.resolve(provider);
     const job = { id:crypto.randomUUID(),batchId,type,candidateId,provider:provider||this.gateway.config.defaultProvider,requestedProvider:provider||null,snapshotId,skillSelection,stageSelections,
       theme,status:'queued',progress:'排队等待执行',logs:[],createdAt:new Date().toISOString(),
-      runOptions:{ force, candidateId, documentKind, focus, focuses } };
+      runOptions:{ force, candidateId, documentKind, focus, focuses, ...(String(styleBrief||'').trim()?{styleBrief:String(styleBrief).trim()}:{}) } };
     this.jobs.set(job.id,job); this.store.createAiRun({id:job.id,batchId,type,provider:job.provider});
     this.store.updateAiRun(job.id,{status:'queued',progress:'排队等待执行'});
     if(type==='daily'&&Array.isArray(focuses)&&focuses.length)this.store.updateAiRun(job.id,{result_json:JSON.stringify({focuses})});

@@ -47,6 +47,40 @@
 }
 ```
 
+### 视觉意图示例
+
+视觉意图只强化事实基座已经确认的冲突、变化和边界，不增加新的判断。事件图文优先用 `compare`、`stats` 或 `highlight` 标出“变化在哪里”，而不是给普通背景信息加装饰：
+
+```json
+{
+  "type": "compare",
+  "title": "价格变化",
+  "headers": ["时间", "公开信息"],
+  "rows": [
+    ["此前", "原价格"],
+    ["现在", "新价格"]
+  ],
+  "visual": {"tone": "accent", "icon": "price", "badge": "关键变化"},
+  "source_refs": ["来源1", "来源2"]
+}
+```
+
+如果需要突出一句话，保留完整 `content`，并用 `content_runs` 标记原文片段：
+
+```json
+{
+  "type": "highlight",
+  "content": "争议集中在公开时间和实际执行之间的差异。",
+  "content_runs": [
+    {"text": "争议集中在 ", "role": "normal"},
+    {"text": "公开时间和实际执行之间的差异", "role": "warning", "tone": "danger", "emphasis": "strong"},
+    {"text": "。", "role": "normal"}
+  ],
+  "visual": {"icon": "warning", "badge": "争议焦点"},
+  "source_refs": ["来源1", "来源2"]
+}
+```
+
 ## 一、页面结构
 
 ### 1. 封面：一句话说明事件
@@ -80,8 +114,22 @@
   "title": "事件时间线",
   "items": [
     {"time": "2019年", "title": "港股上市", "content": "具体事实", "source_refs": ["来源1"]},
-    {"time": "2025年", "title": "宣布配售", "content": "具体事实", "source_refs": ["来源2"]}
-  ]
+    {
+      "time": "2025年",
+      "title": "宣布配售",
+      "content": "配售金额为 800 亿港元，用于 AI 投资。",
+      "visual": {"emphasis": "strong", "tone": "accent"},
+      "content_runs": [
+        {"text": "配售金额为 ", "role": "normal"},
+        {"text": "800 亿港元", "role": "metric", "tone": "accent", "emphasis": "strong"},
+        {"text": "，用于 ", "role": "normal"},
+        {"text": "AI", "role": "label", "tone": "accent", "emphasis": "strong"},
+        {"text": " 投资。", "role": "normal"}
+      ],
+      "source_refs": ["来源2"]
+    }
+  ],
+  "visual": {"icon": "timeline", "badge": "时间变化"}
 }
 ```
 
@@ -96,6 +144,28 @@
   "title": "当前确认",
   "items": ["主体已发布公告", "相关回应仍待核实"],
   "source_refs": ["来源1", "来源2"]
+}
+```
+
+列表和对比表也可以只标记条目内部的关键事实，不必给每个条目加图标：
+
+```json
+{
+  "type": "list",
+  "title": "增持与配售",
+  "items": [
+    {
+      "content": "马云连续增持阿里港股，总额超 6 亿港元",
+      "visual": {"emphasis": "strong", "tone": "accent"},
+      "content_runs": [
+        {"text": "马云", "role": "label", "tone": "accent", "emphasis": "strong"},
+        {"text": "连续增持阿里港股，总额超 ", "role": "normal"},
+        {"text": "6 亿港元", "role": "metric", "tone": "accent", "emphasis": "strong"}
+      ]
+    },
+    "普通背景事实"
+  ],
+  "source_refs": ["来源1"]
 }
 ```
 

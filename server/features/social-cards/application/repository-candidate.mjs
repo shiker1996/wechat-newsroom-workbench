@@ -17,7 +17,16 @@ export function createRepositoryCandidate({ store, batchId, url, channel }) {
   store.addCandidates(batchId, [hotspot.id], { tracks: ['social_cards'] });
   const candidate = store.listCandidates(batchId, 'social_cards').find((item) => Number(item.hotspot_id) === Number(hotspot.id));
   if (!candidate) throw new Error('仓库图文候选创建失败');
-  store.updateCandidate(candidate.id, { angle: parsed.repository, thesis: parsed.repository });
+  store.updateCandidate(candidate.id, {
+    angle: parsed.repository,
+    thesis: parsed.repository,
+    // 手动候选的数据库默认分类是 news_event；必须显式标记为仓库项目，
+    // 否则工具图文页面会按事件事实基座和事件故事板渲染。
+    content_class: 'github_project',
+    classification_status: 'manual',
+    classification_confidence: 1,
+    classification_reason: '手动添加 GitHub 仓库',
+  });
   store.updateCandidateTrack(candidate.id, 'social_cards', { status: 'pooled', pool_role: '工具图文', output_mode: outputMode });
   store.saveCardEditorial(candidate.id, { ...store.getCardEditorial(candidate.id), output_mode: outputMode, status: 'DISCUSS' });
   return store.getCandidate(candidate.id);

@@ -34,8 +34,11 @@ export function readLocalProjectImplementation(inputPath, options = {}) {
 
   const maxFiles = Math.min(Number(options.maxFiles) || 80, 200);
   const maxFileBytes = Math.min(Number(options.maxFileBytes) || 256 * 1024, 1024 * 1024);
-  const maxCharsPerFile = Math.min(Number(options.maxCharsPerFile) || 5000, 20000);
+  const maxCharsPerFile = Math.min(Number(options.maxCharsPerFile) || 5000, 100000);
   const maxTotalChars = Math.min(Number(options.maxTotalChars) || 60000, 200000);
+  const includePaths = new Set((Array.isArray(options.includePaths) ? options.includePaths : [])
+    .map((item) => path.normalize(String(item || '').trim()))
+    .filter(Boolean));
   const candidates = [];
   const skipped = { directories: 0, secrets: 0, binaryOrUnsupported: 0, oversized: 0, symlinks: 0 };
 
@@ -50,6 +53,7 @@ export function readLocalProjectImplementation(inputPath, options = {}) {
         continue;
       }
       if (!entry.isFile()) continue;
+      if (includePaths.size && !includePaths.has(path.normalize(relative))) continue;
       if (SECRET_FILE.test(entry.name)) { skipped.secrets += 1; continue; }
       if (!isTextFile(entry.name)) { skipped.binaryOrUnsupported += 1; continue; }
       const size = fs.statSync(absolute).size;

@@ -1,12 +1,12 @@
 import { CONVERSATION_AGENT_BUDGET_DEFAULTS, CONVERSATION_AGENT_BUDGET_LIMITS } from './contracts.mjs';
-import { compactToolResult, toolCallFingerprint } from './context.mjs';
+import { compactAgentHistory, compactToolResult, toolCallFingerprint } from './context.mjs';
 import { agentEvent } from './events.mjs';
 import { AgentContractError, validateAgentEnvelope, toolError } from './tool-protocol.mjs';
 import { executeConversationTool } from './tool-executor.mjs';
 
 function budgets(input={}){const out={};for(const [key,value] of Object.entries(CONVERSATION_AGENT_BUDGET_DEFAULTS))out[key]=Math.min(CONVERSATION_AGENT_BUDGET_LIMITS[key],Math.max(1,Number(input[key])||value));return Object.freeze(out);}
 function runId(){return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;}
-function withTimeout(promise,timeoutMs){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new AgentContractError('AGENT_BUDGET_EXCEEDED','Agent 已超过总耗时预算')),timeoutMs);Promise.resolve(promise).then((value)=>{clearTimeout(timer);resolve(value);},(error)=>{clearTimeout(timer);reject(error);});});}
+function withTimeout(promise,timeoutMs){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new AgentContractError('AGENT_BUDGET_EXCEEDED',`Agent 已超过总耗时预算（${timeoutMs}ms）`)),timeoutMs);Promise.resolve(promise).then((value)=>{clearTimeout(timer);resolve(value);},(error)=>{clearTimeout(timer);reject(error);});});}
 function completedEvent(result){const data=result?.data||{},url=data.final_url||data.url||result?.provenance?.finalUrl||result?.provenance?.requestedUrl,title=data.title||'',chars=String(data.content||data.excerpt||data.text||'').length;return {summary:chars?`已读取 ${chars} 字`:title?'资料读取完成':'工具执行完成',sources:url?[{title,url}]:[]};}
 
 export async function runConversationAgent({entryPoint,modelStep,messages=[],registry,catalog,toolContext={},resolveArguments,sanitizeToolResult=(result)=>result,cacheLookup=null,onEvent=()=>{},store=null,budget={},signal=null}={}){
@@ -17,9 +17,10 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
   try{
     for(let step=0;step<limits.maxModelSteps;step+=1){
       if(signal?.aborted)throw new AgentContractError('AGENT_ABORTED','Agent 已取消');
-      if(Date.now()-started>limits.timeoutMs)throw new AgentContractError('AGENT_BUDGET_EXCEEDED','Agent 已超过总耗时预算');
+      if(Date.now()-started>limits.timeoutMs)throw new AgentContractError('AGENT_BUDGET_EXCEEDED',`Agent 已超过总耗时预算（${limits.timeoutMs}ms）`);
       const remaining=Math.max(1,limits.timeoutMs-(Date.now()-started));
-      const envelope=validateAgentEnvelope(await withTimeout(modelStep({entryPoint,messages:history,catalog,step,signal,emit}),remaining),{maxRequests:limits.maxParallelToolCalls});
+      const modelHistory=compactAgentHistory(history,limits.maxHistoryChars);
+      const envelope=validateAgentEnvelope(await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining),{maxRequests:limits.maxParallelToolCalls});
       if(envelope.type==='final'){
         store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
         emit('done',{status:'completed'});return {agentRunId:id,...envelope,modelSteps:step+1,toolCalls};

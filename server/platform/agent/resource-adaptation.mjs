@@ -11,6 +11,7 @@ import path from 'node:path';
 import { saveFactAttachment } from './fact-attachments.mjs';
 
 export const RESOURCE_ID_SCHEMA=Object.freeze({type:'object',required:['resourceId'],additionalProperties:false,properties:{resourceId:{type:'string'}}});
+export const PROJECT_RESOURCE_SCHEMA=Object.freeze({type:'object',required:['resourceId'],additionalProperties:false,properties:{resourceId:{type:'string'},options:{type:'object',additionalProperties:false,properties:{includePaths:{type:'array',items:{type:'string'},maxItems:8},maxFiles:{type:'integer',minimum:1,maximum:200},maxFileBytes:{type:'integer',minimum:1,maximum:1048576},maxCharsPerFile:{type:'integer',minimum:1,maximum:100000},maxTotalChars:{type:'integer',minimum:1,maximum:200000}}}}});
 export const RESOURCE_ID_QUERY_SCHEMA=Object.freeze({type:'object',required:['resourceId','query'],additionalProperties:false,properties:{resourceId:{type:'string'},query:{type:'string'}}});
 export const PASSAGE_RESOURCE_SCHEMA=Object.freeze({type:'object',required:['resourceIds','query'],additionalProperties:false,properties:{resourceIds:{type:'array',items:{type:'string'},minItems:1},query:{type:'string'},k:{type:'integer'}}});
 
@@ -79,8 +80,8 @@ export const isResourceAdaptedCapability=(capability,catalogProfiles={})=>CAPABI
 // 行为逐字节一致；拒绝文案按 ctx.capability 从 options.messages（agent+capability 二维）取，内联字符串为最终兜底。
 export const RESOURCE_KIND_PROFILES=Object.freeze({
   'project-path':{
-    schema:RESOURCE_ID_SCHEMA,
-    resolve(resource,args,{messages,capability}){if(!resource?.path)throw resourceNotAllowed(messages[capability]||'项目资源不属于当前请求');return {path:resource.path,options:{}};},
+    schema:PROJECT_RESOURCE_SCHEMA,
+    resolve(resource,args,{messages,capability}){if(!resource?.path)throw resourceNotAllowed(messages[capability]||'项目资源不属于当前请求');return {path:resource.path,options:args?.options&&typeof args.options==='object'?args.options:{}};},
   },
   'url-fetch':{
     schema:RESOURCE_ID_SCHEMA,

@@ -49,6 +49,26 @@
 }
 ```
 
+### 视觉意图示例
+
+视觉意图只突出跨来源、跨主体或跨时间事实中的变化信号，不把单个榜单、一次发布或主观推测包装成趋势：
+
+```json
+{
+  "type": "highlight",
+  "title": "变化信号",
+  "content": "主体 A 已公开采用路径，主体 B 仍处于测试阶段。",
+  "content_runs": [
+    {"text": "主体 A 已公开采用路径", "role": "metric", "tone": "accent", "emphasis": "strong"},
+    {"text": "，", "role": "normal"},
+    {"text": "主体 B 仍处于测试阶段", "role": "warning", "tone": "warning", "emphasis": "strong"},
+    {"text": "。", "role": "normal"}
+  ],
+  "visual": {"icon": "timeline", "badge": "趋势证据"},
+  "source_refs": ["来源1", "来源2"]
+}
+```
+
 ## 一、页面结构
 
 ### 1. 封面：提出趋势信号

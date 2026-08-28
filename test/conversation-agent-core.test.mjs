@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runConversationAgent } from '../server/platform/agent/conversation-agent.mjs';
+import { compactAgentHistory } from '../server/platform/agent/context.mjs';
 import { buildConversationToolCatalog } from '../server/platform/agent/tool-catalog.mjs';
 import { AgentContractError, validateAgentEnvelope } from '../server/platform/agent/tool-protocol.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
@@ -47,6 +48,25 @@ test('Agent 支持单工具结果回送模型后返回 final，并发送统一�
   }});
   assert.equal(result.type,'final');assert.equal(result.toolCalls,1);assert.equal(result.modelSteps,2);
   for(const type of ['tool.requested','tool.running','tool.completed','done'])assert.ok(events.some((event)=>event.type===type));
+});
+
+test('Agent 历史上下文超限时保留事实读取和最近审计并压缩旧轮次',()=>{
+  const history=[
+    {role:'system',protected:true,content:'系统提示'},
+    {role:'user',protected:true,content:'初始请求'},
+    {role:'assistant',content:'旧补丁 1'},
+    {role:'tool',content:JSON.stringify([{capability:'filesystem.project.read',status:'ok',data:{answer:'事实'.repeat(3000)}}])},
+    {role:'assistant',content:'旧补丁 2'},
+    {role:'tool',content:JSON.stringify([{capability:'content.social_card.layout_audit',status:'ok',data:{summary:'旧审计'.repeat(1000)}}])},
+    {role:'assistant',content:'最新补丁'},
+    {role:'tool',content:JSON.stringify([{capability:'content.social_card.layout_audit',status:'ok',data:{summary:'最新审计'.repeat(1000)}}])},
+  ];
+  const compacted=compactAgentHistory(history,5000);
+  assert.ok(compacted.length<history.length);
+  assert.ok(compacted.some((message)=>message.content==='系统提示'));
+  assert.ok(compacted.some((message)=>message.content.includes('上下文压缩')));
+  assert.ok(compacted.some((message)=>message.role==='tool'&&message.content.includes('filesystem.project.read')));
+  assert.ok(compacted.at(-1).content.includes('最新审计'));
 });
 
 test('Agent 同一步并行多个只读工具并拒绝不可见能力',async()=>{

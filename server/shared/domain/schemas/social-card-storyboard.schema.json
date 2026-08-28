@@ -33,7 +33,31 @@
             "items": {
               "type": "object",
               "properties": {
-                "source_refs": { "type": "array", "items": { "type": "string" } }
+                "source_refs": { "type": "array", "items": { "type": "string" } },
+                "visual": {
+                  "type": "object",
+                  "properties": {
+                    "emphasis": { "type": "string", "enum": ["normal", "strong", "hero"] },
+                    "tone": { "type": "string", "enum": ["default", "accent", "danger", "success", "warning", "muted"] },
+                    "icon": { "type": "string", "enum": ["none", "metric", "ai", "price", "warning", "source", "user", "timeline", "rocket"] },
+                    "badge": { "type": "string", "maxLength": 12 }
+                  },
+                  "additionalProperties": false
+                },
+                "content_runs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["text"],
+                    "properties": {
+                      "text": { "type": "string" },
+                      "role": { "type": "string", "enum": ["normal", "metric", "label", "warning", "source"] },
+                      "tone": { "type": "string", "enum": ["default", "accent", "danger", "success", "warning", "muted"] },
+                      "emphasis": { "type": "string", "enum": ["normal", "strong"] }
+                    },
+                    "additionalProperties": false
+                  }
+                }
               },
               "additionalProperties": true
             }

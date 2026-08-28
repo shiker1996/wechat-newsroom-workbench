@@ -54,6 +54,7 @@ export async function handleSocialCardRoutes(context) {
   const cardPageLayoutMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)\/layout$/);
   const cardPageAiMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)\/ai$/);
   const cardPageMatch = pathname.match(/^\/api\/candidates\/(\d+)\/card-pages\/(\d+)$/);
+  const socialBeautifyMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/social-card-beautify$/);
   const socialCardsMatch = pathname.match(/^\/api\/candidates\/(\d+)\/social-cards$/);
   if(pathname==='/api/social/template-metrics'&&request.method==='GET'){
     const templatePackId=searchParams.get('templatePackId')||searchParams.get('template')||null;
@@ -66,7 +67,14 @@ export async function handleSocialCardRoutes(context) {
     const read=(name,fallback='')=>{const file=path.join(workspace.dir,name);if(!fs.existsSync(file))return fallback;return fs.readFileSync(file,'utf8');};
     const parse=(name,fallback)=>{try{return JSON.parse(read(name));}catch{return fallback;}};
     const images=workspace.files.filter((file)=>file.name.startsWith('output/')).map((file,index)=>({index:index+1,name:path.basename(file.name),url:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}`,downloadUrl:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}?download=1`,size:fs.statSync(file.path).size}));
-    return json(response,200,{candidateId:candidate.id,code:candidate.candidate_id,title:candidate.hotspot_title,ready:images.length>0,images,copy:read('copy.txt'),facts:read('fact-sheet.md'),cardPlan:parse('card-plan.json',{}),layout:parse('layout-report.json',{}),delivery:parse('delivery-report.json',{}),contentPlanAdjustments:parse('social-card-content-plan-adjustments.json',null),factIndex:parse('social-card-fact-index.json',null),templateMetrics:parse('social-template-metrics.json',null),templateStats:store.socialTemplateMetricsStats?.()||null,htmlUrl:fs.existsSync(path.join(workspace.dir,'my-design.html'))?`/api/candidates/${candidate.id}/social-cards/files/my-design.html`:'',bundleUrl:images.length?`/api/candidates/${candidate.id}/social-cards/download`:''});
+    const beautifiedImages=workspace.files.filter((file)=>file.name.startsWith('ai-beautified-output/')).map((file,index)=>({index:index+1,name:path.basename(file.name),url:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}`,downloadUrl:`/api/candidates/${candidate.id}/social-cards/files/${encodeURIComponent(file.name)}?download=1`,size:fs.statSync(file.path).size}));
+    const beautifyReport=parse('ai-beautify-report.json',null);
+    const beautifyStages=parse('social-card-ai-visual-stage-executions.json',null);
+    const beautifyGenerationGate=parse('ai-beautified-generation-gate.json',null);
+    const beautifyRepairReport=parse('ai-beautified-page-repair-report.json',null);
+    const beautifyContentAudit=parse('ai-visual-content-audit.json',null);
+    const beautifyDeliveryGate=parse('ai-beautified-delivery-gate.json',null);
+    return json(response,200,{candidateId:candidate.id,code:candidate.candidate_id,title:candidate.hotspot_title,ready:images.length>0||beautifiedImages.length>0,images,beautifiedImages,copy:read('copy.txt'),facts:read('fact-sheet.md'),cardPlan:parse('card-plan.json',{}),layout:parse('layout-report.json',{}),delivery:parse('delivery-report.json',{}),beautifyReport,beautifyStages,beautifyGenerationGate,beautifyRepairReport,beautifyContentAudit,beautifyDeliveryGate,contentPlanAdjustments:parse('social-card-content-plan-adjustments.json',null),factIndex:parse('social-card-fact-index.json',null),templateMetrics:parse('social-template-metrics.json',null),templateStats:store.socialTemplateMetricsStats?.()||null,htmlUrl:fs.existsSync(path.join(workspace.dir,'my-design.html'))?`/api/candidates/${candidate.id}/social-cards/files/my-design.html`:'',beautifiedHtmlUrl:fs.existsSync(path.join(workspace.dir,'ai-beautified.html'))?`/api/candidates/${candidate.id}/social-cards/files/ai-beautified.html`:'',bundleUrl:images.length||beautifiedImages.length?`/api/candidates/${candidate.id}/social-cards/download`:''});
   }
   const socialCardFileMatch=pathname.match(/^\/api\/candidates\/(\d+)\/social-cards\/files\/(.+)$/);
   if(socialCardFileMatch&&request.method==='GET'){
@@ -76,6 +84,15 @@ export async function handleSocialCardRoutes(context) {
   const socialCardDownloadMatch=pathname.match(/^\/api\/candidates\/(\d+)\/social-cards\/download$/);
   if(socialCardDownloadMatch&&request.method==='GET'){
     const candidate=store.getCandidate(Number(socialCardDownloadMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});const batch=store.getBatch(candidate.batch_id);const workspace=socialCardFiles(batch,candidate);if(!workspace.files.length)return json(response,404,{error:'暂无可下载图文产物'});const zip=createZip(workspace.files);response.writeHead(200,{'content-type':'application/zip','content-disposition':`attachment; filename="${candidate.candidate_id.toLowerCase()}-social-cards.zip"`,'content-length':zip.length});return response.end(zip);
+  }
+  if (socialBeautifyMatch && request.method === 'POST') {
+    const candidate=store.getCandidate(Number(socialBeautifyMatch[1]));
+    if(!candidate)return json(response,404,{error:'候选不存在'});
+    const workspace=socialCardFiles(store.getBatch(candidate.batch_id),candidate);
+    const input=await body(request);
+    try {
+      return json(response,202,aiJobs.start({batchId:candidate.batch_id,candidateId:candidate.id,provider:input.provider||null,type:'social-card-beautify',styleBrief:String(input.styleBrief||'')}));
+    } catch(error) { return json(response,400,{error:`AI 美化任务启动失败：${error.message}`}); }
   }
   if (cardEditorialMatch && request.method === 'GET') {
     const candidate=store.getCandidate(Number(cardEditorialMatch[1]));

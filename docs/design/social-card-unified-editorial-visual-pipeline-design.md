@@ -8,12 +8,16 @@
 >
 > 相关当前基线：[Social 图文生成现状与运行链路](./social-card-generation-current-flow.md)
 
+> 当前生效口径（2026-08-28）：不新增、不恢复独立的“叙事提炼”节点。故事板 Agent 在读取事实基座后，直接完成事实取舍、读者问题提炼、页面职责编排和视觉意图标注。本文前半部分保留的“叙事提炼”内容属于历史讨论稿，不是当前实施依据；当前 AI 视觉改造以第 18 节以后为准。
+
+> AI 视觉专项的精简实施方案已单独整理为：[Social 图文 AI 视觉生成 Pipeline + Agent 改造方案](./social-card-ai-visual-pipeline-agent-design.md)。AV-0 至 AV-7 只改造 `social-card-beautify`，不修改故事板生成和 `card-plan.json`。
+
 ## 1. 背景
 
 当前 Social 图文已经具备事实基座、语义故事板、页面组件、模板容量预检、确定性渲染和浏览器布局审计，但内容链路仍存在两个断点：
 
 1. 仓库和事件的来源读取方式不同，没有统一的“来源准备”阶段；
-2. 事实基座直接进入故事板，缺少一次面向读者的“叙事提炼”，导致故事板容易把事实原样排成文本和列表；
+2. 故事板需要同时完成事实取舍和面向读者的表达提炼，否则容易把事实原样排成文本和列表；
 3. 渲染器已经支持 `stats`、`compare`、`timeline`、`steps`、`scenes`、`highlight` 等内容块，但故事板经常只输出 `text`、`list`、`note`，丰富组件没有命中；
 4. 当前没有通用的数据结构表达事件矛盾、读者问题、数字关系、箭头关系、语义图标和徽章。
 
@@ -28,14 +32,12 @@
 
 ## 2. 设计结论
 
-工具图文和事件图文统一采用以下五阶段主流程：
+工具图文和事件图文统一采用以下四阶段主流程：
 
 ```text
 来源准备
   ↓
 事实基座
-  ↓
-叙事提炼
   ↓
 故事板
   ↓
@@ -48,7 +50,7 @@
 
 ```text
 仓库来源准备 ──→ repository-inspector ──┐
-                                       ├─→ 统一叙事提炼 ─→ 仓库故事板 ─┐
+                                       ├─→ 仓库故事板（事实取舍与表达提炼） ─┐
 事件来源准备 ──→ event-research-analyzer ─┘                         ├─→ 视觉渲染
                                                                      ┘
 ```
@@ -59,8 +61,7 @@
 | --- | --- | --- |
 | 来源准备 | 确定来源范围、读取正文/文档、记录状态和 provenance | 不做最终观点判断 |
 | 事实基座 | 提取确认事实、主张、机制、数据、影响和未知项 | 不决定页面顺序和视觉形式 |
-| 叙事提炼 | 选择核心钩子、读者问题、矛盾、主张和视觉重点 | 不增加事实、不替代来源分析 |
-| 故事板 | 将叙事主线分配到页面和语义内容块 | 不输出 HTML/CSS、不决定像素坐标 |
+| 故事板 | 在事实基座内选择核心钩子、读者问题、矛盾、主张和视觉重点，并分配到页面和语义内容块 | 不增加事实、不替代来源分析、不输出 HTML/CSS |
 | 视觉渲染 | 将语义内容块渲染为图标、数字卡、对比卡、箭头、HTML 和 PNG | 不凭视觉猜事实、不补文案事实 |
 
 ## 3. 设计目标
@@ -68,7 +69,7 @@
 ### 3.1 目标
 
 - 工具图文和事件图文使用同一条主流程，减少入口和阶段语义差异。
-- 在事实基座和故事板之间增加统一的叙事提炼节点。
+- 由故事板在消费事实基座时完成事实取舍和读者表达提炼，不增加独立中间产物。
 - 让故事板明确选择 `text/list/stats/compare/timeline/scenes/highlight` 等内容结构。
 - 让“数字、对比、前后变化和因果/关系”可以被视觉化，而不是退化为列表。
 - 让封面能够使用有来源支撑的事件矛盾或工具痛点吸引读者。
@@ -83,7 +84,7 @@
 - 不让模型输出任意 HTML、CSS、SVG 或坐标。
 - 不删除现有 `clean-v1`、`neon-v1`、`brutalist-v1` 等模板。
 - 不要求每个故事板强行使用所有视觉组件。
-- 不用叙事提炼替代 `repository-inspector` 或 `event-research-analyzer`。
+- 不用故事板的事实取舍替代 `repository-inspector` 或 `event-research-analyzer` 的事实分析。
 
 ## 4. 阶段一：来源准备
 
@@ -202,139 +203,19 @@ event-research-analyzer
 
 事实分析器不负责决定“封面怎么写”。这由下一阶段完成。
 
-## 6. 阶段三：叙事提炼
+## 6. 已取消：独立叙事提炼（历史讨论稿，不实施）
 
-叙事提炼是本次改造新增的统一节点，负责把“事实全集”压缩为“读者最应该先看到的主线”。
+本节早期曾讨论过将“钩子、读者问题、矛盾和视觉重点”做成独立产物，但该方案已取消。相关内容由故事板直接从事实基座中选择和表达，禁止创建 `social-card-narrative-focus`、`social-card-narrative-planner` 或独立叙事阶段。
 
-### 6.1 统一输出契约
+## 7. 阶段三：故事板（事实取舍与表达提炼）
 
-Phase 1 已将以下契约冻结为独立文件：
-
-```text
-server/shared/domain/schemas/social-card-narrative-focus.schema.json
-```
-
-运行时契约名为 `social_card_narrative_focus`。它是故事板的新增输入，不会替代 `social_card_fact_base`；旧故事板在没有该字段时仍可按事实基座兼容运行。
-
-```json
-{
-  "schemaVersion": 1,
-  "contentType": "repository|event",
-  "hook": {
-    "title": "",
-    "subtitle": "",
-    "fact_ids": [],
-    "source_refs": []
-  },
-  "reader_question": "",
-  "core_statement": "",
-  "tension": {
-    "type": "pain_vs_solution|change_or_contrast|claim_vs_evidence|before_after|none",
-    "left": {
-      "label": "",
-      "value": "",
-      "fact_ids": [],
-      "source_refs": []
-    },
-    "right": {
-      "label": "",
-      "value": "",
-      "fact_ids": [],
-      "source_refs": []
-    },
-    "relation": {
-      "label": "",
-      "direction": "up|down|from_to|contrast|none",
-      "fact_ids": [],
-      "source_refs": []
-    }
-  },
-  "key_points": [],
-  "visual_motifs": [
-    {
-      "kind": "metric|compare|flow|timeline|scene|highlight|badge",
-      "fact_ids": [],
-      "source_refs": []
-    }
-  ],
-  "uncertainties": [],
-  "forbidden_claims": []
-}
-```
-
-所有钩子、问题和矛盾都必须可以回指事实或来源。叙事提炼可以改变表达和优先级，但不能增加数字、效果、动机、因果或引语。
-
-### 6.2 仓库的叙事提炼
-
-仓库采用：
-
-```text
-开发者痛点 → 仓库机制 → 使用结果 → 适用人群 → 限制
-```
-
-示例：
-
-```json
-{
-  "hook": { "title": "README太长？这个仓库帮你看懂项目结构" },
-  "reader_question": "它能不能减少我理解复杂仓库的时间？",
-  "tension": {
-    "type": "pain_vs_solution",
-    "left": { "label": "痛点", "value": "目录、依赖和入口分散" },
-    "right": { "label": "解决方式", "value": "按结构和能力整理仓库" },
-    "relation": { "label": "从难读到可执行", "direction": "from_to" }
-  }
-}
-```
-
-“封神”“效率翻十倍”等夸张表达只有在事实基座有明确测量依据时才允许使用；否则应使用具体、可验证的表达。
-
-### 6.3 事件的叙事提炼
-
-事件采用：
-
-```text
-事件变化 → 核心矛盾 → 为什么重要 → 影响对象 → 不确定性
-```
-
-C004 的提炼结果示例：
-
-```json
-{
-  "hook": {
-    "title": "Mac mini涨2500元，M6要做AI入口？",
-    "fact_ids": ["fact:price:m6-mini", "fact:positioning:local-ai"],
-    "source_refs": ["hotspot:20881", "hotspot:20848"]
-  },
-  "reader_question": "涨价后的Mac mini还算入门款吗？",
-  "core_statement": "M6的AI性能卖点已经明确，但Mac mini的新定位和涨价后的市场接受度仍待验证。",
-  "tension": {
-    "type": "change_or_contrast",
-    "left": { "label": "价格", "value": "4499元 → 6999元", "source_refs": ["hotspot:20881"] },
-    "right": { "label": "AI性能", "value": "官方宣称最高提升4倍", "source_refs": ["hotspot:20881"] },
-    "relation": { "label": "+2500元", "direction": "up", "source_refs": ["hotspot:20881"] }
-  },
-  "visual_motifs": [
-    { "kind": "metric", "source_refs": ["hotspot:20881", "hotspot:20848"] },
-    { "kind": "flow", "source_refs": ["hotspot:20881"] },
-    { "kind": "compare", "source_refs": ["hotspot:20848"] },
-    { "kind": "highlight", "source_refs": ["hotspot:20881", "hotspot:20848"] }
-  ]
-}
-```
-
-注意：箭头只表达已有的前后变化，不表达未经证实的因果关系。C004 可以表达“4499 元到 6999 元”，但不能用箭头暗示“涨价导致 AI 性能提升”。
-
-## 7. 阶段四：故事板
-
-故事板接收“事实基座 + 叙事提炼”，不再只接收事实全集。
+故事板直接接收事实基座，不再依赖独立叙事产物。它在同一个生成阶段完成事实取舍、读者问题提炼、矛盾/变化识别、页面顺序编排和语义视觉标注。
 
 ### 7.1 故事板新增输入
 
 ```json
 {
   "facts": "social_card_fact_base",
-  "narrative": "social_card_narrative_focus",
   "templateCapabilities": {},
   "channelMode": "xiaohongshu|wechat"
 }
@@ -355,13 +236,13 @@ C004 的提炼结果示例：
 
 故事板不决定具体 CSS、坐标或模板 DOM。
 
-### 7.3 叙事提炼到故事板的转换
+### 7.3 故事板内部的事实提炼与页面转换
 
-叙事提炼不是只供封面使用的文案建议，而是故事板的结构输入。故事板必须消费 `hook`、`reader_question`、`tension`、`key_points` 和 `visual_motifs`，将它们转换为页面职责和内容块类型。
+故事板不是把事实全集原样复制到页面，而是从事实基座中直接提炼 `hook`、`reader_question`、`tension`、`key_points` 和 `visual_motifs`，再将它们转换为页面职责和内容块类型。这些字段是故事板内部结果，不是独立阶段或独立文件。
 
 统一转换关系：
 
-| 叙事提炼字段 | 故事板职责 | 优先内容块 |
+| 故事板提炼字段 | 故事板职责 | 优先内容块 |
 | --- | --- | --- |
 | `hook` | 封面主张和副标题 | `text` / `highlight` |
 | `reader_question` | 第二页或概念页的阅读问题 | `text` / `highlight` |
@@ -371,10 +252,10 @@ C004 的提炼结果示例：
 | `visual_motifs` | 页面视觉结构提示 | 对应结构化内容块和受控图标徽章 |
 | `uncertainties` | 风险、证据边界和后续观察 | `note` / `highlight` / `list` |
 
-故事板需要完成以下转换，而不是原样复制叙事提炼：
+故事板需要完成以下转换，而不是原样复制事实基座：
 
 ```text
-叙事钩子       → 封面标题
+核心事实/问题   → 封面标题
 读者问题       → 页面问题或概念标题
 核心矛盾两端   → 对比/数字内容块
 变化关系       → 箭头关系或时间线
@@ -388,8 +269,8 @@ C004 的提炼结果示例：
 
 ```json
 {
-  "narrative_role": "hook|question|mechanism|evidence|comparison|scene|risk|takeaway",
-  "narrative_refs": ["tension", "key_points[0]"],
+  "story_role": "hook|question|mechanism|evidence|comparison|scene|risk|takeaway",
+  "story_refs": ["facts.price.old", "facts.price.new"],
   "visual_intent": {
     "kind": "metric|compare|flow|timeline|scene|highlight|badge",
     "icon_key": "price",
@@ -398,7 +279,7 @@ C004 的提炼结果示例：
 }
 ```
 
-这些字段只表达页面职责和视觉意图，不替代 `fact_ids`、`source_refs`，也不能绕过来源门禁。
+这些字段只表达页面职责和视觉意图，不替代 `fact_ids`、`source_refs`，也不能绕过来源门禁；它们随 `card-plan.json` 保存，不单独输出。
 
 ### 7.4 内容块选择规则
 
@@ -429,7 +310,7 @@ P7 风险结论：真实性能、市场需求和芯片路线仍待验证
 
 不是每个 C004 都必须有 7 页。如果事实不支持某个页面，就删除该页面或降级为普通解释块。
 
-## 8. 阶段五：视觉渲染
+## 8. 阶段四：视觉渲染
 
 视觉渲染继续由程序完成。新增目标是让语义故事板能够稳定命中相应视觉组件。
 
@@ -566,13 +447,12 @@ text、list、note、stats、compare、timeline、highlight
 
 ## 10. 产物和可追溯性
 
-五阶段分别写入独立产物，方便调试和复现：
+四阶段分别写入独立产物，方便调试和复现：
 
 | 阶段 | 产物建议 | 作用 |
 | --- | --- | --- |
 | 来源准备 | `source-preparation.json` | 来源清单、读取状态、正文哈希、失败原因 |
 | 事实基座 | `social-card-fact-base.json` / 现有事实索引 | 结构化事实、来源和事实候选 |
-| 叙事提炼 | `social-card-narrative-focus.json` | 钩子、问题、矛盾、视觉重点和禁止主张 |
 | 故事板 | `card-plan-original.json` | 页面职责、内容块、证据引用和视觉意图 |
 | 视觉渲染 | `card-plan.json`、`my-design.html`、`output/page-*.png` | 有效计划、HTML、PNG 和最终布局 |
 
@@ -587,9 +467,9 @@ text、list、note、stats、compare、timeline、highlight
 
 每个核心事实、数字卡条目、对比项和视觉徽章都应能通过 `fact_ids/source_refs` 回溯到来源。若某个装饰元素没有事实含义，可以不绑定来源，但必须来自系统受控映射。
 
-## 11. 叙事感知的合并与修复
+## 11. 故事板职责感知的合并与修复
 
-故事板增加叙事提炼和结构化视觉块后，现有的容量重排、续页合并和内容计划调整不能继续只按照“页数、块数和文字长度”处理。否则可能出现以下问题：
+故事板增加页面职责和结构化视觉块后，现有的容量重排、续页合并和内容计划调整不能继续只按照“页数、块数和文字长度”处理。否则可能出现以下问题：
 
 - 将封面的事件矛盾合并成普通摘要，失去钩子；
 - 将 `stats` 数字卡拆成列表，失去数字层级；
@@ -598,24 +478,24 @@ text、list、note、stats、compare、timeline、highlight
 - 将“适用场景”和“风险边界”合并，导致读者误以为风险是使用建议；
 - 为了填充页面新增没有叙事职责的辅助组件，破坏故事线。
 
-### 11.1 叙事原子
+### 11.1 页面职责原子
 
-每个页面和内容块在进入重排前都应带有叙事元数据：
+每个页面和内容块在进入重排前都应带有页面职责元数据：
 
 ```json
 {
-  "narrative_role": "hook|question|mechanism|evidence|comparison|scene|risk|takeaway",
-  "narrative_group": "price-vs-ai-positioning",
-  "narrative_refs": ["tension.left", "tension.right", "tension.relation"],
+  "story_role": "hook|question|mechanism|evidence|comparison|scene|risk|takeaway",
+  "story_group": "price-vs-ai-positioning",
+  "story_refs": ["facts.price.old", "facts.price.new", "facts.price.delta"],
   "preservation": "required|preferred|optional"
 }
 ```
 
-这些字段应随内容原子、核心组件和补充组件一起保存。重排时不仅守恒事实原子和来源，也要守恒核心叙事角色。
+这些字段应随内容原子、核心组件和补充组件一起保存。重排时不仅守恒事实原子和来源，也要守恒核心页面职责。
 
 ### 11.2 合并兼容矩阵
 
-默认只允许合并叙事职责相邻、证据口径一致且不破坏视觉关系的页面：
+默认只允许合并页面职责相邻、证据口径一致且不破坏视觉关系的页面：
 
 | 来源页面 | 目标页面 | 默认策略 |
 | --- | --- | --- |
@@ -658,8 +538,8 @@ compare.variant=flow 箭头关系
 
 - 事实原子守恒；
 - `source_refs` 和 `fact_ids` 守恒；
-- `narrative_role` 兼容；
-- `narrative_group` 不被拆散；
+- `story_role` 兼容；
+- `story_group` 不被拆散；
 - `claim_type` 和证据口径不混淆；
 - 结构化块类型不被无理由改变；
 - 合并后模板容量和浏览器布局审计通过。
@@ -713,13 +593,13 @@ flow compare → text
 - 技术数字和性能数据必须绑定来源；
 - 仓库“实际运行效果”不能由 README 自动升级而来。
 
-### 11.2 叙事门禁
+### 11.2 故事板事实与表达门禁
 
-- `hook`、`reader_question`、`tension` 至少有一个事实或来源引用；
+- 故事板中的核心事实、读者问题、对比关系和视觉重点必须有 `fact_ids` 或 `source_refs`；
 - 矛盾两端不能来自纯推断；
 - 不能把官方宣称改写成独立验证结果；
 - 不能用箭头表达未被事实支持的因果关系；
-- 证据不足时允许 `tension.type=none`，不得强行制造冲突。
+- 证据不足时不得强行制造冲突，应在故事板中降级为事实说明或待验证提示。
 
 ### 11.3 故事板门禁
 
@@ -748,8 +628,6 @@ flow compare → text
   ↓
 生成/读取事实基座
   ↓
-叙事提炼
-  ↓
 故事板
   ↓
 视觉渲染和审计
@@ -757,11 +635,10 @@ flow compare → text
 
 进度文案按阶段展示：
 
-- `图文 1/5：准备关联来源`；
-- `图文 2/5：整理事实基座`；
-- `图文 3/5：提炼叙事主线`；
-- `图文 4/5：生成故事板`；
-- `图文 5/5：渲染和检查图片卡`。
+- `图文 1/4：准备关联来源`；
+- `图文 2/4：整理事实基座`；
+- `图文 3/4：生成故事板并完成事实取舍`；
+- `图文 4/4：渲染和检查图片卡`。
 
 失败恢复：
 
@@ -769,11 +646,10 @@ flow compare → text
 | --- | --- |
 | 来源准备 | 保留失败来源和原因；来源不足则阻断并提示补充来源 |
 | 事实基座 | 读取有效缓存；来源签名变化时重新分析 |
-| 叙事提炼 | 若无足够矛盾，输出无矛盾的事实主线，不强行生成钩子 |
 | 故事板 | 使用安全结构重新生成或人工调整故事板 |
 | 视觉渲染 | 组件降级、装箱、拆页和浏览器审计 |
 
-叙事提炼不应暴露为独立的“分析事件”按钮。它是生成图文的自动阶段；如需调试，可在编辑器中查看叙事主线和来源引用，但不增加普通用户的必经流程。
+故事板内部的事实取舍不暴露为独立的“叙事提炼”或“分析事件”按钮；如需调试，可在编辑器中查看页面职责、视觉意图和来源引用，但不增加普通用户的必经流程。
 
 ## 14. 对现有实现的改造映射
 
@@ -783,25 +659,23 @@ flow compare → text
 
 ```text
 server/features/research/application/source-preparation.mjs
-server/features/social-cards/application/social-card-narrative-planner.mjs
-server/shared/domain/schemas/social-card-narrative-focus.schema.json
+server/features/social-cards/application/storyboard-contracts.mjs
 ```
 
 职责：
 
 - `source-preparation.mjs`：统一仓库和事件来源包格式，维护读取状态和 source signature；
-- `social-card-narrative-planner.mjs`：消费事实基座，输出叙事提炼契约，执行来源和事实校验；Phase 1 已实现并接入 `card-editorial` 入口；
-- `social-card-narrative-focus.schema.json`：冻结钩子、读者问题、矛盾和视觉重点字段。
+- `storyboard-contracts.mjs`：由故事板生成阶段在事实基座内完成页面事实取舍；不产生独立叙事文件。
 
 ### 13.2 修改现有模块
 
 | 模块 | 改造内容 |
 | --- | --- |
-| `server/features/social-cards/application/social-card-pipeline.mjs` | 将来源准备和叙事提炼纳入生成阶段，保存阶段产物和快照 |
-| `server/features/social-cards/application/storyboard-contracts.mjs` | 将叙事提炼注入故事板 Prompt，补充视觉意图字段 |
+| `server/features/social-cards/application/social-card-pipeline.mjs` | 将来源准备、事实基座和故事板生成纳入统一阶段，保存阶段产物和快照 |
+| `server/features/social-cards/application/storyboard-contracts.mjs` | 要求故事板在事实基座内完成事实取舍，并补充视觉意图字段 |
 | `server/features/social-cards/prompts/runtime-contract.md` | 要求事实关系使用结构化块，钩子和矛盾必须有来源 |
-| `skills/repository-card-storyboard/SKILL.md` | 增加痛点—机制—结果的叙事提炼消费规则 |
-| `skills/event-card-storyboard/SKILL.md` | 增加事件变化—矛盾—影响—不确定性的叙事提炼消费规则 |
+| `skills/repository-card-storyboard/SKILL.md` | 增加痛点—机制—结果的事实取舍与页面编排规则 |
+| `skills/event-card-storyboard/SKILL.md` | 增加事件变化—矛盾—影响—不确定性的事实取舍与页面编排规则 |
 | `skills/open-source-technology-storyboard/SKILL.md` | 增加机制—证据—读者问题—视觉结构规则 |
 | `skills/open-source-trend-storyboard/SKILL.md` | 增加趋势信号—主体变化—对比—待观察信号规则 |
 | `server/shared/rendering/storyboard-html-content.mjs` | 支持 `compare.variant=flow`、受控图标和徽章元数据 |
@@ -810,7 +684,7 @@ server/shared/domain/schemas/social-card-narrative-focus.schema.json
 | `server/shared/rendering/social-card-repair-policy.mjs` | 校验新增变体字段，保证降级和原子守恒 |
 | `server/features/social-cards/application/social-card-content-planner.mjs` | 将视觉组件纳入页面专属候选和安全装箱 |
 | `server/shared/rendering/social-card-fact-index.mjs` | 为数字、对比、时间线和场景事实提供稳定候选标签 |
-| `docs/design/social-card-generation-current-flow.md` | 在实现完成后更新为五阶段主流程 |
+| `docs/design/social-card-generation-current-flow.md` | 更新为四阶段主流程 |
 
 ## 15. 实施阶段
 
@@ -821,21 +695,19 @@ server/shared/domain/schemas/social-card-narrative-focus.schema.json
 - 用 C004、一个仓库项目和一个趋势事件建立固定回归样稿；
 - 不改变现有生成结果。
 
-### Phase 1：叙事提炼契约（已完成）
+### Phase 1：故事板事实取舍契约（已完成）
 
-- 新增 `social-card-narrative-focus` schema；
-- 实现仓库、事件和自定义内容的叙事提炼适配器；
-- 将叙事提炼注入故事板 Prompt；
-- 保证没有矛盾时可以安全输出 `none`；
-- 保存 `social-card-narrative-focus.json`，并在渲染流水线登记为图文产物；
-- 对未知事实 ID、未知来源和无引用矛盾执行门禁，失败时安全降级为无矛盾主线。
+- 故事板直接读取统一事实基座，并在自身 Prompt 中完成页面事实取舍；
+- 统一要求核心事实、读者问题、页面职责和视觉意图回指事实或来源；
+- 不创建 `social-card-narrative-focus` schema、叙事规划器或独立叙事产物；
+- 对未知事实 ID、未知来源和无引用视觉意图执行门禁，失败时安全降级为事实基座中的保守页面。
 
-验收：已通过仓库叙事提炼契约测试、引用门禁测试和事件/事实基座回归测试；同一事实基座可以得到明确的钩子、读者问题或无矛盾的安全主线，且每个字段可追溯。
+验收：故事板可以从同一事实基座得到明确的核心事实、读者问题和页面主线，且每个页面字段可追溯；没有额外的叙事文件或阶段记录。
 
 ### Phase 2：故事板结构命中（首版完成）
 
-- 已新增叙事到结构化故事板的固定运行契约；
-- 已在故事板生成后增加确定性桥接，按叙事矛盾和关键点补充 `stats`、`compare`、`scenes`、`highlight`；
+- 已新增事实提炼到结构化故事板的固定运行契约；
+- 已在故事板生成后增加确定性桥接，按事实关系和页面职责补充 `stats`、`compare`、`scenes`、`highlight`；
 - 已按渠道限制桥接能力，小红书开放结构化块，公众号保持安全降级；
 - 保留原有 `text/list/note` 作为降级形式，并保留 `fact_ids`、`source_refs` 和叙事元数据。
 
@@ -868,8 +740,8 @@ server/shared/domain/schemas/social-card-narrative-focus.schema.json
 
 ### Phase 5：清理和推广
 
-- 将五阶段流程写入当前实现文档；
-- 旧故事板无叙事提炼时兼容读取，但新生成必须经过叙事提炼；
+- 将四阶段流程写入当前实现文档；
+- 清理旧的独立叙事阶段、产物和按钮表述；
 - 删除生成阶段依赖标题猜测视觉结构的逻辑；
 - 按内容类型和渠道统计命中率、降级率和人工修改率。
 
@@ -878,8 +750,8 @@ server/shared/domain/schemas/social-card-narrative-focus.schema.json
 必须覆盖：
 
 1. 仓库和事件来源包可以被统一读取和缓存；
-2. 来源签名变化会使事实基座和叙事提炼缓存失效；
-3. 叙事钩子、读者问题和矛盾必须绑定事实或来源；
+2. 来源签名变化会使事实基座和故事板缓存失效；
+3. 故事板核心事实、读者问题和视觉关系必须绑定事实或来源；
 4. 没有足够证据时不会生成虚假的矛盾；
 5. 工具使用 `pain_vs_solution`，事件使用 `change_or_contrast` 或 `claim_vs_evidence`；
 6. 数字事实可以被转换为 `stats`；
@@ -921,4 +793,605 @@ C004 的目标不是简单显示“苹果发布 M6”，而是让读者快速理
 
 这就是统一流程最终要实现的效果：
 
-> 事实基座保证内容可靠，叙事提炼保证内容值得读，故事板保证内容讲得清，视觉渲染保证关系看得见。
+> 事实基座保证内容可靠，故事板完成事实取舍并把内容讲得清，视觉渲染保证关系看得见。
+
+## 18. AI 视觉生成 Pipeline + Agent 规范化重构
+
+前面的四阶段定义的是内容生产主流程：
+
+```text
+来源准备 → 事实基座 → 故事板（内部完成事实取舍） → 视觉渲染
+```
+
+其中“视觉渲染”存在两条完全独立的执行链路：
+
+```text
+故事板
+  ├─→ 程序化视觉渲染：确定性组件 → 模板 HTML → 布局审计 → PNG
+  └─→ AI 视觉渲染：生成 Agent → 生成门禁 → 单页审计/修复 Agent → 最终审计 → PNG
+```
+
+两条链路共享事实、故事板、主题和渠道信息，但不共享 HTML 构图、不互相回退，也不把程序化页面壳作为 AI 视觉生成的输入限制。
+
+### 18.1 当前 AI 视觉链路的问题
+
+当前 `social-card-beautify` 已能做到从文件读取资料、写入完整 HTML 和调用浏览器能力，但仍有以下架构问题：
+
+1. 全量页面生成和审计修复由同一个长生命周期 Agent 控制；
+2. 页面生成状态、审计状态和修复状态混在 `modelStep` 中；
+3. Agent 仍然可见确定性审计工具，容易自行决定审计顺序并产生重复调用；
+4. 审计结果以工具消息持续累积，导致上下文增长和 JSON 截断；
+5. `browser_inspect` 和 `browser_audit` 的观察职责、判定职责没有在 Pipeline 层彻底分离；
+6. AI 视觉流程没有完整复用文章和排版流程的技能快照、阶段契约和产物记录；
+7. 单页修复失败会被提升为整组生成失败，但缺少可恢复的逐页状态和诊断产物；
+8. Agent 生成成功、页面结构通过和最终交付通过没有清晰的阶段边界。
+
+### 18.2 目标架构
+
+AI 视觉生成改为由 Pipeline 控制生命周期，由 Agent 执行有限创作任务：
+
+```text
+AI 视觉 Pipeline
+  │
+  ├─ 1. inputs：准备并冻结输入文件
+  ├─ 2. generation：启动全量生成 Agent
+  ├─ 3. generation-gate：程序检查 HTML 结构和页面数量
+  ├─ 4. audit-repair：程序逐页审计，逐页启动修复 Agent
+  ├─ 5. final-audit：程序执行最终整组审计
+  ├─ 6. screenshots：生成 PNG 和图片清单
+  └─ 7. delivery-gate：交付门禁、报告和状态更新
+```
+
+Pipeline 负责：
+
+- 阶段顺序和状态机；
+- 输入和技能快照；
+- 页面数量、页面差异和文件安全校验；
+- 审计调用、修复目标页和重试次数；
+- 失败恢复、阶段产物和最终交付判断。
+
+Agent 负责：
+
+- 根据事实、故事板和主题规范进行视觉创作；
+- 写入全局 CSS 和页面 HTML；
+- 根据明确的单页修复指令修改目标页面；
+- 在任务结束时返回简短、合法的结构化确认。
+
+Agent 不负责：
+
+- 决定页面数量；
+- 决定整组是否通过；
+- 调用最终交付门禁；
+- 修改非目标页面；
+- 通过删除内容、缩小文字或滚动容器规避布局问题。
+
+### 18.3 AI 视觉阶段契约
+
+新增独立的 AI 视觉阶段契约，建议命名为 `SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT`：
+
+```js
+[
+  { id: 'inputs',          skill: 'fixed-program' },
+  { id: 'generation',      skill: 'social-card-ai-visual-generator' },
+  { id: 'generation-gate', skill: 'fixed-program' },
+  { id: 'audit-repair',    skill: 'social-card-ai-visual-generator' },
+  { id: 'final-audit',     skill: 'fixed-program' },
+  { id: 'screenshots',     skill: 'html-pages-to-images' },
+  { id: 'delivery-gate',   skill: 'fixed-program' }
+]
+```
+
+其中 `audit-repair` 是一个由 Pipeline 管理的循环阶段，不是 Agent 自由循环。每次循环包含一条可追溯记录：
+
+```json
+{
+  "page": 2,
+  "attempt": 1,
+  "auditBefore": { "valid": false, "issues": ["text_too_small"] },
+  "agentRunId": "agent-...",
+  "changed": true,
+  "auditAfter": { "valid": true, "issues": [] },
+  "status": "passed"
+}
+```
+
+顶层阶段记录必须校验阶段顺序、技能名称、技能 hash、输入产物和输出产物，模式与文章 Pipeline、排版 Pipeline 保持一致。
+
+### 18.4 输入和技能运行时
+
+AI 视觉 Pipeline 使用 `prepareSkillRun` 建立生成快照，并使用 `bindGenerationSnapshot` 绑定后续模型调用。快照至少冻结：
+
+- `social-card-ai-visual-generator` 技能 Prompt 和 hash；
+- `layout-guide.md` 版本和 hash；
+- 当前主题 SPEC 版本和 hash；
+- Provider、模型和模型配置；
+- Agent 可用能力及其插件版本；
+- 当前 Pipeline 的输入、选择和任务用途。
+
+生成 Agent 的用户消息只传运行参数，不重复塞入长文本：
+
+```json
+{
+  "render_request": {
+    "workspace": {
+      "resourceId": "project:current",
+      "files": [
+        "fact-sheet.md",
+        "card-plan.json",
+        "social-theme-design-spec.md",
+        "layout-guide.md"
+      ]
+    },
+    "channelMode": "xiaohongshu",
+    "requiredPageCount": 6,
+    "outputHtml": "ai-beautified.html"
+  }
+}
+```
+
+四份文件是 Agent 的主要上下文：
+
+- `fact-sheet.md`：事实、证据和事实边界；
+- `card-plan.json`：页面顺序、页面职责、内容块和视觉意图；
+- `social-theme-design-spec.md`：当前主题的色彩、字体、组件和视觉方向；
+- `layout-guide.md`：通用页面结构、字号、间距、安全区和密度规则。
+
+禁止将完整 HTML、整组页面内容或重复的设计规范复制进模型消息。文件读取结果也不应在后续修复会话中重复携带。
+
+### 18.5 全量生成 Agent
+
+全量生成 Agent 是一次性、短生命周期的创作阶段。它只拥有：
+
+```text
+filesystem.project.read
+filesystem.project.write
+```
+
+执行顺序：
+
+1. 一次性读取四份输入文件；
+2. 使用 `set_head` 写入全局 CSS 和必要的 meta；
+3. 使用 `append_body` 逐页追加完整 `.page`；
+4. 页面数量达到 `requiredPageCount` 后返回简短完成确认。
+
+生成阶段禁止调用：
+
+- `content.social_card.browser_audit`；
+- `replace_page` 或 `replace_pages`；
+- 修改已生成页面；
+- 输出完整 HTML JSON；
+- 使用程序化页面壳、`ai-page-slot` 或程序化构图。
+
+生成 Agent 的工具返回只保留必要的写入结果，例如当前页数、文件路径和字符数，不把 HTML 正文重新放入对话历史。
+
+### 18.6 生成结果门禁
+
+全量生成 Agent 结束后，Pipeline 先执行结构门禁，再启动审计修复。结构门禁包括：
+
+- 存在完整的 `html/head/body` 根节点；
+- 全局 CSS 存在且没有危险外链；
+- 页面数量严格等于故事板页数；
+- 页面编号连续且唯一；
+- 每页存在 `.page` 和内容区域；
+- 不存在 `ai-page-slot`；
+- 不存在空页面、未闭合标签或截断 HTML；
+- 不存在脚本、事件属性、远程字体、远程图片和非法 URL；
+- 页面内容没有渲染内部来源 ID、候选 ID、批次 ID 或内部路径；
+- 页面结构没有被生成 Agent 之外的流程改写。
+
+结构门禁未通过时，允许重新启动一次全量生成 Agent，并将结构错误作为明确的生成指令反馈。不能直接进入逐页布局修复，因为缺页、根节点缺失和 HTML 截断不是单页布局问题。
+
+### 18.7 浏览器观察、确定性审计与修复 Agent
+
+三者分离：
+
+| 能力 | 调用方 | 职责 | 是否判断通过 |
+| --- | --- | --- | --- |
+| `browser_inspect` | 修复 Agent | 返回指定页真实 DOM 边界、计算样式和滚动尺寸 | 否 |
+| `browser_audit` | Pipeline | 执行确定性规则，返回问题、利用率和修复指令 | 是 |
+| 修复 Agent | Pipeline 启动 | 根据当前页问题调整 HTML | 否 |
+
+`browser_audit` 不应继续作为普通生成 Agent 的可见工具。Pipeline 直接调用审计脚本或能力实现，并将结构化结果传给修复 Agent。
+
+单页修复流程：
+
+```text
+Pipeline 审计 Pn
+  ↓
+得到 issue + repairInstructions
+  ↓
+启动一个新的单页修复 Agent
+  ↓
+Agent 可选 inspect Pn
+  ↓
+Agent replace_page(Pn)
+  ↓
+Pipeline 校验只有 Pn 发生变化
+  ↓
+Pipeline 重新审计 Pn
+```
+
+修复 Agent 的上下文只包含：
+
+- 目标页编号；
+- 当前页 HTML 或页面读取结果；
+- 当前主题和 Layout Guide 的必要摘要；
+- 本轮审计问题；
+- 程序生成的明确修复指令；
+- 允许使用的写入模式和目标路径。
+
+修复 Agent 不接收整组历史审计消息，也不接收其他页面的完整 HTML。
+
+### 18.8 修复指令契约
+
+审计结果必须从“问题标签”升级为可执行的修复指令：
+
+```json
+{
+  "page": 3,
+  "valid": false,
+  "issues": [
+    {
+      "code": "text_too_small",
+      "selector": ".page-body .source-note",
+      "severity": "warning",
+      "observed": { "fontSize": "9px" },
+      "instruction": "将该来源说明提升到至少 10px，并保持与相邻内容有 8px 以上间距。"
+    },
+    {
+      "code": "vertical_imbalance",
+      "selector": ".page-body",
+      "severity": "warning",
+      "instruction": "减少顶部空白，将主体卡片整体向上扩展；不得删除事实、不得增加滚动容器。"
+    }
+  ]
+}
+```
+
+修复指令生成规则：
+
+- `text_too_small`：明确目标字号和选择器；
+- `text_invisible`：明确前景色、背景色和对比度方向；
+- `overflow/clipped`：明确需要压缩的间距、内容层级或卡片数量；
+- `underfilled/vertical_imbalance`：明确可扩展区域和目标利用率；
+- `horizontal_overflow`：明确禁止横向滚动并要求收缩内容宽度；
+- `overfilled`：明确只可压缩重复说明，不得删除独立事实。
+
+### 18.9 单页修复硬约束
+
+每次修复必须通过以下程序校验：
+
+- 只能修改审计指定的页面；
+- 页面总数不能变化；
+- 其他页面 HTML hash 不能变化；
+- 目标页必须实际发生变化；
+- 不得重新生成 `html/head/body` 页面壳；
+- 不得删除 `fact_ids`、`source_refs` 对应的可见事实；
+- 不得删除数字、价格、型号、人名、公司名和限制条件；
+- 不得通过 `overflow:auto`、`overflow:hidden`、裁切或透明文字绕过问题；
+- 修复后必须重新审计同一页面；
+- 相同页面和相同问题签名无变化时停止重试。
+
+默认重试策略：
+
+```text
+单页最多 3 次修复 Agent
+每次修复后必须重新审计
+连续两次审计签名不变 → 当前页 blocked
+任一页 blocked → 整组不进入交付门禁
+```
+
+页级失败应保留 HTML 草稿和完整报告供编辑室查看，但不得生成或登记为可交付 PNG。
+
+### 18.10 上下文、预算与截断处理
+
+生成和修复不得共用一个无限增长的 Agent 历史。预算按层拆分：
+
+| 层级 | 作用 | 上限控制 |
+| --- | --- | --- |
+| Pipeline | 控制整组总耗时和最大修复页数 | 总超时、总页数、每页重试次数 |
+| 生成 Agent | 完成 CSS 和全部页面 | 模型步骤、工具调用、工具结果字符数 |
+| 修复 Agent | 完成单页一次修复 | 低模型步骤、低工具调用、短历史 |
+| JSON 修复 | 处理结构化响应异常 | 最多一次紧凑重试 |
+
+模型输出只允许返回短协议：
+
+```json
+{
+  "type": "final",
+  "assistantReply": "已写入 P3 修复结果",
+  "htmlPath": "ai-beautified.html",
+  "page": 3
+}
+```
+
+HTML 和 CSS 永远通过文件工具写入。若 JSON 截断：
+
+1. 程序识别 `MODEL_JSON_TRUNCATED`；
+2. 使用短消息要求 Agent 只返回一个完整工具请求或完成确认；
+3. 若再次失败，当前 Agent 阶段标记失败并保留诊断产物；
+4. 不把截断响应继续拼进长期上下文，也不触发整组重复修复循环。
+
+### 18.11 产物和阶段记录
+
+AI 视觉目录新增或规范化以下产物：
+
+```text
+social-card-ai-visual-skill-manifest.json
+social-card-ai-visual-stage-executions.json
+source-preparation.json
+fact-sheet.md
+card-plan.json
+social-theme-design-spec.md
+layout-guide.md
+ai-beautified.html
+ai-beautified-generation-gate.json
+ai-beautified-page-repair-report.json
+ai-beautified-layout-report.json
+ai-beautify-report.json
+ai-beautified-output/page-*.png
+```
+
+阶段记录至少包含：
+
+```json
+{
+  "stage": "audit-repair",
+  "skill": "social-card-ai-visual-generator",
+  "skillHash": "sha256:...",
+  "inputArtifacts": ["ai-beautified.html", "ai-beautified-generation-gate.json"],
+  "outputArtifact": "ai-beautified-page-repair-report.json",
+  "gate": "passed|blocked|failed",
+  "attempts": [],
+  "completedAt": "2026-08-28T00:00:00.000Z"
+}
+```
+
+报告必须区分：
+
+- Agent 是否成功返回；
+- 文件是否成功写入；
+- 结构门禁是否通过；
+- 单页审计是否通过；
+- 最终整组审计是否通过；
+- PNG 是否生成；
+- 是否允许交付。
+
+### 18.12 失败状态和恢复
+
+| 失败位置 | 状态 | 恢复方式 |
+| --- | --- | --- |
+| 输入准备 | `inputs-blocked` | 修复输入文件或来源，不启动 Agent |
+| Agent 生成 | `generation-failed` | 保留模型调用和文件诊断，重新生成整组 |
+| 结构门禁 | `generation-gate-blocked` | 反馈结构错误，最多重新生成一次 |
+| 单页修复 | `page-repair-blocked` | 保留目标页和审计报告，允许编辑器手动修改 |
+| 最终审计 | `final-audit-blocked` | 保留完整 HTML，不生成交付 PNG |
+| 截图 | `screenshots-failed` | 只重试截图，不重新调用 Agent |
+| 交付门禁 | `delivery-blocked` | 修复产物登记或安全问题，不重做内容 |
+
+AI 视觉失败不得自动切换为程序化结果。程序化生成仍可以由用户单独执行，两条链路的状态和产物必须分开登记。
+
+### 18.13 代码模块调整
+
+AI 视觉入口可以继续兼容 `social-card-beautify` 任务名，但内部建议拆为：
+
+```text
+server/features/social-cards/application/
+├─ social-card-ai-visual-pipeline.mjs
+├─ social-card-ai-visual-agent.mjs
+├─ social-card-ai-visual-tools.mjs
+├─ social-card-ai-visual-gates.mjs
+├─ social-card-ai-visual-artifacts.mjs
+└─ social-card-beautify.mjs          # 兼容入口和任务适配
+```
+
+职责：
+
+- `social-card-ai-visual-pipeline.mjs`：阶段状态机、阶段契约和总预算；
+- `social-card-ai-visual-agent.mjs`：全量生成 Agent、单页修复 Agent 和提示词组装；
+- `social-card-ai-visual-tools.mjs`：文件读写、页面读取和 `browser_inspect` 工具；
+- `social-card-ai-visual-gates.mjs`：结构门禁、页面差异门禁和交付门禁；
+- `social-card-ai-visual-artifacts.mjs`：快照、报告、阶段执行记录和 Artifact 登记；
+- `social-card-beautify.mjs`：保留现有调用方兼容，不再承载全部实现。
+
+共享平台层需要补充：
+
+- 通用阶段记录器，供 Social、文章和排版 Pipeline 使用；
+- 可冻结临时 Agent 能力的技能运行时扩展；
+- 统一的 Agent 会话预算和结构化错误记录；
+- 单页 HTML 读取和单页替换的标准能力协议。
+
+### 18.14 前端进度状态
+
+前端将“AI 美化”统一改称“AI 视觉生成”，并按 Pipeline 阶段显示：
+
+```text
+准备视觉输入
+AI 生成整组页面
+检查页面结构
+审计 P1
+AI 修复 P1
+复核 P1
+审计 P2
+最终整组审计
+生成图片
+交付完成
+```
+
+失败信息应显示具体阶段和页面，例如：
+
+```text
+AI 视觉生成未完成
+阶段：P3 单页修复
+原因：连续两次修复后仍存在 text_too_small
+已保留：HTML、审计报告和 Agent 执行记录
+```
+
+## 19. AI 视觉专项实施阶段
+
+本专项不改变来源准备、事实基座、故事板和程序化图文逻辑，先重构 AI 视觉渲染链路。每一阶段都必须有代码、测试和产物验收，不以“模型成功返回”作为唯一完成条件。
+
+### AV-0：基线冻结和观测补齐
+
+目标：冻结当前行为，建立可比较的故障基线。
+
+工作内容：
+
+- 固定 C004、C005、C011 和一个仓库图文作为回归样本；
+- 记录当前输入文件、主题 SPEC、模型、Agent 工具调用和失败阶段；
+- 保存当前 `ai-beautified.html`、布局报告和模型调用记录；
+- 统一错误分类：截断、预算、结构、页面数量、布局和截图失败；
+- 确认程序化图文链路与 AI 视觉链路的产物目录和状态完全分离。
+
+验收：同一候选重复执行时，可以定位失败发生在生成、结构门禁、某页修复、最终审计还是截图阶段。
+
+### AV-1：Pipeline Runtime 和阶段契约（已完成）
+
+目标：让 AI 视觉流程具备和文章、排版流程相同的阶段运行能力。
+
+工作内容：
+
+- 已新增 `SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT`；
+- 已接入 `prepareSkillRun`、`bindGenerationSnapshot`；
+- 已写入 `social-card-ai-visual-skill-manifest.json`；
+- 已写入 `social-card-ai-visual-stage-executions.json`；
+- 已增加 AI 视觉专用阶段记录器和阶段失败记录；
+- 已将 Provider、模型、技能 hash 和工具版本纳入快照。
+
+验收：已通过一次运行的阶段记录还原输入、技能、模型、工具、产物和失败位置；阶段顺序错误会被程序拒绝。AV-1 当时保留的共用 Agent 仅是过渡状态，现已由 AV-2 拆出全量生成 Agent，兼容审计修复阶段仍单独保留。
+
+### AV-2：全量生成 Agent 独立化（已完成）
+
+目标：将生成阶段从审计修复循环中彻底拆出。
+
+工作内容：
+
+- 已新增独立全量生成 Agent 运行器；
+- 生成 Agent 只开放文件读取和文件写入，工具目录不暴露审计能力；
+- 四份输入资料由生成 Agent 通过一次读取获得；
+- `set_head` 写入 CSS，`append_body` 逐页写入完整页面；
+- 已从生成阶段移除 `browser_audit`、`replace_pages` 和页面修复逻辑；
+- 生成 Agent 输出只保留短 JSON 确认，并通过运行时强制补齐缺失页面；
+- 原有审计修复 Agent 暂作为兼容阶段保留，后续由 AV-4 替换为 Pipeline 控制的单页修复 Agent。
+
+验收：已通过生成与社交卡回归测试；Agent 完成全部页面后才结束；生成阶段不会调用审计；HTML 不出现在模型 JSON 中；上下文不会随着页面正文重复增长。
+
+### AV-3：结构门禁和生成恢复（已完成）
+
+目标：在布局审计前阻断不完整 HTML 和页面数量错误。
+
+工作内容：
+
+- 已实现 HTML 根节点、页面数量、页面编号和安全内容校验；
+- 已实现空页面、截断 HTML、内部字段外露和危险资源校验；
+- 生成门禁失败时执行一次全量生成恢复；
+- 恢复仍失败时保留草稿和诊断，不进入布局修复。
+
+验收：已通过结构失败恢复回归；页面数量从 6 变成 1、根节点缺失或 HTML 截断时，不会启动 P1–P6 布局修复循环。
+
+### AV-4：Pipeline 控制审计和单页修复 Agent（已完成）
+
+目标：建立“程序审计 → 单页 Agent 修复 → 程序复核”的闭环。
+
+工作内容：
+
+- 已从修复 Agent 工具目录移除 `browser_audit`；
+- Pipeline 已直接调用确定性浏览器审计；
+- 已将审计问题转换为可执行 `repairInstructions`；
+- 每个问题页已启动独立修复 Agent；
+- 修复 Agent 可选调用 `browser_inspect`；
+- 已增加页面内容指纹、页面数量和目标页校验；
+- 已增加单页重试上限和相同审计签名停止规则。
+
+验收：已通过单页修复回归；审计 P3 时只能修改 P3；P1–P6 不会被一次 `replace_pages` 重写；修复上下文不会包含上一页和整组历史；同一问题无变化时会停止而不是消耗工具预算。
+
+### AV-5：最终审计、截图和交付门禁（已完成）
+
+目标：让 Agent 成功不等于图文交付成功。
+
+工作内容：
+
+- 增加最终整组确定性审计；
+- 将文字可见性、字号、溢出、裁切、利用率、对比度纳入同一报告；
+- 只有最终审计通过才生成 PNG；
+- 截图失败只重试截图，不重新调用 Agent；
+- 交付门禁统一登记 HTML、PNG、报告和状态；
+- AI 视觉失败不自动生成程序化回退页面。
+
+实现结果：最终整组审计未通过时跳过 PNG 和正式登记；截图阶段最多只重试截图，不重新调用 Agent；截图数量、两位数页文件名和空文件均纳入门禁；新增 `ai-beautified-delivery-gate.json` 记录 HTML、布局审计、截图和登记状态。
+
+验收：任何页面审计未通过时都不会被标记为可交付；已通过页面的 PNG 不会因另一页失败而被误登记为整组完成；报告可以区分 Agent、审计、截图和交付失败。
+
+### AV-6：技能和工具规范化（已完成）
+
+目标：让技能说明与运行时工具协议一致，减少模型误解。
+
+工作内容：
+
+- 重写 `skills/social-card-ai-visual-generator/SKILL.md` 的阶段说明；
+- 将生成阶段和修复阶段写成两个明确协议；
+- 补充输入文件、工具权限、文件写入、页面替换和返回 JSON 示例；
+- 将 `browser_inspect` 明确为观察能力；
+- 将 `browser_audit` 明确为 Pipeline 能力，不作为生成 Agent 工具；
+- 补充 Layout Guide、主题 SPEC、字号和对比度的优先级关系；
+- 补充截断和 JSON 结构错误的短响应约束。
+
+实现结果：`social-card-ai-visual-generator` 已明确区分全量生成 Agent、单页修复 Agent 与 Pipeline 审计；删除了让 Agent 自行调用 `browser_audit` 和把 Agent `final` 当作交付通过的歧义，补充了 `replace_pages` 单页写入示例。
+
+验收：技能文档中的每个工具、字段和返回示例都能被实际运行时接受；模型不会因使用旧 `blocks`、完整 HTML JSON 或整组 `replace_pages` 而触发协议错误。
+
+### AV-7：前端、回归和切换（已完成）
+
+目标：完成用户可见状态、全量回归和正式切换。
+
+工作内容：
+
+- 前端显示“AI 视觉生成”及其阶段进度；
+- 展示当前修复页、问题类型和剩余尝试次数；
+- 编辑器保留失败 HTML、审计报告和阶段执行记录；
+- 覆盖事件、仓库、开源技术、开源趋势和自定义故事板；
+- 覆盖小红书和公众号渠道能力差异；
+- 覆盖正常生成、结构失败、JSON 截断、工具预算、单页不收敛、截图失败和最终门禁失败；
+- 对旧任务记录和旧 `ai-beautified.html` 保持只读兼容；
+- 通过回归后再将新 Pipeline 作为默认实现。
+
+实现结果：编辑室现在能展示 AI 视觉阶段、当前修复页、失败原因、保留的 AI HTML 与运行报告；AI 视觉失败后会自动刷新诊断区。已完成 103 个离线相关测试和静态检查，未启动服务。
+
+验收：五类故事板均能完成独立 AI 视觉生成；程序化生成不受影响；AI 视觉失败原因可定位、产物可保留、修复范围可验证；无服务启动要求，测试使用固定工作目录和离线样本完成。
+
+### 19.1 阶段依赖和交付顺序
+
+```text
+AV-0 基线
+  ↓
+AV-1 运行时与契约
+  ↓
+AV-2 全量生成 Agent
+  ↓
+AV-3 结构门禁
+  ↓
+AV-4 单页审计修复
+  ↓
+AV-5 最终交付门禁
+  ↓
+AV-6 技能与工具规范化
+  ↓
+AV-7 前端与全量回归
+```
+
+AV-2 完成前不应继续扩大布局修复规则；AV-3 完成前不应把页面数量错误交给布局审计；AV-4 完成前不应把 `browser_audit` 继续暴露给生成 Agent；AV-5 完成前不应把 AI HTML 登记为正式可交付结果。
+
+## 20. 完成定义
+
+本方案全部完成的标准是：
+
+1. 内容侧遵循“来源准备 → 事实基座 → 故事板（内部完成事实取舍） → 视觉渲染”；
+2. 程序化视觉和 AI 视觉是两条独立链路；
+3. AI 视觉有正式阶段契约、技能快照和阶段执行记录；
+4. 全量页面生成和单页审计修复由不同 Agent 阶段负责；
+5. 确定性审计由 Pipeline 调用，Agent 只消费修复指令；
+6. `browser_inspect` 只提供真实布局观察，不判断交付是否通过；
+7. 页面数量、结构、安全、事实和单页差异由程序门禁保护；
+8. 任何截断、重复修复或预算耗尽都能定位到具体阶段和页面；
+9. 最终 PNG 只在整组审计和交付门禁通过后生成；
+10. 失败时保留可诊断产物，不自动伪造程序化成功结果。

@@ -590,6 +590,9 @@ AI 规划配图占位
 ### POST /api/candidates/:id/ai/social-card
 按已锁定故事板启动整组图文生成，产出文案、HTML、PNG、布局与交付报告。
 
+### POST /api/candidates/:id/ai/social-card-beautify
+按当前故事板和主题契约独立启动 AI 图文生成，先由程序生成仅包含主题变量、字体、画布尺寸、页面数量和页面插槽的最小页面壳，再由 AI 为每页输出完整页面内部布局并产出独立的 `ai-beautified.html`、逐页 PNG 和布局审计报告；不会读取或覆盖原始图文。
+
 ### GET /api/candidates/:id/social-cards
 读取图文交付状态、图片清单、文案、事实清单和报告。
 

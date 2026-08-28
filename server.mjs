@@ -193,7 +193,7 @@ function socialCardWorkdir(batch, candidate) {
   return candidateSocialCardDir(config.workspaceRoot, batch, candidate);
 }
 
-function socialCardFiles(batch,candidate){const dir=socialCardWorkdir(batch,candidate);const names=['fact-sheet.md','repository-fact-sheet.json','card-plan.json','copy.txt','my-design.html','layout-report.json','delivery-report.json','social-card-skill-manifest.json','social-card-stage-executions.json'];const files=names.filter((name)=>fs.existsSync(path.join(dir,name))).map((name)=>({name,path:path.join(dir,name)}));const output=path.join(dir,'output');if(fs.existsSync(output))for(const name of fs.readdirSync(output).filter((name)=>name.toLowerCase().endsWith('.png')).sort())files.push({name:`output/${name}`,path:path.join(output,name)});return {dir,files};}
+function socialCardFiles(batch,candidate){const dir=socialCardWorkdir(batch,candidate);const names=['fact-sheet.md','repository-fact-sheet.json','card-plan.json','copy.txt','my-design.html','ai-beautified.html','layout-report.json','delivery-report.json','ai-beautify-report.json','ai-beautified-layout-report.json','social-card-skill-manifest.json','social-card-stage-executions.json'];const files=names.filter((name)=>fs.existsSync(path.join(dir,name))).map((name)=>({name,path:path.join(dir,name)}));for(const [folder,prefix] of [['output','output/'],['ai-beautified-output','ai-beautified-output/']]){const output=path.join(dir,folder);if(fs.existsSync(output))for(const name of fs.readdirSync(output).filter((name)=>name.toLowerCase().endsWith('.png')).sort())files.push({name:`${prefix}${name}`,path:path.join(output,name)});}return {dir,files};}
 
 function candidateRepositoryUrl(candidate) {
   if (/^https:\/\/github\.com\//i.test(candidate.url||'')) return candidate.url;
@@ -202,13 +202,17 @@ function candidateRepositoryUrl(candidate) {
 
 function socialContentType(candidate) {
   const classified = String(candidate?.content_class || '').trim();
-  if (classified === 'open_source_technology' || classified === 'open_source_trend' || classified === 'news_event') return 'event';
-  if (classified === 'github_project') return 'repository';
   const mode=candidate?.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
+  if (classified === 'open_source_technology' || classified === 'open_source_trend') return 'event';
+  if (classified === 'github_project') return 'repository';
+  // 历史上手动添加仓库的 content_class 可能落成默认值 news_event；
+  // 工具图文输出模式仍然是明确的仓库路由，兼容这些旧候选。
+  if (mode.includes('tool-cards')) return 'repository';
   if(mode.includes('event-cards'))return 'event';
   if(mode.includes('custom-cards'))return 'custom';
   if(mode.includes('technology-cards'))return 'event';
   if(mode.includes('trend-cards'))return 'event';
+  if (classified === 'news_event') return 'event';
   return 'repository';
 }
 // 渠道与内容形态都编码在 candidate_tracks.output_mode：xiaohongshu-* 走小红书渲染分支，其余走公众号

@@ -172,17 +172,24 @@ function blockHeight(block, visual) {
   const scale = blockFontScale(block);
   const scaled = (height) => Math.ceil(height * scale);
   const heading = textLength(block?.title) ? 25 : 8;
-  if (type === 'code') return scaled(165 + Math.ceil(textLength(block?.content) / 36) * 12);
+  const visualMeta = block?.visual && typeof block.visual === 'object' ? block.visual : {};
+  const blockVisualOverhead = (visualMeta.icon && visualMeta.icon !== 'none') || textLength(visualMeta.badge) ? 18 : 0;
+  const itemVisualOverhead = Array.isArray(block?.items)
+    ? block.items.filter((item) => item && typeof item === 'object' && item.visual && typeof item.visual === 'object'
+      && ((item.visual.icon && item.visual.icon !== 'none') || textLength(item.visual.badge))).length * 12
+    : 0;
+  const visualOverhead = blockVisualOverhead + itemVisualOverhead;
+  if (type === 'code') return scaled(165 + Math.ceil(textLength(block?.content) / 36) * 12 + visualOverhead);
   if (type === 'compare') {
     const rows = Array.isArray(block?.rows) ? block.rows : [];
-    return scaled(heading + 26 + rows.reduce((sum, row) => sum + Math.max(1, lineEstimate((Array.isArray(row) ? row : []).join(' '), 28)) * 18, 0));
+    return scaled(heading + 26 + rows.reduce((sum, row) => sum + Math.max(1, lineEstimate((Array.isArray(row) ? row : []).join(' '), 28)) * 18, 0) + visualOverhead);
   }
   const values = blockItems(block);
   if (values.length) {
     const itemHeight = type === 'stats' ? 58 : type === 'steps' ? 48 : type === 'timeline' ? 48 : 24;
-    return scaled(heading + values.reduce((sum, item) => sum + itemHeight + Math.max(0, lineEstimate(itemText(item), 22) - 1) * 15, 0) + Math.max(0, values.length - 1) * 5);
+    return scaled(heading + values.reduce((sum, item) => sum + itemHeight + Math.max(0, lineEstimate(itemText(item), 22) - 1) * 15, 0) + Math.max(0, values.length - 1) * 5 + visualOverhead);
   }
-  return scaled(heading + Math.max(1, lineEstimate(block?.content, 28)) * 17 + 14);
+  return scaled(heading + Math.max(1, lineEstimate(block?.content, 28)) * 17 + 14 + visualOverhead);
 }
 
 function mergeAdjacentCodeBlocksForEstimate(blocks) {

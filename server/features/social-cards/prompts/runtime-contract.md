@@ -24,7 +24,21 @@
       "goal": "本页要表达的事实结论或内容结论",
       "evidence": ["事实基座中直接支持本页的证据"],
       "content_blocks": [
-        {"type": "{{BLOCK_TYPES}}", "title": "可选小标题", "content": "仅 text/note/highlight/code 使用；单块不超过240字，内容具体充实", "items": [], "headers": [], "rows": [], "source_refs": ["事实基座中直接支持该块的来源标识"]}
+        {
+          "type": "{{BLOCK_TYPES}}",
+          "title": "可选小标题",
+          "content": "仅 text/note/highlight/code 使用；单块不超过240字，内容具体充实",
+          "items": [],
+          "headers": [],
+          "rows": [],
+          "source_refs": ["事实基座中直接支持该块的来源标识"],
+          "visual": {
+            "emphasis": "normal|strong|hero",
+            "tone": "default|accent|danger|success|warning|muted",
+            "icon": "none|metric|ai|price|warning|source|user|timeline|rocket",
+            "badge": "可选的短标签"
+          }
+        }
       ]
     }
   ]
@@ -42,6 +56,11 @@
 - 不得把内部指令、学习目标或布局说明写入标题、goal 和正文。
 - 不得输出 HTML、CSS、脚本、坐标、尺寸或本地路径。
 - 每个 content_block 必须给出 source_refs；结构化条目的对象也可单独给出 source_refs。引用只能来自事实基座或已核验素材，不得编造来源标识。
+- `visual` 是关键信息提取后的语义视觉意图，可放在内容块或结构化条目上，不是 CSS 配置。承载核心事实、数字变化、主体关系、对比、时间变化、边界或操作路径的块必须输出 `visual`；普通背景段落可以省略。只能使用上述枚举值；`badge` 最多 12 个字，必须是当前事实或叙事职责的准确短标签，不得凭空增加“官方数据”“实测”等证据等级。若模型遗漏，运行时会按块类型和标题做保守兜底。
+- `visual.emphasis` 用于标记块或条目的重点程度，`tone` 用于表达事实支持的语义色调，`icon` 只能使用受控图标键。每页最多标记 1 个 `hero` 块、2 个 `strong` 块，避免所有内容同时高亮。
+- 普通 `text`、`highlight`、`note` 块如需在一句话中突出数字、主体或短语，应在保留完整 `content` 的同时提供 `content_runs`：`[{"text":"原文片段","role":"normal|metric|label|warning|source","tone":"default|accent|danger|success|warning|muted","emphasis":"normal|strong"}]`。片段必须按原文顺序完整覆盖 `content`，不得改写、增删事实；没有把握时只使用块级 `visual`。
+- `list.items`、`timeline.items`、`steps.items`、`scenes.items` 中的对象，以及 `compare.rows` 中需要强调的单元格，也可以使用同样的 `visual` 和 `content_runs`。列表/表格对象用 `{ "content": "完整条目", "visual": {...}, "content_runs": [...] }`；时间线、步骤和场景对象保留自身的 `time`/`title`/`content` 字段，`content_runs` 只覆盖 `content`；不要为了装饰给每一条都添加图标或徽章。
+- 不输出字号、颜色值、坐标、间距、HTML、CSS、SVG 或表情字符；具体视觉实现由后续渲染器和渠道主题决定。视觉意图不得替代 `source_refs`，也不得成为新增事实的来源。
 
 ## 四类故事板的公共门槛
 

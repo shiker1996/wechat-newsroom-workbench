@@ -219,7 +219,7 @@ test('refactoring baseline: supported AI job types are accepted and persisted', 
 test('refactoring stage 2: every supported AI job type has an explicit handler', () => {
   const handlers = createAiJobHandlers({ store: {}, gateway: {}, config: {}, log() {} });
   assert.deepEqual([...handlers.keys()], AI_JOB_TYPES);
-  assert.equal(handlers.size, 12);
+  assert.equal(handlers.size, 13);
   assert.equal(handlers.has('unsupported-job'), false);
 });
 
@@ -399,7 +399,7 @@ test('refactoring stage 4: storyboard document shell injects theme CSS and metad
     },
   });
   assert.match(html, /<title>&lt;主题&gt; · 事件图文<\/title>/);
-  assert.match(html, /\.theme-contract\{--accent:#123456\}<\/style>/);
+  assert.match(html, /\.theme-contract\{--accent:#123456\}/);
   assert.match(html, /class="theme-contract" data-visual-style="contract-theme" data-theme-version="1.2.3" data-theme-hash="contract-hash" data-channel="xiaohongshu"/);
   assert.match(html, /<section class="page"><\/section><\/body><\/html>$/);
 });

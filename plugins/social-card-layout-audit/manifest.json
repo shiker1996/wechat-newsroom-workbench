@@ -1,0 +1,34 @@
+{
+  "id": "social-card-layout-audit",
+  "name": "社交卡布局审计",
+  "version": "1.0.0",
+  "capabilities": [
+    "content.social_card.layout_audit",
+    "content.social_card.browser_audit"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "read-only",
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "patch"
+    ],
+    "properties": {
+      "patch": {
+        "type": "object"
+      },
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "description": "在本地无头 Chromium 中渲染社交卡临时补丁，返回目标页的布局指标、文字可见性和计算样式采样。",
+  "outputSchema": {
+    "type": "object"
+  },
+  "enabledByDefault": true,
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
+}

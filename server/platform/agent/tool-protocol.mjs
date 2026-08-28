@@ -9,6 +9,14 @@ export class AgentContractError extends Error{
   constructor(code,message,issues=[]){super(message);this.name='AgentContractError';this.code=ERROR_CODES.has(code)?code:'INVALID_AGENT_ENVELOPE';this.issues=issues;}
 }
 
+// 模型生成的工具理由只是可观测性说明，不应因为说明过长阻断实际工具调用。
+// 调用方在进入严格校验前可使用此函数做边界归一化；协议本身仍保持 1–160 字符约束。
+export function normalizeToolRequest(value,{fallbackReason='执行工具调用'}={}){
+  if(!object(value))return value;
+  const reason=String(value.reason??'').trim()||fallbackReason;
+  return {...value,reason:[...reason].slice(0,160).join('')};
+}
+
 function exactKeys(value,allowed,path){
   const unknown=Object.keys(value).filter((key)=>!allowed.includes(key));
   if(unknown.length)throw new AgentContractError('INVALID_AGENT_ENVELOPE',`${path} 包含未知字段：${unknown.join('、')}`,unknown.map((field)=>({path:`${path}.${field}`,code:'UNKNOWN_FIELD'})));
@@ -52,4 +60,3 @@ export function validateAgentEnvelope(value,{maxRequests=4}={}){
 export function toolError(request,code,message,retryable=false){return Object.freeze({requestId:request.requestId,capability:request.capability,status:'error',error:{code:ERROR_CODES.has(code)?code:'TOOL_EXECUTION_FAILED',message:String(message||'工具执行失败'),retryable:Boolean(retryable)}});}
 
 export function toolSuccess(request,result){return Object.freeze({requestId:request.requestId,capability:request.capability,status:'ok',data:structuredClone(result.data||{}),warnings:(result.warnings||[]).map(String),provenance:{provider:String(result.provenance?.plugin||result.provenance?.provider||''),fetchedAt:new Date().toISOString()}});}
-

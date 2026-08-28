@@ -19,6 +19,7 @@ test('手动添加仓库图文：URL 规范化为裸仓库地址并建立工具�
   const track = candidate.tracks.find((item) => item.track === 'social_cards');
   assert.equal(track.output_mode, 'wechat-tool-cards');
   assert.equal(track.pool_role, '工具图文');
+  assert.equal(candidate.content_class, 'github_project');
   assert.equal(candidate.card_editorial.output_mode, 'wechat-tool-cards');
 });
 

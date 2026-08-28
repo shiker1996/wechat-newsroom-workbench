@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260816-immersive-sidebar">
+  <link rel="stylesheet" href="/styles.css?v=20260827-generation-labels">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -416,7 +416,7 @@
               </div>
               <div id="card-plan-preview" class="card-plan-preview"></div>
             </section>
-            <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后生成整组 HTML、PNG 与发布文案。<span class="muted action-hint">生成调用模型（计费），渲染为本地确定性执行。</span></p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>生成整组图文</button></div></section>
+            <section class="card-gate-panel social-production-bar"><div class="social-stage-number">03</div><div class="production-gate-heading"><div><span class="kicker">GENERATION READY</span><h4 id="card-ready-title">请先生成故事板</h4><p>确认故事板后可独立生成程序化图文或 AI 图文。<span class="muted action-hint">两条链路均调用模型（计费），图片渲染在本地执行。</span></p></div></div><div class="editorial-actions"><button class="primary-button" type="button" id="generate-social-card" disabled>程序化生成</button><button class="outline-button" type="button" id="ai-beautify-social-card" disabled>AI 视觉生成</button></div></section>
             <section class="social-delivery" id="social-delivery" hidden>
               <div class="social-delivery-head">
                 <div>
@@ -425,15 +425,19 @@
                   <p id="social-delivery-meta"></p>
                 </div>
                 <div class="editorial-actions">
-                  <a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开 HTML</a>
+                  <a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开原始 HTML</a>
+                  <a class="outline-button" id="social-open-ai-html" target="_blank" rel="noreferrer" hidden>打开 AI 视觉 HTML</a>
                   <a class="primary-button" id="social-download-all">下载整组</a>
                 </div>
               </div>
+              <p id="social-beautify-status" class="social-beautify-status" role="status" aria-live="polite" hidden></p>
               <div class="social-delivery-grid">
                 <div class="social-gallery">
+                  <div id="social-delivery-versions" class="social-delivery-versions" hidden></div>
                   <div class="social-gallery-stage">
                     <button type="button" id="social-gallery-prev" aria-label="上一张">←</button>
                     <img id="social-gallery-image" alt="图文卡片预览">
+                    <p id="social-gallery-empty" class="social-gallery-empty" hidden></p>
                     <button type="button" id="social-gallery-next" aria-label="下一张">→</button>
                     <span id="social-gallery-counter"></span>
                   </div>
@@ -445,6 +449,7 @@
                     <button type="button" data-social-proof="copy" class="active">发布文案</button>
                     <button type="button" data-social-proof="facts">事实清单</button>
                     <button type="button" data-social-proof="layout">布局审计</button>
+                    <button type="button" data-social-proof="ai-visual">AI 视觉运行</button>
                   </div>
                   <pre id="social-proof-content"></pre>
                 </div>

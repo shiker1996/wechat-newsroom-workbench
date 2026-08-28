@@ -14,7 +14,13 @@ export async function executeConversationTool(request,{registry,catalog,context=
     if(cached?.status==='ok')return toolSuccess(request,cached);
   }
   const executionLog=context.executionLog||createStoreExecutionLogger(context.store,context);
-  let result;try{result=await registry.execute(request.capability,args,{...context,executionLog,authorizedExternalWrite:false});}catch(error){return toolError(request,'TOOL_EXECUTION_FAILED',error.message,false);}
+  let result;
+  try {
+    const applicationHandler = context.toolHandlers?.[request.capability];
+    result = typeof applicationHandler === 'function'
+      ? await applicationHandler(args, { ...context, executionLog, authorizedExternalWrite: false, request })
+      : await registry.execute(request.capability, args, { ...context, executionLog, authorizedExternalWrite: false });
+  } catch(error) { return toolError(request,'TOOL_EXECUTION_FAILED',error.message,false); }
   if(result?.status==='ok')return toolSuccess(request,result);
   const code=ERROR_MAP[result?.error?.code]||'TOOL_EXECUTION_FAILED';
   return toolError(request,code,result?.error?.message||'工具执行失败',Boolean(result?.error?.retryable));

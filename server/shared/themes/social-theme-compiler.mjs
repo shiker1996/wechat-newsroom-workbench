@@ -52,6 +52,12 @@ function variables(theme){
   return `--bg:${lower(c.background)};--page:${lower(c.page||c.surface)};--surface:${lower(c.surface)};--ink:${lower(c.text)};--muted:${lower(c.muted)};--accent:${lower(c.accent)};--accent2:${lower(c.accentSecondary)};--line:${lower(c.line)};--inverse:${lower(c.inverseText)};--code:${lower(c.codeBackground)};--body-size:${t.bodyPx}px;--h1-size:${t.h1Px}px;--h2-size:${t.h2Px}px;--caption-size:${t.captionPx}px;--code-size:${Number(t.codePx)||t.captionPx}px;--line-height:${t.lineHeight};--letter-spacing:${t.letterSpacingEm}em;--page-padding:${sp.articlePaddingPx}px;--section-gap:${sp.sectionPx}px;--paragraph-gap:${sp.paragraphPx}px;--card-gap:${sp.cardGapPx}px;--radius:${s.radiusPx}px;--border-width:${s.borderWidthPx}px;--shadow:${SHADOWS[s.shadow]};--decoration-opacity:${Number(effects.decorationOpacity)}`;
 }
 
+export function compileSocialThemeVariables(theme){
+  const definition=typeof theme==='string'?socialThemeDefinition(theme):theme;
+  if(!definition?.social)throw new Error(`未知图文视觉主题：${definition?.id||theme}`);
+  return variables(definition);
+}
+
 export function compileSocialTheme(theme){
   const definition=typeof theme==='string'?socialThemeDefinition(theme):theme;
   if(!definition?.social)throw new Error(`未知图文视觉主题：${definition?.id||theme}`);
