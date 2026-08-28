@@ -422,19 +422,28 @@
                 <div>
                   <span class="kicker">DELIVERY LIGHTBOX</span>
                   <h3>图文成片</h3>
-                  <p id="social-delivery-meta"></p>
                 </div>
                 <div class="editorial-actions">
-                  <a class="outline-button" id="social-open-html" target="_blank" rel="noreferrer">打开原始 HTML</a>
-                  <a class="outline-button" id="social-open-ai-html" target="_blank" rel="noreferrer" hidden>打开 AI 视觉 HTML</a>
                   <a class="primary-button" id="social-download-all">下载整组</a>
                 </div>
               </div>
-              <p id="social-beautify-status" class="social-beautify-status" role="status" aria-live="polite" hidden></p>
+              <div class="social-delivery-status" id="social-delivery-status">
+                <section class="social-delivery-status-block social-delivery-programmatic-status">
+                  <span class="social-delivery-status-label">程序化处理</span>
+                  <p id="social-delivery-meta"></p>
+                </section>
+                <section class="social-delivery-status-block social-delivery-ai-status" id="social-delivery-ai-status" hidden>
+                  <span class="social-delivery-status-label">AI 视觉处理</span>
+                  <p id="social-beautify-status" class="social-beautify-status" role="status" aria-live="polite"></p>
+                </section>
+              </div>
               <div class="social-delivery-grid">
                 <div class="social-gallery">
                   <div id="social-delivery-versions" class="social-delivery-versions" hidden></div>
                   <div class="social-gallery-stage">
+                    <div class="social-gallery-tools" aria-label="打开图文 HTML">
+                      <a class="outline-button" id="social-open-current-html" target="_blank" rel="noreferrer" hidden>打开程序版 HTML</a>
+                    </div>
                     <button type="button" id="social-gallery-prev" aria-label="上一张">←</button>
                     <img id="social-gallery-image" alt="图文卡片预览">
                     <p id="social-gallery-empty" class="social-gallery-empty" hidden></p>
@@ -449,7 +458,6 @@
                     <button type="button" data-social-proof="copy" class="active">发布文案</button>
                     <button type="button" data-social-proof="facts">事实清单</button>
                     <button type="button" data-social-proof="layout">布局审计</button>
-                    <button type="button" data-social-proof="ai-visual">AI 视觉运行</button>
                   </div>
                   <pre id="social-proof-content"></pre>
                 </div>

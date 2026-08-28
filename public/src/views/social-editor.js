@@ -127,8 +127,20 @@ function applyModeLayout(){
 function updateSocialTabControls(){const tabs=document.getElementById('social-editor-candidates');const previous=document.getElementById('social-tabs-previous');const next=document.getElementById('social-tabs-next');if(!tabs||!previous||!next)return;const max=Math.max(0,tabs.scrollWidth-tabs.clientWidth);previous.disabled=tabs.scrollLeft<=1;next.disabled=tabs.scrollLeft>=max-1;}
 function setupSocialTabNavigation(){const tabs=document.getElementById('social-editor-candidates');const strip=tabs?.closest('.social-candidate-tab-strip');if(!tabs||!strip||strip.dataset.navigationBound==='true')return;strip.dataset.navigationBound='true';strip.addEventListener('click',(event)=>{const arrow=event.target.closest('.candidate-tab-arrow');if(!arrow)return;tabs.scrollBy({left:(arrow.classList.contains('previous')?-1:1)*Math.max(220,tabs.clientWidth*.72),behavior:'smooth'});});tabs.addEventListener('scroll',updateSocialTabControls,{passive:true});window.addEventListener('resize',updateSocialTabControls,{passive:true});updateSocialTabControls();}
 
+function syncCurrentHtmlLink(){
+  const link=document.getElementById('social-open-current-html');
+  if(!link)return;
+  const isAiVisual=deliveryViewMode==='beautified';
+  const url=isAiVisual?delivery?.beautifiedHtmlUrl:delivery?.htmlUrl;
+  link.hidden=!url;
+  link.href=url||'';
+  link.textContent=isAiVisual?'打开 AI 视觉 HTML':'打开程序版 HTML';
+  link.setAttribute('aria-label',isAiVisual?'打开当前 AI 视觉版 HTML':'打开当前程序版 HTML');
+}
+
 function renderDeliveryImage(){
   const images=deliveryViewMode==='beautified'&&delivery?.beautifiedImages?.length?delivery.beautifiedImages:(delivery?.images||[]);
+  syncCurrentHtmlLink();
   const imageNode=document.getElementById('social-gallery-image');
   const emptyNode=document.getElementById('social-gallery-empty');
   const previous=document.getElementById('social-gallery-prev');
@@ -164,7 +176,7 @@ function renderDeliveryVersions(){
   const hasOriginal=Boolean(delivery?.images?.length);
   const hasBeautified=Boolean(delivery?.beautifiedImages?.length);
   container.hidden=!hasBeautified;
-  container.innerHTML=hasBeautified?`<span class="social-delivery-versions-label">预览版本</span><div class="social-delivery-version-tabs" role="tablist" aria-label="图文预览版本">${hasOriginal?`<button type="button" role="tab" aria-selected="${deliveryViewMode==='original'}" data-social-delivery-mode="original" class="${deliveryViewMode==='original'?'active':''}"><i aria-hidden="true"></i>原始版</button>`:''}<button type="button" role="tab" aria-selected="${deliveryViewMode==='beautified'}" data-social-delivery-mode="beautified" class="${deliveryViewMode==='beautified'?'active':''}"><i aria-hidden="true"></i>AI 视觉版</button></div>`:'';
+  container.innerHTML=hasBeautified?`<span class="social-delivery-versions-label">预览版本</span><div class="social-delivery-version-tabs" role="tablist" aria-label="图文预览版本">${hasOriginal?`<button type="button" role="tab" aria-selected="${deliveryViewMode==='original'}" data-social-delivery-mode="original" class="${deliveryViewMode==='original'?'active':''}"><i aria-hidden="true"></i>程序版</button>`:''}<button type="button" role="tab" aria-selected="${deliveryViewMode==='beautified'}" data-social-delivery-mode="beautified" class="${deliveryViewMode==='beautified'?'active':''}"><i aria-hidden="true"></i>AI 视觉版</button></div>`:'';
 }
 
 function renderDeliveryFilm(){
@@ -216,6 +228,11 @@ function syncBeautifyButton(){
   button.setAttribute('aria-busy',active?'true':'false');
   button.textContent=active?(job.status==='queued'?'排队等待执行…':socialBeautifyProgressLabel(job.progress)):delivery?.beautifiedHtmlUrl?'重新 AI 视觉生成':'AI 视觉生成';
   button.title=active?'正在根据故事板生成 AI 页面并截图…':storyboardReady?'根据当前故事板和主题契约独立生成 AI 图文':'请先生成故事板';
+  const deliveryStatus=document.getElementById('social-delivery-status');
+  const aiStatusBlock=document.getElementById('social-delivery-ai-status');
+  const hasAiStatus=Boolean(active||delivery?.beautifyReport||delivery?.beautifiedHtmlUrl);
+  if(deliveryStatus)deliveryStatus.classList.toggle('has-ai-status',hasAiStatus);
+  if(aiStatusBlock)aiStatusBlock.hidden=!hasAiStatus;
   const status=document.getElementById('social-beautify-status');
   if(status&&active){status.hidden=false;status.classList.add('is-running');status.textContent=`AI 视觉生成进行中 · ${socialBeautifyProgressLabel(job.progress)} · 执行完成后将自动切换到 AI 视觉版`;}
   if(status&&!active)status.classList.remove('is-running');
@@ -258,6 +275,7 @@ async function loadDelivery(candidateId=selectedId){
   if(candidateId!==selectedId)return;
   delivery=data;
   if(data.beautifiedImages?.length&&!data.images?.length)deliveryViewMode='beautified';
+  else if(!data.images?.length&&data.beautifiedHtmlUrl)deliveryViewMode='beautified';
   else if(!data.beautifiedImages?.length)deliveryViewMode='original';
   currentFactIndex=data.factIndex||currentFactIndex;
   const panel=document.getElementById('social-delivery');
@@ -274,11 +292,12 @@ async function loadDelivery(candidateId=selectedId){
   const aiAuditPassed=data.beautifyReport?.finalAudit?.status==='passed'||data.beautifyDeliveryGate?.checks?.finalAudit?.valid===true;
   const aiAudit=data.beautifyReport?.finalAudit||data.beautifyDeliveryGate?.checks?.finalAudit?(aiAuditPassed?'通过':'未通过'):'待确认';
   document.getElementById('social-delivery-meta').textContent=`${deliveryCount} · 程序化布局审计${data.layout?.valid?'通过':'待确认'} · AI 最终审计${aiAudit} · AI 交付${aiGate==='passed'?'通过':aiGate?'未通过':'待确认'}${metricLabel}${metricSummary}${planSummary}`;
-  const originalHtml=document.getElementById('social-open-html');
-  if(originalHtml){originalHtml.hidden=!data.htmlUrl;originalHtml.href=data.htmlUrl||'';}
-  const aiHtml=document.getElementById('social-open-ai-html');
-  if(aiHtml){aiHtml.hidden=!data.beautifiedHtmlUrl;aiHtml.href=data.beautifiedHtmlUrl||'';}
+  syncCurrentHtmlLink();
   const beautifyStatus=document.getElementById('social-beautify-status');
+  const deliveryStatus=document.getElementById('social-delivery-status');
+  const aiStatusBlock=document.getElementById('social-delivery-ai-status');
+  if(deliveryStatus)deliveryStatus.classList.toggle('has-ai-status',hasAiDiagnostics);
+  if(aiStatusBlock)aiStatusBlock.hidden=!hasAiDiagnostics;
   if(beautifyStatus){beautifyStatus.hidden=!hasAiDiagnostics;beautifyStatus.classList.toggle('is-failed',Boolean(data.beautifyReport&&data.beautifyReport.status!=='passed'));beautifyStatus.innerHTML=aiVisualStatusHtml(data.beautifyReport,data.beautifyStages,data.beautifyRepairReport);}
   document.getElementById('social-download-all').href=data.bundleUrl;
   renderDeliveryVersions();
@@ -752,7 +771,7 @@ const beautifyButton=document.getElementById('ai-beautify-social-card');
 beautifyButton?.addEventListener('click',async()=>{
   if(!selectedId)return;
   const candidateId=Number(selectedId);
-  if(delivery.beautifiedHtmlUrl&&!await confirmAction('重新生成 AI 视觉版会覆盖当前 AI 视觉版 HTML 与 PNG，原始版不会改变，是否继续？',{confirmText:'重新生成'}))return;
+  if(delivery?.beautifiedHtmlUrl&&!await confirmAction('重新生成 AI 视觉版会覆盖当前 AI 视觉版 HTML 与 PNG，程序版不会改变，是否继续？',{confirmText:'重新生成'}))return;
   try{
     socialBeautifyJobs.set(candidateId,{status:'running',progress:'正在启动…'});syncBeautifyButton();
     const job=await request(`/api/candidates/${candidateId}/ai/social-card-beautify`,{method:'POST',body:JSON.stringify({})});

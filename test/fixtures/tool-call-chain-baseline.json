@@ -63,6 +63,17 @@
       "riskLevel": "network-read"
     },
     {
+      "id": "social-card-layout-audit",
+      "name": "社交卡布局审计",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.social_card.layout_audit",
+        "content.social_card.browser_audit"
+      ],
+      "riskLevel": "read-only"
+    },
+    {
       "id": "tavily-search",
       "name": "Tavily 搜索",
       "version": "1.0.0",
@@ -305,6 +316,18 @@
     {
       "id": "seo-keyword-scoring",
       "name": "SEO 关键词评分",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "social-card-ai-visual-generator",
+      "name": "社交卡 AI 视觉生成",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "id": "social-theme-design-spec-generator",
+      "name": "Social 主题设计规范生成",
       "requiredCapabilities": [],
       "optionalCapabilities": []
     },

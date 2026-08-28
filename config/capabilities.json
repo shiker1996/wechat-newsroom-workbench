@@ -11,6 +11,8 @@
     "diagram.mermaid.render": {"name":"Mermaid 图表渲染","description":"将 Mermaid 图表定义渲染为可交付图片。","category":"内容渲染"},
     "diagram.echarts.render": {"name":"ECharts 图表渲染","description":"将 ECharts 配置渲染为可交付图片。","category":"内容渲染"},
     "image.cdn.upload": {"name":"图片存储上传","description":"将本地图片上传到已配置的图片存储并返回公开地址。","category":"内容交付"},
+    "content.social_card.layout_audit": {"name":"社交卡布局审计","description":"对社交卡片的页面布局、利用率和溢出情况执行浏览器实测审计。","category":"内容渲染"},
+    "content.social_card.browser_audit": {"name":"社交卡浏览器审计","description":"在本地浏览器中检查社交卡片临时页面的真实样式与布局。","category":"内容渲染"},
     "collect.direct": {"name":"RSS／Atom 直连采集","description":"从标准 RSS 或 Atom 地址采集内容。","category":"内容采集"},
     "collect.rsshub": {"name":"RSSHub 路由采集","description":"通过配置的 RSSHub 路由采集内容。","category":"内容采集"},
     "collect.twitter": {"name":"X 内容采集","description":"通过 RSSHub 等实现采集指定 X 账号内容。","category":"内容采集"},
