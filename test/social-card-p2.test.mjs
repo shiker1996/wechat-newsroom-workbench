@@ -435,7 +435,8 @@ test('AI 视觉失败时编辑室展示阶段诊断而不是隐藏整个交付�
   const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');
   const route=fs.readFileSync(path.join(root,'server','platform','http','routes','social-card-routes.mjs'),'utf8');
   assert.match(html,/social-gallery-empty/);
-  assert.match(html,/data-social-proof="ai-visual"/);
+  assert.match(html,/social-delivery-status/);
+  assert.doesNotMatch(html,/data-social-proof="ai-visual"/);
   assert.match(source,/hasAiDiagnostics/);
   assert.match(source,/beautifyStages/);
   assert.match(source,/watchSocialBeautifyJob[\s\S]*await loadDelivery\(candidateId\)/);

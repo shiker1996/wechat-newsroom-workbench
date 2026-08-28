@@ -228,11 +228,6 @@ function syncBeautifyButton(){
   button.setAttribute('aria-busy',active?'true':'false');
   button.textContent=active?(job.status==='queued'?'排队等待执行…':socialBeautifyProgressLabel(job.progress)):delivery?.beautifiedHtmlUrl?'重新 AI 视觉生成':'AI 视觉生成';
   button.title=active?'正在根据故事板生成 AI 页面并截图…':storyboardReady?'根据当前故事板和主题契约独立生成 AI 图文':'请先生成故事板';
-  const deliveryStatus=document.getElementById('social-delivery-status');
-  const aiStatusBlock=document.getElementById('social-delivery-ai-status');
-  const hasAiStatus=Boolean(active||delivery?.beautifyReport||delivery?.beautifiedHtmlUrl);
-  if(deliveryStatus)deliveryStatus.classList.toggle('has-ai-status',hasAiStatus);
-  if(aiStatusBlock)aiStatusBlock.hidden=!hasAiStatus;
   const status=document.getElementById('social-beautify-status');
   if(status&&active){status.hidden=false;status.classList.add('is-running');status.textContent=`AI 视觉生成进行中 · ${socialBeautifyProgressLabel(job.progress)} · 执行完成后将自动切换到 AI 视觉版`;}
   if(status&&!active)status.classList.remove('is-running');
@@ -288,16 +283,9 @@ async function loadDelivery(candidateId=selectedId){
   const metricSummary=data.templateStats?.usageCount?` · 通过率 ${metricRate(data.templateStats.layoutPassRate)} · 过空 ${metricRate(data.templateStats.underfilledRate)} · 溢出 ${metricRate(data.templateStats.overflowRate)}`:'';
   const planSummary=data.contentPlanAdjustments?.rounds?.length?` · 内容计划调整 ${data.contentPlanAdjustments.rounds.length} 轮`:'';
   const deliveryCount=data.images?.length?`${data.images.length} 张`:(data.beautifiedImages?.length?`AI 视觉版 ${data.beautifiedImages.length} 张`:'暂无可交付 PNG');
-  const aiGate=data.beautifyReport?.deliveryGate?.status||data.beautifyDeliveryGate?.status;
-  const aiAuditPassed=data.beautifyReport?.finalAudit?.status==='passed'||data.beautifyDeliveryGate?.checks?.finalAudit?.valid===true;
-  const aiAudit=data.beautifyReport?.finalAudit||data.beautifyDeliveryGate?.checks?.finalAudit?(aiAuditPassed?'通过':'未通过'):'待确认';
-  document.getElementById('social-delivery-meta').textContent=`${deliveryCount} · 程序化布局审计${data.layout?.valid?'通过':'待确认'} · AI 最终审计${aiAudit} · AI 交付${aiGate==='passed'?'通过':aiGate?'未通过':'待确认'}${metricLabel}${metricSummary}${planSummary}`;
+  document.getElementById('social-delivery-meta').textContent=`${deliveryCount} · 程序化布局审计${data.layout?.valid?'通过':'待确认'}${metricLabel}${metricSummary}${planSummary}`;
   syncCurrentHtmlLink();
   const beautifyStatus=document.getElementById('social-beautify-status');
-  const deliveryStatus=document.getElementById('social-delivery-status');
-  const aiStatusBlock=document.getElementById('social-delivery-ai-status');
-  if(deliveryStatus)deliveryStatus.classList.toggle('has-ai-status',hasAiDiagnostics);
-  if(aiStatusBlock)aiStatusBlock.hidden=!hasAiDiagnostics;
   if(beautifyStatus){beautifyStatus.hidden=!hasAiDiagnostics;beautifyStatus.classList.toggle('is-failed',Boolean(data.beautifyReport&&data.beautifyReport.status!=='passed'));beautifyStatus.innerHTML=aiVisualStatusHtml(data.beautifyReport,data.beautifyStages,data.beautifyRepairReport);}
   document.getElementById('social-download-all').href=data.bundleUrl;
   renderDeliveryVersions();
