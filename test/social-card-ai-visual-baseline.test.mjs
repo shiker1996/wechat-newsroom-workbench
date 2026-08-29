@@ -5,8 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { classifySocialCardAiVisualFailure, collectSocialCardAiVisualArtifacts, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES, writeSocialCardAiVisualBaseline } from '../server/features/social-cards/application/social-card-ai-visual-baseline.mjs';
 import { createSocialCardAiVisualStageRecorder, SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT, writeSocialCardAiVisualSkillManifest } from '../server/features/social-cards/application/social-card-ai-visual-pipeline.mjs';
-import { filterAiVisualGenerationCatalog } from '../server/features/social-cards/application/social-card-ai-visual-agent.mjs';
-import { filterAiVisualRepairCatalog } from '../server/features/social-cards/application/social-card-ai-visual-repair-agent.mjs';
+import { filterAiVisualGenerationCatalog, shouldUseAiVisualPlanningThinking } from '../server/features/social-cards/application/social-card-ai-visual-agent.mjs';
 import { normalizeToolRequest, validateToolRequest } from '../server/platform/agent/tool-protocol.mjs';
 
 test('AI 视觉 Agent 的工具理由过长时在严格校验前截断', () => {
@@ -15,11 +14,9 @@ test('AI 视觉 Agent 的工具理由过长时在严格校验前截断', () => {
   assert.equal(validateToolRequest(request).reason, request.reason);
 });
 
-test('AI 视觉基线统一归类模型、结构、布局和截图错误', () => {
+test('AI 视觉基线统一归类模型、截图和交付错误', () => {
   assert.equal(classifySocialCardAiVisualFailure({ code: 'MODEL_JSON_TRUNCATED', message: 'JSON 被截断' }).code, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.MODEL_JSON_TRUNCATED);
   assert.equal(classifySocialCardAiVisualFailure('AI 视觉 Agent 达到工具调用预算').code, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.AGENT_BUDGET);
-  assert.equal(classifySocialCardAiVisualFailure('页面数量改变（原 6，新 1）').code, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.PAGE_COUNT);
-  assert.equal(classifySocialCardAiVisualFailure('P2 text_invisible；P3 vertical_imbalance').code, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.LAYOUT_AUDIT);
   assert.equal(classifySocialCardAiVisualFailure('PNG 截图生成失败').code, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.SCREENSHOTS);
 });
 
@@ -32,6 +29,8 @@ test('AI 视觉基线枚举输入和输出产物，不读取候选目录之外�
   assert.equal(artifacts.find((item) => item.name === 'ai-beautified.html').exists, true);
   assert.equal(artifacts.find((item) => item.name === 'card-plan.json').required, true);
   assert.equal(artifacts.find((item) => item.name === 'ai-visual-card-plan.json').required, false);
+  assert.equal(artifacts.find((item) => item.name === 'social-theme-snapshot.json').required, true);
+  assert.equal(artifacts.some((item) => item.name === 'layout-guide.md'), false);
   assert.equal(artifacts.some((item) => item.name.includes('..')), false);
 });
 
@@ -40,7 +39,7 @@ test('AI 视觉运行开始时写入可追溯基线文件', () => {
   const result = writeSocialCardAiVisualBaseline({ workdir, candidateId: 1017, batchId: 'batch-1', contentType: 'event', channelMode: 'xiaohongshu', themeId: 'ice-blue', requiredPageCount: 5, storyboardPageCount: 5 });
   const baseline = JSON.parse(fs.readFileSync(result.path, 'utf8'));
   assert.equal(baseline.candidateId, 1017);
-  assert.equal(baseline.currentFlow.generationAndRepairShareAgent, true);
+  assert.equal(baseline.currentFlow.generationPhase, 'document_write begin + append + finish');
   assert.equal(baseline.currentFlow.programmaticFallback, false);
   assert.equal(baseline.requiredPageCount, 5);
   assert.equal(fs.existsSync(result.path), true);
@@ -55,11 +54,11 @@ test('AI 视觉阶段记录器严格校验阶段顺序并持久化执行记录',
   copy.finish({ detail: 'copy ready' });
   const generation = recorder.start('generation', { skill: 'social-card-ai-visual-generator', outputArtifact: 'ai-beautified.html' });
   generation.fail(new Error('test failure'));
-  assert.throws(() => recorder.start('final-audit', { skill: 'fixed-program' }), /阶段不一致/);
+  assert.throws(() => recorder.start('delivery-gate', { skill: 'fixed-program' }), /阶段不一致/);
   const saved = JSON.parse(fs.readFileSync(recorder.path, 'utf8'));
   assert.deepEqual(saved.stages.map((stage) => stage.stage), ['inputs', 'copy', 'generation']);
   assert.equal(saved.stages[2].status, 'failed');
-  assert.deepEqual(SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT.map((stage) => stage.id).slice(0, 3), ['inputs', 'copy', 'generation']);
+  assert.deepEqual(SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT.map((stage) => stage.id), ['inputs', 'copy', 'generation', 'screenshots', 'delivery-gate']);
 });
 
 test('AI 视觉技能清单记录快照、模型和实际可见能力', () => {
@@ -81,18 +80,15 @@ test('全量生成 Agent 的工具目录不包含浏览器观察和审计能力'
   const catalog = filterAiVisualGenerationCatalog([
     { capability: 'filesystem.project.read' },
     { capability: 'filesystem.project.write' },
+    { capability: 'filesystem.project.document_write' },
     { capability: 'content.social_card.browser_inspect' },
     { capability: 'content.social_card.browser_audit' },
   ]);
-  assert.deepEqual(catalog.map((item) => item.capability), ['filesystem.project.read', 'filesystem.project.write']);
+  assert.deepEqual(catalog.map((item) => item.capability), ['filesystem.project.read', 'filesystem.project.document_write']);
 });
 
-test('单页修复 Agent 的工具目录不包含确定性浏览器审计能力', () => {
-  const catalog = filterAiVisualRepairCatalog([
-    { capability: 'filesystem.project.write' },
-    { capability: 'content.social_card.browser_inspect' },
-    { capability: 'content.social_card.browser_audit' },
-    { capability: 'filesystem.project.read' },
-  ]);
-  assert.deepEqual(catalog.map((item) => item.capability), ['filesystem.project.write', 'content.social_card.browser_inspect']);
+test('AI 视觉生成只在首次实际写入前开启 thinking', () => {
+  assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: false, documentStarted: false, planningThinkingUsed: false }), false);
+  assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: true, documentStarted: true, planningThinkingUsed: false }), true);
+  assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: true, documentStarted: true, planningThinkingUsed: true }), false);
 });

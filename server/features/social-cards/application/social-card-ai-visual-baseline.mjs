@@ -7,9 +7,6 @@ export const SOCIAL_CARD_AI_VISUAL_FAILURE_CODES = Object.freeze({
   COPY: 'copy',
   MODEL_JSON_TRUNCATED: 'model-json-truncated',
   AGENT_BUDGET: 'agent-budget',
-  GENERATION_STRUCTURE: 'generation-structure',
-  PAGE_COUNT: 'page-count',
-  LAYOUT_AUDIT: 'layout-audit',
   SCREENSHOTS: 'screenshots',
   DELIVERY_GATE: 'delivery-gate',
   UNKNOWN: 'unknown',
@@ -21,15 +18,11 @@ export const SOCIAL_CARD_AI_VISUAL_ARTIFACTS = Object.freeze([
   { name: 'event-analysis.json', stage: 'inputs', required: false },
   { name: 'custom-fact-sheet.json', stage: 'inputs', required: false },
   { name: 'ai-visual-card-plan.json', stage: 'inputs', required: false },
+  { name: 'social-theme-snapshot.json', stage: 'inputs', required: true },
   { name: 'copy.txt', stage: 'copy', required: true },
   { name: 'social-theme-design-spec.md', stage: 'inputs', required: true },
-  { name: 'layout-guide.md', stage: 'inputs', required: true },
   { name: 'my-design.html', stage: 'programmatic-render', required: false },
   { name: 'ai-beautified.html', stage: 'generation', required: false },
-  { name: 'ai-beautified-generation-gate.json', stage: 'generation-gate', required: false },
-  { name: 'ai-beautified-page-repair-report.json', stage: 'audit-repair', required: false },
-  { name: 'ai-beautified-layout-report.json', stage: 'final-audit', required: false },
-  { name: 'ai-visual-content-audit.json', stage: 'content-audit', required: false },
   { name: 'ai-beautified-delivery-gate.json', stage: 'delivery-gate', required: false },
   { name: 'ai-beautify-report.json', stage: 'delivery-gate', required: false },
   { name: 'social-card-ai-visual-skill-manifest.json', stage: 'inputs', required: false },
@@ -61,14 +54,6 @@ export function classifySocialCardAiVisualFailure(error, { stage = '', source = 
   } else if (/agent_budget_exceeded|工具调用预算|模型步骤预算|总耗时预算|超过.*预算/.test(normalized)) {
     code = SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.AGENT_BUDGET;
     inferredStage = stage || 'agent';
-  } else if (/页面数量改变|页数|根节点|html.*结构|结构.*缺失|截断 html|不完整 html/.test(normalized)) {
-    code = /页面数量|页数/.test(normalized)
-      ? SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.PAGE_COUNT
-      : SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.GENERATION_STRUCTURE;
-    inferredStage = stage || 'generation-gate';
-  } else if (/text_invisible|text_too_small|underfilled|overfilled|overflow|clipped|vertical_imbalance|布局审计|对比度/.test(normalized)) {
-    code = SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.LAYOUT_AUDIT;
-    inferredStage = stage || 'audit-repair';
   } else if (/png|截图|screenshots|render.*image|生成图片/.test(normalized)) {
     code = SOCIAL_CARD_AI_VISUAL_FAILURE_CODES.SCREENSHOTS;
     inferredStage = stage || 'screenshots';
@@ -145,13 +130,10 @@ export function writeSocialCardAiVisualBaseline({
     currentFlow: {
       entryPoint: 'social-card-beautify',
       agentEntryPoint: 'social-card-ai-visual',
-      generationAndRepairShareAgent: true,
-      generationPhase: 'set_head + append_head_css + append_body',
+      generationPhase: 'document_write begin + append + finish',
       copyPhase: 'shared social-card-copy before visual generation',
-      repairPhase: 'replace_pages',
-      browserInspect: 'agent-visible observation',
-      browserAudit: 'agent-visible deterministic audit',
-      finalAudit: 'pipeline post-agent audit',
+      screenshotsPhase: 'html-pages-to-images after generation',
+      deliveryPhase: 'HTML + copy + PNG existence and count check',
       programmaticFallback: false,
     },
     failureTaxonomy: Object.values(SOCIAL_CARD_AI_VISUAL_FAILURE_CODES),

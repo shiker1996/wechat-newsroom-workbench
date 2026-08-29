@@ -1,0 +1,83 @@
+{
+  "id": "ai-visual-document-writer",
+  "name": "AI 视觉文档分块写入",
+  "version": "1.0.0",
+  "capabilities": [
+    "filesystem.project.document_write"
+  ],
+  "entry": "./adapter.mjs",
+  "riskLevel": "local-write",
+  "pathInputs": [
+    "path"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "operation",
+      "sessionId",
+      "path"
+    ],
+    "properties": {
+      "operation": {
+        "type": "string",
+        "enum": [
+          "begin",
+          "append",
+          "finish",
+          "abort"
+        ]
+      },
+      "sessionId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "requestId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "path": {
+        "type": "string",
+        "minLength": 1
+      },
+      "content": {
+        "type": "string",
+        "maxLength": 16384
+      },
+      "expectedRevision": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "operation",
+      "sessionId",
+      "path",
+      "status",
+      "revision",
+      "totalBytes",
+      "sha256"
+    ],
+    "properties": {
+      "operation": { "type": "string" },
+      "sessionId": { "type": "string" },
+      "path": { "type": "string" },
+      "status": { "type": "string" },
+      "revision": { "type": "integer" },
+      "appendedBytes": { "type": "integer" },
+      "totalBytes": { "type": "integer" },
+      "sha256": { "type": "string" },
+      "alreadyApplied": { "type": "boolean" }
+    }
+  },
+  "description": "在授权的候选工作目录内，按 Agent 提交顺序原样追加 AI 视觉 HTML/CSS 分块；不解析、不改写、不补充视觉内容。",
+  "enabledByDefault": true,
+  "schemaVersion": 1,
+  "kind": "tool",
+  "runtime": {}
+}

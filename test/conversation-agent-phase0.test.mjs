@@ -35,7 +35,7 @@ test('Phase 0 三份 JSON Schema 禁止未知字段并区分工具请求、成�
   const result=readJson('../server/platform/agent/schemas/tool-result.schema.json');
   const envelope=readJson('../server/platform/agent/schemas/agent-envelope.schema.json');
   assert.equal(request.additionalProperties,false);
-  assert.deepEqual(request.required,['requestId','capability','arguments','reason']);
+  assert.deepEqual(request.required,['requestId','capability','arguments']);
   assert.equal(request.properties.reason.maxLength,160);
   assert.equal(result.oneOf.length,2);
   assert.equal(result.oneOf[0].properties.status.const,'ok');

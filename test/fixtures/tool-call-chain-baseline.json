@@ -3,6 +3,16 @@
   "generatedFrom": "repository manifests and capability-call markers",
   "tools": [
     {
+      "id": "ai-visual-document-writer",
+      "name": "AI 视觉文档分块写入",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "filesystem.project.document_write"
+      ],
+      "riskLevel": "local-write"
+    },
+    {
       "id": "document-folder-search",
       "name": "本地知识库检索",
       "version": "1.0.0",

@@ -8,18 +8,12 @@
 
 ## 1. 目标
 
-将 AI 视觉生成从“一个 Agent 生成、审计、修复全包”改为由 Pipeline 管理阶段、由 Agent 执行有限任务：
+将 AI 视觉生成收束为由一个 Agent 负责完整视觉设计、由 Pipeline 负责输入准备、截图和交付登记：
 
 ```text
 已生成故事板
   ↓
-CSS Agent → 页面 Agent
-  ↓
-生成结构门禁
-  ↓
-程序布局审计 → 单页修复 Agent → 程序复核
-  ↓
-最终整组审计
+单个 AI 视觉 Agent（document_write 分块写入完整 HTML/CSS）
   ↓
 截图与交付门禁
 ```
@@ -28,14 +22,18 @@ CSS Agent → 页面 Agent
 
 ## 2. 固定输入
 
-Pipeline 为候选目录准备四份文件，Agent 通过文件工具读取：
+Pipeline 为候选目录准备本次运行的内容与主题文件，Agent 通过文件工具一次读取：
 
 ```text
-fact-sheet.md                  事实和来源边界
 card-plan.json                 已生成故事板和页面职责
+ai-visual-card-plan.json       只读视觉语义索引
+原始事实 JSON                  事实和来源边界
 social-theme-design-spec.md    当前主题设计规范
-layout-guide.md                通用页面结构和排版规范
+social-theme-snapshot.json     主题版本和运行快照
+copy.txt                       已生成的配套文案
 ```
+
+`xhs-visual-contract.md`、`layout-guide.md` 和 `visual-component-mapping.md` 不复制到候选目录，由技能运行时随 Prompt 注入，分别负责通用结构、布局基线和语义组件映射。它们不是本次运行的候选输入，也不由 Agent 重复读取。
 
 另传少量运行参数：
 
@@ -54,66 +52,40 @@ layout-guide.md                通用页面结构和排版规范
 | 阶段 | 执行者 | 主要职责 |
 | --- | --- | --- |
 | `inputs` | Pipeline | 准备输入文件、冻结技能/模型/工具快照 |
-| `generation` | CSS Agent + 页面 Agent | 分两个独立循环读取资料，先写 CSS，再逐页写入完整页面 |
-| `generation-gate` | Pipeline | 检查 HTML 根节点、页数、页码、安全结构 |
-| `audit-repair` | Pipeline + 单页修复 Agent | 审计问题页，生成明确修复指令，单页修复并复核 |
-| `final-audit` | Pipeline | 执行整组浏览器布局审计 |
-| `screenshots` | Pipeline | 仅对最终通过的 HTML 截图 |
+| `generation` | 单个 AI 视觉 Agent | 读取冻结资料并通过文档分块写入完整 HTML/CSS |
+| `screenshots` | Pipeline | 对生成后的 HTML 逐页截图，供人工直接验证视觉产物 |
 | `delivery-gate` | Pipeline | 登记 HTML、PNG、报告和阶段记录 |
 
 ## 4. Agent 权限边界
 
-### 4.1 CSS Agent 与页面 Agent
+### 4.1 AI 视觉 Agent
 
 只开放：
 
 ```text
 filesystem.project.read
-filesystem.project.write
+filesystem.project.document_write
 ```
 
-生成阶段拆为两个独立的 Agent 循环，顺序固定为：
-
-1. CSS Agent 读取四份输入文件；
-2. CSS Agent 使用 `set_head` 和 `append_head_css` 写入全局 CSS；
-3. CSS Agent 返回本阶段短 JSON 确认，Pipeline 检查 CSS 文件状态；
-4. 页面 Agent 读取工作文件和当前 HTML；
-5. 页面 Agent 使用 `append_body` 逐页写入完整 `.page`；
-6. 达到目标页数后返回本阶段短 JSON 确认，Pipeline 检查页面状态。
-
-CSS Agent 和页面 Agent 都禁止调用浏览器审计、浏览器观察、`replace_pages`，也禁止把完整 HTML 放进 JSON。CSS Agent 禁止 `append_body`，页面 Agent 禁止修改全局 CSS。模型确认只是阶段完成信号，文件状态和结构门禁才是最终依据。
-
-### 4.2 单页修复 Agent
-
-由 Pipeline 在审计失败后启动，只接收：
-
-- 目标页编号；
-- 目标页当前 HTML；
-- 当前主题和 Layout Guide 的必要规则；
-- 程序生成的 `repairInstructions`；
-- 允许的写入路径和模式。
-
-修复 Agent 只能修改当前问题页，不能改页数、页面职责、事实、来源或其他页面。
+生成阶段只启动一个 AI 视觉 Agent。它先读取冻结输入，再用 `document_write.begin`、多个 `append` 和 `finish` 原样写入完整 HTML/CSS；分块只解决模型输出长度，不由程序拼接或补写视觉内容。Agent 不调用浏览器审计，也不输出完整 HTML JSON。
 
 ## 5. 审计边界
 
-浏览器观察、确定性审计和修复职责分离：
+生成与交付职责分离：
 
 | 能力 | 作用 | 是否判断通过 |
 | --- | --- | --- |
-| `browser_inspect` | 返回指定页真实 DOM、计算样式和边界 | 否 |
-| `browser_audit` | 按规则检查溢出、裁切、字号、可见性、利用率和对比度 | 是 |
-| 修复 Agent | 根据程序修复指令修改目标页 | 否 |
+| `document_write` | 原样分块写入 AI 视觉 HTML/CSS | 否 |
+| `html-pages-to-images` | 把生成后的每个 `.page` 输出为 PNG | 否 |
+| `delivery-gate` | 检查 HTML、copy 和 PNG 文件是否完整并登记 | 是 |
 
-全量生成阶段不可见审计能力。AV-2 期间暂保留旧的兼容审计修复 Agent；AV-4 将其替换为 Pipeline 控制的单页修复流程。
+全量生成阶段只开放项目读取和文档分块写入能力；截图和交付检查在 Agent 完成后执行，不反馈为自动修复。
 
 ## 6. 失败处理
 
 - JSON 截断：只反馈短 JSON 修复请求，不重新传入 HTML；
-- 生成结构失败：停在 `generation-gate`，不进入布局修复；
-- 页面数量错误：保留草稿和诊断，不启动逐页审计；
-- 单页布局失败：只重试当前问题页，达到上限后停止；
-- 最终审计失败：不生成或登记正式 PNG；
+- 截图失败：只重试截图阶段，不重新调用 AI；
+- HTML、copy 或 PNG 文件不完整：交付门禁阻断登记并保留生成产物；
 - AI 视觉失败：不自动回退为程序化图文成功结果。
 
 ## 7. 阶段实施状态
@@ -128,34 +100,26 @@ CSS Agent 和页面 Agent 都禁止调用浏览器审计、浏览器观察、`re
 
 ### AV-2：全量生成 Agent（已完成）
 
-已将全量页面生成从旧审计修复 Agent 中拆出，并进一步拆为 CSS Agent 和页面 Agent 两个独立循环。两个 Agent 只读文件和写文件，不可见浏览器审计工具；CSS 阶段先写样式，页面阶段再写入 `ai-beautified.html`。
+已收束为单个全量 AI 视觉 Agent。Agent 读取冻结输入，通过 `document_write` 的 begin/append/finish 分块原样写入 `ai-beautified.html`，不由程序拼接 CSS 或页面。
 
-### AV-3：结构门禁和生成恢复（已完成）
+### AV-3：截图和交付登记（已完成）
 
-已完善根节点、页数、页码、空页面、内部字段和截断 HTML 检查；结构失败时最多执行一次全量生成恢复，恢复仍失败则保留草稿和诊断，不进入布局修复。
+已恢复截图和轻量交付门禁：生成完成后输出逐页 PNG，并检查 HTML、copy 和 PNG 数量/文件是否完整；截图失败只重试截图，不重新调用 Agent。
 
-### AV-4：Pipeline 审计和单页修复（已完成）
+### AV-4：技能规范化（已完成）
 
-已将实际路径改为“程序审计 → 单页修复 Agent → 程序复核”；修复 Agent 不可见 `browser_audit`，每次只处理一个问题页，并在页面无变化或问题签名不变时停止。
+已同步 `social-card-ai-visual-generator` 的说明、工具权限、输入文件和分块写入协议；技能只负责完整视觉 HTML，截图和交付登记由编排层负责。
 
-### AV-5：最终审计和交付门禁（已完成）
+### AV-5：前端和回归（已完成）
 
-已统一最终整组布局审计、截图完整性和交付状态；最终审计失败会跳过 PNG，截图失败只重试截图，不重新调用 Agent，并保留诊断产物。
-
-### AV-6：技能规范化（已完成）
-
-已同步 `social-card-ai-visual-generator` 的说明、工具权限、输入文件、分阶段写入协议和返回示例：CSS Agent 只写样式，页面 Agent 只追加页面；修复 Agent 只处理一个目标页；`browser_inspect` 仅用于观察；`browser_audit` 仅由 Pipeline 调用；阶段 `final` 不再冒充最终交付通过。
-
-### AV-7：前端和回归（已完成）
-
-已补充 AI 视觉阶段状态、当前修复页、失败原因、保留 HTML/报告展示和 AI 视觉运行诊断页；只读接口同步暴露阶段执行记录、结构门禁、单页修复报告和交付门禁。已完成离线回归，未启动服务。
+已补充 AI 视觉阶段状态、失败原因、HTML/PNG/交付报告展示和 AI 视觉运行诊断页；只读接口同步暴露阶段执行记录和交付门禁。已完成离线回归。
 
 ## 8. 验收标准
 
 1. 全量生成 Agent 不可见 `browser_inspect` 和 `browser_audit`；
 2. 生成阶段只写 CSS 和逐页追加 HTML；
-3. 生成完成后才执行结构门禁和布局审计；
-4. 审计修复只修改目标页；
-5. 最终审计通过后才截图和登记交付；
+3. 生成完成后执行截图和交付文件检查；
+4. 截图失败不重新调用 AI，只重试截图阶段；
+5. 交付文件完整后登记交付；
 6. 全流程不修改故事板生成逻辑、不修改 `card-plan.json`；
 7. 程序化图文和 AI 视觉图文保持两条独立链路。

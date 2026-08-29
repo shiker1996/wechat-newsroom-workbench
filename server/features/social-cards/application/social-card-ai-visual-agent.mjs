@@ -1,9 +1,16 @@
 import { runConversationAgent } from '../../../platform/agent/conversation-agent.mjs';
-import { normalizeToolRequest, validateAgentEnvelope } from '../../../platform/agent/tool-protocol.mjs';
+import { normalizeAgentEnvelope, normalizeToolRequest, validateAgentEnvelope } from '../../../platform/agent/tool-protocol.mjs';
 import { parseModelJsonWithRepair } from '../../../platform/llm/model-json.mjs';
 
 const PROJECT_READ = 'filesystem.project.read';
-const PROJECT_WRITE = 'filesystem.project.write';
+export const AI_VISUAL_DOCUMENT_WRITE = 'filesystem.project.document_write';
+
+// 留出 JSON 信封、工具参数和结束符的余量，避免内容刚好填满模型输出上限后
+// 只剩下不完整的 `tool_requests` 闭合符。
+const DOCUMENT_CHUNK_MAX_CHARS = 8_000;
+// 正常生成和 JSON/过早 final 恢复必须使用同一个输出预算，避免恢复请求
+// 采用更小上限后，把同一个 append 请求再次截断。
+const AGENT_OUTPUT_MAX_TOKENS = 5_000;
 
 function readRequest(requestId, workspaceFiles, reason = '读取 AI 视觉生成资料') {
   return {
@@ -14,98 +21,78 @@ function readRequest(requestId, workspaceFiles, reason = '读取 AI 视觉生成
       capability: PROJECT_READ,
       arguments: {
         resourceId: 'project:current',
-        options: { includePaths: workspaceFiles, maxFiles: workspaceFiles.length, maxCharsPerFile: 100000, maxTotalChars: 140000 },
+        options: { includePaths: workspaceFiles, maxFiles: workspaceFiles.length, maxCharsPerFile: 100_000, maxTotalChars: 140_000 },
       },
       reason,
     }],
   };
 }
 
-function continueRequest(requestId, page, reason = '继续写入下一页完整 HTML') {
+function continueRequest(requestId, sessionId, reason = '继续分块写入完整 HTML') {
   return {
     type: 'tool_requests',
-    assistant_note: `继续写入 P${page}`,
+    assistant_note: '继续通过分块写入工具生成完整 HTML',
     requests: [{
       requestId,
-      capability: PROJECT_WRITE,
-      arguments: { resourceId: 'project:current', path: 'ai-beautified.html', mode: 'append_body', content: '' },
+      capability: AI_VISUAL_DOCUMENT_WRITE,
+      arguments: {
+        resourceId: 'project:current',
+        path: 'ai-beautified.html',
+        operation: 'append',
+        sessionId,
+        requestId: `chunk-${requestId}`,
+        content: '',
+      },
       reason,
     }],
   };
 }
 
-// CSS 至少写入一个基础分片后才能追加页面；大 CSS 必须拆成多个小分片，
-// 避免把样式和页面内容塞进同一个超大的 JSON 响应。
-const REQUIRED_CSS_CHUNKS = 1;
-const MAX_CSS_CHUNKS = 3;
-const GENERATION_CSS_CHUNK_MAX_CHARS = 3_500;
-const GENERATION_OUTPUT_MAX_TOKENS = 5_000;
-const CSS_OUTPUT_MAX_TOKENS = 5_000;
-const CSS_RECOVERY_OUTPUT_MAX_TOKENS = 3_000;
-
-function cssGenerationInstruction(cssChunkCount) {
-  if (cssChunkCount <= 0) {
-    return `当前尚未建立视觉样式。只使用 filesystem.project.write 的 set_head 写入精简的全局基础 CSS：主题变量、画布、页面壳、公共排版、页眉和页脚。不要在本片生成封面、尾页或内容组件 CSS；这些样式必须留给后续 append_head_css。当前分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内。不要生成页面，也不要返回 final。`;
+function generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount, maxPages }) {
+  if (!sourceRead) return '先读取 workspace.files 中的全部本次运行输入；技能内置参考已经随系统提示注入，并据此完成整组页面的视觉解释；不要先写页面。';
+  if (!documentStarted) {
+    return '资料已读取。现在开始一次完整的单 Agent 视觉生成会话：先用 filesystem.project.document_write 的 begin 操作建立文档。不要返回 final。';
   }
-  if (cssChunkCount < MAX_CSS_CHUNKS) {
-    return `精简全局基础 CSS 已写入。现在使用 append_head_css 追加封面、尾页和实际页面所需的内容组件 CSS，每个分片严格控制在 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符以内；不要重复全局基础规则。如果全部实际组件均已覆盖，直接返回 CSS 阶段 final，不要生成页面。`;
+  if (documentFinished) {
+    return '文档已完成 finish。现在只返回严格合法的 {"type":"final","assistantReply":"已完成 AI 视觉 HTML 生成"}，不要调用工具，不要输出 HTML/CSS。';
   }
-  return 'CSS 分片已达到上限，禁止继续追加 CSS；直接返回 CSS 阶段 final，不要生成页面。';
+  if (pageCount < maxPages) {
+    return `当前检测到 ${pageCount}/${maxPages} 页。继续用 filesystem.project.document_write 的 append 原样追加下一段完整 HTML/CSS，单个 content 不超过 ${DOCUMENT_CHUNK_MAX_CHARS} 字符。你负责自行决定 CSS、页面和闭合标签的分块顺序；当前仍未完成整组 ${maxPages} 页，不要返回 final。每个 append 使用新的 requestId，并根据上一次工具结果填写 expectedRevision。服务端会自动注入固定的 resourceId、path 和 sessionId。`;
+  }
+  return `当前检测到已达到 ${maxPages} 页。检查整份 HTML 是否已经包含完整主题 CSS、所有页面结构、闭合标签和可见主题装饰；如果还没写完，继续 append，每个 content 不超过 ${DOCUMENT_CHUNK_MAX_CHARS} 字符。全部内容写完后，用 filesystem.project.document_write 的 finish 结束会话，随后才能返回 final。服务端会自动注入固定的 resourceId、path 和 sessionId。`;
 }
 
-function pageGenerationInstruction(currentPageCount, maxPages) {
-  if (currentPageCount < maxPages) return `当前已生成 ${currentPageCount}/${maxPages} 页。只使用 append_body 追加 P${currentPageCount + 1} 的完整 .page section，不要修改 CSS，不要返回 final。`;
-  return `当前已生成 ${currentPageCount}/${maxPages} 页。页面阶段已完成，只返回简短 final，不要再调用工具。`;
-}
-
-function cssStageOverride() {
+function generationStageOverride(requiredPageCount) {
   return `
-## 当前 Agent 阶段：CSS 生成
+## 当前 Agent 阶段：单一 AI 视觉生成
 
-这是独立的 CSS Agent 循环。上文中的全量生成说明不能改变本阶段约束。
+  你是整组 ${requiredPageCount} 页社交卡的唯一视觉设计师、HTML/CSS 执行者和文件写入者。不要把任务拆给 CSS Agent、页面 Agent 或任何后续程序。先完整读取 workspace.files 中的全部本次运行输入；布局、结构和组件映射参考已随技能提示注入；再在同一个会话中完成视觉解释、主题系统、组件 CSS、全部页面和 HTML 闭合。
 
-- 当前只允许调用 filesystem.project.read 和 filesystem.project.write；
-- 先用 set_head 只写精简的全局基础 CSS：主题变量、画布、页面壳、公共排版、页眉和页脚；禁止在 set_head 中展开封面、尾页或内容组件样式；
-- 封面、尾页和内容组件 CSS 只能用 append_head_css 继续追加，每个分片不超过 ${GENERATION_CSS_CHUNK_MAX_CHARS} 字符；最多 ${MAX_CSS_CHUNKS} 个 CSS 分片；
-- append_head_css 不得重复主题变量、画布、页面壳、公共排版、页眉或页脚规则；
-- 本阶段禁止 append_body、replace_pages、浏览器审计和完整 HTML 输出；
-- 基础 CSS 和需要的组件 CSS 写完后，返回简短 final，表示 CSS 阶段完成；
-- 如果基础 CSS 尚未写入，不能返回 final，必须继续提交 set_head；
-- 所有 content 都必须是合法 JSON 字符串，外层 JSON 必须完整闭合。
+- 当前只允许调用 filesystem.project.read 和 filesystem.project.document_write。
+- 只使用 filesystem.project.document_write 写入文件；不要输出完整 HTML/CSS 到 final 或普通回答。
+- 写入目标固定为 project:current 下的 ai-beautified.html；resourceId、path 和 sessionId 由服务端自动注入，不要为了补齐它们消耗输出空间。
+- 第一次写入必须是 operation=begin；之后使用 operation=append 原样追加 HTML/CSS 分块；所有内容写完后使用 operation=finish；finish 成功后才能返回 final。
+- append 的 content 是原始 HTML/CSS，不要让程序替你拼接、改写、补 CSS、补结构或插入主题装饰。每块不超过 ${DOCUMENT_CHUNK_MAX_CHARS} 字符，并为每块使用唯一 requestId；能填写时使用上一次结果中的 expectedRevision。
+- 可以先追加完整 HTML 的 doctype/head/style，再追加 body/page，也可以按你认为最稳妥的顺序分块；不要假设程序会保留任何预置页面壳，最终文件必须由你的分块内容本身构成完整 HTML。
+- 视觉判断必须来自 workspace.files 中的全部输入和你的整组设计决策：每页一个主焦点，主题装饰在 375×667 原尺寸可见，内容层级和页面节奏有变化，不能把所有页面退化为同一种普通卡片。
+- 生成阶段不调用浏览器审计，不调用修复能力，不调用旧的 filesystem.project.write，不返回程序化补丁。
+- 只有在 ${requiredPageCount} 页、主题 CSS、页面正文、闭合标签和主题装饰全部写完并成功 finish 后，才返回严格的 {"type":"final","assistantReply":"简短说明"}；assistantReply 必须是字符串。
+- 所有工具请求必须是完整合法 JSON；HTML/CSS 放在 JSON 字符串 content 中，正确转义引号、反斜杠和换行。
 `;
 }
 
-function pageStageOverride(requiredPageCount) {
-  return `
-## 当前 Agent 阶段：页面 HTML 生成
-
-这是独立的页面 Agent 循环。CSS 阶段已经完成，当前只负责生成 ${requiredPageCount} 页 HTML。
-
-- 当前只允许调用 filesystem.project.read 和 filesystem.project.write；
-- 首次读取一次工作文件和当前 ai-beautified.html，确认已经存在的 CSS 类名；
-- 只能使用 append_body，每次追加一个完整 .page section；
-- 禁止 set_head、append_head_css、replace_pages、浏览器审计和完整 HTML 输出；
-- 页面达到 ${requiredPageCount} 页后，返回简短 final，表示页面阶段完成；
-- 如果页面还不完整，不能返回 final，必须继续追加缺失页面；
-- 所有 content 都必须是合法 JSON 字符串，外层 JSON 必须完整闭合。
-`;
+function invalidContinuationRequest(requestId, sessionId, reason) {
+  return continueRequest(requestId, sessionId, reason);
 }
 
-function invalidCssContinuationRequest(requestId) {
-  return {
-    type: 'tool_requests',
-    assistant_note: 'CSS 尚未完成，继续提交 CSS 分片',
-    requests: [{
-      requestId,
-      capability: PROJECT_WRITE,
-      arguments: { resourceId: 'project:current', path: 'ai-beautified.html', mode: 'set_head', content: '' },
-      reason: 'CSS 尚未写入完成，不能结束 CSS 阶段',
-    }],
-  };
-}
-
+// AI 视觉模型只输出写入意图；内部 AgentEnvelope 由服务端补齐。
+// 这样模型不需要重复生成 type/requests/capability/arguments 等包装层。
 export function filterAiVisualGenerationCatalog(catalog = []) {
-  return (Array.isArray(catalog) ? catalog : []).filter((item) => [PROJECT_READ, PROJECT_WRITE].includes(item.capability));
+  return (Array.isArray(catalog) ? catalog : []).filter((item) => [PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE].includes(item.capability));
+}
+
+export function shouldUseAiVisualPlanningThinking({ sourceRead = false, documentStarted = false, planningThinkingUsed = false } = {}) {
+  return Boolean(sourceRead && documentStarted && !planningThinkingUsed);
 }
 
 export async function runSocialCardAiVisualGenerationAgent({
@@ -121,175 +108,213 @@ export async function runSocialCardAiVisualGenerationAgent({
   workspaceFiles,
   requiredPageCount,
   getPageCount,
-  getCssChunkCount = () => 0,
-  isSourceRead = () => false,
+  documentWriteSessionId,
   markSourceRead = () => {},
   onPhaseChange = () => {},
-  toolHandlers,
   resolveArguments,
   sanitizeToolResult,
   toolContext = {},
-  maxOutputTokens = 7000,
+  maxOutputTokens = AGENT_OUTPUT_MAX_TOKENS,
   onProgress = () => {},
 } = {}) {
   if (typeof getPageCount !== 'function') throw new TypeError('生成 Agent 缺少 getPageCount');
-  if (typeof getCssChunkCount !== 'function') throw new TypeError('生成 Agent 缺少 getCssChunkCount');
+  if (!documentWriteSessionId) throw new TypeError('生成 Agent 缺少 documentWriteSessionId');
   const files = Array.isArray(workspaceFiles) ? [...workspaceFiles] : [];
-  const pageFiles = [...new Set([...files, 'ai-beautified.html'])];
+  // 生成阶段只读取冻结的设计输入。ai-beautified.html 是本轮输出，不作为旧页面
+  // 参考，避免上一轮的 CSS、类名或页面骨架污染当前 Agent 的视觉判断。
+  const pageFiles = [...new Set(files)];
   const maxPages = Math.max(1, Number(requiredPageCount) || 1);
   const generationCatalog = filterAiVisualGenerationCatalog(catalog);
-  const allowedCapabilities = [PROJECT_READ, PROJECT_WRITE];
+  const allowedCapabilities = [PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE];
   const baseMessages = [{ role: 'user', protected: true, content: JSON.stringify({ render_request: renderRequest }) }];
-  const toolContextFor = (phase) => ({ ...toolContext, skillId: 'social-card-ai-visual-generator', generationPhase: phase, allowedCapabilities, toolHandlers: { [PROJECT_WRITE]: toolHandlers?.[PROJECT_WRITE] } });
-  const complete = async ({ phase, history, step, signal, instruction, outputMaxTokens }) => gateway.complete({
+  let sourceRead = false;
+  let documentStarted = false;
+  let documentFinished = false;
+  let pendingOperation = null;
+  let lastModelResult = null;
+  let planningThinkingUsed = false;
+
+  const complete = async ({ history, step, signal, instruction, outputMaxTokens = AGENT_OUTPUT_MAX_TOKENS, thinking = false }) => gateway.complete({
     provider,
-    purpose: `social-card-ai-visual-${phase}-generation-agent`,
+    purpose: 'social-card-ai-visual-generation-agent',
     batchId,
     candidateId,
-    thinking: false,
+    thinking,
     temperature: step ? 0.35 : 0.25,
-    maxOutputTokens: Math.min(outputMaxTokens || GENERATION_OUTPUT_MAX_TOKENS, maxOutputTokens),
-    // Agent 自己掌握分片恢复。关闭 Gateway 的截断扩容重试，避免模型在更大
-    // token 预算里重复整段 CSS，最终仍把工具 JSON 写断。
+    maxOutputTokens: Math.min(outputMaxTokens, maxOutputTokens),
     adaptiveOutput: false,
     jsonMode: true,
     signal,
     messages: [...history, { role: 'user', protected: true, content: instruction }],
   });
 
-  const runCssAgent = async () => {
-    onPhaseChange('css');
-    let sourceRead = false;
-    let lastModelResult = null;
-    const agent = await runConversationAgent({
-      entryPoint: 'social-card-ai-visual-css-generation',
-      registry,
-      catalog: generationCatalog,
-      messages: [{ role: 'system', protected: true, content: `${agentSystem}${cssStageOverride()}` }, ...baseMessages],
-      store,
-      budget: { maxModelSteps: 10, maxToolCalls: 10, maxParallelToolCalls: 1, maxToolResultChars: 80000, maxTotalToolResultChars: 180000, maxHistoryChars: 180000, timeoutMs: 300000 },
-      toolContext: toolContextFor('css'),
-      resolveArguments,
-      sanitizeToolResult,
-      onEvent: (event) => {
-        if (event?.type === 'tool.completed' && event?.capability === PROJECT_READ) { sourceRead = true; markSourceRead(); }
-        if (event?.type === 'tool.completed' && event?.capability === PROJECT_WRITE) onProgress('AI CSS Agent 已写入视觉样式…');
-      },
-      modelStep: async ({ messages: history, step, signal }) => {
-        const cssChunkCount = Number(getCssChunkCount()) || 0;
-        if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_css_read_${step + 1}`, files), { maxRequests: 1 });
-        let result = await complete({ phase: 'css', history, step, signal, instruction: cssGenerationInstruction(cssChunkCount), outputMaxTokens: CSS_OUTPUT_MAX_TOKENS });
-        lastModelResult = result;
-        const parsed = await parseModelJsonWithRepair(result, {
-          store,
-          label: 'AI CSS Agent',
-          repair: async (error) => {
-            const mode = cssChunkCount <= 0 ? 'set_head' : 'append_head_css';
-            const scopeInstruction = mode === 'set_head'
-              ? '本片只包含主题变量、画布、页面壳、公共排版、页眉和页脚，不得包含封面、尾页或内容组件 CSS。'
-              : '本片只追加尚未覆盖的封面、尾页或内容组件 CSS，不得重复全局基础规则。';
-            const recoveryInstruction = `上一条响应 JSON 不完整（${error.code || 'JSON_FORMAT_ERROR'}）。重新生成一个更短的新分片，不要复制或修补上一条响应。只返回一个 ${mode} 工具请求；content 必须包含完整 style，CSS 分片控制在 2400 字符以内；${scopeInstruction}不要重复 CSS，不要返回页面或解释。`;
-            onProgress('AI CSS Agent 输出结构异常，反馈模型缩短并重交 CSS 分片…');
-            result = await complete({ phase: 'css', history, step, signal, instruction: recoveryInstruction, outputMaxTokens: CSS_RECOVERY_OUTPUT_MAX_TOKENS });
-            lastModelResult = result;
-            return result;
-          },
-        });
-        if (parsed?.type === 'final') {
-          if ((Number(getCssChunkCount()) || 0) >= REQUIRED_CSS_CHUNKS) return validateAgentEnvelope(parsed, { maxRequests: 1 });
-          return validateAgentEnvelope(invalidCssContinuationRequest(`tr_css_continue_${step + 1}`), { maxRequests: 1 });
-        }
-        if (parsed?.type === 'tool_requests') {
-          const request = normalizeToolRequest(parsed.requests?.[0], { fallbackReason: '执行 CSS 生成工具调用' });
-          if (!request || ![PROJECT_READ, PROJECT_WRITE].includes(request.capability)) return validateAgentEnvelope(invalidCssContinuationRequest(`tr_css_continue_${step + 1}`), { maxRequests: 1 });
-          if (request.capability === PROJECT_READ) { sourceRead = true; markSourceRead(); }
-          if (request.capability === PROJECT_WRITE) {
-            const mode = String(request.arguments?.mode || '');
-            if (!['set_head', 'append_head_css'].includes(mode)) return validateAgentEnvelope(invalidCssContinuationRequest(`tr_css_mode_${step + 1}`), { maxRequests: 1 });
-            request.arguments = { ...(request.arguments || {}), resourceId: 'project:current', path: 'ai-beautified.html' };
-          }
-          return validateAgentEnvelope({ ...parsed, requests: [request] }, { maxRequests: 1 });
-        }
-        if ((Number(getCssChunkCount()) || 0) < REQUIRED_CSS_CHUNKS) return validateAgentEnvelope(invalidCssContinuationRequest(`tr_css_continue_${step + 1}`), { maxRequests: 1 });
-        return validateAgentEnvelope({ type: 'final', assistantReply: 'CSS 阶段已完成' }, { maxRequests: 1 });
-      },
-    });
-    return { ...agent, sourceRead, lastModelResult };
+  const describeModelResponseError = (error) => {
+    const issueText = Array.isArray(error?.issues) && error.issues.length
+      ? `；字段问题：${error.issues.map((issue) => `${issue.path || '未知字段'}（${issue.code || 'INVALID'}）`).join('、')}`
+      : '';
+    return `${error?.code || 'MODEL_RESPONSE_INVALID'}：${error?.message || '响应不符合要求'}${issueText}`.slice(0, 900);
   };
 
-  const runPageAgent = async () => {
-    onPhaseChange('pages');
-    let sourceRead = false;
-    let lastModelResult = null;
-    const agent = await runConversationAgent({
-      entryPoint: 'social-card-ai-visual-page-generation',
-      registry,
-      catalog: generationCatalog,
-      messages: [{ role: 'system', protected: true, content: `${agentSystem}${pageStageOverride(maxPages)}` }, ...baseMessages],
-      store,
-      budget: { maxModelSteps: Math.max(12, maxPages + 6), maxToolCalls: Math.max(12, maxPages + 6), maxParallelToolCalls: 1, maxToolResultChars: 80000, maxTotalToolResultChars: 180000, maxHistoryChars: 180000, timeoutMs: 300000 },
-      toolContext: toolContextFor('pages'),
-      resolveArguments,
-      sanitizeToolResult,
-      onEvent: (event) => {
-        if (event?.type === 'tool.completed' && event?.capability === PROJECT_READ) { sourceRead = true; markSourceRead(); }
-        if (event?.type === 'tool.completed' && event?.capability === PROJECT_WRITE) onProgress('AI 页面 Agent 已写入视觉 HTML…');
-      },
-      modelStep: async ({ messages: history, step, signal }) => {
-        const currentPageCount = Number(getPageCount()) || 0;
-        if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_pages_read_${step + 1}`, pageFiles), { maxRequests: 1 });
-        let result = await complete({ phase: 'page', history, step, signal, instruction: pageGenerationInstruction(currentPageCount, maxPages) });
-        lastModelResult = result;
-        const parsed = await parseModelJsonWithRepair(result, {
-          store,
-          label: 'AI 页面 Agent',
-          repair: async (error) => {
-            const recoveryInstruction = `上一条响应 JSON 不完整（${error.code || 'JSON_FORMAT_ERROR'}）。只返回一个 append_body 工具请求；content 必须是 P${currentPageCount + 1} 的完整 .page section，控制在 6000 字符以内；不要返回 CSS 或解释。`;
-            onProgress('AI 页面 Agent 输出结构异常，反馈模型缩短并重交当前页面…');
-            result = await complete({ phase: 'page', history, step, signal, instruction: recoveryInstruction });
-            lastModelResult = result;
-            return result;
-          },
-        });
-        if (parsed?.type === 'final') {
-          if ((Number(getPageCount()) || 0) >= maxPages) return validateAgentEnvelope(parsed, { maxRequests: 1 });
-          return validateAgentEnvelope(continueRequest(`tr_page_continue_${step + 1}`, (Number(getPageCount()) || 0) + 1, '页面尚未完成，不能结束页面阶段'), { maxRequests: 1 });
-        }
-        if (parsed?.type === 'tool_requests') {
-          const request = normalizeToolRequest(parsed.requests?.[0], { fallbackReason: '执行页面生成工具调用' });
-          if (!request || ![PROJECT_READ, PROJECT_WRITE].includes(request.capability)) return validateAgentEnvelope(continueRequest(`tr_page_continue_${step + 1}`, (Number(getPageCount()) || 0) + 1), { maxRequests: 1 });
-          if (request.capability === PROJECT_READ) { sourceRead = true; markSourceRead(); }
-          if (request.capability === PROJECT_WRITE) {
-            if (String(request.arguments?.mode || '') !== 'append_body') return validateAgentEnvelope(continueRequest(`tr_page_mode_${step + 1}`, (Number(getPageCount()) || 0) + 1, '页面阶段只能使用 append_body'), { maxRequests: 1 });
-            request.arguments = { ...(request.arguments || {}), resourceId: 'project:current', path: 'ai-beautified.html' };
-            if ((Number(getPageCount()) || 0) >= maxPages) return validateAgentEnvelope({ type: 'final', assistantReply: '页面阶段已完成' }, { maxRequests: 1 });
-          }
-          return validateAgentEnvelope({ ...parsed, requests: [request] }, { maxRequests: 1 });
-        }
-        if ((Number(getPageCount()) || 0) < maxPages) return validateAgentEnvelope(continueRequest(`tr_page_continue_${step + 1}`, (Number(getPageCount()) || 0) + 1), { maxRequests: 1 });
-        return validateAgentEnvelope({ type: 'final', assistantReply: '页面阶段已完成' }, { maxRequests: 1 });
-      },
-    });
-    return { ...agent, sourceRead, lastModelResult };
+  const jsonRecoveryInstruction = (error, attempt, maxAttempts) => `上一条模型响应无法安全解析为完整 JSON。第 ${attempt}/${maxAttempts} 次恢复。具体问题：${describeModelResponseError(error)}。只返回一个完整合法的 filesystem.project.document_write append 工具请求；content 只放尚未写入的更短 HTML/CSS 分块，不超过 ${Math.min(8_000, DOCUMENT_CHUNK_MAX_CHARS)} 字符；不要返回解释，不要返回完整 HTML。服务端会补齐 resourceId、path、sessionId、assistant_note 和 reason。`;
+
+  const protocolRecoveryInstruction = (parsed, error) => {
+    const detail = describeModelResponseError(error);
+    if (parsed?.type === 'final') {
+      return `上一条响应 JSON 语法正确，但 final 信封不符合协议。具体问题：${detail}。只返回完整合法的 {"type":"final","assistantReply":"阶段已完成"}，不要调用工具，不要输出解释。`;
+    }
+    return `上一条响应 JSON 语法正确，但工具请求信封不符合协议。具体问题：${detail}。只返回一个完整合法的 filesystem.project.document_write append 工具请求；必须保留外层 requestId、capability、arguments.operation 和 append 的 content。assistant_note、reason、resourceId、path、sessionId 可以省略，服务端会自动补齐；不要返回解释。`;
   };
 
-  const cssAgent = await runCssAgent();
-  if (cssAgent.type !== 'final' || (Number(getCssChunkCount()) || 0) < REQUIRED_CSS_CHUNKS) {
-    onPhaseChange('idle');
-    return { ...cssAgent, sourceRead: cssAgent.sourceRead, lastModelResult: cssAgent.lastModelResult, cssChunkCount: Number(getCssChunkCount()) || 0, pageCount: Number(getPageCount()) || 0, allowedCapabilities, catalog: generationCatalog, agentRunIds: [cssAgent.agentRunId].filter(Boolean) };
-  }
-  const pageAgent = await runPageAgent();
+  const parseAndValidateVisualEnvelope = async ({ result, history, step, signal, label }) => {
+    const parsed = await parseModelJsonWithRepair(result, {
+      store,
+      label,
+      allowMissingToolRequestReason: true,
+      allowMissingToolRequestAssistantNote: true,
+      maxRepairAttempts: 2,
+      repair: async (error, { attempt, maxAttempts }) => {
+        onProgress(`AI 视觉 Agent 输出结构异常，第 ${attempt} 次反馈具体错误并缩短分块…`);
+        const recoveryResult = await complete({
+          history,
+          step,
+          signal,
+          instruction: jsonRecoveryInstruction(error, attempt, maxAttempts),
+          outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
+        });
+        lastModelResult = recoveryResult;
+        return recoveryResult;
+      },
+    });
+    try {
+      return validateAgentEnvelope(normalizeAgentEnvelope(parsed), { maxRequests: 1 });
+    } catch (error) {
+      onProgress('AI 视觉 Agent 输出字段不符合协议，反馈具体字段问题…');
+      const corrected = await complete({
+        history,
+        step,
+        signal,
+        instruction: protocolRecoveryInstruction(parsed, error),
+        outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
+      });
+      lastModelResult = corrected;
+      const correctedParsed = await parseModelJsonWithRepair(corrected, {
+        store,
+        label: `${label}协议反馈结果`,
+        allowMissingToolRequestReason: true,
+        allowMissingToolRequestAssistantNote: true,
+        maxRepairAttempts: 1,
+        repair: async (jsonError, { attempt, maxAttempts }) => {
+          const recoveryResult = await complete({
+            history,
+            step,
+            signal,
+            instruction: jsonRecoveryInstruction(jsonError, attempt, maxAttempts),
+            outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
+          });
+          lastModelResult = recoveryResult;
+          return recoveryResult;
+        },
+      });
+      return validateAgentEnvelope(normalizeAgentEnvelope(correctedParsed), { maxRequests: 1 });
+    }
+  };
+
+  onPhaseChange('generation');
+  const agent = await runConversationAgent({
+    entryPoint: 'social-card-ai-visual-generation',
+    registry,
+    catalog: generationCatalog,
+    messages: [{ role: 'system', protected: true, content: `${agentSystem}${generationStageOverride(maxPages)}` }, ...baseMessages],
+    store,
+    budget: { maxModelSteps: Math.max(18, maxPages + 12), maxToolCalls: Math.max(18, maxPages + 12), maxParallelToolCalls: 1, maxToolResultChars: 80_000, maxTotalToolResultChars: 220_000, maxHistoryChars: 220_000, timeoutMs: 300_000 },
+    toolContext: { ...toolContext, skillId: 'social-card-ai-visual-generator', generationPhase: 'generation', allowedCapabilities },
+    resolveArguments,
+    sanitizeToolResult,
+    onEvent: (event) => {
+      if (event?.type === 'tool.completed' && event?.capability === PROJECT_READ) {
+        sourceRead = true;
+        markSourceRead();
+      }
+      if (event?.type === 'tool.completed' && event?.capability === AI_VISUAL_DOCUMENT_WRITE) {
+        if (pendingOperation === 'begin') documentStarted = true;
+        if (pendingOperation === 'finish') documentFinished = true;
+        onProgress('AI 视觉 Agent 已原样追加 HTML/CSS 分块…');
+        pendingOperation = null;
+      }
+    },
+    modelStep: async ({ messages: history, step, signal }) => {
+      if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_visual_read_${step + 1}`, pageFiles), { maxRequests: 1 });
+      if (!documentStarted) {
+        pendingOperation = 'begin';
+        return validateAgentEnvelope({
+          type: 'tool_requests',
+          assistant_note: '建立 AI 视觉 HTML 写入会话',
+          requests: [{
+            requestId: `tr_visual_begin_${step + 1}`,
+            capability: AI_VISUAL_DOCUMENT_WRITE,
+            arguments: { resourceId: 'project:current', path: 'ai-beautified.html', operation: 'begin', sessionId: documentWriteSessionId },
+            reason: '开始由同一个视觉 Agent 分块写入完整 HTML/CSS',
+          }],
+        }, { maxRequests: 1 });
+      }
+
+      const usePlanningThinking = shouldUseAiVisualPlanningThinking({ sourceRead, documentStarted, planningThinkingUsed });
+      planningThinkingUsed = true;
+      let result = await complete({ history, step, signal, thinking: usePlanningThinking, instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages }) });
+      lastModelResult = result;
+      let parsed = await parseAndValidateVisualEnvelope({ result, history, step, signal, label: 'AI 视觉 Agent' });
+      if (parsed?.type === 'final') {
+        if (documentFinished && (Number(getPageCount()) || 0) >= maxPages) return validateAgentEnvelope(parsed, { maxRequests: 1 });
+        const correction = await complete({
+          history: [...history, { role: 'assistant', content: JSON.stringify(parsed), protected: true }],
+          step,
+          signal,
+          instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages }) + ' 你刚才过早返回了 final。必须继续写入，不能结束。',
+          outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
+        });
+        lastModelResult = correction;
+        parsed = await parseAndValidateVisualEnvelope({
+          result: correction,
+          history: [...history, { role: 'assistant', content: JSON.stringify(parsed), protected: true }],
+          step,
+          signal,
+          label: 'AI 视觉 Agent 完成前恢复',
+        });
+        if (parsed?.type === 'final') return validateAgentEnvelope(parsed, { maxRequests: 1 });
+      }
+      if (parsed?.type === 'tool_requests') {
+        const request = normalizeToolRequest(parsed.requests?.[0], { fallbackReason: '执行 AI 视觉分块写入' });
+        if (!request || ![PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE].includes(request.capability)) {
+          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_recover_${step + 1}`, documentWriteSessionId, '只能使用项目读取和 AI 视觉文档分块写入能力'), { maxRequests: 1 });
+        }
+        if (request.capability === PROJECT_READ) {
+          sourceRead = true;
+          markSourceRead();
+          return validateAgentEnvelope({ ...parsed, requests: [request] }, { maxRequests: 1 });
+        }
+        const operation = String(request.arguments?.operation || '');
+        if (!['begin', 'append', 'finish', 'abort'].includes(operation)) {
+          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_operation_${step + 1}`, documentWriteSessionId, 'operation 必须是 begin、append、finish 或 abort'), { maxRequests: 1 });
+        }
+        if (operation === 'append' && String(request.arguments?.content || '').length > DOCUMENT_CHUNK_MAX_CHARS) {
+          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_chunk_${step + 1}`, documentWriteSessionId, `单个 content 不得超过 ${DOCUMENT_CHUNK_MAX_CHARS} 字符，请拆成更小分块`), { maxRequests: 1 });
+        }
+        request.arguments = { ...(request.arguments || {}), resourceId: 'project:current', path: 'ai-beautified.html', sessionId: documentWriteSessionId };
+        pendingOperation = operation;
+        return validateAgentEnvelope({ ...parsed, requests: [request] }, { maxRequests: 1 });
+      }
+      return validateAgentEnvelope({ type: 'final', assistantReply: 'AI 视觉生成阶段结束' }, { maxRequests: 1 });
+    },
+  });
   onPhaseChange('idle');
   return {
-    ...pageAgent,
-    agentRunId: pageAgent.agentRunId || cssAgent.agentRunId,
-    agentRunIds: [cssAgent.agentRunId, pageAgent.agentRunId].filter(Boolean),
-    modelSteps: (cssAgent.modelSteps || 0) + (pageAgent.modelSteps || 0),
-    toolCalls: (cssAgent.toolCalls || 0) + (pageAgent.toolCalls || 0),
-    sourceRead: Boolean(cssAgent.sourceRead && pageAgent.sourceRead),
-    lastModelResult: pageAgent.lastModelResult || cssAgent.lastModelResult,
-    cssChunkCount: Number(getCssChunkCount()) || 0,
+    ...agent,
+    sourceRead,
+    lastModelResult,
+    cssChunkCount: 0,
     pageCount: Number(getPageCount()) || 0,
+    documentStarted,
+    documentFinished,
     allowedCapabilities,
     catalog: generationCatalog,
   };

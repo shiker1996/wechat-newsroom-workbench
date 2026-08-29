@@ -50,13 +50,29 @@ export class AiJobManager {
       this.activeCount += 1;
       job.status = 'running'; job.progress = '准备执行';
       this.store.updateAiRun(job.id, { status: 'running', progress: '准备执行' });
-      this.run(job, job.runOptions || {}).finally(() => {
-        this.running.delete(this.conflictKey(job));
-        this.activeCount = Math.max(0, this.activeCount - 1);
-        this.pruneTerminalJobs();
-        this.tick();
-      });
+      // run() 当前会把业务异常落为 failed，但调度器仍必须兜住任何越过
+      // run() 边界的拒绝（例如 onFailure、日志或收尾存储异常）。否则被忽略的
+      // finally Promise 可能变成 unhandled rejection，Node 进程会直接退出。
+      this.run(job, job.runOptions || {})
+        .catch((error) => this.recordUnexpectedFailure(job, error))
+        .finally(() => {
+          this.running.delete(this.conflictKey(job));
+          this.activeCount = Math.max(0, this.activeCount - 1);
+          this.pruneTerminalJobs();
+          try { this.tick(); } catch {}
+        })
+        .catch(() => {});
     }
+  }
+
+  recordUnexpectedFailure(job, error) {
+    const message = error?.message || String(error || 'AI 任务异常退出');
+    job.status = 'failed';
+    job.error = message;
+    job.finishedAt = new Date().toISOString();
+    try {
+      this.store.updateAiRun(job.id, { status: 'failed', error: message, progress: `失败：${message}` });
+    } catch {}
   }
 
   pruneTerminalJobs(limit = 100) {

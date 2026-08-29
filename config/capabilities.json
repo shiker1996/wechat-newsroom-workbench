@@ -8,6 +8,7 @@
     "content.repository.inspect": {"name":"代码仓库分析","description":"核验代码仓库的元数据、README、版本与安装入口。","category":"信息获取"},
     "content.passage.retrieve": {"name":"文章段落检索","description":"从文章内容池中检索可复用或可引用的相关段落。","category":"内容检索"},
     "filesystem.project.read": {"name":"本地项目读取","description":"只读提取已授权本地项目的结构和文本材料。","category":"本地内容"},
+    "filesystem.project.document_write": {"name":"AI 视觉文档分块写入","description":"在已授权候选目录内原样分块追加 AI 视觉 HTML/CSS 文档。","category":"本地内容"},
     "diagram.mermaid.render": {"name":"Mermaid 图表渲染","description":"将 Mermaid 图表定义渲染为可交付图片。","category":"内容渲染"},
     "diagram.echarts.render": {"name":"ECharts 图表渲染","description":"将 ECharts 配置渲染为可交付图片。","category":"内容渲染"},
     "image.cdn.upload": {"name":"图片存储上传","description":"将本地图片上传到已配置的图片存储并返回公开地址。","category":"内容交付"},

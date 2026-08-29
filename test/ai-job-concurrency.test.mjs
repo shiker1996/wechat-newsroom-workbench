@@ -106,6 +106,20 @@ test('启动任务时把 candidateId/documentKind/focus 等执行参数传给 ru
   } finally { teardown(ctx); }
 });
 
+test('run 边界异常会落为 failed，不产生未处理拒绝', async () => {
+  const ctx = setup();
+  try {
+    const { batch, candidates } = makeCandidates(ctx.store, 1);
+    const mgr = ctx.manager(1);
+    mgr.run = async () => { throw new Error('模拟 Agent 边界异常'); };
+    const job = mgr.start({ batchId: batch.id, candidateId: candidates[0].id, type: 'social-card' });
+    await settle(120);
+    assert.equal(job.status, 'failed');
+    assert.equal(ctx.store.getAiRun(job.id).status, 'failed');
+    assert.match(ctx.store.getAiRun(job.id).error, /模拟 Agent 边界异常/);
+  } finally { teardown(ctx); }
+});
+
 test('队列头部被同互斥键阻塞时，后续无冲突任务可先行', async () => {
   const ctx = setup();
   try {

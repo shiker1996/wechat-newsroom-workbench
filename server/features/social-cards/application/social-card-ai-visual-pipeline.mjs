@@ -5,10 +5,6 @@ export const SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT = Object.freeze([
   { id: 'inputs', skill: 'fixed-program' },
   { id: 'copy', skill: 'xiaohongshu-article-generator' },
   { id: 'generation', skill: 'social-card-ai-visual-generator' },
-  { id: 'generation-gate', skill: 'fixed-program' },
-  { id: 'audit-repair', skill: 'social-card-ai-visual-generator' },
-  { id: 'final-audit', skill: 'fixed-program' },
-  { id: 'content-audit', skill: 'fixed-program' },
   { id: 'screenshots', skill: 'html-pages-to-images' },
   { id: 'delivery-gate', skill: 'fixed-program' },
 ]);

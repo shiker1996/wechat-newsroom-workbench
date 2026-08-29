@@ -13,8 +13,8 @@
 本基线用于在 AI 视觉 Pipeline 重构前固定当前行为，区分：
 
 - AI 视觉生成链路和程序化图文链路；
-- Agent 生成、浏览器观察、确定性审计、截图和交付门禁；
-- 模型协议错误、工具预算错误、结构错误和真实布局错误。
+- Agent 生成、截图和交付门禁；
+- 模型协议错误、工具预算错误和交付文件错误。
 
 本阶段不改变生成算法、不启动服务、不切换默认实现。
 
@@ -25,12 +25,12 @@
 | 任务入口 | `social-card-beautify` |
 | 代码入口 | `server/features/social-cards/application/social-card-beautify.mjs` 的 `runSocialCardBeautify` |
 | 程序化入口 | `runSocialCardPipeline` |
-| AI Agent 入口 | `social-card-ai-visual-generation`；兼容修复阶段仍使用 `social-card-ai-visual` |
+| AI Agent 入口 | `social-card-ai-visual-generation` |
 | AI 输出 | `ai-beautified.html`、`ai-beautified-output/` |
 | 程序化输出 | `my-design.html`、`output/` |
-| 页面写入 | Agent 调用 `filesystem.project.write` |
-| 浏览器观察 | `content.social_card.browser_inspect`，仅兼容审计修复 Agent 可见 |
-| 确定性审计 | `content.social_card.browser_audit`，仅兼容审计修复 Agent 可见；全量生成 Agent 不可见 |
+| 页面写入 | Agent 调用 `filesystem.project.document_write`，原样分块追加 |
+| 截图 | `html-pages-to-images` 在生成完成后执行 |
+| 交付检查 | 检查 HTML、copy 和 PNG 是否完整并登记 |
 | 失败回退 | 不生成程序化回退页面 |
 
 ## 3. 当前实际流程
@@ -38,28 +38,19 @@
 ```text
 准备 fact-sheet/card-plan/主题 SPEC/Layout Guide
   ↓
-创建最小 ai-beautified.html 文件
+创建空的 ai-beautified.html 文件容器
   ↓
 全量生成 Agent
   ├─ 读取四份文件
-  ├─ set_head 写 CSS
-  └─ append_body 逐页写入
-  ↓
-生成结构门禁
-  ↓
-兼容审计修复 Agent
-  ├─ browser_audit
-  ├─ browser_inspect
-  └─ replace_pages 单页修复
+  ├─ 读取冻结输入
+  └─ document_write 分块写入完整 HTML/CSS
   ↓
 PNG 渲染
   ↓
-最终整组布局审计
-  ↓
-登记 AI 视觉产物
+交付门禁和 AI 视觉产物登记
 ```
 
-当前已具备“生成阶段先完成全部页面，再进入审计阶段”的运行时保护。AV-2 已将全量生成和兼容审计修复拆成两个 Agent 会话；AV-3 已增加结构门禁和一次全量恢复；AV-4 已改为 Pipeline 审计与单页修复 Agent 闭环。
+当前链路只保留“准备输入 → 单 Agent 分块生成 → 截图 → 交付登记”，不再自动执行结构门禁、布局审计、AI 修复或内容审计。
 
 ## 4. 固定回归样本
 
@@ -78,11 +69,9 @@ PNG 渲染
 fact-sheet.md
 card-plan.json
 social-theme-design-spec.md
-layout-guide.md
 my-design.html（如存在）
 ai-beautified.html（如存在）
 layout-report.json（如存在）
-ai-beautified-layout-report.json（如存在）
 ai-beautify-report.json（如存在）
 Agent 模型调用记录
 Agent 工具调用记录
@@ -99,9 +88,6 @@ Agent 工具调用记录
 | `inputs` | 四份输入缺失、读取失败、来源资料不可用 | inputs |
 | `model-json-truncated` | `MODEL_JSON_TRUNCATED`、JSON 结构未闭合 | Agent |
 | `agent-budget` | 模型步骤预算、工具调用预算、总耗时预算 | Agent |
-| `generation-structure` | 根节点缺失、HTML 不完整、危险结构 | generation-gate |
-| `page-count` | 页面数量改变、页码无效、缺页 | generation-gate |
-| `layout-audit` | 溢出、裁切、字号、文字不可见、利用率、垂直失衡 | audit-repair/final-audit |
 | `screenshots` | PNG 渲染、截图目录或图片生成失败 | screenshots |
 | `delivery-gate` | 报告、Artifact 登记或交付状态失败 | delivery-gate |
 | `unknown` | 暂时无法归类的错误 | unknown |
@@ -120,9 +106,8 @@ ai-visual-baseline.json
 
 - 候选、批次、内容类型、渠道和主题；
 - 故事板页数和目标页数；
-- 当前生成/修复是否共用 Agent；
-- `browser_inspect`、`browser_audit` 和最终审计的当前边界；
-- 输入、HTML、布局报告、截图目录等产物是否存在；
+- 当前生成阶段的 Agent、截图和交付阶段边界；
+- 输入、HTML、截图目录和交付门禁等产物是否存在；
 - 可归类的失败类型。
 
 文件只用于基线和诊断，不参与生成输入，不改变页面内容，也不作为交付产物。

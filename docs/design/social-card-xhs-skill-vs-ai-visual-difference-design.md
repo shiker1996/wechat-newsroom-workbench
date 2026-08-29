@@ -48,14 +48,14 @@
 
 | 核对项 | XHS Skill 实际产物 | 当前 AI 视觉产物 | 当前判断 |
 | --- | --- | --- | --- |
-| 生成职责 | Agent 写 HTML；脚本截图 | Agent 写完整 HTML；Pipeline 审计和修复 | 生成契约不同 |
-| 页面外壳 | `page-inner + topbar + page-body + bottom-strip` | 主要是 `page + page-body` | 当前外壳更弱 |
-| 封面结构 | 图标块、角标、标题、分隔线、副标题、底部标签/日期 | 标签、标题、副标题、数据行 | 封面层次不同 |
-| 内容密度 | 参考 4 层填充；内容页偏紧凑 | AI 技能只要求 2–4 个视觉层；实际页面层数不稳定 | 当前约束更松 |
+| 生成职责 | Agent 写 HTML；脚本截图 | Agent 写完整 HTML；Pipeline 截图和交付登记 | 生成契约不同 |
+| 页面外壳 | `page-inner + topbar + page-body + bottom-strip` | 同一通用骨架，由 Agent 完整写入 | 现行结构已对齐 |
+| 封面结构 | 图标块、角标、标题、分隔线、副标题、底部标签/日期 | 同一通用封面骨架，主题负责视觉处理 | 现行结构已对齐 |
+| 内容密度 | 参考 4 层填充；内容页偏紧凑 | 以 3–4 个有意义内容层和 60%–80% 视觉占用为目标 | 现行约束已收紧 |
 | 内容组件 | `.card`、`.stat`、`.tip`、`.list`、`.mini-grid`、`.diagram` 等组合 | `.crim-card`、`.crim-list`、`.crim-step-row`、`.crim-tip` 等组合 | 组件命名和组合方式不同 |
-| 页眉页脚 | 页眉和底部导航均参与视觉构图 | 当前多数页面没有底部导航 | 页面收束感不同 |
-| 装饰 | 主题 CSS 中的背景、边框、阴影、色条、渐变共同参与构图 | 当前主要是所有页面复用同一套内框/圆环/斜线 | 当前装饰存在，但变化和参与度不足 |
-| 视觉骨架 | 通用骨架较稳定，Agent 在其中填充内容 | 页面壳和内容布局均由 Agent 临时决定 | 差异主要来自生成契约 |
+| 页眉页脚 | 页眉和底部导航均参与视觉构图 | 同一通用骨架，主题可改变外观 | 现行结构已对齐 |
+| 装饰 | 主题 CSS 中的背景、边框、阴影、色条、渐变共同参与构图 | 主题 SPEC 明确要求装饰在原尺寸可感知并参与层级 | 现行 Prompt/SPEC 已加强 |
+| 视觉骨架 | 通用骨架较稳定，Agent 在其中填充内容 | 通用骨架由内置视觉契约约束，主题 SPEC 只负责主题层 | 差异主要来自视觉决策自由度 |
 
 ## 2.1 规范文件对比：第一项核对结果
 
@@ -69,11 +69,11 @@
 | --- | --- | --- |
 | `.page-body` 基础 CSS | `flex`、纵向排列、`gap:8px`，没有强制 `justify-content` | 额外加入 `justify-content:center` |
 | 标签最小字号 | 9px | 10px |
-| 页面利用率 | 82%–95% 为推荐目标 | 增加了 `cover/content/ending` 的审计硬区间 |
-| 审计说明 | 主要是视觉排版建议 | 增加 `underfilled`、`overfilled`、垂直失衡等项目门禁说明 |
+| 页面利用率 | 82%–95% 为推荐目标 | 采用生成阶段 60%–80% 内容区视觉占用目标，不执行运行时审计 |
+| 审计说明 | 主要是视觉排版建议 | 现行生成阶段不执行布局审计；只保留截图和交付登记 |
 | 垂直对齐 | 建议视觉重心略偏上 | 明确要求整组页面统一垂直居中 |
 
-因此，`layout-guide.md` 可以视为“外部布局指南 + 当前项目的审计和居中规则”，不是完全独立的一套布局规范。
+因此，`layout-guide.md` 可以视为“外部布局指南 + 当前项目的布局和居中规则”，是技能运行时注入的通用布局参考，不是候选主题输入。
 
 ### `DESIGN_SYSTEM.md` 与 `social-theme-design-spec.md`
 
@@ -92,14 +92,14 @@
 - 主要提供主题 Token、`crim-*` 组件名、少量核心 CSS 配方和装饰层；
 - 只保留当前主题，不包含外部设计系统的完整通用组件库；
 - “页面编排”主要是文字建议，但当时的 SPEC 仍把通用页面结构写进了主题文件；现行版本只声明主题如何接入通用骨架，不再复制骨架和通用组件 CSS；
-- 增加了当前 AI 链路的事实、审计和安全门禁要求；
+- 保留当前 AI 链路的事实边界和安全要求，不复制生成流程、截图或运行时审计职责；
 - 旧版 SPEC 曾写有“程序负责页面壳、AI 只生成插槽内容”，但该旧规则已从主题 SPEC 和主题规范生成器移除；当前 AI 视觉技能与主题 SPEC 均要求 Agent 写入完整 HTML 页面。
 
 外部 crimson 设计系统与改造前 crimson SPEC 也不是一一对应：外部使用 `.cr-card`、`.cr-stat`、`.cr-tip` 等类名说明和通用卡片体系；改造前 SPEC 主要使用 `.crim-card`、`.crim-stat`、`.crim-tip`，并把运行时变量统一成 `--bg`、`--surface`、`--accent` 等。现行版本只保留 `.crim-*` 前缀绑定，完整组件语义由 `xhs-visual-contract.md` 提供。
 
 ### 第一项核对结论
 
-“昨天参考外部文件生成当前 Layout Guide”这个判断基本成立；`layout-guide.md` 的主体内容确实高度相似，只加入了项目自己的审计和居中约束。
+“昨天参考外部文件生成当前 Layout Guide”这个判断基本成立；`layout-guide.md` 的主体内容确实高度相似，只加入了项目自己的布局和居中约束。
 
 但不能把同样的结论套到现行 SPEC：它不再定义页面骨架或通用组件目录，只保留主题 Token、视觉绑定和装饰配方；完整骨架、封面结构、组件语义和基础 CSS 统一由 `xhs-visual-contract.md` 提供。
 
@@ -118,7 +118,7 @@
 | --- | --- | --- |
 | `social-card-ai-visual-generator/SKILL.md` | 读取输入、事实保真、生成顺序、写入协议、审计修复边界 | 维护通用组件 CSS 细节或主题 Token |
 | `references/xhs-visual-contract.md` | 通用页面骨架、封面结构、组件语义和基础 CSS | 主题配色、具体事实和页面内容 |
-| `references/layout-guide.md` | 375×667 画布、安全区、字号、间距、利用率和布局审计口径 | 主题视觉风格或组件语义目录 |
+| `references/layout-guide.md` | 375×667 画布、安全区、字号、间距、利用率和布局基线 | 主题视觉风格或组件语义目录；不作为候选工作区文件 |
 | `themes/social/<id>/AI_DESIGN_SPEC.md` | 主题 Token、类名前缀、组件视觉覆盖和装饰配方 | 页面骨架、固定页面模板、通用组件目录和通用门禁 |
 
 本轮同步修正了主题 SPEC 生成器，避免之后重新生成主题文件时把通用结构和组件 CSS 带回来。
@@ -141,7 +141,7 @@
 3. 使用同等明确的内容密度和卡片组合基线。
 4. 使用主题专属 CSS，而不是只使用主题颜色。
 5. 让装饰层参与页面构图，而不是统一叠加在所有页面上。
-6. 保留当前 AI 视觉链路的事实完整性、布局审计和安全门禁。
+6. 保留当前 AI 视觉链路的事实完整性、截图和交付门禁；视觉问题通过生成 Prompt/SPEC 解决，不在生成后用程序审计修补。
 
 页面角色固定模板不是本目标的必要条件；如果后续发现 XHS Skill 的实际产物存在更具体的页面构图模式，再以实际 HTML 和截图为证据补充。
 
@@ -229,8 +229,8 @@
 2. 将数据库故事板写成候选目录中的 `card-plan.json`。
 3. 检查并确定原始事实文件：`repository-fact-sheet.json`、`event-analysis.json` 或 `custom-fact-sheet.json`。
 4. 生成 `ai-visual-card-plan.json`，作为 Pipeline 内部的精简视觉计划记录。
-5. 从 `themes/social/<theme-id>/AI_DESIGN_SPEC.md` 复制主题 SPEC 到候选目录的 `social-theme-design-spec.md`。
-6. 从 `skills/social-card-ai-visual-generator/references/layout-guide.md` 复制布局指南到候选目录的 `layout-guide.md`。
+5. 从 `themes/social/<theme-id>/AI_DESIGN_SPEC.md` 复制主题 SPEC 到候选目录的 `social-theme-design-spec.md`，作为本次运行唯一的主题专属输入。
+6. 由技能运行时把 `xhs-visual-contract.md`、`layout-guide.md` 和 `visual-component-mapping.md` 作为内置参考注入 Prompt，不复制到候选目录。
 7. 生成空的 `ai-beautified.html` 脚手架。
 
 正常生成 Agent 实际读取的候选工作文件是：
@@ -239,7 +239,6 @@
 card-plan.json
 原始事实 JSON
 social-theme-design-spec.md
-layout-guide.md
 ```
 
 ### 8.2 加载技能提示词

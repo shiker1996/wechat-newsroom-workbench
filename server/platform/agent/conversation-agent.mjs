@@ -1,7 +1,7 @@
 import { CONVERSATION_AGENT_BUDGET_DEFAULTS, CONVERSATION_AGENT_BUDGET_LIMITS } from './contracts.mjs';
 import { compactAgentHistory, compactToolResult, toolCallFingerprint } from './context.mjs';
 import { agentEvent } from './events.mjs';
-import { AgentContractError, validateAgentEnvelope, toolError } from './tool-protocol.mjs';
+import { AgentContractError, normalizeAgentEnvelope, validateAgentEnvelope, toolError } from './tool-protocol.mjs';
 import { executeConversationTool } from './tool-executor.mjs';
 
 function budgets(input={}){const out={};for(const [key,value] of Object.entries(CONVERSATION_AGENT_BUDGET_DEFAULTS))out[key]=Math.min(CONVERSATION_AGENT_BUDGET_LIMITS[key],Math.max(1,Number(input[key])||value));return Object.freeze(out);}
@@ -20,7 +20,8 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       if(Date.now()-started>limits.timeoutMs)throw new AgentContractError('AGENT_BUDGET_EXCEEDED',`Agent 已超过总耗时预算（${limits.timeoutMs}ms）`);
       const remaining=Math.max(1,limits.timeoutMs-(Date.now()-started));
       const modelHistory=compactAgentHistory(history,limits.maxHistoryChars);
-      const envelope=validateAgentEnvelope(await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining),{maxRequests:limits.maxParallelToolCalls});
+      const modelEnvelope=await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining);
+      const envelope=validateAgentEnvelope(normalizeAgentEnvelope(modelEnvelope),{maxRequests:limits.maxParallelToolCalls});
       if(envelope.type==='final'){
         store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
         emit('done',{status:'completed'});return {agentRunId:id,...envelope,modelSteps:step+1,toolCalls};

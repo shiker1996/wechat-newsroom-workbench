@@ -1,5 +1,7 @@
 # XHS 视觉生成通用契约
 
+> 本文件由 `social-card-ai-visual-generator` 运行时作为内置参考注入，不复制到候选工作目录，也不属于 `workspace.files`。本文件只负责通用结构关系和组件语义。
+
 > 来源：`E:\Downloads\skills\skills\xiaohongshu-article-generator\DESIGN_SYSTEM.md` 与 `LAYOUT_GUIDE.md`
 >
 > 用途：给 `social-card-ai-visual-generator` 提供与 XHS Skill 一致的通用 HTML 骨架和组件结构。主题颜色、字体、边框、阴影和装饰仍以候选目录中的 `social-theme-design-spec.md` 为准。
@@ -55,7 +57,9 @@
       <span class="xhs-sub">SECTION</span>
     </header>
     <main class="page-body">
-      <!-- 1–4 个有意义的内容组件，默认 3–4 层填充 -->
+      <div class="page-content-stack">
+        <!-- 1–4 个有意义的内容组件，默认 3–4 层填充 -->
+      </div>
     </main>
     <footer class="bottom-strip">
       <span class="bs-logo">账号或项目名</span>
@@ -66,6 +70,16 @@
 ```
 
 主题前缀可以把 `xhs-` 替换为 SPEC 声明的主题前缀，但不能删除 `page-inner`、`page-body` 或 `bottom-strip`。例如主题 SPEC 声明 `crim-*` 时，页眉使用 `.crim-topbar`、`.crim-num`、`.crim-title`、`.crim-sub`，外壳仍保持本契约结构。
+
+## 2.3 结构职责（布局数值见 Layout Guide）
+
+本契约只规定结构关系和布局职责，不重复维护页面尺寸、CSS 声明、padding、gap 或垂直对齐数值。所有布局 CSS 的唯一参考是 `references/layout-guide.md`；如果两份资料出现差异，以 Layout Guide 的布局实现为准。
+
+- `.page-inner` 是页面内部的纵向容器；封面标签和装饰可以绝对定位，不计入正常流。
+- `.page-body` 是唯一的正文可用区，负责承载内容并提供垂直对齐空间。
+- `.page-content-stack` 是内容页唯一的纵向内容栈，负责标题、卡片和辅助层的排列与间距。
+- `.page-inner`、`.page-body` 和 `.page-content-stack` 不得依赖固定 Grid 行号；不能因为绝对定位的标签或装饰改变正常流子元素数量后产生空白或错位。
+- `.page-body` 必须只承载一个 `.page-content-stack`；普通内容页不得把多个卡片直接放成 `.page-body` 的兄弟元素。
 
 ## 3. 通用组件目录
 
@@ -206,6 +220,7 @@
 
 - 每页最多 4 个主要内容组件；
 - 内容密度允许时，普通内容页默认 3–4 层；
+- 事实允许时，内容栈应形成内容区约 60%–80% 的视觉占用；主组件要有足够视觉重量，不能让整组页面都只占中部一小条；
 - 封面和结尾页可以少于 3 层，但必须有明确主视觉；
 - 不用空白卡、重复卖点或无意义 emoji 填充；
 - 不使用 `space-between`、负 margin、内部滚动或裁切制造密度；
@@ -246,10 +261,11 @@
 写入每页前逐项确认：
 
 - 封面是否有 `page-cover`、`page-inner`、`cover-center`、`cover-bottom`；
-- 内页是否有 `page-inner`、页眉、`page-body`、`bottom-strip`；
+- 内页是否有 `page-inner`、页眉、`page-body`、唯一的 `page-content-stack`、`bottom-strip`，且内容卡片均位于内容栈内；
 - 页面是否只使用 1–4 个有意义组件；
 - 是否至少有一个主题组件，而不是只有裸文本；
 - 普通内容页是否达到 3–4 层有效内容；
+- 内容密度是否来自真实组件和事实关系，而不是空白占位；
 - 主题装饰是否真正可见；
 - 整组相邻页面是否连续使用相同主卡片轮廓；
 - 指标、证据和结论页面是否分别形成数字焦点、证据边界和结论色块；

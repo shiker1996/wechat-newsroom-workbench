@@ -6,7 +6,7 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "assistant_note", "requests"],
+      "required": ["type", "requests"],
       "properties": {
         "type": { "const": "tool_requests" },
         "assistant_note": { "type": "string", "maxLength": 300 },
@@ -21,7 +21,7 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "assistantReply", "output"],
+      "required": ["type", "assistantReply"],
       "properties": {
         "type": { "const": "final" },
         "assistantReply": { "type": "string" },

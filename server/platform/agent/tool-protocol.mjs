@@ -17,6 +17,16 @@ export function normalizeToolRequest(value,{fallbackReason='执行工具调用'}
   return {...value,reason:[...reason].slice(0,160).join('')};
 }
 
+// assistant_note 和 reason 只用于过程可观测性，不改变工具路由或写入语义。
+// 统一在严格校验前补齐，避免每个 Agent 都重复处理模型省略的说明字段。
+export function normalizeAgentEnvelope(value,{fallbackAssistantNote='执行工具调用',fallbackReason='执行工具调用'}={}){
+  if(!object(value)||value.type!=='tool_requests')return value;
+  const normalized={...value};
+  if(!Object.prototype.hasOwnProperty.call(normalized,'assistant_note'))normalized.assistant_note=fallbackAssistantNote;
+  if(Array.isArray(normalized.requests))normalized.requests=normalized.requests.map((request)=>normalizeToolRequest(request,{fallbackReason}));
+  return normalized;
+}
+
 function exactKeys(value,allowed,path){
   const unknown=Object.keys(value).filter((key)=>!allowed.includes(key));
   if(unknown.length)throw new AgentContractError('INVALID_AGENT_ENVELOPE',`${path} 包含未知字段：${unknown.join('、')}`,unknown.map((field)=>({path:`${path}.${field}`,code:'UNKNOWN_FIELD'})));
@@ -33,6 +43,7 @@ export function validateToolRequest(value){
 }
 
 export function validateAgentEnvelope(value,{maxRequests=4}={}){
+  value=normalizeAgentEnvelope(value);
   if(!object(value))throw new AgentContractError('INVALID_AGENT_ENVELOPE','AgentEnvelope 必须是对象');
   if(value.type==='final'){
     // final 打平：业务字段直接平铺在信封顶层，协议只强制 type+assistantReply；

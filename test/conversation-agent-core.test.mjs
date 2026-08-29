@@ -32,6 +32,12 @@ test('final 信封打平：业务字段平铺顶层，兼容旧嵌套 output 层
   assert.deepEqual(nested.output,{nextQuestion:'q',editorial:{next_action:'DISCUSS'}});
 });
 
+test('协议允许省略过程说明字段，并在校验前补齐默认值',()=>{
+  const envelope=validateAgentEnvelope({type:'tool_requests',requests:[{requestId:'tr_optional_meta',capability:'content.demo.read',arguments:{query:'hello'}}]});
+  assert.equal(envelope.assistant_note,'执行工具调用');
+  assert.equal(envelope.requests[0].reason,'执行工具调用');
+});
+
 test('工具目录取入口、技能授权、启用实现和只读风险的交集',()=>{
   const tools=registry();
   const catalog=buildConversationToolCatalog({registry:tools,entryCapabilities:['content.demo.read','content.demo.write'],allowedCapabilities:['content.demo.read','content.demo.write']});

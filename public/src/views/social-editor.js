@@ -189,19 +189,17 @@ function renderDeliveryFilm(){
 }
 
 function aiVisualStageLabel(stage){
-  return ({inputs:'准备输入',generation:'全量页面生成','generation-gate':'结构门禁','audit-repair':'逐页审计修复','final-audit':'最终整组审计','content-audit':'内容覆盖审计',screenshots:'生成 PNG','delivery-gate':'交付门禁'})[stage]||stage||'AI 视觉';
+  return ({inputs:'准备输入',copy:'生成配套文案',generation:'全量页面生成',screenshots:'生成 PNG','delivery-gate':'交付门禁'})[stage]||stage||'AI 视觉';
 }
 
-function aiVisualStatusHtml(report,stages,repairReport){
+function aiVisualStatusHtml(report,stages){
   if(!report&&!stages)return '';
   const stageItems=Array.isArray(stages?.stages)?stages.stages:[];
   const stageText=stageItems.map((stage)=>`${aiVisualStageLabel(stage.stage)}：${stage.status==='completed'?'完成':stage.status==='running'?'进行中':stage.status==='blocked'?'未通过':stage.status==='failed'?'失败':'等待'}`).join(' · ');
   const status=String(report?.status||'').trim();
-  const statusText=status==='layout-review-required'?'AI 视觉页面已生成，最终布局审计未通过':status==='screenshots-failed'?'AI 视觉页面已生成，PNG 截图失败':status==='delivery-blocked'?'AI 视觉交付门禁未通过':'';
-  const detail=report?.finalAudit?.issues?.length?report.finalAudit.issues.slice(0,4).join('；'):report?.screenshots?.issues?.length?report.screenshots.issues.slice(0,4).join('；'):report?.deliveryGate?.reason||'';
-  const lastRepair=Array.isArray(repairReport?.agentRuns)&&repairReport.agentRuns.length?repairReport.agentRuns.at(-1):null;
-  const repairText=lastRepair?`最近修复：P${lastRepair.page||'?'} · 第${lastRepair.attempt||'?'}轮${lastRepair.wrotePage===false?' · 未写入':''}`:'';
-  return `${statusText?`<span>${escapeHtml(statusText)}</span>`:''}${stageText?`<span>${escapeHtml(stageText)}</span>`:''}${repairText?`<span>${escapeHtml(repairText)}</span>`:''}${detail?`<small>${escapeHtml(detail)}</small>`:''}`;
+  const statusText=status==='screenshots-failed'?'AI 视觉页面已生成，PNG 截图失败':status==='delivery-blocked'?'AI 视觉交付门禁未通过':'';
+  const detail=report?.screenshots?.issues?.length?report.screenshots.issues.slice(0,4).join('；'):report?.deliveryGate?.reason||'';
+  return `${statusText?`<span>${escapeHtml(statusText)}</span>`:''}${stageText?`<span>${escapeHtml(stageText)}</span>`:''}${detail?`<small>${escapeHtml(detail)}</small>`:''}`;
 }
 
 function socialBeautifyProgressLabel(progress=''){
@@ -264,7 +262,7 @@ function adjustmentOperationLabel(operation){
 }
 function renderProof(){
   if(!delivery)return;
-  const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2), 'ai-visual':JSON.stringify({report:delivery.beautifyReport,stages:delivery.beautifyStages,generationGate:delivery.beautifyGenerationGate,repairReport:delivery.beautifyRepairReport,deliveryGate:delivery.beautifyDeliveryGate},null,2)};
+  const values={copy:delivery.copy||'暂无发布文案',facts:delivery.facts||'暂无事实清单',layout:JSON.stringify(delivery.layout||{},null,2), 'ai-visual':JSON.stringify({report:delivery.beautifyReport,stages:delivery.beautifyStages,deliveryGate:delivery.beautifyDeliveryGate},null,2)};
   document.getElementById('social-proof-content').textContent=values[proofTab];
   document.querySelectorAll('[data-social-proof]').forEach((button)=>button.classList.toggle('active',button.dataset.socialProof===proofTab));
 }
@@ -292,7 +290,7 @@ async function loadDelivery(candidateId=selectedId){
   const beautifyStatus=document.getElementById('social-beautify-status');
   const deliveryMeta=document.getElementById('social-delivery-meta');
   if(deliveryMeta)deliveryMeta.hidden=hasAiDiagnostics;
-  if(beautifyStatus){beautifyStatus.hidden=!hasAiDiagnostics;beautifyStatus.classList.toggle('is-failed',Boolean(data.beautifyReport&&data.beautifyReport.status!=='passed'));beautifyStatus.innerHTML=aiVisualStatusHtml(data.beautifyReport,data.beautifyStages,data.beautifyRepairReport);}
+  if(beautifyStatus){beautifyStatus.hidden=!hasAiDiagnostics;beautifyStatus.classList.toggle('is-failed',Boolean(data.beautifyReport&&data.beautifyReport.status!=='passed'));beautifyStatus.innerHTML=aiVisualStatusHtml(data.beautifyReport,data.beautifyStages);}
   document.getElementById('social-download-all').href=data.bundleUrl;
   renderDeliveryVersions();
   renderDeliveryFilm();
