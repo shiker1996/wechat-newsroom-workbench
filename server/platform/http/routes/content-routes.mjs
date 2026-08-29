@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { indexArtifacts, isInsideRoots, resolveArtifactRelativeAsset } from '../../artifacts/artifact-indexer.mjs';
-import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact } from '../../artifacts/artifact-preview.mjs';
+import { imageArtifactPreviewHtml, injectPhonePreviewStyles, isImageArtifact, textArtifactPreviewHtml } from '../../artifacts/artifact-preview.mjs';
 import { boundedLimit, pipeFile } from '../route-helpers.mjs';
+
+const ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
 
 export async function handleContentRoutes(context) {
   const { request, response, pathname, searchParams, store, artifactRoots, mime, json } = context;
@@ -57,9 +59,15 @@ export async function handleContentRoutes(context) {
       json(response, 404, { error: '产物不存在或不在允许目录内' });
       return true;
     }
+    response.setHeader('content-security-policy', ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY);
     if (isImageArtifact(artifact.file_path)) {
-      response.writeHead(200, { 'content-security-policy': "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'", 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      response.writeHead(200, { 'content-security-policy': ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       response.end(imageArtifactPreviewHtml(`/api/artifacts/${artifact.id}/content`, artifact.name));
+      return true;
+    }
+    if (path.extname(artifact.file_path).toLowerCase() !== '.html') {
+      response.writeHead(200, { 'content-security-policy': ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(textArtifactPreviewHtml(fs.readFileSync(artifact.file_path, 'utf8'), artifact.name));
       return true;
     }
     response.writeHead(302, { location: `/api/artifacts/${artifact.id}/content` });
@@ -76,15 +84,12 @@ export async function handleContentRoutes(context) {
     }
     const extension = path.extname(artifact.file_path).toLowerCase();
     if (extension === '.html' && searchParams.get('preview') === 'phone') {
-      response.writeHead(200, { 'content-security-policy': "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'", 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      response.writeHead(200, { 'content-security-policy': ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       response.end(injectPhonePreviewStyles(fs.readFileSync(artifact.file_path, 'utf8')));
       return true;
     }
     const contentHeaders = { 'content-type': mime[extension] ?? 'text/plain; charset=utf-8' };
-    if (extension === '.html') {
-      // 应用自身的产物预览 iframe 需要嵌入该 HTML，放宽 frame-ancestors 为同源
-      contentHeaders['content-security-policy'] = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
-    }
+    if (extension === '.html') contentHeaders['content-security-policy'] = ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY;
     response.writeHead(200, contentHeaders);
     return pipeFile(response,artifact.file_path);
   }

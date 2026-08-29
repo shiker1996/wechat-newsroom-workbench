@@ -224,6 +224,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .event-card-row b { font-size: 11px;color:var(--muted); }
 .event-card-row ul { margin:2px 0 0;padding-left:16px; }
 .event-card-row li { line-height:1.5; }
+.content-class-badge,.content-route-badge { display:inline-block; margin-right:5px; padding:2px 5px; border:1px solid var(--line); font:700 10px/1.2 var(--body); vertical-align:middle; white-space:nowrap; }.content-class-badge { color:var(--ink); background:var(--paper-deep); }.content-class-github_project { color:#765117; border-color:#c9a35a; background:#fbf1cf; }.content-class-open_source_technology { color:#286b5b; border-color:#86bcae; background:#e5f2ed; }.content-class-open_source_trend { color:#5d4a82; border-color:#ab9dcc; background:#eeeaf7; }.content-class-news_event { color:#7b332b; border-color:#d49b92; background:#fae9e5; }.content-route-badge { color:var(--muted); font-weight:600; }
+.content-class-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.content-class-tabs button{appearance:none;padding:6px 10px;border:1px solid var(--line);background:var(--paper);color:var(--muted);cursor:pointer;font:700 11px/1 var(--body)}.content-class-tabs button:hover,.content-class-tabs button.active{border-color:var(--red);background:var(--white);color:var(--red)}
 .hotword-event-actions { display:flex;gap:8px;margin-top:4px; }
 .hotword-event-actions .text-button { font-size:11px;padding:2px 0; }
 
