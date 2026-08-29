@@ -1,5 +1,5 @@
 import { runConversationAgent } from '../../../platform/agent/conversation-agent.mjs';
-import { normalizeAgentEnvelope, normalizeToolRequest, validateAgentEnvelope } from '../../../platform/agent/tool-protocol.mjs';
+import { AgentContractError, normalizeAgentEnvelope, normalizeToolRequest, validateAgentEnvelope } from '../../../platform/agent/tool-protocol.mjs';
 import { parseModelJsonWithRepair } from '../../../platform/llm/model-json.mjs';
 
 const PROJECT_READ = 'filesystem.project.read';
@@ -22,26 +22,6 @@ function readRequest(requestId, workspaceFiles, reason = '读取 AI 视觉生成
       arguments: {
         resourceId: 'project:current',
         options: { includePaths: workspaceFiles, maxFiles: workspaceFiles.length, maxCharsPerFile: 100_000, maxTotalChars: 140_000 },
-      },
-      reason,
-    }],
-  };
-}
-
-function continueRequest(requestId, sessionId, reason = '继续分块写入完整 HTML') {
-  return {
-    type: 'tool_requests',
-    assistant_note: '继续通过分块写入工具生成完整 HTML',
-    requests: [{
-      requestId,
-      capability: AI_VISUAL_DOCUMENT_WRITE,
-      arguments: {
-        resourceId: 'project:current',
-        path: 'ai-beautified.html',
-        operation: 'append',
-        sessionId,
-        requestId: `chunk-${requestId}`,
-        content: '',
       },
       reason,
     }],
@@ -79,10 +59,6 @@ function generationStageOverride(requiredPageCount) {
 - 只有在 ${requiredPageCount} 页、主题 CSS、页面正文、闭合标签和主题装饰全部写完并成功 finish 后，才返回严格的 {"type":"final","assistantReply":"简短说明"}；assistantReply 必须是字符串。
 - 所有工具请求必须是完整合法 JSON；HTML/CSS 放在 JSON 字符串 content 中，正确转义引号、反斜杠和换行。
 `;
-}
-
-function invalidContinuationRequest(requestId, sessionId, reason) {
-  return continueRequest(requestId, sessionId, reason);
 }
 
 // AI 视觉模型只输出写入意图；内部 AgentEnvelope 由服务端补齐。
@@ -219,6 +195,25 @@ export async function runSocialCardAiVisualGenerationAgent({
     }
   };
 
+  const recoverToolRequest = async ({ parsed, history, step, signal, instruction, label }) => {
+    const recoveryHistory = [...history, { role: 'assistant', content: JSON.stringify(parsed), protected: true }];
+    const corrected = await complete({
+      history: recoveryHistory,
+      step,
+      signal,
+      instruction,
+      outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
+    });
+    lastModelResult = corrected;
+    return parseAndValidateVisualEnvelope({
+      result: corrected,
+      history: recoveryHistory,
+      step,
+      signal,
+      label,
+    });
+  };
+
   onPhaseChange('generation');
   const agent = await runConversationAgent({
     entryPoint: 'social-card-ai-visual-generation',
@@ -263,29 +258,37 @@ export async function runSocialCardAiVisualGenerationAgent({
       let result = await complete({ history, step, signal, thinking: usePlanningThinking, instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages }) });
       lastModelResult = result;
       let parsed = await parseAndValidateVisualEnvelope({ result, history, step, signal, label: 'AI 视觉 Agent' });
-      if (parsed?.type === 'final') {
-        if (documentFinished && (Number(getPageCount()) || 0) >= maxPages) return validateAgentEnvelope(parsed, { maxRequests: 1 });
-        const correction = await complete({
-          history: [...history, { role: 'assistant', content: JSON.stringify(parsed), protected: true }],
-          step,
-          signal,
-          instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages }) + ' 你刚才过早返回了 final。必须继续写入，不能结束。',
-          outputMaxTokens: AGENT_OUTPUT_MAX_TOKENS,
-        });
-        lastModelResult = correction;
-        parsed = await parseAndValidateVisualEnvelope({
-          result: correction,
-          history: [...history, { role: 'assistant', content: JSON.stringify(parsed), protected: true }],
-          step,
-          signal,
-          label: 'AI 视觉 Agent 完成前恢复',
-        });
-        if (parsed?.type === 'final') return validateAgentEnvelope(parsed, { maxRequests: 1 });
-      }
-      if (parsed?.type === 'tool_requests') {
+      let recoveryAttempts = 0;
+      while (true) {
+        if (parsed?.type === 'final') {
+          if (documentFinished && (Number(getPageCount()) || 0) >= maxPages) return validateAgentEnvelope(parsed, { maxRequests: 1 });
+          if (recoveryAttempts >= 2) throw new AgentContractError('INVALID_AGENT_ENVELOPE', 'AI 视觉 Agent 连续过早返回 final，文档尚未完成，未执行空写入');
+          recoveryAttempts += 1;
+          parsed = await recoverToolRequest({
+            parsed,
+            history,
+            step,
+            signal,
+            label: 'AI 视觉 Agent 完成前恢复',
+            instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages }) + ' 你刚才过早返回了 final。必须继续写入，不能结束。',
+          });
+          continue;
+        }
+        if (parsed?.type !== 'tool_requests') return validateAgentEnvelope({ type: 'final', assistantReply: 'AI 视觉生成阶段结束' }, { maxRequests: 1 });
+
         const request = normalizeToolRequest(parsed.requests?.[0], { fallbackReason: '执行 AI 视觉分块写入' });
         if (!request || ![PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE].includes(request.capability)) {
-          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_recover_${step + 1}`, documentWriteSessionId, '只能使用项目读取和 AI 视觉文档分块写入能力'), { maxRequests: 1 });
+          if (recoveryAttempts >= 2) throw new AgentContractError('INVALID_AGENT_ENVELOPE', 'AI 视觉 Agent 连续返回不可用的工具能力，未执行空写入');
+          recoveryAttempts += 1;
+          parsed = await recoverToolRequest({
+            parsed,
+            history,
+            step,
+            signal,
+            label: 'AI 视觉 Agent 工具能力恢复',
+            instruction: '上一条工具请求未执行，原因：只能使用 filesystem.project.read 或 filesystem.project.document_write。请保留尚未写入的 HTML/CSS 内容，只返回一个完整合法、能力正确的工具请求；不要输出空 append、解释或完整 HTML。服务端会自动补齐 resourceId、path、sessionId、assistant_note 和 reason。',
+          });
+          continue;
         }
         if (request.capability === PROJECT_READ) {
           sourceRead = true;
@@ -294,16 +297,36 @@ export async function runSocialCardAiVisualGenerationAgent({
         }
         const operation = String(request.arguments?.operation || '');
         if (!['begin', 'append', 'finish', 'abort'].includes(operation)) {
-          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_operation_${step + 1}`, documentWriteSessionId, 'operation 必须是 begin、append、finish 或 abort'), { maxRequests: 1 });
+          if (recoveryAttempts >= 2) throw new AgentContractError('INVALID_AGENT_ENVELOPE', 'AI 视觉 Agent 连续返回不可用的写入操作，未执行空写入');
+          recoveryAttempts += 1;
+          parsed = await recoverToolRequest({
+            parsed,
+            history,
+            step,
+            signal,
+            label: 'AI 视觉 Agent 写入操作恢复',
+            instruction: '上一条文档写入请求未执行，原因：operation 必须是 begin、append、finish 或 abort。请保留尚未写入的 HTML/CSS 内容，只返回一个完整合法的 filesystem.project.document_write 请求；不要输出空 append、解释或完整 HTML。服务端会自动补齐 resourceId、path、sessionId、assistant_note 和 reason。',
+          });
+          continue;
         }
-        if (operation === 'append' && String(request.arguments?.content || '').length > DOCUMENT_CHUNK_MAX_CHARS) {
-          return validateAgentEnvelope(invalidContinuationRequest(`tr_visual_chunk_${step + 1}`, documentWriteSessionId, `单个 content 不得超过 ${DOCUMENT_CHUNK_MAX_CHARS} 字符，请拆成更小分块`), { maxRequests: 1 });
+        const content = String(request.arguments?.content ?? '');
+        if (operation === 'append' && !content) {
+          if (recoveryAttempts >= 2) throw new AgentContractError('INVALID_AGENT_ENVELOPE', 'AI 视觉 Agent 连续返回空 append，未执行空写入');
+          recoveryAttempts += 1;
+          parsed = await recoverToolRequest({
+            parsed,
+            history,
+            step,
+            signal,
+            label: 'AI 视觉 Agent 分块大小恢复',
+            instruction: '上一条 append 请求未执行，因为 content 为空。请继续写入尚未写入的 HTML/CSS，只返回一个 content 非空的完整合法 append 工具请求；不要返回空 append、解释或完整 HTML。服务端会补齐 resourceId、path、sessionId、assistant_note 和 reason。',
+          });
+          continue;
         }
         request.arguments = { ...(request.arguments || {}), resourceId: 'project:current', path: 'ai-beautified.html', sessionId: documentWriteSessionId };
         pendingOperation = operation;
         return validateAgentEnvelope({ ...parsed, requests: [request] }, { maxRequests: 1 });
       }
-      return validateAgentEnvelope({ type: 'final', assistantReply: 'AI 视觉生成阶段结束' }, { maxRequests: 1 });
     },
   });
   onPhaseChange('idle');

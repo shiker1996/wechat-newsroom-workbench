@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { classifySocialCardAiVisualFailure, collectSocialCardAiVisualArtifacts, SOCIAL_CARD_AI_VISUAL_FAILURE_CODES, writeSocialCardAiVisualBaseline } from '../server/features/social-cards/application/social-card-ai-visual-baseline.mjs';
 import { createSocialCardAiVisualStageRecorder, SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT, writeSocialCardAiVisualSkillManifest } from '../server/features/social-cards/application/social-card-ai-visual-pipeline.mjs';
-import { filterAiVisualGenerationCatalog, shouldUseAiVisualPlanningThinking } from '../server/features/social-cards/application/social-card-ai-visual-agent.mjs';
+import { filterAiVisualGenerationCatalog, runSocialCardAiVisualGenerationAgent, shouldUseAiVisualPlanningThinking } from '../server/features/social-cards/application/social-card-ai-visual-agent.mjs';
 import { normalizeToolRequest, validateToolRequest } from '../server/platform/agent/tool-protocol.mjs';
 
 test('AI 视觉 Agent 的工具理由过长时在严格校验前截断', () => {
@@ -91,4 +91,51 @@ test('AI 视觉生成只在首次实际写入前开启 thinking', () => {
   assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: false, documentStarted: false, planningThinkingUsed: false }), false);
   assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: true, documentStarted: true, planningThinkingUsed: false }), true);
   assert.equal(shouldUseAiVisualPlanningThinking({ sourceRead: true, documentStarted: true, planningThinkingUsed: true }), false);
+});
+
+test('AI 视觉分块 JSON 完整时直接写入，不受 content.length 人为门槛影响', async () => {
+  const oversizedContent = '<section class="page">P1</section>' + 'x'.repeat(8_001);
+  const replies = [
+    JSON.stringify({ type: 'tool_requests', assistant_note: '追加页面', requests: [{ requestId: 'tr_visual_oversized', capability: 'filesystem.project.document_write', arguments: { operation: 'append', content: oversizedContent }, reason: '追加 HTML' }] }),
+    JSON.stringify({ type: 'tool_requests', assistant_note: '完成文档', requests: [{ requestId: 'tr_visual_finish', capability: 'filesystem.project.document_write', arguments: { operation: 'finish' }, reason: '结束文档写入' }] }),
+    JSON.stringify({ type: 'final', assistantReply: '已完成' }),
+  ];
+  const calls = [];
+  const writes = [];
+  let html = '';
+  const gateway = {
+    async complete(input) {
+      calls.push(input);
+      return { callId: `visual-${calls.length}`, content: replies.shift() };
+    },
+  };
+  const toolHandlers = {
+    'filesystem.project.read': async () => ({ status: 'ok', data: { files: [] } }),
+    'filesystem.project.document_write': async (args) => {
+      writes.push(args);
+      if (args.operation === 'append') html += args.content;
+      return { status: 'ok', data: { operation: args.operation } };
+    },
+  };
+  const result = await runSocialCardAiVisualGenerationAgent({
+    gateway,
+    store: null,
+    batchId: 'batch-oversized',
+    candidateId: 1,
+    provider: 'mock',
+    registry: {},
+    catalog: [{ capability: 'filesystem.project.read' }, { capability: 'filesystem.project.document_write' }],
+    agentSystem: '',
+    renderRequest: {},
+    workspaceFiles: ['card-plan.json'],
+    requiredPageCount: 1,
+    getPageCount: () => (html.match(/class="page"/g) || []).length,
+    documentWriteSessionId: 'session-oversized',
+    toolContext: { toolHandlers },
+  });
+  assert.equal(result.type, 'final');
+  assert.deepEqual(writes.map((item) => item.operation), ['begin', 'append', 'finish']);
+  assert.equal(writes.some((item) => item.operation === 'append' && !item.content), false);
+  assert.equal(writes.find((item) => item.operation === 'append').content, oversizedContent);
+  assert.equal(calls.length, 3);
 });

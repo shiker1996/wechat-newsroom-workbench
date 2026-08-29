@@ -17,12 +17,15 @@ const runtimeVars = { background: '--bg', page: '--page', surface: '--surface', 
 
 function json(value) { return JSON.stringify(value || {}, null, 2); }
 
-// sizeScale belongs to the programmatic theme compiler. It is deliberately not
-// exposed in the AI-facing spec so the Agent follows the shared Layout Guide.
+// Typography sizing/weight belongs to the shared Layout Guide. These fields are
+// deliberately not exposed in the AI-facing spec so the Agent can choose them
+// by page responsibility instead of inheriting programmatic defaults.
 function removeAiSizing(value) {
   if (Array.isArray(value)) return value.map(removeAiSizing);
   if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'sizeScale').map(([key, item]) => [key, removeAiSizing(item)]));
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !['sizeScale', 'fontWeight'].includes(key))
+    .map(([key, item]) => [key, removeAiSizing(item)]));
 }
 
 function componentSection(prefix) {
@@ -117,7 +120,7 @@ ${colorRows}
 ### 字体
 
 - 字体：正文 ${typography.family || 'sans'}；标题 ${typography.headingFamily || typography.family || 'sans'}。
-- 字号、行高、字距、间距、安全区和内容占用统一遵循 AI 视觉技能提供的 Layout Guide，本主题不另设数值。
+- 排版和布局统一遵循 AI 视觉技能提供的 Layout Guide，本主题不另设数值。
 
 ### 形状与效果
 
@@ -127,7 +130,7 @@ ${colorRows}
 
 ### 组件级主题配置
 
-以下配置只提供组件的默认字体、字重、语义颜色和边框角色；具体内容、尺寸和构图仍由故事板事实与页面 Agent 决定：
+以下配置只提供组件的字体家族、语义颜色和边框角色；字号、字重、行高和具体构图由 Layout Guide、故事板事实与页面 Agent 决定：
 
 \`\`\`json
 ${json(components)}

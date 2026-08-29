@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildAiRenderRequest, buildAiVisualCardPlan, buildBeautifyContext, createAiVisualDocumentWriteSessionId, runSocialCardBeautify, validateAiVisualGenerationCompletion, validateAiVisualScreenshotSet } from '../server/features/social-cards/application/social-card-beautify.mjs';
+import { buildAiRenderRequest, buildAiVisualCardPlan, buildAiVisualThemeSnapshot, buildBeautifyContext, createAiVisualDocumentWriteSessionId, runSocialCardBeautify, validateAiVisualGenerationCompletion, validateAiVisualScreenshotSet } from '../server/features/social-cards/application/social-card-beautify.mjs';
 import { buildSocialCardCopyInput, generateSocialCardCopy, validateSocialCardCopy } from '../server/features/social-cards/application/social-card-copy.mjs';
 import { SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT } from '../server/features/social-cards/application/social-card-ai-visual-pipeline.mjs';
 import { parseModelJson, parseModelJsonWithRepair } from '../server/platform/llm/model-json.mjs';
@@ -78,6 +78,45 @@ test('AI 美化上下文读取最终故事板和主题契约，而不是只读�
   assert.equal(context.storyboard[1].content_blocks[0].type, 'metric');
   assert.equal(context.theme.id, 'solarized');
   assert.equal(context.layoutContract.pageWidth, 375);
+});
+
+test('AI 视觉主题快照不暴露程序化字号、行高和间距 token', () => {
+  const snapshot = buildAiVisualThemeSnapshot({
+    themeId: 'neon',
+    capacityProfile: {
+      theme: {
+        bodyPx: 11,
+        h1Px: 34,
+        h2Px: 13,
+        captionPx: 10,
+        codePx: 11,
+        lineHeight: 1.45,
+        letterSpacingEm: 0,
+        articlePaddingPx: 18,
+        cardGapPx: 12,
+        borderWidthPx: 1,
+        shadow: 'glow',
+      },
+    },
+  });
+  assert.deepEqual(snapshot.capacityProfile.theme, { borderWidthPx: 1, shadow: 'glow' });
+});
+
+test('AI 视觉参考与主题 SPEC 不携带固定字号或字重', () => {
+  const layoutGuide = fs.readFileSync(path.resolve('skills/social-card-ai-visual-generator/references/layout-guide.md'), 'utf8');
+  const contract = fs.readFileSync(path.resolve('skills/social-card-ai-visual-generator/references/xhs-visual-contract.md'), 'utf8');
+  assert.match(layoutGuide, /\.page-content-stack[\s\S]*?gap:\s*8px/);
+  assert.match(layoutGuide, /卡片之间必须保留可见间隔/);
+  assert.doesNotMatch(contract, /font-size\s*:/i);
+  assert.doesNotMatch(contract, /font-weight\s*:/i);
+  assert.doesNotMatch(contract, /(?:padding|margin|gap)\s*:/i);
+  for (const entry of fs.readdirSync(path.resolve('themes/social'), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const specPath = path.join('themes/social', entry.name, 'AI_DESIGN_SPEC.md');
+    if (!fs.existsSync(specPath)) continue;
+    const spec = fs.readFileSync(specPath, 'utf8');
+    assert.doesNotMatch(spec, /fontWeight|sizeScale/);
+  }
 });
 
 test('AI 请求只保留创作与安全校验所需字段', () => {

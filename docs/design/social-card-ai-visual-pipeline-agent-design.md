@@ -5,6 +5,8 @@
 > 范围：仅改造 `social-card-beautify` 的 AI 视觉生成链路。
 >
 > 明确不包含：来源准备、事实基座、故事板生成、程序化图文渲染和故事板内容结构调整。
+>
+> 最近更新：2026-08-30。当前生成阶段以单 Agent 分块写入为准；截图和交付门禁开启，结构门禁、布局审计、AI 修复和内容审计保持关闭。
 
 ## 1. 目标
 
@@ -34,6 +36,8 @@ copy.txt                       已生成的配套文案
 ```
 
 `xhs-visual-contract.md`、`layout-guide.md` 和 `visual-component-mapping.md` 不复制到候选目录，由技能运行时随 Prompt 注入，分别负责通用结构、布局基线和语义组件映射。它们不是本次运行的候选输入，也不由 Agent 重复读取。
+
+输入职责进一步收敛：`layout-guide.md` 是字号、字重、行高和间距数值的唯一来源；`xhs-visual-contract.md` 只描述 DOM 结构和组件语义；`social-theme-design-spec.md` 只描述主题视觉，不定义排版或间距数值；AI 侧的 `social-theme-snapshot.json` 只保留主题运行元数据和容量/形状信息，不暴露程序化字号、行高和间距 token。程序化渲染链路仍可使用完整主题 Token。
 
 另传少量运行参数：
 
@@ -69,6 +73,8 @@ filesystem.project.document_write
 
 生成阶段只启动一个 AI 视觉 Agent。它先读取冻结输入，再用 `document_write.begin`、多个 `append` 和 `finish` 原样写入完整 HTML/CSS；分块只解决模型输出长度，不由程序拼接或补写视觉内容。Agent 不调用浏览器审计，也不输出完整 HTML JSON。
 
+`buildAiVisualGenerationBrief()` 只补充本次运行的页数、输入清单、主题标识和 `styleBrief`；固定的视觉、布局、事实和写入规则由技能正文、内置参考和阶段指令分别负责，避免运行时 Prompt 重复定义。
+
 ## 5. 审计边界
 
 生成与交付职责分离：
@@ -83,7 +89,7 @@ filesystem.project.document_write
 
 ## 6. 失败处理
 
-- JSON 截断：只反馈短 JSON 修复请求，不重新传入 HTML；
+- JSON 仅缺少尾部闭合符且内容完整：解析器按 JSON 结构直接恢复，不再次调用 AI；无法安全恢复或字段不符合协议时，才反馈短请求并要求模型缩短分块；
 - 截图失败：只重试截图阶段，不重新调用 AI；
 - HTML、copy 或 PNG 文件不完整：交付门禁阻断登记并保留生成产物；
 - AI 视觉失败：不自动回退为程序化图文成功结果。
@@ -102,6 +108,8 @@ filesystem.project.document_write
 
 已收束为单个全量 AI 视觉 Agent。Agent 读取冻结输入，通过 `document_write` 的 begin/append/finish 分块原样写入 `ai-beautified.html`，不由程序拼接 CSS 或页面。
 
+每次生成使用新的文档写入会话 ID，避免重试复用旧会话；生成只有同时满足 Agent 正常返回 `final`、文档成功 `finish`、实际页面数与故事板一致时才算完成。
+
 ### AV-3：截图和交付登记（已完成）
 
 已恢复截图和轻量交付门禁：生成完成后输出逐页 PNG，并检查 HTML、copy 和 PNG 数量/文件是否完整；截图失败只重试截图，不重新调用 Agent。
@@ -109,6 +117,8 @@ filesystem.project.document_write
 ### AV-4：技能规范化（已完成）
 
 已同步 `social-card-ai-visual-generator` 的说明、工具权限、输入文件和分块写入协议；技能只负责完整视觉 HTML，截图和交付登记由编排层负责。
+
+同时已将主题设计规范中的 `fontWeight`、`sizeScale` 等程序化默认值从 AI-facing SPEC 移除；视觉契约不再提供组件级字号、字重或间距 CSS 示例，相关数值统一读取 `layout-guide.md`。
 
 ### AV-5：前端和回归（已完成）
 

@@ -1,5 +1,7 @@
 # AI 视觉生成对齐方案
 
+> 当前状态：生成链路已按本文目标实施。当前生效口径以 `docs/design/social-card-ai-visual-pipeline-agent-design.md` 和代码为准；本文保留实施过程和决策记录。
+
 ## 1. 目标
 
 将项目中的 AI 视觉生成版改造成与本次对话中生成的“本地版”和“技能生成版”一致的生成模式：
@@ -37,20 +39,21 @@
 
 这些函数可以继续服务于项目的确定性本地渲染链路，但不应参与 AI 视觉 HTML 的生成。
 
-### 2.3 本阶段暂不处理
+### 2.3 当前后置阶段边界
 
+- 结构门禁
 - 浏览器布局审计
 - AI 页面修复 Agent
+- 内容审计
 - 程序化视觉修补
 - 程序化回退页面
-- 截图门禁和交付门禁
 - 将自由 HTML 转换成程序化模板
 
-第一阶段只验证 Agent 原始 HTML/CSS 的生成质量。
+以上阶段当前仍关闭，用于只观察 Agent 原始 HTML/CSS。截图和轻量交付门禁已恢复，由 Pipeline 在生成完成后执行；截图失败只重试截图，不重新调用 AI。
 
-## 3. 当前问题
+## 3. 已解决的历史问题
 
-当前流程在 [`server/features/social-cards/application/social-card-ai-visual-agent.mjs`](../server/features/social-cards/application/social-card-ai-visual-agent.mjs) 中拆成两个独立循环：
+早期流程在 [`server/features/social-cards/application/social-card-ai-visual-agent.mjs`](../server/features/social-cards/application/social-card-ai-visual-agent.mjs) 中拆成两个独立循环：
 
 ```text
 CSS Agent
@@ -60,7 +63,7 @@ Page Agent
   → append_body / append_body_with_styles
 ```
 
-这造成以下结构性差异：
+这曾造成以下结构性差异，当前已改为单 Agent：
 
 1. CSS 和 HTML 不在同一个设计上下文内完成。
 2. CSS Agent 无法看到页面最终构图，容易漏写或误写组件 CSS。
@@ -69,8 +72,8 @@ Page Agent
 5. 页面被强制逐页追加，页面之间难以保持整体节奏。
 6. 工具协议和阶段切换占用了大量模型上下文。
 7. 当前结构契约要求固定类名，削弱了技能生成版的自由组件表达。
-8. `ai-visual-card-plan.json` 已生成，并作为生成 Agent 的候选工作区输入。
-9. `social-theme-snapshot.json` 已生成，并作为生成 Agent 的候选工作区输入。
+8. `ai-visual-card-plan.json` 已作为生成 Agent 的候选工作区输入。
+9. `social-theme-snapshot.json` 已作为生成 Agent 的候选工作区输入，但 AI-facing 副本会移除程序化字号、行高和间距 token。
 10. AI 视觉生成和技能版比较时使用同一份 `card-plan.json` 与事实基座；不复制布局参考到候选目录，避免输入重复。
 
 ## 4. 目标架构
@@ -173,12 +176,14 @@ Agent 不负责：
 主题 SPEC 应提供：
 
 - 颜色语义
-- 字体和字号倾向
+- 字体家族
 - 背景纹理
 - 页面装饰
 - 强、中、弱视觉层级
 - 主题组件方向
 - 主题应避免的视觉退化
+
+主题 SPEC 不提供字号、字重、行高或间距数值；这些排版参数统一由 `skills/social-card-ai-visual-generator/references/layout-guide.md` 决定。`xhs-visual-contract.md` 只提供结构关系和组件语义。
 
 但不再强制：
 
@@ -354,7 +359,7 @@ runSocialCardAiVisualGenerationAgent()
 - 删除 CSS 分片和 Page Agent 的强制流程描述。
 - 删除固定主题组件类名要求。
 - 保留通用页面骨架和内容栈作为生成基线，但不由程序注入或修补；具体主题组件、圆角、阴影和装饰仍由 Agent 自主决定。
-- 将页面骨架与主题表达分离：骨架服务稳定的画布、间距和可读性，主题不被固定模板限制。
+- 将页面骨架与主题表达分离：骨架服务稳定的画布、间距和可读性，主题不被固定模板限制；排版和间距数值集中由 Layout Guide 管理。
 - 保留主题装饰必须实际可见、不能退化为纯色背景的要求。
 
 ### 8.4 Prompt 体量
@@ -391,7 +396,7 @@ runSocialCardAiVisualGenerationAgent()
 
 ### 10.1 协议失败
 
-例如：JSON 不完整、没有写入文件、写入路径错误。程序可以要求 Agent 重新提交一个更短的完整写入请求，但不得修改视觉内容。
+例如：JSON 无法安全恢复、没有写入文件、写入路径错误。仅缺少尾部闭合符且内容完整时由解析器直接恢复；其他协议错误才要求 Agent 重新提交更短的完整写入请求，但不得修改视觉内容。
 
 ### 10.2 视觉或结构问题
 
@@ -473,12 +478,7 @@ AI 版达到以下标准即可进入下一阶段：
 
 ### 第五步：再决定是否恢复后置阶段
 
-只有生成结果稳定后，才单独讨论：
-
-- 是否恢复结构诊断
-- 是否恢复浏览器审计
-- 是否恢复 AI 修复
-- 是否需要交付门禁
+当前已恢复截图和交付门禁；结构诊断、浏览器审计、AI 修复和内容审计仍保持关闭，待生成质量稳定后再单独评估。
 
 后置阶段不能反向决定生成阶段的视觉结构。
 
@@ -491,7 +491,7 @@ AI 版达到以下标准即可进入下一阶段：
 改为单 Agent 整页生成
 从程序约束组件类名
 改为 Prompt 驱动视觉表达
-从逐页追加 CSS/HTML
+从双 Agent 逐段拼接 CSS/HTML
 改为一次性写出完整文档
 ```
 

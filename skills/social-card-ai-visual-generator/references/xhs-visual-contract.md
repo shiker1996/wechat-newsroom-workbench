@@ -73,11 +73,11 @@
 
 ## 2.3 结构职责（布局数值见 Layout Guide）
 
-本契约只规定结构关系和布局职责，不重复维护页面尺寸、CSS 声明、padding、gap 或垂直对齐数值。所有布局 CSS 的唯一参考是 `references/layout-guide.md`；如果两份资料出现差异，以 Layout Guide 的布局实现为准。
+本契约只规定结构关系和布局职责；所有页面尺寸、对齐和间距数值以 `references/layout-guide.md` 为准。如果两份资料出现差异，以 Layout Guide 的布局实现为准。
 
 - `.page-inner` 是页面内部的纵向容器；封面标签和装饰可以绝对定位，不计入正常流。
 - `.page-body` 是唯一的正文可用区，负责承载内容并提供垂直对齐空间。
-- `.page-content-stack` 是内容页唯一的纵向内容栈，负责标题、卡片和辅助层的排列与间距。
+- `.page-content-stack` 是内容页唯一的纵向内容栈，负责标题、卡片和辅助层的纵向排列。
 - `.page-inner`、`.page-body` 和 `.page-content-stack` 不得依赖固定 Grid 行号；不能因为绝对定位的标签或装饰改变正常流子元素数量后产生空白或错位。
 - `.page-body` 必须只承载一个 `.page-content-stack`；普通内容页不得把多个卡片直接放成 `.page-body` 的兄弟元素。
 
@@ -128,84 +128,66 @@
 
 如果主题 SPEC 已提供主题前缀组件，例如 `.crim-card`、`.crim-stat`、`.crim-tip`，使用主题前缀实现同样的组件语义，不要只使用普通文本和裸边框替代组件。
 
-### 3.2 通用组件 CSS 基线
+### 3.2 通用组件结构基线
 
-以下是从 XHS Skill 设计系统迁入的组件尺寸和层级基线。主题 SPEC 可以覆盖颜色、边框、圆角、阴影和字体，但不得降低组件的语义结构或把组件退化成裸文本。
+以下只示范组件之间的结构关系，不提供文字或间距数值。主题 SPEC 可以覆盖颜色、边框、圆角、阴影和字体家族，但不得降低组件的语义结构或把组件退化成裸文本。
 
 ```css
 /* 数据卡 */
-.stat-card { padding:10px 8px; text-align:center; flex:1; }
-.stat-num { display:block; font-size:22px; font-weight:bold; }
-.stat-label { display:block; font-size:10px; letter-spacing:.5px; margin-top:2px; }
+.stat-card { text-align:center; flex:1; }
+.stat-num { display:block; }
+.stat-label { display:block; }
 
 /* 亮点卡 */
-.feat-card { padding:12px; }
-.feat-icon { font-size:20px; margin-bottom:6px; }
-.feat-title { font-size:13px; font-weight:bold; margin-bottom:4px; }
-.feat-body { font-size:11px; line-height:1.5; }
+
 
 /* 步骤卡 */
-.step-card { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; }
-.step-num { flex-shrink:0; font-size:18px; font-weight:bold; }
-.step-title { font-size:13px; font-weight:bold; margin-bottom:2px; }
-.step-body { font-size:11px; line-height:1.5; }
+.step-card { display:flex; align-items:flex-start; }
+.step-num { flex-shrink:0; }
 
 /* 时间线卡 */
-.timeline-card { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid rgba(128,128,128,.2); }
-.tl-node { width:8px; height:8px; flex-shrink:0; margin-top:4px; border-radius:50%; }
+.timeline-card { display:flex; border-bottom:1px solid rgba(128,128,128,.2); }
+.tl-node { width:8px; height:8px; flex-shrink:0; border-radius:50%; }
 .tl-content { flex:1; }
-.tl-time { font-size:10px; letter-spacing:.5px; margin-bottom:2px; }
-.tl-title { font-size:12px; font-weight:bold; margin-bottom:2px; }
-.tl-desc { font-size:11px; line-height:1.5; }
 
 /* 引言卡 */
-.quote-card { padding:8px 12px; border-left:3px solid var(--accent); }
-.quote-text { font-size:12px; line-height:1.6; font-style:italic; }
-.quote-author { font-size:11px; letter-spacing:.5px; margin-top:4px; }
+.quote-card { border-left:3px solid var(--accent); }
+.quote-text { font-style:italic; }
 
 /* 对比卡：不要用裁切隐藏表格或长文本；圆角由主题边框和背景表达 */
 .compare-card { min-width:0; }
-.compare-table { width:100%; border-collapse:collapse; font-size:11px; }
-.compare-table th { padding:8px 10px; text-align:left; font-size:10px; letter-spacing:.5px; }
-.compare-table td { padding:8px 10px; vertical-align:top; }
-.compare-arrow { padding:0 6px; text-align:center; }
+.compare-table { width:100%; border-collapse:collapse; }
+.compare-table th { text-align:left; }
+.compare-table td { vertical-align:top; }
+.compare-arrow { text-align:center; }
 
 /* 总结和 CTA */
-.summary-card { padding:12px; text-align:center; }
-.sum-icon { font-size:20px; margin-bottom:6px; }
-.sum-text { font-size:13px; font-weight:bold; line-height:1.5; }
-.cta-card { padding:12px; text-align:center; }
-.cta-text { font-size:14px; font-weight:bold; }
-.cta-sub { font-size:10px; margin-top:4px; }
+.summary-card { text-align:center; }
+.cta-card { text-align:center; }
 
 /* 代码卡：必须在 375px 画布内完整可见，不使用内部滚动 */
-.code-card { padding:10px 12px; font-family:'Courier New',monospace; font-size:11px; line-height:1.7; overflow-wrap:anywhere; }
-.code-lang { font-size:11px; letter-spacing:1px; margin-bottom:6px; opacity:.6; }
+.code-card { font-family:'Courier New',monospace; overflow-wrap:anywhere; }
+.code-lang { opacity:.6; }
 
 /* 人物卡 */
-.profile-card { display:flex; align-items:flex-start; gap:12px; padding:12px; }
-.profile-avatar { width:40px; height:40px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:20px; }
+.profile-card { display:flex; align-items:flex-start; }
+.profile-avatar { width:40px; height:40px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .profile-info { flex:1; }
-.profile-name { font-size:12px; font-weight:bold; margin-bottom:2px; }
-.profile-title { font-size:11px; margin-bottom:6px; opacity:.7; }
-.profile-quote { font-size:11px; line-height:1.5; font-style:italic; }
+.profile-title { opacity:.7; }
+.profile-quote { font-style:italic; }
 
 /* 列表、提示和勋章 */
-.list-card { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(128,128,128,.15); }
-.list-rank { width:24px; flex-shrink:0; text-align:center; font-size:16px; font-weight:bold; }
+.list-card { display:flex; align-items:center; border-bottom:1px solid rgba(128,128,128,.15); }
+.list-rank { width:24px; flex-shrink:0; text-align:center; }
 .list-content { flex:1; }
-.list-title { font-size:12px; font-weight:bold; margin-bottom:2px; }
-.list-desc { font-size:11px; line-height:1.4; }
-.tip-card { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; }
-.tip-icon { flex-shrink:0; font-size:16px; }
+.tip-card { display:flex; align-items:flex-start; }
+.tip-icon { flex-shrink:0; }
 .tip-content { flex:1; }
-.tip-title { font-size:12px; font-weight:bold; margin-bottom:2px; }
-.tip-body { font-size:11px; line-height:1.5; }
-.badge-card { display:flex; flex-wrap:wrap; gap:6px; padding:10px 0; }
-.badge-tag { padding:3px 9px; border-radius:20px; font-size:10px; letter-spacing:.5px; }
+.badge-card { display:flex; flex-wrap:wrap; }
+.badge-tag { border-radius:20px; }
 ```
 
-主题前缀组件（例如 `.crim-card`）必须达到相同的结构和字号层级；如果主题组件名称不同，生成 Agent 仍要按上面的语义映射实现。
+主题前缀组件（例如 `.crim-card`）必须达到相同的结构语义；如果主题组件名称不同，生成 Agent 仍要按上面的语义映射实现，并按 `layout-guide.md` 为不同文本职责选择字号和字重。
 
 ## 4. 内容层组合基线
 
@@ -223,8 +205,6 @@
 - 事实允许时，内容栈应形成内容区约 60%–80% 的视觉占用；主组件要有足够视觉重量，不能让整组页面都只占中部一小条；
 - 封面和结尾页可以少于 3 层，但必须有明确主视觉；
 - 不用空白卡、重复卖点或无意义 emoji 填充；
-- 不使用 `space-between`、负 margin、内部滚动或裁切制造密度；
-- 卡片间距以 8px 基准，常用 8–16px；
 - 内容页整体垂直居中，卡片内部文字默认左对齐。
 
 ### 4.1 整组视觉节奏与角色焦点

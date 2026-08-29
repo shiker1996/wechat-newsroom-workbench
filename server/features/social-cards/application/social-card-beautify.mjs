@@ -28,6 +28,10 @@ const AI_INTERNAL_FIELDS = new Set(['source_refs', 'source_urls', 'source_url', 
 const SOCIAL_CARD_PROJECT_READ_CAPABILITY = 'filesystem.project.read';
 const AI_VISUAL_BUNDLED_REFERENCE_FILES = Object.freeze(['layout-guide.md', 'xhs-visual-contract.md', 'visual-component-mapping.md']);
 const AI_VISUAL_INPUT_INSTRUCTION = '必须先一次读取 workspace.files 中列出的全部本次运行输入，再开始视觉策划和写入。workspace.files 只包含 card-plan.json、ai-visual-card-plan.json、原始事实 JSON、social-theme-design-spec.md、social-theme-snapshot.json 和 copy.txt；它们分别负责故事板事实、视觉语义索引、事实核对、主题配方、运行元数据和只读文案。layout-guide.md、xhs-visual-contract.md、visual-component-mapping.md 已随本技能作为内置参考注入，不属于 workspace.files，不要重复读取或把它们当成候选内容。所有输入只控制设计和事实边界，不能把路径、来源 ID、技术字段或规范说明展示为页面正文。';
+const AI_VISUAL_THEME_LAYOUT_FIELDS = Object.freeze([
+  'bodyPx', 'h1Px', 'h2Px', 'captionPx', 'codePx', 'lineHeight', 'letterSpacingEm',
+  'articlePaddingPx', 'sectionPx', 'paragraphPx', 'cardGapPx',
+]);
 // 生成完成后直接截图，方便人工查看原始视觉产物。
 const ENABLE_AI_VISUAL_SCREENSHOTS = true;
 // 只检查交付文件是否真实存在且完整。
@@ -126,6 +130,15 @@ function canonicalAiVisualWorkspaceFiles(factFile) {
   return ['card-plan.json', 'ai-visual-card-plan.json', factFile, 'social-theme-snapshot.json', 'social-theme-design-spec.md', 'copy.txt'];
 }
 
+export function buildAiVisualThemeSnapshot(snapshot = {}) {
+  const output = structuredClone(snapshot && typeof snapshot === 'object' ? snapshot : {});
+  const themeMetrics = output?.capacityProfile?.theme;
+  if (themeMetrics && typeof themeMetrics === 'object') {
+    for (const field of AI_VISUAL_THEME_LAYOUT_FIELDS) delete themeMetrics[field];
+  }
+  return output;
+}
+
 function hasBundledVisualReference(skillBundle, referenceName) {
   return (Array.isArray(skillBundle?.files) ? skillBundle.files : [])
     .some((filePath) => path.basename(String(filePath)).toLowerCase() === referenceName.toLowerCase());
@@ -158,8 +171,9 @@ function syncAiThemeSnapshot({ workdir, store, editorial, candidate }) {
     templateSource: capabilities.source,
     templateFallback: capabilities.fallback,
   };
-  writeFile(path.join(workdir, 'social-theme-snapshot.json'), JSON.stringify(snapshot, null, 2));
-  return snapshot;
+  const aiVisualSnapshot = buildAiVisualThemeSnapshot(snapshot);
+  writeFile(path.join(workdir, 'social-theme-snapshot.json'), JSON.stringify(aiVisualSnapshot, null, 2));
+  return aiVisualSnapshot;
 }
 
 function compactStoryboardPage(page, index) {
@@ -278,23 +292,19 @@ export function buildAiRenderRequest(context = {}, {
 function buildAiVisualGenerationBrief({ context, workspaceFiles, styleBrief = '' }) {
   const theme = context?.theme || {};
   const fileList = (Array.isArray(workspaceFiles) ? workspaceFiles : []).join('、');
+  const pageCount = Number(context?.requiredPageCount) || 0;
+  const themeLabel = [theme.id, theme.label, theme.version].filter(Boolean).join(' · ') || '由 social-theme-design-spec.md 确定';
+  const brief = String(styleBrief || '').trim().slice(0, 800);
   return `
 
-## 当前生成任务（优先级高于泛化说明）
+## 本次运行参数
 
-你现在只执行“整组 AI 视觉 HTML 生成”，不是审计、修复或程序化模板渲染。目标是在同一个视觉上下文中，为严格 ${Number(context?.requiredPageCount) || 0} 页内容设计并写出完整的 ai-beautified.html。
+- 目标页数：${pageCount}
+- 冻结输入文件：${fileList}
+- 当前主题：${themeLabel}
+- 额外设计意图：${brief || '无，按主题规范和视觉技能自行决定。'}
 
-本次 workspace.files 冻结输入：${fileList}。
-请先读取以上全部文件，再在内部完成整组视觉策划。输入职责如下：
-${AI_VISUAL_INPUT_INSTRUCTION}
-
-布局与结构只遵循技能已注入的 xhs-visual-contract.md 和 layout-guide.md，不要自行发明另一套页面壳或重复定义布局规则；主题组件可以改变外观，但不能改变通用结构职责。
-
-先为每页确定一个唯一主焦点（数字、证据、步骤、人物、对比、风险或结论），再选择 1–2 个辅助组件和整组页面节奏。主题装饰必须在原尺寸可辨认，并且和内容层级共同起作用；不要只留下纯色背景、透明到不可见的伪装饰或同一张普通圆角卡片换文案。允许根据主题和语义自由决定圆角、阴影、边框、色块、纹理、组件命名、构图和装饰位置，不要机械复制另一套模板。
-
-主题：${String(theme.id || '由 social-theme-design-spec.md 确定')}（${String(theme.label || '')}，${String(theme.version || '')}）。补充设计意图：${String(styleBrief || '突出核心事实，建立明确强/中/弱层级，并用少量有语义的装饰增强阅读节奏。').slice(0, 800)}
-
-输出责任只有一个：你同时负责完整主题 CSS、通用布局骨架、主题组件 CSS、全部页面 HTML、装饰层和闭合标签。先用 document_write.begin，再用多个 append 原样写入，最后 finish；分块只是解决输出长度，不改变你对整份文档的设计责任。不要输出完整 HTML JSON，不要依赖程序补 CSS、补 page-content-stack、补 gap、补装饰或拼接页面。
+以上仅补充本次运行的动态参数；生成规则、布局规范、主题执行、分块写入协议和阶段边界以已加载的技能及当前阶段指令为准。
 `;
 }
 
