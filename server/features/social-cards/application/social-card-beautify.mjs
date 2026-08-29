@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { candidateSocialCardDir } from '../../../platform/core/workspace-paths.mjs';
@@ -35,6 +36,11 @@ const ENABLE_AI_VISUAL_DELIVERY_GATE = true;
 function htmlPageCount(html) {
   return [...String(html || '').matchAll(/class=["']([^"']+)["']/gi)]
     .filter((match) => match[1].split(/\s+/).includes('page')).length;
+}
+
+export function createAiVisualDocumentWriteSessionId(batchId, candidateId) {
+  const runToken = randomUUID().replaceAll('-', '').slice(0, 16);
+  return `ai-visual-${String(batchId).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 54)}-${String(candidateId).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 24)}-${runToken}`;
 }
 
 export function validateAiVisualGenerationCompletion({ agent = null, generatedPageCount = 0, requiredPageCount = 0 } = {}) {
@@ -775,7 +781,7 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
     metadata: { agentEntryPoint: 'social-card-ai-visual-generation', auditToolsVisible: false },
   });
   let generationAgent;
-  const documentWriteSessionId = `ai-visual-${String(batchId).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 54)}-${String(candidateId).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 24)}`;
+  const documentWriteSessionId = createAiVisualDocumentWriteSessionId(batchId, candidateId);
   try {
     generationAgent = await runSocialCardAiVisualGenerationAgent({
       gateway,

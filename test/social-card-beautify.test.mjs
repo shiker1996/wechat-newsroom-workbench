@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildAiRenderRequest, buildAiVisualCardPlan, buildBeautifyContext, runSocialCardBeautify, validateAiVisualGenerationCompletion, validateAiVisualScreenshotSet } from '../server/features/social-cards/application/social-card-beautify.mjs';
+import { buildAiRenderRequest, buildAiVisualCardPlan, buildBeautifyContext, createAiVisualDocumentWriteSessionId, runSocialCardBeautify, validateAiVisualGenerationCompletion, validateAiVisualScreenshotSet } from '../server/features/social-cards/application/social-card-beautify.mjs';
 import { buildSocialCardCopyInput, generateSocialCardCopy, validateSocialCardCopy } from '../server/features/social-cards/application/social-card-copy.mjs';
 import { SOCIAL_CARD_AI_VISUAL_STAGE_CONTRACT } from '../server/features/social-cards/application/social-card-ai-visual-pipeline.mjs';
 import { parseModelJson, parseModelJsonWithRepair } from '../server/platform/llm/model-json.mjs';
@@ -212,6 +212,14 @@ test('AI 视觉生成只有正常 final、文档 finish 且页面完整时才算
   });
   assert.equal(incomplete.valid, false);
   assert.match(incomplete.issues.join('；'), /Agent 未正常完成|文档未成功 finish|页面数不完整/);
+});
+
+test('AI 视觉重新生成使用新的文档写入会话 ID', () => {
+  const first = createAiVisualDocumentWriteSessionId('batch-1', 'candidate-1');
+  const second = createAiVisualDocumentWriteSessionId('batch-1', 'candidate-1');
+  assert.notEqual(first, second);
+  assert.match(first, /^ai-visual-batch-1-candidate-1-[A-Za-z0-9]{16}$/);
+  assert.ok(first.length <= 120);
 });
 
 test('AI 视觉生成链路不再包含结构门禁、布局审计、修复和内容审计阶段', async () => {
