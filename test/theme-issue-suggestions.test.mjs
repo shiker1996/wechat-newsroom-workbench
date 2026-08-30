@@ -22,7 +22,7 @@ test('enrichThemeIssues adds actionable suggestions per code', () => {
   ], definition);
   assert.match(issues[0].suggestion, /建议把该颜色改为 #[0-9A-F]{6}（可达 [\d.]+:1）/);
   assert.match(issues[0].suggestion, /当前对比度 [\d.]+:1（要求 ≥4\.5:1）/);
-  assert.match(issues[1].suggestion, /sans \/ serif \/ mono/);
+  assert.match(issues[1].suggestion, /sans \/ serif \/ song \/ kai \/ hei \/ mono/);
   assert.match(issues[2].suggestion, /可先调整为 40（范围内）/);
   assert.match(issues[3].suggestion, /六位十六进制/);
   assert.match(issues[4].suggestion, /删除/);

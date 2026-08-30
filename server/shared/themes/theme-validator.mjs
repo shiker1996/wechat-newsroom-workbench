@@ -13,7 +13,7 @@ const TOKEN_FIELDS={colors:new Set(['background','surface','page','text','muted'
 // 封面主题的 token 面向 900×383 固定画布构图：画布底色、标题/眉题/副标题/信息行字阶、内容区留白与 badge 圆角
 const COVER_TOKEN_FIELDS={colors:new Set(['page','text','muted','accent','accentSecondary','inverseText','codeBackground']),typography:new Set(['family','headingFamily','titlePx','titleLineHeight','eyebrowPx','subtitlePx','metaPx']),spacing:new Set(['paddingXPx','paddingYPx','gapPx','metaBottomPx']),shape:new Set(['badgeRadiusPx'])};
 const TARGETS=new Set(['article','social','cover']), STATUSES=new Set(['draft','published','disabled','archived']), SOURCES=new Set(['builtin','user']);
-const FONTS=new Set(['sans','serif','mono']), SHADOWS=new Set(['none','soft','hard','glow']);
+const FONTS=new Set(['sans','serif','song','kai','hei','mono']), SHADOWS=new Set(['none','soft','hard','glow']);
 const HEX=/^#[0-9a-f]{6}$/i, ID=/^[a-z0-9]+(?:-[a-z0-9]+)*$/, VERSION=/^\d+\.\d+\.\d+$/;
 const COMPATIBLE_OPTIONAL_RECIPES=Object.freeze({article:new Set(['rhythm']),social:new Set(['coverTitle','skeleton','coverSupport'])});
 const TEMPLATE_MATCH_SOURCES=new Set(['program-recommended','user-selected','inherited','compatibility']);

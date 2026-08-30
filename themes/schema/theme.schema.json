@@ -37,7 +37,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["family", "headingFamily", "bodyPx", "h1Px", "h2Px", "captionPx", "lineHeight", "letterSpacingEm"],
           "properties": {
-            "family": { "enum": ["sans", "serif", "mono"] }, "headingFamily": { "enum": ["sans", "serif", "mono"] },
+            "family": { "enum": ["sans", "serif", "song", "kai", "hei", "mono"] }, "headingFamily": { "enum": ["sans", "serif", "song", "kai", "hei", "mono"] },
             "bodyPx": { "type": "number", "minimum": 9, "maximum": 18, "multipleOf": 1 }, "h1Px": { "type": "number", "minimum": 22, "maximum": 44, "multipleOf": 1 },
             "h2Px": { "type": "number", "minimum": 11, "maximum": 28, "multipleOf": 1 }, "captionPx": { "type": "number", "minimum": 8, "maximum": 15, "multipleOf": 1 },
             "codePx": { "type": "number", "minimum": 8, "maximum": 15, "multipleOf": 1 },
@@ -69,7 +69,7 @@
         "components": {
           "type": "object", "additionalProperties": false,
           "properties": {
-            "title": { "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"], "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
+            "title": { "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"], "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
             "lead": { "type": "object", "additionalProperties": false, "required": ["sizeScale", "colorRole"], "properties": { "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
             "quote": { "type": "object", "additionalProperties": false, "required": ["textColorRole", "surfaceRole", "borderColorRole"], "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "surfaceRole": { "enum": ["inherit", "transparent", "surface", "page", "accent", "accentSecondary", "codeBackground"] }, "borderColorRole": { "enum": ["line", "text", "accent", "accentSecondary"] } } },
             "list": { "type": "object", "additionalProperties": false, "required": ["textColorRole", "markerColorRole"], "properties": { "textColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }, "markerColorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } } },
@@ -121,7 +121,7 @@
               "type": "object", "additionalProperties": false,
               "required": ["fontFamily", "fontWeight", "sizeScale", "colorRole", "borderColorRole"],
               "properties": {
-                "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] },
+              "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] },
                 "fontWeight": { "enum": [500, 600, 700, 800, 900] },
                 "sizeScale": { "enum": ["compact", "standard", "display"] },
                 "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] },
@@ -132,7 +132,7 @@
               "type": "object", "additionalProperties": false,
               "required": ["fontFamily", "fontWeight", "colorRole"],
               "properties": {
-                "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] },
+              "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] },
                 "fontWeight": { "enum": [500, 600, 700, 800, 900] },
                 "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] }
               }
@@ -147,7 +147,7 @@
             },
             "statValue": {
               "type": "object", "additionalProperties": false, "required": ["fontFamily", "fontWeight", "sizeScale", "colorRole"],
-              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "fontWeight": { "enum": [500, 600, 700, 800, 900] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] }, "fontWeight": { "enum": [500, 600, 700, 800, 900] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
             },
             "statLabel": {
               "type": "object", "additionalProperties": false, "required": ["sizeScale", "colorRole"],
@@ -171,11 +171,11 @@
             },
             "contentTitle": {
               "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"],
-              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
             },
             "endingTitle": {
               "type": "object", "additionalProperties": false, "required": ["fontFamily", "sizeScale", "colorRole"],
-              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
+              "properties": { "fontFamily": { "enum": ["inherit", "sans", "serif", "song", "kai", "hei", "mono"] }, "sizeScale": { "enum": ["compact", "standard", "display"] }, "colorRole": { "enum": ["text", "muted", "accent", "accentSecondary", "inverseText"] } }
             }
           }
         },

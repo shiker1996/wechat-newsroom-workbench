@@ -237,7 +237,7 @@ test('新主题渲染出完全不同的视觉语言，不只是换色', () => {
   assert.match(report, /◆/);
   // 书信手账：正文衬线、「一、」章节、大引号引文、星点分隔
   const career = markdownToHtml(md, { theme: 'career-essay' });
-  assert.match(career, /background:#F6EFDF;color:#3B3226;font-family:Georgia/);
+  assert.match(career, /background:#F6EFDF;color:#3B3226;font-family:'STKaiti'/);
   assert.match(career, /一、/);
   assert.match(career, /font-size:30px[^"]*">“/);
   assert.match(career, /✦/);

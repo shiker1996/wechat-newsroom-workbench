@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { escapeHtml } from '../../../shared/rendering/html-utils.mjs';
-import { structuredCardComponentCss } from '../../../shared/rendering/structured-card-components.mjs';
 import { articleThemeDefinition } from '../../../shared/themes/article-theme-compiler.mjs';
+import { fontStack } from '../../../shared/themes/font-utils.mjs';
 
 // 文章配图确定性生成（待办「文章配图接入图文确定性生成链」）：
 // 占位标记为可生成（IMG-DATA，kind=timeline|datacard）时，用固定 HTML 模板 + html-pages-to-images
@@ -54,8 +54,8 @@ function normalizeTokens(input = {}) {
   return {
     colors: Object.fromEntries(Object.entries(colors).map(([key, value]) => [key, safeHex(value, DEFAULT_TOKENS.colors[key] || DEFAULT_TOKENS.colors.text)])),
     typography: {
-      family: typography.family === 'serif' ? 'serif' : 'sans',
-      headingFamily: typography.headingFamily === 'sans' ? 'sans' : 'serif',
+      family: ['sans', 'serif', 'song', 'kai', 'hei', 'mono'].includes(typography.family) ? typography.family : 'sans',
+      headingFamily: ['sans', 'serif', 'song', 'kai', 'hei', 'mono'].includes(typography.headingFamily) ? typography.headingFamily : 'serif',
       bodyPx: safePx(typography.bodyPx, DEFAULT_TOKENS.typography.bodyPx, 12, 24),
       captionPx: safePx(typography.captionPx, DEFAULT_TOKENS.typography.captionPx, 9, 18),
     },
@@ -82,37 +82,67 @@ export function resolveArticleImageTokens(workdir, themeId = '') {
 }
 
 function fontFamily(kind) {
-  return kind === 'serif' ? 'Georgia,"Noto Serif SC","Microsoft YaHei",serif' : '"Microsoft YaHei UI","PingFang SC",sans-serif';
+  return fontStack(kind);
+}
+
+// 文章结构化配图的视觉模板。
+// 这些 HTML 只在本地 Chromium 中作为截图源，最终交付仍然是 PNG；
+// 因此可以使用 grid、伪元素和 CSS 变量来表达版式，不会进入公众号 HTML。
+function articleStructuredCardCss({ dense = false, featureCount = 0 } = {}) {
+  const cardPadding = dense ? 13 : 18;
+  const valueSize = dense ? 28 : 40;
+  const labelSize = dense ? 11 : 12;
+  const timelineGap = dense ? 8 : 12;
+  const timelineTitleSize = dense ? 15 : 18;
+  const featureRows = Math.max(1, featureCount - 1);
+  return `
+    .content-block{display:block;min-width:0;width:100%}
+    .stats-block{background:var(--bg);padding:0}
+    .stats-block .stat-row{display:grid;gap:${dense ? 8 : 10}px;align-items:stretch}
+    .stats-block .stat{min-width:0;padding:${cardPadding}px ${dense ? 14 : 18}px;background:var(--surface);border-top:3px solid var(--ink);border-bottom:1px solid var(--line);text-align:left}
+    .stats-block .stat b{display:block;font-family:var(--heading-family);font-size:${valueSize}px;line-height:1;color:var(--accent);letter-spacing:-.04em;overflow-wrap:anywhere}
+    .stats-block .stat span{display:block;margin-top:8px;color:var(--muted);font-size:${labelSize}px;line-height:1.45;overflow-wrap:anywhere}
+    .stats-feature .stat:first-child{grid-row:span ${featureRows};background:var(--accent);border-color:var(--accent)}
+    .stats-feature .stat:first-child b,.stats-feature .stat:first-child span{color:var(--inverse)}
+    .stats-feature .stat:first-child b{font-size:${dense ? 38 : 54}px}
+    .stats-grid .stat{grid-column:span 2;border-top:1px solid var(--line)}
+    .stats-grid .stat:nth-child(1),.stats-grid .stat:nth-child(2){grid-column:span 3}
+    .stats-grid .stat:nth-child(2){border-top:3px solid var(--accent)}
+    .timeline-block{background:var(--bg);padding:2px 8px 0}
+    .timeline-block:before{content:'PROCESS / ${String(featureCount || 0).padStart(2, '0')}';display:block;margin:0 0 8px -2px;color:var(--accent2);font:10px/1.2 ${fontFamily('sans')};letter-spacing:.13em;transform-origin:left top}
+    .timeline-block .tl{display:grid;margin-left:8px;padding-left:18px;border-left:2px solid var(--accent2)}
+    .timeline-block .tl-node{position:relative;margin:0;padding:0 0 ${timelineGap}px;border:0}
+    .timeline-block .tl-node:last-child{padding-bottom:0}
+    .timeline-block .tl-node:before{content:'';position:absolute;left:-25px;top:2px;width:10px;height:10px;background:var(--bg);border:2px solid var(--accent2);border-radius:50%}
+    .timeline-block .tl-time{display:block;color:var(--accent2);font:700 ${dense ? 10 : 11}px/1.3 ${fontFamily('sans')};letter-spacing:.08em}
+    .timeline-block .tl-node h3{margin:3px 0 0;color:var(--ink);font:700 ${timelineTitleSize}px/1.3 var(--heading-family);overflow-wrap:anywhere}
+    .timeline-block .tl-node p{margin:3px 0 0;color:var(--muted);font-size:${dense ? 10 : 11}px;line-height:1.4;overflow-wrap:anywhere}`;
 }
 
 function timelineHtml({ title, items }, { width, height }, tokens) {
   const dense = items.length > 5;
-  const componentScale = dense ? Math.max(1, 1.5 - (items.length - 5) * 0.35) : 1.5;
   const rows = items.map((item) => `
     <div class="tl-node">
       <span class="tl-time">${escapeHtml(item.label)}</span>
       <h3>${escapeHtml(item.value)}</h3>
     </div>`).join('');
-  return pageHtml({ width, height, title, subtitle: '事件时间线', body: `<div class="content-block timeline-block"><div class="tl">${rows}</div></div>` }, `
-    :root{--component-scale:${componentScale}}
-    ${structuredCardComponentCss()}
-    .timeline-block{padding:${dense ? 14 : 18}px ${dense ? 16 : 20}px;border:var(--border-width) solid var(--line);border-radius:var(--radius);background:color-mix(in srgb,var(--surface) 88%,var(--accent))}`, tokens);
+  return pageHtml({ width, height, title, subtitle: '事件时间线', body: `<div class="content-block timeline-block"><div class="tl">${rows}</div></div>` },
+    articleStructuredCardCss({ dense, featureCount: items.length }), tokens);
 }
 
 function datacardHtml({ title, items }, { width, height }, tokens) {
   const dense = items.length > 4;
+  const feature = items.length <= 4;
   const cards = items.map((item) => `
-    <div class="stat">
+    <div class="stat${feature && item === items[0] ? ' stat-feature' : ''}">
       <b>${escapeHtml(item.value)}</b>
       <span>${escapeHtml(item.label)}</span>
     </div>`).join('');
-  const cols = items.length <= 2 ? items.length : items.length <= 4 ? 2 : 3;
-  return pageHtml({ width, height, title, subtitle: '数据速览', body: `<div class="content-block stats-block"><div class="stat-row" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${cards}</div></div>` }, `
-    :root{--component-scale:1.5}
-    ${structuredCardComponentCss()}
-    .stats-block{padding:${dense ? 14 : 18}px;border:var(--border-width) solid var(--line);border-radius:var(--radius);background:color-mix(in srgb,var(--surface) 88%,var(--accent))}
-    .stats-block .stat-row{display:grid;gap:${dense ? 9 : 12}px}
-    .stats-block .stat{text-align:left}`, tokens);
+  const gridStyle = feature
+    ? `grid-template-columns:${items.length === 2 ? 'repeat(2,minmax(0,1fr))' : '1.25fr .75fr'};grid-template-rows:repeat(${Math.max(1, items.length - 1)},minmax(0,1fr))`
+    : 'grid-template-columns:repeat(6,minmax(0,1fr))';
+  const body = `<div class="content-block stats-block ${feature ? 'stats-feature' : 'stats-grid'}"><div class="stat-row" style="${gridStyle}">${cards}</div></div>`;
+  return pageHtml({ width, height, title, subtitle: '数据速览', body }, articleStructuredCardCss({ dense, featureCount: items.length }), tokens);
 }
 
 function pageHtml({ width, height, title, subtitle, body }, extraCss, tokens) {
@@ -123,7 +153,7 @@ function pageHtml({ width, height, title, subtitle, body }, extraCss, tokens) {
 <html lang="zh-CN"><head><meta charset="utf-8">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  :root{--bg:${colors.background};--surface:${colors.surface};--ink:${colors.text};--muted:${colors.muted};--accent:${colors.accent};--accent2:${colors.accentSecondary};--line:${colors.line};--inverse:${colors.inverseText};--border-width:${tokens.shape.borderWidthPx}px;--radius:${tokens.shape.radiusPx}px;--shadow:${tokens.shape.shadow};--component-scale:1}
+  :root{--bg:${colors.background};--surface:${colors.surface};--ink:${colors.text};--muted:${colors.muted};--accent:${colors.accent};--accent2:${colors.accentSecondary};--line:${colors.line};--inverse:${colors.inverseText};--border-width:${tokens.shape.borderWidthPx}px;--radius:${tokens.shape.radiusPx}px;--shadow:${tokens.shape.shadow};--component-scale:1;--heading-family:${headingFamily};--body-family:${bodyFamily}}
   body{font-family:${bodyFamily};background:var(--bg);color:var(--ink)}
   .page{width:${width}px;height:${height}px;background:var(--bg);padding:28px 30px;display:flex;flex-direction:column}
   .head{border-left:${Math.max(3, tokens.shape.borderWidthPx + 2)}px solid var(--accent);padding-left:14px;margin-bottom:20px}

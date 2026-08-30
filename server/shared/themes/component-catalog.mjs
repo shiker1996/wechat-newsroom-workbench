@@ -1,4 +1,4 @@
-export const FONT_FAMILIES=Object.freeze(['inherit','sans','serif','mono']);
+export const FONT_FAMILIES=Object.freeze(['inherit','sans','serif','song','kai','hei','mono']);
 export const FONT_WEIGHTS=Object.freeze([500,600,700,800,900]);
 export const SIZE_SCALES=Object.freeze(['compact','standard','display']);
 export const TEXT_COLOR_ROLES=Object.freeze(['text','muted','accent','accentSecondary','inverseText']);
@@ -6,7 +6,7 @@ export const BORDER_COLOR_ROLES=Object.freeze(['line','text','accent','accentSec
 export const SURFACE_ROLES=Object.freeze(['inherit','transparent','surface','page','accent','accentSecondary','codeBackground']);
 export const BORDER_WEIGHTS=Object.freeze(['inherit','none','thin','medium','heavy']);
 
-const OPTION_LABELS={inherit:'继承主题',sans:'无衬线',serif:'衬线',mono:'等宽',500:'纤细',600:'中等',700:'加粗',800:'特粗',900:'黑体',compact:'紧凑',standard:'标准',display:'展示',text:'正文色',muted:'弱化色',accent:'主强调色',accentSecondary:'次强调色',inverseText:'反白色',line:'边线色',transparent:'透明',surface:'内容表面',page:'页面底色',codeBackground:'深色表面',none:'无边框',thin:'细边框',medium:'中边框',heavy:'粗边框'};
+const OPTION_LABELS={inherit:'继承主题',sans:'系统无衬线',serif:'兼容衬线',song:'宋体',kai:'楷体',hei:'黑体',mono:'等宽',500:'纤细',600:'中等',700:'加粗',800:'特粗',900:'黑体',compact:'紧凑',standard:'标准',display:'展示',text:'正文色',muted:'弱化色',accent:'主强调色',accentSecondary:'次强调色',inverseText:'反白色',line:'边线色',transparent:'透明',surface:'内容表面',page:'页面底色',codeBackground:'深色表面',none:'无边框',thin:'细边框',medium:'中边框',heavy:'粗边框'};
 const field=(label,values)=>Object.freeze({label,options:Object.freeze(values.map((value)=>Object.freeze({value,label:OPTION_LABELS[value]})))});
 
 export const SOCIAL_COMPONENT_CATALOG=Object.freeze({

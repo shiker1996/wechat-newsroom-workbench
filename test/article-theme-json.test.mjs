@@ -27,10 +27,26 @@ test('阶段 2 文章配方由 JSON 编译为确定性渲染契约', () => {
   assert.equal(tech.variants.frame,'terminal-frame');
   assert.equal(tech.variants.h2,'terminal');
   assert.equal(tech.variants.list,'chevron');
+  assert.equal(tech.definition.tokens.typography.headingFamily,'mono');
   assert.equal(tech.tokens.colors.accent,'#39D353');
   assert.match(tech.hash,/^sha256:/);
   assert.equal(articleThemeDefinition('missing',{fallback:false}),null);
   assert.equal(articleThemeDefinition('missing').id,'magazine-warm');
+});
+
+test('阶段 2 内置文章主题使用可落地的 Windows 中文字体角色', () => {
+  const registry=getBuiltinThemeRegistry();
+  assert.equal(registry.require('career-essay').tokens.typography.family,'kai');
+  assert.equal(registry.require('career-essay').tokens.typography.headingFamily,'kai');
+  assert.equal(registry.require('magazine-warm').tokens.typography.family,'song');
+  assert.equal(registry.require('magazine-warm').tokens.typography.headingFamily,'song');
+  assert.equal(registry.require('gossip-card').tokens.typography.family,'hei');
+  assert.equal(registry.require('gossip-card').tokens.typography.headingFamily,'hei');
+  assert.equal(registry.require('news-digest').tokens.typography.family,'hei');
+  assert.equal(registry.require('news-digest').tokens.typography.headingFamily,'hei');
+  assert.equal(registry.require('research-report').tokens.typography.family,'song');
+  assert.equal(registry.require('research-report').tokens.typography.headingFamily,'song');
+  assert.equal(registry.require('tech-wire').tokens.typography.headingFamily,'mono');
 });
 
 test('阶段 2 生产渲染模块不再内置主题色或按主题 ID 分支样式', () => {

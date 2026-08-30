@@ -1,4 +1,5 @@
 import { articleThemeDefinition } from '../../../shared/themes/article-theme-compiler.mjs';
+import { fontStack } from '../../../shared/themes/font-utils.mjs';
 
 const DEFAULT_COLORS = {
   background:'#FFFFFF', surface:'#FFFFFF', text:'#202522', muted:'#6C736E',
@@ -8,12 +9,6 @@ const DEFAULT_COLORS = {
 function clamp(value, fallback, min, max) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
-}
-
-function fontStack(kind = 'sans') {
-  if (kind === 'mono') return 'ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace';
-  if (kind === 'serif') return 'Georgia,"Noto Serif SC","Songti SC","Microsoft YaHei",serif';
-  return '"Microsoft YaHei UI","PingFang SC","Noto Sans SC",sans-serif';
 }
 
 export function chartTheme(tokens = {}) {

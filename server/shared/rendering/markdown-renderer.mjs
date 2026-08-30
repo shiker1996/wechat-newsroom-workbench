@@ -1,5 +1,6 @@
 import { colorContrast } from '../themes/theme-validator.mjs';
 import { articleThemeDefinition, compileArticleTheme } from '../themes/article-theme-compiler.mjs';
+import { fontStack } from '../themes/font-utils.mjs';
 import { escapeHtml } from './html-utils.mjs';
 
 export function normalizeDesignTokens(input = {}) {
@@ -96,12 +97,13 @@ function buildInlineStyles(tokens, themeName = 'magazine-warm') {
   const rhythmLineHeight=Math.max(1.35,Math.min(2.1,lineHeight+(rhythm==='airy'?.08:rhythm==='dense'?-.08:0)));
   const themeRadiusPx = Number(themeVariables.shape.radiusPx);
   const shadow = ({none:'none',soft:`0 10px 28px ${hexToRgba(ink,.12)}`,hard:`6px 6px 0 ${accentSecondary}`,glow:`0 0 22px ${hexToRgba(accent,.28)}`})[themeVariables.shape.shadow] || 'none';
-  const font = `-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif`;
-  // 杂志风：标题、引言用衬线，正文保留无衬线保证移动端可读性
-  const serif = `Georgia,'Songti SC','STSong','SimSun',serif`;
-  const mono = `Consolas,'Courier New',monospace`;
-  const headingFont = themeVariables.typography.headingFamily === 'serif' ? serif : themeVariables.typography.headingFamily === 'mono' ? mono : font;
-  const bodyFont = variants.bodyFont === 'serif' ? serif : variants.bodyFont === 'mono' ? mono : font;
+  const font = fontStack('sans', { singleQuotes:true });
+  // 主题字体角色映射到本机常见中文字体；没有安装扩展字体时也不会全部回退到微软雅黑。
+  const serif = fontStack('serif', { singleQuotes:true });
+  const mono = fontStack('mono', { singleQuotes:true });
+  const familyForRole = (role) => role === 'inherit' ? '' : fontStack(role, { singleQuotes:true });
+  const headingFont = familyForRole(themeVariables.typography.headingFamily) || font;
+  const bodyFont = familyForRole(variants.bodyFont) || font;
   const articleFrame = isTech
     ? `border-top:3px solid ${accent};border-bottom:1px solid ${hexToRgba(accent, 0.35)}`
     : isNews
@@ -121,7 +123,7 @@ function buildInlineStyles(tokens, themeName = 'magazine-warm') {
     kickerMono: `margin:0 0 14px;padding-bottom:8px;border-bottom:1px dashed ${hexToRgba(accent, 0.45)};color:${accent};font-family:${mono};font-size:${captionPx}px;letter-spacing:1px`,
     kickerCenter: `margin:0 0 18px;text-align:center;color:${muted};font-size:${Math.max(captionPx - 1, 11)}px;letter-spacing:6px`,
     h1: variants.h1 === 'invert-block'
-      ? `background:${ink};color:${inverseText};padding:18px 18px 22px;font-size:${h1Px}px;line-height:1.3;margin:0 0 ${rhythmSectionPx}px;border-bottom:6px solid ${accent};font-weight:900;letter-spacing:${letterSpacing}em`
+      ? `background:${ink};color:${inverseText};padding:18px 18px 22px;font-family:${headingFont};font-size:${h1Px}px;line-height:1.3;margin:0 0 ${rhythmSectionPx}px;border-bottom:6px solid ${accent};font-weight:900;letter-spacing:${letterSpacing}em`
       : variants.h1 === 'center-double'
         ? `font-family:${headingFont};text-align:center;font-size:${h1Px}px;line-height:1.35;margin:0 0 ${rhythmSectionPx}px;padding:20px 4px 18px;border-top:6px double ${ink};border-bottom:1px solid ${ink};font-weight:700;letter-spacing:${letterSpacing}em`
       : variants.h1 === 'serif-display'
@@ -130,7 +132,7 @@ function buildInlineStyles(tokens, themeName = 'magazine-warm') {
             ? `font-family:${headingFont};font-size:${h1Px}px;line-height:1.3;margin:0 0 ${rhythmSectionPx}px;padding:4px 0 16px;border-bottom:1px solid ${line};font-weight:800;color:${ink};letter-spacing:${letterSpacing}em`
           : variants.serifHeadings
             ? `font-family:${headingFont};font-size:${h1Px}px;line-height:1.4;margin:0 0 ${rhythmSectionPx}px;padding-bottom:16px;border-bottom:1px solid ${line};font-weight:700;letter-spacing:${letterSpacing}em`
-            : `font-size:${h1Px}px;line-height:1.35;margin:0 0 ${rhythmSectionPx}px;font-weight:900;color:${ink};letter-spacing:${letterSpacing}em`,
+            : `font-family:${headingFont};font-size:${h1Px}px;line-height:1.35;margin:0 0 ${rhythmSectionPx}px;font-weight:900;color:${ink};letter-spacing:${letterSpacing}em`,
     h2: variants.h2 === 'numbered-rule'
       ? `font-family:${headingFont};font-size:${h2Px}px;line-height:1.45;margin:${sectionPx + 6}px 0 ${paragraphPx}px;padding-top:18px;border-top:${Math.max(1,borderWidthPx)}px solid ${line};font-weight:700`
       : variants.h2 === 'terminal'
@@ -181,7 +183,7 @@ function buildInlineStyles(tokens, themeName = 'magazine-warm') {
     sup: `color:${accent};font-size:${Math.max(captionPx - 1, 11)}px;line-height:0`,
     footnote: `font-size:${captionPx}px;color:${muted};line-height:1.7;margin:0 0 8px`,
   };
-  const roleColor=(role)=>({text:ink,muted,accent,accentSecondary,inverseText,line}[role]||ink),surfaceColor=(role)=>({surface,page:surface,accent,accentSecondary,codeBackground,transparent:'transparent'}[role]||''),componentFont=(role)=>role==='serif'?serif:role==='mono'?mono:role==='sans'?font:'',scaled=(base,scale,delta=2)=>Math.max(8,base+(scale==='compact'?-delta:scale==='display'?delta:0)),explicit=theme.definition.article.components||{};
+  const roleColor=(role)=>({text:ink,muted,accent,accentSecondary,inverseText,line}[role]||ink),surfaceColor=(role)=>({surface,page:surface,accent,accentSecondary,codeBackground,transparent:'transparent'}[role]||''),componentFont=(role)=>role==='inherit'?'':fontStack(role, { singleQuotes:true }),scaled=(base,scale,delta=2)=>Math.max(8,base+(scale==='compact'?-delta:scale==='display'?delta:0)),explicit=theme.definition.article.components||{};
   if(explicit.title){const title=components.title,titleFont=componentFont(title.fontFamily);styles.h1+=`${titleFont?`;font-family:${titleFont}`:''};font-size:${scaled(h1Px,title.sizeScale,3)}px;color:${roleColor(title.colorRole)}`;}
   if(explicit.lead)styles.lead+=`;font-size:${scaled(bodyPx+1,components.lead.sizeScale,2)}px;color:${roleColor(components.lead.colorRole)}`;
   if(explicit.quote){const quote=components.quote,quoteSurface=surfaceColor(quote.surfaceRole);styles.blockquote+=`;color:${roleColor(quote.textColorRole)};border-color:${roleColor(quote.borderColorRole)}${quoteSurface?`;background:${quoteSurface}`:''}`;}

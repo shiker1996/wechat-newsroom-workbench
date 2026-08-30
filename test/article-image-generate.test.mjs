@@ -43,11 +43,20 @@ test('generated structured images use article tokens and adapt card layout to it
     { label:'核心', value:'42%' }, { label:'增长', value:'18%' }, { label:'覆盖', value:'9' },
   ] }, '16:9', { colors:{ background:'#101820', surface:'#1B2733', text:'#FFFFFF', muted:'#A7B4C2', accent:'#FF7A59', line:'#3D5368', inverseText:'#101820' }, shape:{ radiusPx:4, borderWidthPx:2, shadow:'none' }, typography:{ headingFamily:'sans' } });
   assert.match(html, /--bg:#101820/);
-  assert.match(html, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(html, /grid-template-columns:1\.25fr \.75fr/);
+  assert.match(html, /class="stat stat-feature"/);
   assert.match(html, /class="stat"/);
   assert.match(html, /--accent:#FF7A59/);
-  assert.match(html, /background:color-mix\(in srgb,var\(--surface\) 88%,var\(--accent\)\)/);
+  assert.match(html, /stats-feature \.stat:first-child/);
   assert.doesNotMatch(html, /d-card|d-value|d-label/);
+});
+
+test('structured image typography preserves the mono heading role', () => {
+  const { html } = buildGenerateImageHtml({ kind:'datacard', title:'终端指标', items:[
+    { label:'任务', value:'86' }, { label:'周期', value:'4 周' },
+  ] }, '16:9', { typography:{ family:'sans', headingFamily:'mono' } });
+  assert.match(html, /--heading-family:Consolas/);
+  assert.match(html, /font-family:var\(--heading-family\)/);
 });
 
 test('timeline image uses the social-card rail component structure', () => {
@@ -61,12 +70,12 @@ test('timeline image uses the social-card rail component structure', () => {
   assert.doesNotMatch(html, /class="t-(?:list|row|dot|label|value)"/);
 });
 
-test('dense timeline scales down before the fixed 16:9 canvas clips its last node', () => {
+test('dense timeline uses compact typography before the fixed 16:9 canvas clips its last node', () => {
   const { html } = buildGenerateImageHtml({ kind:'timeline', title:'六周演进', items:[
     { label:'第1周', value:'一' }, { label:'第2周', value:'二' }, { label:'第3周', value:'三' },
     { label:'第4周', value:'四' }, { label:'第5周', value:'五' }, { label:'第6周', value:'六' },
   ] }, '16:9');
-  assert.match(html, /--component-scale:1\.15/);
+  assert.match(html, /timeline-block \.tl-node h3\{margin:3px 0 0;color:var\(--ink\);font:700 15px/);
   assert.match(html, /第6周[\s\S]*六/);
 });
 

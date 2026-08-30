@@ -24,8 +24,8 @@ export function suggestContrastColor(foreground,background,minimum){
 }
 
 const ENUM_HINTS={
-  'tokens.typography.family':'可选 sans / serif / mono',
-  'tokens.typography.headingFamily':'可选 sans / serif / mono',
+  'tokens.typography.family':'可选 sans / serif / song / kai / hei / mono',
+  'tokens.typography.headingFamily':'可选 sans / serif / song / kai / hei / mono',
   'tokens.shape.shadow':'可选 none / soft / hard / glow',
 };
 
