@@ -535,25 +535,33 @@ AI 规划配图占位
 ## 文章封面图
 
 ### POST /api/candidates/:id/cover/generate
-生成 900×383 公众号封面图 { provider?, theme? }；theme 为封面主题 id 或 "auto"（AI 按文章调性选主题）。缺少成稿终稿时返回 409。返回 202 AI 任务（type=cover-image）
+生成 900×383 公众号封面图 `{ provider?, theme?, mode? }`；theme 为封面主题 id 或 "auto"（AI 按文章调性选主题），mode 为 `standard`（默认）或 `ai-visual`。AI 视觉模式会基于封面主题 SPEC 生成 HTML/CSS 后直接截图，当前跳过 AI HTML 结构/视觉质量门禁；生成或截图失败时任务直接失败，不自动回退标准封面。缺少成稿终稿时返回 409，mode 非法返回 400。返回 202 AI 任务（type=cover-image）
 → 文章封面图
 
 ### GET /api/candidates/:id/cover
-封面图状态 { exists, size?, modifiedAt?, title? }。
+封面图状态 { exists, size?, modifiedAt?, title?, mode?, aiVisualFallback?, aiVisualError?, aiVisualHtmlAvailable? }；mode 为当前产物模式。
 
 ### GET /api/candidates/:id/cover/local
 封面 PNG 预览（返回图片文件）
 → 文章封面图
 
+### GET /api/candidates/:id/cover/ai-html
+查看最近一次 AI 视觉封面的 HTML/CSS 源文件；仅当该次生成产出 AI 视觉封面 HTML 时可用。
+→ 文章封面图
+
 ### POST /api/batches/:id/daily/cover/generate
-生成批次早报的 900×383 封面图 { provider?, theme? }；终稿取批次级 daily-final 文档，产物落 articles/<批次>/daily/images/cover.png。缺少早报终稿时返回 409。返回 202 AI 任务（type=cover-image，candidateId=null）
+生成批次早报的 900×383 封面图 `{ provider?, theme?, mode? }`；mode 为 `standard`（默认）或 `ai-visual`。AI 视觉模式直接将模型 HTML/CSS 截图为图片，当前跳过 AI HTML 结构/视觉质量门禁；生成或截图失败时任务直接失败，不自动回退标准封面。终稿取批次级 daily-final 文档，产物落 articles/<批次>/daily/images/cover.png。缺少早报终稿时返回 409，mode 非法返回 400。返回 202 AI 任务（type=cover-image，candidateId=null）
 → 文章封面图
 
 ### GET /api/batches/:id/daily/cover
-早报封面图状态 { exists, size?, modifiedAt?, title? }。
+早报封面图状态 { exists, size?, modifiedAt?, title?, mode?, aiVisualFallback?, aiVisualError?, aiVisualHtmlAvailable? }。
 
 ### GET /api/batches/:id/daily/cover/local
 早报封面 PNG 预览（返回图片文件）
+→ 文章封面图
+
+### GET /api/batches/:id/daily/cover/ai-html
+查看最近一次 AI 视觉早报封面的 HTML/CSS 源文件；仅当该次生成产出 AI 视觉封面 HTML 时可用。
 → 文章封面图
 
 ---

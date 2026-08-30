@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"article-cover-ai-visual-generator","name":"文章封面 AI 视觉生成","version":"1.0.0","kind":"stage","entryPoints":["article-cover"],"contentTypes":["article_cover"],"inputContract":"article_cover_visual_input","outputContract":"article_cover_delivery","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}

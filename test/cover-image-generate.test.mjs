@@ -84,23 +84,34 @@ test('title highlights are selected deterministically from key information', () 
   assert.deepEqual(selectCoverTitleHighlights('一个普通的短标题'), []);
 });
 
-test('AI cover semantics are constrained to title substrings and SVG allowlist', async () => {
-  const normalized=normalizeCoverSemantics({highlightTerms:['11月12日前','模型不存在'],motifKind:'network'}, {title:'开发者11月12日前必须行动'});
+test('AI cover semantics are constrained to title substrings, SVG allowlist and visual brief bounds', async () => {
+  const normalized=normalizeCoverSemantics({highlightTerms:['11月12日前','模型不存在'],motifKind:'network',coreSubject:'开发者',coreAction:'必须行动',visualMetaphorCandidates:['线路','线路','x'.repeat(40)]}, {title:'开发者11月12日前必须行动'});
   assert.deepEqual(normalized.highlightTerms, ['11月12日前']);
   assert.equal(normalized.motifKind, 'network');
+  assert.equal(normalized.coreSubject, '开发者');
+  assert.equal(normalized.coreAction, '必须行动');
+  assert.deepEqual(normalized.visualMetaphorCandidates, ['线路','x'.repeat(28)]);
 
   const calls=[];
   const semantics=await analyzeCoverSemantics({
-    gateway:{complete:async (request)=>{calls.push(request);return {content:JSON.stringify({highlightTerms:['终止','11月12日前'],motifKind:'network'}),callId:'cover-semantics-1'};}},
+    gateway:{complete:async (request)=>{calls.push(request);return {content:JSON.stringify({highlightTerms:['终止','11月12日前'],motifKind:'network',coreSubject:'合作关系',coreAction:'终止',narrativeChange:'合作 → 终止',emotionalTension:'合作破裂与行动期限',visualMetaphorCandidates:['断裂连接','时间节点'],primaryFocus:'合作关系终止与行动期限',secondaryFocus:'截止时间',compositionHint:'左侧标题，右侧使用有面积的关系网络与时间节点'}),callId:'cover-semantics-1'};}},
     provider:'fake',batchId:1066,candidateId:1066,title:'OpenAI终止与Cursor合作，开发者11月12日前必须行动',summary:'摘要',
   });
   assert.deepEqual(semantics.highlightTerms, ['终止','11月12日前']);
   assert.equal(semantics.motifKind, 'network');
+  assert.equal(semantics.narrativeChange, '合作 → 终止');
+  assert.deepEqual(semantics.visualMetaphorCandidates, ['断裂连接','时间节点']);
+  assert.equal(semantics.primaryFocus, '合作关系终止与行动期限');
+  assert.equal('secondaryFocus' in semantics, false);
+  assert.equal('compositionHint' in semantics, false);
   assert.equal(calls[0].purpose, 'cover-semantic-analysis');
   assert.equal(calls[0].jsonMode, true);
   assert.equal(calls[0].thinking, false);
   assert.match(calls[0].messages[0].content, /必须结合标题的核心主旨、动作和对象/);
   assert.match(calls[0].messages[0].content, /不要根据配色、主题名称或随机性选择/);
+  assert.match(calls[0].messages[0].content, /visualMetaphorCandidates/);
+  assert.match(calls[0].messages[0].content, /新增语义短语只能概括标题和摘要已经支持的内容/);
+  assert.match(calls[0].messages[0].content, /不要写成具体构图、位置或必须出现的视觉组件/);
   assert.deepEqual(selectCoverTitleHighlights('合作将在11月12日前终止', ['终止'], {useFallback:false}), ['终止']);
 });
 
@@ -186,6 +197,7 @@ test('cover routes, job type and navigation are wired', () => {
   const routes = fs.readFileSync('server/platform/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('\\/cover\\/generate$'));
   assert.ok(routes.includes('\\/cover\\/local$'));
+  assert.ok(routes.includes('\\/cover\\/ai-html$'));
   const jobs = fs.readFileSync('server/features/batches/application/ai-job-handlers.mjs', 'utf8');
   assert.ok(jobs.includes("'cover-image'"));
   assert.ok(jobs.includes('runCoverImageJob'));
@@ -193,6 +205,9 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(index.includes('data-view="cover"'));
   assert.ok(index.includes('id="goto-cover"'));
   assert.ok(index.includes('id="download-cover"'));
+  assert.ok(index.includes('id="cover-mode"'));
+  assert.ok(index.includes('id="cover-ai-html"'));
+  assert.ok(index.includes('AI 视觉封面'));
   assert.ok(index.includes('data-theme-picker="cover"'));
   assert.ok(index.includes('data-theme-browser="cover"'));
   const main = fs.readFileSync('public/src/main.js', 'utf8');
@@ -209,9 +224,15 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(view.includes('preferredId && !preferred'));
   assert.ok(view.includes('daily-final'));
   assert.ok(view.includes('daily/cover'));
+  assert.ok(view.includes('mode: currentMode()'));
+  assert.ok(view.includes('aiVisualFallback'));
+  assert.ok(view.includes('/ai-html'));
   assert.ok(routes.includes('\\/daily\\/cover\\/generate$'));
   assert.ok(routes.includes('\\/daily\\/cover\\/local$'));
+  assert.ok(routes.includes('\\/daily\\/cover\\/ai-html$'));
   assert.ok(routes.includes('\\/daily\\/cover$'));
+  assert.ok(routes.includes("['standard', 'ai-visual']"));
+  assert.ok(routes.includes("mode }));"));
 });
 
 test('theme-baked cover spec: validation and deterministic article fill-in', () => {

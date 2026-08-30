@@ -13,6 +13,7 @@ function bindCover() {
   if (bound) return;
   bound = true;
   $("#cover-candidate").addEventListener("change", () => loadCoverState().catch((error) => toast(error.message, "error")));
+  $("#cover-mode").addEventListener("change", () => renderModeHelp());
   $("#generate-cover").addEventListener("click", (event) => withLoading(event.currentTarget, "正在生成…", () => generateCover().catch((error) => {
     $("#cover-status").textContent = `生成失败：${error.message}`;
     toast(error.message, "error");
@@ -21,6 +22,42 @@ function bindCover() {
 
 function currentCandidateId() {
   return $("#cover-candidate")?.value || "";
+}
+
+function currentMode() {
+  return $("#cover-mode")?.value || "standard";
+}
+
+function renderModeHelp() {
+  const mode = currentMode();
+  const help = $("#cover-mode-help");
+  if (!help) return;
+  help.textContent = mode === "ai-visual"
+    ? "AI 视觉封面：AI 生成 HTML/CSS 后直接截图，不调用文生图；生成或截图失败时任务直接失败。"
+    : "标准封面：AI 只做主题与构图决策，图片由本地确定性模板渲染。";
+}
+
+function renderAiStatus(status) {
+  const target = $("#cover-ai-status");
+  const link = $("#cover-ai-html");
+  if (!target) return;
+  target.hidden = true;
+  target.textContent = "";
+  if (link) { link.hidden = true; link.removeAttribute("href"); }
+  if (!status?.exists) return;
+  if (status.aiVisualFallback) {
+    target.textContent = `AI 视觉生成失败，已回退标准封面${status.aiVisualError ? `：${status.aiVisualError}` : ""}`;
+    target.hidden = false;
+    target.className = "cover-ai-status warning";
+  } else if (status.mode === "ai-visual") {
+    target.textContent = "AI 视觉封面已生成（HTML/CSS 截图，不调用文生图模型）";
+    target.hidden = false;
+    target.className = "cover-ai-status success";
+  }
+  if (link && status.aiVisualHtmlAvailable) {
+    link.href = coverApi(currentCandidateId(), "/ai-html");
+    link.hidden = false;
+  }
 }
 
 async function loadCandidates() {
@@ -67,14 +104,16 @@ async function loadCoverState() {
   renderArticleInfo();
   const id = currentCandidateId();
   const img = $("#cover-image"), empty = $("#cover-empty"), download = $("#download-cover");
-  if (!id) { img.hidden = true; empty.hidden = false; download.hidden = true; return; }
+  if (!id) { img.hidden = true; empty.hidden = false; download.hidden = true; renderAiStatus({ exists: false }); return; }
   const status = await request(coverApi(id));
   coverExists = status.exists;
+  renderAiStatus(status);
   if (status.exists) {
     const url = `${coverApi(id, "/local")}?v=${encodeURIComponent(status.modifiedAt)}`;
     img.src = url; img.hidden = false; empty.hidden = true;
     download.href = url; download.hidden = false;
-    $("#cover-status").textContent = `已生成 · ${new Date(status.modifiedAt).toLocaleString("zh-CN")} · 可重新生成覆盖`;
+    const modeLabel = status.aiVisualFallback ? "标准封面（AI 视觉失败后回退）" : status.mode === "ai-visual" ? "AI 视觉封面" : "标准封面";
+    $("#cover-status").textContent = `${modeLabel} · ${new Date(status.modifiedAt).toLocaleString("zh-CN")} · 可重新生成覆盖`;
   } else {
     img.hidden = true; empty.hidden = false; download.hidden = true;
     $("#cover-status").textContent = "尚未生成封面图";
@@ -87,7 +126,7 @@ async function pollCoverJob(jobId, candidateId) {
     const job = await request(`/api/jobs/${jobId}`);
     if (String(job.candidateId ?? job.candidate_id ?? "") !== String(candidateId) && job.candidateId != null) return true;
     if (job.status === "running" || job.status === "queued") {
-      $("#cover-status").textContent = job.progress || "正在生成…";
+      $("#cover-status").textContent = job.progress || (currentMode() === "ai-visual" ? "正在生成 AI 视觉封面…" : "正在生成标准封面…");
       return false;
     }
     if (job.status === "completed") {
@@ -107,14 +146,15 @@ async function generateCover() {
   if (coverExists && !await confirmAction("重新生成将覆盖当前已生成的封面图，是否继续？", { confirmText: "重新生成" })) return;
   const job = await request(coverApi(id, "/generate"), {
     method: "POST",
-    body: JSON.stringify({ theme: $("#cover-theme").value || "auto", provider: $("#cover-provider").value || undefined }),
+    body: JSON.stringify({ theme: $("#cover-theme").value || "auto", provider: $("#cover-provider").value || undefined, mode: currentMode() }),
   });
-  $("#cover-status").textContent = "封面生成任务已入队…";
+  $("#cover-status").textContent = currentMode() === "ai-visual" ? "AI 视觉封面任务已入队…" : "标准封面任务已入队…";
   await pollCoverJob(job.id, id);
 }
 
 export default async function loadCoverView() {
   bindCover();
+  renderModeHelp();
   const prov = $("#cover-provider");
   if (prov) prov.innerHTML = providerOptions(state.models?.defaultProvider || "");
   await Promise.all([loadCandidates()]);

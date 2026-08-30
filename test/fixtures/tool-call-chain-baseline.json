@@ -180,6 +180,12 @@
   ],
   "skills": [
     {
+      "id": "article-cover-ai-visual-generator",
+      "name": "文章封面 AI 视觉生成",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
       "id": "article-image-placeholders",
       "name": "文章配图占位规划",
       "requiredCapabilities": [],

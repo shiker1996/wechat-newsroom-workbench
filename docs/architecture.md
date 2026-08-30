@@ -40,7 +40,7 @@ SQLite（data/workbench.db）      技能运行时 server/skills + skills/
 | `model-routes.mjs` | 模型服务商列表、增删、连通性测试 |
 | `content-routes.mjs` | 热点、文章、日历、日志、产物柜（含 reindex / preview） |
 | `system-routes.mjs` | 最大模块：设置、技能包与插件的安装 / 状态 / 回滚 / 删除、能力槽位、执行日志、RSSHub / Reddit 控制、订阅 CRUD、备份导出 / 校验 / 恢复 |
-| `media-routes.mjs` | 配图工作区、排版 `/ai/typeset`、文档列表、可视化规划与决策 |
+| `media-routes.mjs` | 配图工作区、排版 `/ai/typeset`、文章封面（标准 / AI 视觉）、文档列表、可视化规划与决策 |
 | `article-routes.mjs` | 编辑会（同步与流式）、writer / stage 技能选择、文档修订、来源抓取、`/ai/draft`、`/ai/article` |
 | `social-card-routes.mjs` | 卡片编辑会、卡片页 CRUD / layout、social-cards 文件与 ZIP、渠道、仓库巡检、`/ai/social-card` |
 | `batch-routes.mjs` | 批次 CRUD、采集、排名、社交排名、热点全景和删除影响评估 |
@@ -121,10 +121,12 @@ SQLite（data/workbench.db）      技能运行时 server/skills + skills/
           每阶段产物落候选工作目录，门禁不过自动返工一次）
        → 排版（typeset-pipeline：rendered → design → images → draft → normalized → gate；
           确定性 markdownToHtml + 主题 tokens，只输出内联样式，含 CDN 上传开关）
-       → 封面图（cover-image-generator：AI 只做排版决策产出规格 JSON，
-          validateCoverSpec 校验、不合规整体回退 fallbackCoverSpec，
-          再由封面编译器确定性渲染 900×383 PNG）
+       → 封面图（cover-image-generator：默认由 cover.spec 确定性渲染；
+          可选 AI 视觉模式由单 Agent 生成 HTML/CSS，程序注入真实文字后截图；
+          AI 失败自动回退标准封面，最终统一输出 900×383 cover.png）
 ```
+
+封面 AI 视觉模式位于 `server/features/articles/application/`：`ai-visual-cover-generator.mjs` 负责冻结主题与文章输入并调用通用视觉文档 Agent，`ai-visual-cover-composer.mjs` 负责构建输入和最小 HTML 起始文档，`ai-visual-cover-pipeline.mjs` 负责阶段记录、截图和图片交付检查。它只开放项目文件读取与当前封面目录内的分块写入，不调用文生图、网络搜索或文章写入能力；标准模式仍是默认路径。
 
 ### 图文链
 

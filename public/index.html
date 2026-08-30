@@ -621,17 +621,23 @@
 
     <section class="view" id="view-cover">
       <div class="section-intro"><div><span class="kicker">COVER IMAGE</span></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
-      <div class="typeset-toolbar">
+      <div class="typeset-toolbar cover-toolbar">
         <select id="cover-candidate" aria-label="封面文章"></select>
         <select id="cover-theme" class="visually-hidden" aria-label="封面主题"></select>
         <button type="button" class="theme-picker-trigger" id="cover-theme-trigger" data-theme-picker="cover"><span>封面主题</span><b>自动匹配</b></button>
         <select id="cover-provider" aria-label="封面设计模型"></select>
+        <select id="cover-mode" aria-label="封面生成模式">
+          <option value="standard">标准封面</option>
+          <option value="ai-visual">AI 视觉封面</option>
+        </select>
         <button class="primary-button" id="generate-cover">生成封面图</button>
         <small id="cover-status" class="muted">选择文章与主题后生成封面；重复生成会覆盖旧图。</small>
+        <small id="cover-mode-help" class="muted">标准封面：AI 只做主题与构图决策，图片由本地确定性模板渲染。</small>
+        <small id="cover-ai-status" class="cover-ai-status" aria-live="polite" hidden></small>
       </div>
       <div class="cover-layout">
         <section class="cover-preview-panel">
-          <div class="phone-bar"><span>COVER PREVIEW · 900 × 383</span><a class="text-button" id="download-cover" href="#" download="cover.png" hidden>下载 PNG</a></div>
+          <div class="phone-bar"><span>COVER PREVIEW · 900 × 383</span><span><a class="text-button" id="cover-ai-html" href="#" target="_blank" rel="noopener" hidden>查看 AI HTML</a> <a class="text-button" id="download-cover" href="#" download="cover.png" hidden>下载 PNG</a></span></div>
           <div id="cover-empty" class="cover-empty">当前文章尚未生成封面图<br><small>点击上方“生成封面图”</small></div>
           <img id="cover-image" alt="文章封面图预览" hidden>
         </section>

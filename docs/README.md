@@ -41,6 +41,7 @@
 | [agent-adapter-configurability-design.md](./design/agent-adapter-configurability-design.md) | Agent 能力适配层配置化设计：resourceKind 档案表 + Agent 双 map 声明，资源类能力接入免改代码（2026-08-15，阶段 1–4 已实施） |
 | [conversation-agent-form-unification-design.md](./design/conversation-agent-form-unification-design.md) | 对话 Agent 表单统一设计（`server/features/articles/domain/editorial-readiness.mjs` 的设计依据） |
 | [star-growth-roadmap.md](./design/star-growth-roadmap.md) | Star 增长路线图：发布临门一脚、首个公开 Release、可见性渠道与留存运营（待评审） |
+| [ai-visual-cover-design.md](./design/ai-visual-cover-design.md) | 公众号文章 AI 视觉封面：HTML/CSS 生成、主题 SPEC、标准回退和 900×383 交付（已实施） |
 
 ## 历史归档（archive/）
 

@@ -7,6 +7,28 @@ import { pipeFile } from '../route-helpers.mjs';
 
 export async function handleMediaRoutes(context) {
   const { request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity } = context;
+  const coverStatus = (coverPath) => {
+    const imageDir = path.dirname(coverPath);
+    const reportPath = path.join(imageDir, 'cover-ai-generation.json');
+    const htmlPath = path.join(imageDir, 'ai-cover.html');
+    const standard = { mode: 'standard', aiVisualFallback: false, aiVisualError: '', aiVisualHtmlAvailable: false };
+    if (!fs.existsSync(reportPath) || !fs.existsSync(coverPath)) return standard;
+    try {
+      const reportStat = fs.statSync(reportPath);
+      const coverStat = fs.statSync(coverPath);
+      if (reportStat.mtimeMs < coverStat.mtimeMs) return standard;
+      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      const fallback = report.status === 'fallback';
+      return {
+        mode: fallback ? 'standard' : String(report.mode || 'standard'),
+        aiVisualFallback: fallback,
+        aiVisualError: fallback ? String(report.fallbackReason || '') : '',
+        aiVisualHtmlAvailable: fs.existsSync(htmlPath),
+      };
+    } catch {
+      return standard;
+    }
+  };
   const dailyImageMatch = pathname.match(/^\/api\/batches\/([^/]+)\/daily\/images$/);
   if (dailyImageMatch && request.method === 'GET') {
     const batch = store.getBatch(decodeURIComponent(dailyImageMatch[1]));
@@ -63,7 +85,9 @@ export async function handleMediaRoutes(context) {
     if (!batch) return json(response, 404, { error:'批次不存在' });
     if (!store.getDocument(batch.id, null, 'daily-final')) return json(response, 409, { error:'缺少早报终稿，请先完成批次早报' });
     const input = await body(request);
-    return json(response, 202, aiJobs.start({ batchId:batch.id, candidateId:null, provider:input.provider||null, type:'cover-image', theme:input.theme||'auto' }));
+    const mode = String(input.mode || 'standard');
+    if (!['standard', 'ai-visual'].includes(mode)) return json(response, 400, { error:'封面生成模式必须是 standard 或 ai-visual' });
+    return json(response, 202, aiJobs.start({ batchId:batch.id, candidateId:null, provider:input.provider||null, type:'cover-image', theme:input.theme||'auto', mode }));
   }
   const dailyCoverLocalMatch = pathname.match(/^\/api\/batches\/([^/]+)\/daily\/cover\/local$/);
   if (dailyCoverLocalMatch && request.method === 'GET') {
@@ -75,6 +99,16 @@ export async function handleMediaRoutes(context) {
     response.writeHead(200, { 'content-type':'image/png', 'cache-control':'no-store' });
     return pipeFile(response,coverPath);
   }
+  const dailyCoverHtmlMatch = pathname.match(/^\/api\/batches\/([^/]+)\/daily\/cover\/ai-html$/);
+  if (dailyCoverHtmlMatch && request.method === 'GET') {
+    const batch = store.getBatch(decodeURIComponent(dailyCoverHtmlMatch[1]));
+    if (!batch) return json(response, 404, { error:'批次不存在' });
+    const workdir = path.join(batchArticlesDir(config.workspaceRoot, batch), 'daily');
+    const htmlPath = path.join(workdir, 'images', 'ai-cover.html');
+    if (!isInsideRoots(htmlPath, [workdir]) || !fs.existsSync(htmlPath)) return json(response, 404, { error:'AI 封面 HTML 不存在' });
+    response.writeHead(200, { 'content-type':'text/html; charset=utf-8', 'cache-control':'no-store', 'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; img-src data:;" });
+    return pipeFile(response,htmlPath);
+  }
   const dailyCoverMatch = pathname.match(/^\/api\/batches\/([^/]+)\/daily\/cover$/);
   if (dailyCoverMatch && request.method === 'GET') {
     const batch = store.getBatch(decodeURIComponent(dailyCoverMatch[1]));
@@ -84,7 +118,7 @@ export async function handleMediaRoutes(context) {
     if (!fs.existsSync(coverPath)) return json(response, 200, { exists:false });
     const stat = fs.statSync(coverPath);
     const doc = store.getDocument(batch.id, null, 'daily-final');
-    return json(response, 200, { exists:true, size:stat.size, modifiedAt:stat.mtime.toISOString(), title:doc?.title || '批次早报' });
+    return json(response, 200, { exists:true, size:stat.size, modifiedAt:stat.mtime.toISOString(), title:doc?.title || '批次早报', ...coverStatus(coverPath) });
   }
   const imageWorkspaceMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images$/);
   if (imageWorkspaceMatch && request.method === 'GET') {
@@ -159,7 +193,9 @@ export async function handleMediaRoutes(context) {
     const batch = store.getBatch(candidate.batch_id);
     if (!store.getDocument(batch.id, candidate.id, 'final')) return json(response, 409, { error:'缺少成稿终稿，请先完成成稿链' });
     const input = await body(request);
-    return json(response, 202, aiJobs.start({ batchId:batch.id, candidateId:candidate.id, provider:input.provider||null, type:'cover-image', theme:input.theme||'auto' }));
+    const mode = String(input.mode || 'standard');
+    if (!['standard', 'ai-visual'].includes(mode)) return json(response, 400, { error:'封面生成模式必须是 standard 或 ai-visual' });
+    return json(response, 202, aiJobs.start({ batchId:batch.id, candidateId:candidate.id, provider:input.provider||null, type:'cover-image', theme:input.theme||'auto', mode }));
   }
   const coverLocalMatch = pathname.match(/^\/api\/candidates\/(\d+)\/cover\/local$/);
   if (coverLocalMatch && request.method === 'GET') {
@@ -171,6 +207,16 @@ export async function handleMediaRoutes(context) {
     response.writeHead(200, { 'content-type':'image/png', 'cache-control':'no-store' });
     return pipeFile(response,coverPath);
   }
+  const coverHtmlMatch = pathname.match(/^\/api\/candidates\/(\d+)\/cover\/ai-html$/);
+  if (coverHtmlMatch && request.method === 'GET') {
+    const candidate = store.getCandidate(Number(coverHtmlMatch[1]));
+    if (!candidate) return json(response, 404, { error:'候选不存在' });
+    const batch = store.getBatch(candidate.batch_id); const workdir = articleWorkdir(batch, candidate);
+    const htmlPath = path.join(workdir, 'images', 'ai-cover.html');
+    if (!isInsideRoots(htmlPath, [workdir]) || !fs.existsSync(htmlPath)) return json(response, 404, { error:'AI 封面 HTML 不存在' });
+    response.writeHead(200, { 'content-type':'text/html; charset=utf-8', 'cache-control':'no-store', 'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; img-src data:;" });
+    return pipeFile(response,htmlPath);
+  }
   const coverMatch = pathname.match(/^\/api\/candidates\/(\d+)\/cover$/);
   if (coverMatch && request.method === 'GET') {
     const candidate = store.getCandidate(Number(coverMatch[1]));
@@ -180,7 +226,7 @@ export async function handleMediaRoutes(context) {
     if (!fs.existsSync(coverPath)) return json(response, 200, { exists:false });
     const stat = fs.statSync(coverPath);
     const doc = store.getDocument(batch.id, candidate.id, 'final');
-    return json(response, 200, { exists:true, size:stat.size, modifiedAt:stat.mtime.toISOString(), title:doc?.title || candidate.hotspot_title || '' });
+    return json(response, 200, { exists:true, size:stat.size, modifiedAt:stat.mtime.toISOString(), title:doc?.title || candidate.hotspot_title || '', ...coverStatus(coverPath) });
   }
   const imageCdnMatch = pathname.match(/^\/api\/candidates\/(\d+)\/images\/([^/]+)\/cdn$/);
   if (imageCdnMatch && request.method === 'POST') {
