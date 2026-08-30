@@ -24,8 +24,27 @@ test('Phase 2 提案提示词携带基础模板能力且禁止模型直接写生
   const messages=buildSocialTemplateProposalMessages({prompt:'为工具介绍创建差异化的终端模板',baseTemplatePack:'neon-v1',draftMode:'json'},{basePack:getSocialCardTemplatePack('neon-v1')});
   assert.match(messages[0].content,/基础模板包：neon-v1/);
   assert.match(messages[0].content,/十个角色必须全部出现/);
+  assert.match(messages[0].content,/visualDirection.*terminal.*grid.*mono/);
+  assert.match(messages[0].content,/surface\.density.*compact、standard 或 airy/);
   assert.match(messages[0].content,/不要输出 draft、HTML、CSS/);
   assert.match(messages[0].content,/不是故事板内容/);
+});
+
+test('Phase 2 归一化常见 AI 语义变体，补齐角色并保留受控契约',()=>{
+  const value=candidate({
+    visualDirection:'terminal、grid、mono、grid',
+    roles:{cover:candidate().roles.cover},
+    surface:{density:'dense',decoration:'grid',headingTreatment:'highlight'},
+  });
+  const result=sanitizeSocialTemplateProposal(value,{basePack:getSocialCardTemplatePack('neon-v1')});
+  assert.deepEqual(result.proposal.visualDirection,['terminal','grid','mono']);
+  assert.equal(result.proposal.surface.density,'compact');
+  assert.equal(result.proposal.surface.decoration,'grid-line');
+  assert.equal(result.proposal.surface.headingTreatment,'highlight-block');
+  assert.deepEqual(Object.keys(result.proposal.roles),['cover','concept','feature','steps','data','compare','evidence','timeline','risk','ending']);
+  assert.equal(result.proposal.roles.concept.layout,'problem-stack');
+  assert.ok(result.repairs.some((item)=>item.field==='roles.concept'));
+  assert.doesNotThrow(()=>validateSocialTemplateProposal(result.proposal));
 });
 
 test('Phase 2 敏感字段清理并将 HTML/CSS 草稿标为仅隔离预览',()=>{
@@ -54,6 +73,16 @@ test('Phase 2 AI 生成返回短期提案并支持一次 JSON 格式修复',asyn
   const repairedResult=await generateSocialTemplateProposal({gateway:repaired,request:{prompt:'创建一套终端风格的 Social 模板提案',baseTemplatePack:'neon-v1'},candidateStore:new SocialTemplateProposalStore(),basePack:getSocialCardTemplatePack('neon-v1')});
   assert.equal(repairedResult.repairs[0].field,'proposal');
   assert.equal(repairCalls,2);
+});
+
+test('Phase 2 AI 生成可接受字符串关键词、缺失角色和密度别名',async()=>{
+  const malformed=candidate({visualDirection:'terminal, grid, mono',roles:{cover:candidate().roles.cover},surface:{density:'comfortable',decoration:'orbit',headingTreatment:'underline'}});
+  const result=await generateSocialTemplateProposal({gateway:gatewayFor(JSON.stringify(malformed)),request:{prompt:'创建一套终端风格的 Social 模板提案',baseTemplatePack:'neon-v1'},candidateStore:new SocialTemplateProposalStore(),basePack:getSocialCardTemplatePack('neon-v1')});
+  assert.deepEqual(result.proposal.visualDirection,['terminal','grid','mono']);
+  assert.equal(result.proposal.surface.density,'airy');
+  assert.equal(Object.keys(result.proposal.roles).length,10);
+  assert.ok(result.repairs.some((item)=>item.field==='surface.density'));
+  assert.ok(result.repairs.some((item)=>item.field==='roles.concept'));
 });
 
 test('Phase 2 提案草稿按 TTL 过期且过期错误可定位',()=>{

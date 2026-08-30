@@ -14,6 +14,7 @@ import { resolveSocialCardTemplateContext } from '../../../shared/rendering/soci
 import { generateSocialTemplateProposal, SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES } from '../../../shared/themes/social-template-proposal.mjs';
 import { SocialTemplateProposalStore, SocialTemplateProposalRateLimiter } from '../../../shared/themes/social-template-proposal-store.mjs';
 import { compileSocialTemplateProposal, compileSocialTemplateProposalPack, compileSocialTemplateProposalCss } from '../../application/themes/social-template-proposal-compiler.mjs';
+import { themeMetadataSummary } from '../../../shared/themes/theme-metadata.mjs';
 
 const TARGETS=new Set(['article','social','cover']);
 const SCENE_TAGS=['深度观点','技术教程','快讯','数据对比','事件图文'];
@@ -34,6 +35,29 @@ function recordSocialTemplateProposalMetric(store, input) {
   try { store?.recordSocialTemplateProposalMetric?.(input); } catch { /* metrics must never break a user-facing route */ }
 }
 
+function socialTemplateEditorCatalogForDraft(draft) {
+  const catalog = socialCardTemplateEditorCatalog();
+  const configured = draft?.social?.templatePack;
+  if (!configured?.id || !configured?.roles || !configured?.roleTemplates || catalog.some((item) => item.id === configured.id)) return catalog;
+  const custom = {
+    id: configured.id,
+    version: Number(configured.version) || 1,
+    label: String(configured.label || configured.id),
+    renderer: String(configured.renderer || 'current-deterministic-renderer'),
+    fallbackTemplate: configured.fallbackTemplate || null,
+    roleTemplates: { ...configured.roleTemplates },
+    roles: Object.fromEntries(Object.entries(configured.roles).map(([role, value]) => [role, {
+      template: value?.template || configured.roleTemplates[role] || '',
+      maxBlocks: value?.maxBlocks,
+      maxItems: value?.maxItems,
+      supplementSlots: Array.isArray(value?.supplementSlots) ? value.supplementSlots.map((slot) => ({ ...slot, blockTypes: [...(slot.blockTypes || [])] })) : [],
+      capacity: value?.capacity ? { ...value.capacity, splitBlockTypes: [...(value.capacity.splitBlockTypes || [])] } : null,
+      supportedBlocks: Array.isArray(value?.supportedBlocks) ? [...value.supportedBlocks] : [],
+    }])),
+  };
+  return [...catalog, custom];
+}
+
 export function themeCatalog(target,registry=getBuiltinThemeRegistry(),store=null){
   if(!TARGETS.has(target))throw new Error(`未知主题目标：${target}`);
   const rank=new Map(ORDER[target].map((id,index)=>[id,index]));
@@ -42,17 +66,17 @@ export function themeCatalog(target,registry=getBuiltinThemeRegistry(),store=nul
   return {schemaVersion:1,target,defaultTheme:DEFAULTS[target],items};
 }
 
-function detail(row,target){const published=userThemeFromRow(row),draft=userThemeFromRow(row,{draft:true}),compatibility=auditThemeForPublish(draft,{target}),legacySocial=target==='social'&&!draft?.social?.templatePack?.id,components=target==='social'?socialComponentEditorCatalog(draft.social?.recipes):target==='article'?articleComponentEditorCatalog(draft.article?.recipes):null,template=target==='social'?publicTheme(draft,target).template:null;return {schemaVersion:1,id:row.id,label:row.label,target,source:'user',status:row.status,activeVersion:row.active_version||null,definition:published,draft,compatibility,legacy:legacySocial,editorMode:legacySocial||!compatibility.compatible?'read-only':'full',template,editorCatalog:{recipes:target==='cover'?{}:themeRecipeEditorCatalog(target),components,templatePacks:target==='social'?socialCardTemplateEditorCatalog():[]}};}
+function detail(row,target,metadata){const published=userThemeFromRow(row),draft=userThemeFromRow(row,{draft:true}),compatibility=auditThemeForPublish(draft,{target}),legacySocial=target==='social'&&!draft?.social?.templatePack?.id,components=target==='social'?socialComponentEditorCatalog(draft.social?.recipes):target==='article'?articleComponentEditorCatalog(draft.article?.recipes):null,template=target==='social'?publicTheme(draft,target).template:null;return {schemaVersion:1,id:row.id,label:row.label,target,source:'user',status:row.status,activeVersion:row.active_version||null,metadata:metadata||null,definition:published,draft,compatibility,legacy:legacySocial,editorMode:legacySocial||!compatibility.compatible?'read-only':'full',template,editorCatalog:{recipes:target==='cover'?{}:themeRecipeEditorCatalog(target),components,templatePacks:target==='social'?socialTemplateEditorCatalogForDraft(draft):[]}};}
 export async function handleThemeRoutes({request,response,pathname,searchParams,json,store,body,models,candidateStore=aiThemeCandidates,rateLimiter=aiThemeRateLimiter}){
   if(request.method==='GET'&&pathname==='/api/themes/manage'){
-    const items=(store.listUserThemes({includeArchived:true})||[]).map((row)=>({id:row.id,label:row.label,target:row.target,status:row.status,source:'user',activeVersion:row.active_version||null,updatedAt:row.updated_at}));json(response,200,{schemaVersion:1,items});return true;
+    const items=(store.listUserThemes({includeArchived:true})||[]).map((row)=>({id:row.id,label:row.label,target:row.target,status:row.status,source:'user',activeVersion:row.active_version||null,updatedAt:row.updated_at,metadata:themeMetadataSummary(store.getThemeMetadata?.(row.id))}));json(response,200,{schemaVersion:1,items});return true;
   }
   if(request.method==='GET'&&pathname==='/api/themes'){
     const target=searchParams.get('target')||'';if(!TARGETS.has(target)){json(response,400,{error:'target 必须是 article、social 或 cover'});return true;}
     json(response,200,themeCatalog(target,getBuiltinThemeRegistry(),store));return true;
   }
   if(request.method==='POST'&&pathname==='/api/themes'){
-    try{const input=await body(request);const saved=saveThemeDraft(store,{id:input.id,target:input.target,definition:input.definition});json(response,201,{theme:saved});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;
+    try{const input=await body(request);const saved=saveThemeDraft(store,{id:input.id,target:input.target,definition:input.definition,metadata:input.metadata||null});json(response,201,{theme:saved,metadata:store.getThemeMetadata?.(input.id)||null});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;
   }
   const socialTemplateProposalGenerate= request.method==='POST' && ['/api/social/template-proposals','/api/social/template-proposals/ai/generate','/api/themes/social-template-proposals/generate'].includes(pathname);
   if(socialTemplateProposalGenerate){
@@ -127,18 +151,18 @@ export async function handleThemeRoutes({request,response,pathname,searchParams,
       if(input.label!==undefined)definition.label=String(input.label).trim();if(input.description!==undefined)definition.description=String(input.description).trim();
       const audit=auditThemeForPublish(definition,{target:candidate.target});if(!audit.valid)throw Object.assign(new Error('AI 主题候选重新校验失败'),{code:AI_THEME_ERROR_CODES.OUTPUT_INVALID,issues:audit.issues});
       let id='';for(let attempt=0;attempt<10&&!id;attempt++){const value=`ai-${candidate.target}-${crypto.randomUUID().slice(0,8)}`;if(!store.getUserTheme(value)&&!getBuiltinThemeRegistry().has(value))id=value;}if(!id)throw new Error('无法生成唯一主题 ID，请重试');
-      const theme=saveThemeDraft(store,{id,target:candidate.target,definition});candidateStore.delete(candidateId);json(response,201,{theme,creationMethod:'ai',aiProvenance:{serviceId:candidate.model.serviceId,model:candidate.model.model,promptVersion:candidate.promptVersion,generatedAt:candidate.createdAt,repairs:candidate.repairs}});
+      const aiProvenance={serviceId:candidate.model.serviceId,model:candidate.model.model,promptVersion:candidate.promptVersion,generatedAt:candidate.createdAt,callId:candidate.model.callId||null};const metadata={creationMethod:'ai',intent:{prompt:candidate.request?.prompt,...(candidate.request?.preferences||{})},aiProvenance,designSummary:candidate.designSummary,repairs:candidate.repairs,templateMatchEvidence:definition.social?.templateMatch||null};const theme=saveThemeDraft(store,{id,target:candidate.target,definition,metadata});candidateStore.delete(candidateId);json(response,201,{theme,creationMethod:'ai',metadata:store.getThemeMetadata?.(id)||null,aiProvenance});
     }catch(error){const status=error.code===AI_THEME_ERROR_CODES.CANDIDATE_EXPIRED?410:400;json(response,status,{error:error.message,code:error.code||AI_THEME_ERROR_CODES.OUTPUT_INVALID,issues:error.issues||[]});}return true;
   }
   if(request.method==='POST'&&pathname==='/api/themes/preview'){
     try{const input=await body(request);json(response,200,compileThemePreview({target:input.target,definition:input.definition,highlightField:input.highlightField||''}));}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;
   }
-  if(request.method==='POST'&&pathname==='/api/themes/import'){try{const input=await body(request);json(response,201,importThemeDraft(store,{definition:input.definition,id:input.id||null}));}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
-  const themeCloneMatch=pathname.match(/^\/api\/themes\/([^/]+)\/clone$/);if(request.method==='POST'&&themeCloneMatch){try{const input=await body(request);json(response,201,{theme:cloneTheme(store,{sourceId:decodeURIComponent(themeCloneMatch[1]),id:input.id,label:input.label})});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
-  const themeDraftMatch=pathname.match(/^\/api\/themes\/([^/]+)\/draft$/);if(request.method==='PUT'&&themeDraftMatch){try{const input=await body(request),id=decodeURIComponent(themeDraftMatch[1]),row=store.getUserTheme(id);if(!row){json(response,404,{error:'用户主题不存在'});return true;}json(response,200,{theme:saveThemeDraft(store,{id,target:row.target,definition:input.definition})});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
+  if(request.method==='POST'&&pathname==='/api/themes/import'){try{const input=await body(request),definition=input.metadata?{...input.definition,metadata:input.metadata}:input.definition;json(response,201,importThemeDraft(store,{definition,id:input.id||null}));}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
+  const themeCloneMatch=pathname.match(/^\/api\/themes\/([^/]+)\/clone$/);if(request.method==='POST'&&themeCloneMatch){try{const input=await body(request),theme=cloneTheme(store,{sourceId:decodeURIComponent(themeCloneMatch[1]),id:input.id,label:input.label});json(response,201,{theme,metadata:store.getThemeMetadata?.(theme.id)||null});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
+  const themeDraftMatch=pathname.match(/^\/api\/themes\/([^/]+)\/draft$/);if(request.method==='PUT'&&themeDraftMatch){try{const input=await body(request),id=decodeURIComponent(themeDraftMatch[1]),row=store.getUserTheme(id);if(!row){json(response,404,{error:'用户主题不存在'});return true;}json(response,200,{theme:saveThemeDraft(store,{id,target:row.target,definition:input.definition,metadata:input.metadata||null}),metadata:store.getThemeMetadata?.(id)||null});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
   const themeValidateMatch=pathname.match(/^\/api\/themes\/([^/]+)\/validate$/);if(request.method==='POST'&&themeValidateMatch){const id=decodeURIComponent(themeValidateMatch[1]),row=store.getUserTheme(id);if(!row){json(response,404,{error:'用户主题不存在'});return true;}json(response,200,auditThemeForPublish(userThemeFromRow(row,{draft:true}),{target:row.target}));return true;}
   const themePreviewMatch=pathname.match(/^\/api\/themes\/([^/]+)\/preview$/);if(request.method==='POST'&&themePreviewMatch){try{const row=store.getUserTheme(decodeURIComponent(themePreviewMatch[1]));if(!row){json(response,404,{error:'用户主题不存在'});return true;}const input=await body(request),definition=input.definition||userThemeFromRow(row,{draft:true});json(response,200,compileThemePreview({target:row.target,definition,highlightField:input.highlightField||''}));}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
-  const themePublishMatch=pathname.match(/^\/api\/themes\/([^/]+)\/publish$/);if(request.method==='POST'&&themePublishMatch){try{json(response,200,{theme:publishTheme(store,decodeURIComponent(themePublishMatch[1]))});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
+  const themePublishMatch=pathname.match(/^\/api\/themes\/([^/]+)\/publish$/);if(request.method==='POST'&&themePublishMatch){try{const theme=publishTheme(store,decodeURIComponent(themePublishMatch[1]));json(response,200,{theme,metadata:store.getThemeMetadata?.(theme.id)||null});}catch(error){json(response,400,{error:error.message,issues:error.issues||[]});}return true;}
   const themeArchiveMatch=pathname.match(/^\/api\/themes\/([^/]+)\/archive$/);if(request.method==='POST'&&themeArchiveMatch){const result=store.archiveUserTheme(decodeURIComponent(themeArchiveMatch[1]));json(response,result?200:404,result?{archived:true}:{error:'用户主题不存在'});return true;}
   const themeVersionsMatch=pathname.match(/^\/api\/themes\/([^/]+)\/versions$/);if(request.method==='GET'&&themeVersionsMatch){json(response,200,{items:store.userThemeVersions(decodeURIComponent(themeVersionsMatch[1]))});return true;}
   const themeRestoreMatch=pathname.match(/^\/api\/themes\/([^/]+)\/versions\/([^/]+)\/restore$/);if(request.method==='POST'&&themeRestoreMatch){try{json(response,200,{theme:restoreThemeVersion(store,decodeURIComponent(themeRestoreMatch[1]),decodeURIComponent(themeRestoreMatch[2]))});}catch(error){json(response,404,{error:error.message});}return true;}
@@ -147,7 +171,7 @@ export async function handleThemeRoutes({request,response,pathname,searchParams,
   const themeImpactMatch=pathname.match(/^\/api\/themes\/([^/]+)\/archive-impact$/);if(request.method==='GET'&&themeImpactMatch){const impact=store.themeArchiveImpact(decodeURIComponent(themeImpactMatch[1]));json(response,impact.exists?200:404,impact.exists?impact:{error:'用户主题不存在'});return true;}
   const themeDetailMatch=pathname.match(/^\/api\/themes\/([^/]+)$/);
   if(request.method==='GET'&&themeDetailMatch){
-    const id=decodeURIComponent(themeDetailMatch[1]);const user=store?.getUserTheme?.(id);if(user){json(response,200,detail(user,user.target));return true;}const theme=getBuiltinThemeRegistry().get(id);if(!theme){json(response,404,{error:`未知主题：${id}`});return true;}
+    const id=decodeURIComponent(themeDetailMatch[1]);const user=store?.getUserTheme?.(id);if(user){json(response,200,detail(user,user.target,store.getThemeMetadata?.(id)));return true;}const theme=getBuiltinThemeRegistry().get(id);if(!theme){json(response,404,{error:`未知主题：${id}`});return true;}
     const target=searchParams.get('target')||theme.targets[0];if(!TARGETS.has(target)||!theme.targets.includes(target)){json(response,404,{error:`主题 ${id} 不支持 ${target||'指定目标'}`});return true;}
     json(response,200,{schemaVersion:1,...publicTheme(theme,target)});return true;
   }

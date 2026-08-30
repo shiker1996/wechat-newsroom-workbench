@@ -15,6 +15,7 @@ import { articleThemeCompatibilityView, articleThemeDefinition, compileArticleTh
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
 import { defaultTypesetTheme, enforceWechatFlowLayout, extractHtmlModelOutput, htmlPreservesStructure } from '../../../shared/rendering/typeset-output.mjs';
 import { markdownToHtml, normalizeDesignTokens } from '../../../shared/rendering/markdown-renderer.mjs';
+import { resolveAutoTheme } from '../../../platform/application/themes/auto-theme-router.mjs';
 
 export { defaultTypesetTheme, enforceWechatFlowLayout, extractHtmlModelOutput, htmlPreservesStructure } from '../../../shared/rendering/typeset-output.mjs';
 export { markdownToHtml } from '../../../shared/rendering/markdown-renderer.mjs';
@@ -93,8 +94,19 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   const candidate = candidateId==null?null:store.getCandidate(candidateId);
   const daily=documentKind==='daily-final';
   if ((!daily&&(!candidate||candidate.batch_id!==batchId))||(daily&&candidate)) throw new Error('待排版文稿不存在或不属于当前批次');
-  // theme 为 auto/缺省时按候选类型确定性映射，不传模型
-  if (theme === 'auto' || !theme) theme = defaultTypesetTheme(daily?{category:'📰 综合资讯'}:candidate);
+  let themeRouting = null;
+  // auto 先由 AI 给出候选排序，再按近期使用情况受控轮换；AI 不可用时回退原有类型映射。
+  if (theme === 'auto' || !theme) {
+    themeRouting = await resolveAutoTheme({
+      gateway, provider, store, batchId, candidateId, target: 'article',
+      context: daily ? { title: '批次早报', category: '📰 综合资讯', contentType: 'daily' } : {
+        title: candidate?.hotspot_title, category: candidate?.category, angle: candidate?.angle,
+        thesis: candidate?.thesis, contentType: candidate?.content_route || 'article', composite: Boolean(candidate?.composite),
+      },
+      log: onProgress,
+    });
+    theme = themeRouting?.themeId || defaultTypesetTheme(daily ? { category: '📰 综合资讯' } : candidate);
+  }
   const themeDefinition=resolveWorkspaceTheme(store,theme,'article')||articleThemeDefinition(theme,{fallback:false});
   if (!themeDefinition) throw new Error(`未知排版主题：${theme}（可选：auto、${Object.keys(TYPESET_THEMES).join('、')}）`);
   const compiledTheme=compileArticleTheme(themeDefinition);
@@ -104,7 +116,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   const finalPath = daily?path.join(workdir,'03-FINAL.md'):path.join(workdir, '09-FINAL.md');
   if (!fs.existsSync(finalPath)) throw new Error(`缺少 ${path.basename(finalPath)}，请先保存终稿`);
   const themeSnapshotPath=path.join(workdir,'article-theme-snapshot.json');
-  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:1,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash},null,2));
+  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:1,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,autoRouting:themeRouting},null,2));
   const skills = loadTypesetSkills(skillsWorkspaceRoot);
   const typesetRuntime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:'typeset',bundles:Object.values(skills),provider,snapshotId});
   gateway=bindGenerationSnapshot(gateway,typesetRuntime.snapshotId);
@@ -247,5 +259,5 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   if (stages.length !== TYPESET_STAGE_CONTRACT.length) throw new Error('排版契约未完整执行');
   onProgress('排版完成：article.ai.html 已生成并通过门禁');
   store.updateBatch(batchId, { stage: 'typeset', status: 'completed' });
-  return { workdir, finalHtml, gate: gateResult, theme:{id:themeDefinition.id,version:themeDefinition.version,hash:themeDefinition.hash}, themeSnapshot:themeSnapshotPath, skillManifest:path.join(workdir, 'typeset-skill-manifest.json'), stageExecutions:path.join(workdir, 'typeset-stage-executions.json') };
+  return { workdir, finalHtml, gate: gateResult, theme:{id:themeDefinition.id,version:themeDefinition.version,hash:themeDefinition.hash}, themeRouting, themeSnapshot:themeSnapshotPath, skillManifest:path.join(workdir, 'typeset-skill-manifest.json'), stageExecutions:path.join(workdir, 'typeset-stage-executions.json') };
 }

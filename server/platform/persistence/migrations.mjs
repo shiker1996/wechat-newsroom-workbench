@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 20;
+export const WORKBENCH_SCHEMA_VERSION = 22;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -175,6 +175,55 @@ export function runDatabaseMigrations(db, migrateSchema) {
       if(!columns.has('article_eligible'))db.exec('ALTER TABLE candidates ADD COLUMN article_eligible INTEGER NOT NULL DEFAULT 1');
       if(!columns.has('article_eligibility_reason'))db.exec("ALTER TABLE candidates ADD COLUMN article_eligibility_reason TEXT NOT NULL DEFAULT ''");
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(20,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v21：保存自动主题路由的内容版本、候选排序和受控轮换结果；与实际渲染使用记录分离。
+    if(applied<21){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS theme_routing_decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id TEXT,
+        candidate_row_id INTEGER,
+        candidate_key TEXT NOT NULL,
+        target TEXT NOT NULL CHECK(target IN ('article','social','cover')),
+        content_hash TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'auto' CHECK(mode IN ('auto','fallback','manual')),
+        selected_theme_id TEXT NOT NULL,
+        ranked_themes_json TEXT NOT NULL DEFAULT '[]',
+        reason TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(batch_id,candidate_key,target,content_hash),
+        FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE CASCADE,
+        FOREIGN KEY(candidate_row_id) REFERENCES candidates(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_theme_routing_recent ON theme_routing_decisions(target,created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_routing_batch ON theme_routing_decisions(batch_id,target,created_at DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(21,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v22：主题创建元数据与发布版本快照独立落库，保持视觉定义 JSON 契约纯净。
+    if(applied<22){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS theme_metadata (
+        theme_id TEXT PRIMARY KEY,
+        creation_method TEXT NOT NULL DEFAULT 'manual' CHECK(creation_method IN ('manual','ai','import','clone')),
+        based_on_json TEXT NOT NULL DEFAULT '{}',
+        intent_json TEXT NOT NULL DEFAULT '{}',
+        ai_provenance_json TEXT NOT NULL DEFAULT '{}',
+        design_summary_json TEXT NOT NULL DEFAULT '[]',
+        repairs_json TEXT NOT NULL DEFAULT '[]',
+        template_match_evidence_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(theme_id) REFERENCES theme_definitions(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS theme_version_metadata (
+        theme_version_id INTEGER PRIMARY KEY,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(theme_version_id) REFERENCES theme_versions(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_theme_metadata_method ON theme_metadata(creation_method,updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_version_metadata_created ON theme_version_metadata(created_at DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(22,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

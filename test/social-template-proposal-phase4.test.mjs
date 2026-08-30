@@ -26,6 +26,9 @@ test('Phase 4 确认提案后写入主题草稿，模板包版本与十个角色
   assert.match(confirmed.data.templatePack.id, /^proposal-/);
   assert.equal(Object.keys(confirmed.data.templatePack.roles).length, 10);
   assert.equal(confirmed.data.theme.social?.templatePack?.id, confirmed.data.templatePack.id);
+  const reopened = await route({ method: 'GET', pathname: `/api/themes/${theme.id}`, store });
+  assert.equal(reopened.status, 200);
+  assert.ok(reopened.data.editorCatalog.templatePacks.some((pack) => pack.id === confirmed.data.templatePack.id), '重新打开主题时必须保留自定义模板包选项');
   assert.equal(publishTheme(store, theme.id).social.templatePack.id, confirmed.data.templatePack.id);
 });
 

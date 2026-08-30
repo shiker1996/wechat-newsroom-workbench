@@ -600,19 +600,26 @@ export class Store {
 
   getUserTheme(id) { return this.repositories.themes.get(id); }
 
-  saveUserThemeDraft({id,target,label,definitionJson}) {
-    return this.repositories.themes.saveDraft({ id, target, label, definitionJson });
+  saveUserThemeDraft({id,target,label,definitionJson,metadata=null}) {
+    return this.repositories.themes.saveDraft({ id, target, label, definitionJson, metadata });
   }
 
-  publishUserTheme({id,version,definitionJson,contentHash}) {
-    return this.repositories.themes.publish({ id, version, definitionJson, contentHash });
+  publishUserTheme({id,version,definitionJson,contentHash,metadata=null}) {
+    return this.repositories.themes.publish({ id, version, definitionJson, contentHash, metadata });
   }
 
   archiveUserTheme(id) { return this.repositories.themes.archive(id); }
   userThemeVersions(id) { return this.repositories.themes.versions(id); }
   getUserThemeVersion(id,version) { return this.repositories.themes.getVersion(id, version); }
+  getThemeMetadata(id) { return this.repositories.themes.getMetadata(id); }
+  saveThemeMetadata(input) { return this.repositories.themes.saveMetadata(input); }
+  getThemeVersionMetadata(id) { return this.repositories.themes.getVersionMetadata(id); }
   recordThemeUsage(input) { return this.repositories.themes.recordUsage(input); }
   themeUsageStats(id) { return this.repositories.themes.usageStats(id); }
+  getThemeRoutingDecision(input) { return this.repositories.themes.getRoutingDecision(input); }
+  saveThemeRoutingDecision(input) { return this.repositories.themes.saveRoutingDecision(input); }
+  listRecentThemeRouting(input) { return this.repositories.themes.listRecentRouting(input); }
+  listBatchThemeRouting(input) { return this.repositories.themes.listBatchRouting(input); }
   themeArchiveImpact(id) { return this.repositories.themes.archiveImpact(id); }
   recordSocialTemplateMetric(input) { return this.repositories.socialTemplateMetrics.record(input); }
   listSocialTemplateMetrics(input = {}) { return this.repositories.socialTemplateMetrics.list(input); }

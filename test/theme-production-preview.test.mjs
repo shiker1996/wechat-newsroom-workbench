@@ -12,7 +12,12 @@ test('阶段 2 文章固定样稿直接包含正式排版编译结果',()=>{
   const definition=articleThemeDefinition('magazine-warm');
   const production=markdownToHtml(ARTICLE_THEME_SPECIMEN,{themeDefinition:definition,kicker:'PRODUCTION SPECIMEN'});
   const preview=compileThemePreview({target:'article',definition});
-  assert.ok(preview.html.includes(production));
+  assert.match(preview.html,/PRODUCTION SPECIMEN/);
+  assert.match(preview.html,/把复杂内容讲清楚/);
+  assert.equal((preview.html.match(/<html\b/gi)||[]).length,1);
+  assert.equal((preview.html.match(/<body\b/gi)||[]).length,1);
+  assert.doesNotMatch(preview.html,/<body[\s\S]*<!doctype html>/i);
+  assert.ok(production.includes('PRODUCTION SPECIMEN'));
   assert.deepEqual(preview.usageMap,Object.fromEntries(Object.entries(preview.usageMap)));
   assert.equal(compileThemePreview({target:'article',definition}).html,preview.html);
 });

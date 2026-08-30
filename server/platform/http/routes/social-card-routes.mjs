@@ -12,6 +12,7 @@ import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestr
 import { buildSocialCardReflowPreview } from '../../../shared/rendering/social-card-reflow-preview.mjs';
 import { normalizeSocialCardPageTitle } from '../../../shared/rendering/social-card-title.mjs';
 import { socialCardPageBudget, socialCardPageBudgetMessage } from '../../../shared/rendering/social-card-page-budget.mjs';
+import { buildSocialThemeRoutingContext, resolveAutoTheme } from '../../application/themes/auto-theme-router.mjs';
 
 const SOCIAL_CARD_ENTRY_POINTS=Object.freeze({
   repository:'social-tool',
@@ -21,7 +22,8 @@ const SOCIAL_CARD_ENTRY_POINTS=Object.freeze({
 const eventBackedContentType=(contentType)=>contentType==='event';
 
 function socialTemplateContext(store, editorial, channelMode, contentType) {
-  const themeId=editorial?.visual_style||'ice-blue';
+  const requested=editorial?.visual_style||'auto';
+  const themeId=requested==='auto'?'ice-blue':requested;
   const themeDefinition=resolveWorkspaceTheme(store,themeId,'social')||socialThemeDefinition(themeId,{fallback:false});
   return { themeDefinition, capabilities:getSocialCardTemplateCapabilities({themeDefinition,channelMode,contentType}) };
 }
@@ -103,9 +105,12 @@ export async function handleSocialCardRoutes(context) {
     const contentType=socialContentType(candidate),eventAnalysis=eventBackedContentType(contentType)?resolveEventAnalysisFor(candidate):null;
     const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
     const cardPlan=JSON.parse(editorial.card_plan_json||'[]');const channelMode=socialChannelMode(candidate);
-    const themeContext=socialTemplateContext(store,editorial,channelMode,contentType);
+    const cachedThemeRouting=editorial.visual_style==='auto'
+      ? await resolveAutoTheme({gateway:null,store,batchId:candidate.batch_id,candidateId:candidate.id,target:'social',context:buildSocialThemeRoutingContext({candidate,contentType,channelMode,facts}),cachedOnly:true})
+      : null;
+    const themeContext=socialTemplateContext(store,cachedThemeRouting?.themeId?{...editorial,visual_style:cachedThemeRouting.themeId}:editorial,channelMode,contentType);
     const themeState=resolveSocialCardStoryboardThemeState({editorial,themeDefinition:themeContext.themeDefinition,channelMode,contentType});
-    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,themeState,layoutReport,reflowState,contentPlanAdjustments,factIndex,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
+    return json(response,200,{candidate,editorial,facts,score,contentType,channelMode,eventAnalysis,gate,themeState,themeRouting:cachedThemeRouting,layoutReport,reflowState,contentPlanAdjustments,factIndex,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode})});
   }
   if(cardPageLayoutMatch&&request.method==='PUT'){
     const candidate=store.getCandidate(Number(cardPageLayoutMatch[1]));if(!candidate)return json(response,404,{error:'候选不存在'});
@@ -315,7 +320,13 @@ export async function handleSocialCardRoutes(context) {
       const eventAnalysisSkill=contentType==='event'?loadSkillBundle({workspaceRoot:root,skillName:'event-research-analyzer'}):null;
       if(eventAnalysisSkill?.fallback)throw new Error('事件深度分析技能缺失');
       const channelMode=socialChannelMode(candidate);
-      const templateContext=socialTemplateContext(store,current,channelMode,contentType);
+      const themeRouting=current.visual_style==='auto'
+        ? await resolveAutoTheme({
+          gateway:models, provider:input.provider, store, batchId:candidate.batch_id, candidateId:candidate.id, target:'social',
+          context:buildSocialThemeRoutingContext({candidate,contentType,channelMode,facts}),
+        })
+        : null;
+      const templateContext=socialTemplateContext(store,themeRouting?.themeId?{...current,visual_style:themeRouting.themeId}:current,channelMode,contentType);
       const storyboardSystem=buildSocialCardStoryboardSystemPrompt({
         workspaceRoot:root,skillId:storyboardSelection.selectedSkill,
         skillPrompt:socialSkill.prompt,contentType,channelMode,templateCapabilities:templateContext.capabilities,

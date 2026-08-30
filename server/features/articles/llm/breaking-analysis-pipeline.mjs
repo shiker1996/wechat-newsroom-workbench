@@ -159,7 +159,7 @@ export function routeBreakingAnalysis({store,batchId,tracks}){
     store.addCandidateTracks(candidate.id,['social_cards'],{status:'pooled',score:social.finalScore,pool_role:'突发专题',output_mode:'wechat-event-cards'});
     store.updateCandidateTrack(candidate.id,'social_cards',{status:'pooled',score:social.finalScore,pool_role:'突发专题',output_mode:'wechat-event-cards'});
     store.saveSocialScore(candidate.id,{...social.dimensions,...social.penalties,finalScore:social.finalScore,scoreProfile:'event',recommendation:social.recommendation});
-    store.saveCardEditorial(candidate.id,{...store.getCardEditorial(candidate.id),output_mode:'wechat-event-cards',visual_style:'charcoal',recommended_pages:social.recommendedPages||6,status:'DISCUSS'});
+    store.saveCardEditorial(candidate.id,{...store.getCardEditorial(candidate.id),output_mode:'wechat-event-cards',visual_style:'auto',recommended_pages:social.recommendedPages||6,status:'DISCUSS'});
   } else if(candidate.tracks.some((item)=>item.track==='social_cards'))store.removeCandidateTrack(candidate.id,'social_cards');
   return {candidate:store.getCandidate(candidate.id),tracks:selected};
 }

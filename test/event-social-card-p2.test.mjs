@@ -27,7 +27,7 @@ test('事件故事板 HTML 使用事件标签和事实边界页脚',()=>{
   assert.match(html,/BREAKING FOCUS/);assert.match(html,/EVIDENCE CHECK/);assert.match(html,/据公开素材整理 · 未核实内容已标注/);assert.doesNotMatch(html,/OPEN SOURCE/);
 });
 
-test('事件图文分流设置正式输出模式和默认视觉主题',()=>{
+test('事件图文分流设置正式输出模式并交给自动主题路由',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'event-social-route-'));const store=new Store(path.join(root,'test.db'));
   try{
     const batch=store.createBreakingBatch({date:'2026-07-23',title:'事件',urls:['https://example.com'],requestedTracks:['social_cards']});
@@ -35,7 +35,7 @@ test('事件图文分流设置正式输出模式和默认视觉主题',()=>{
     const {candidate}=routeBreakingAnalysis({store,batchId:batch.id,tracks:['social_cards']});
     const track=store.listCandidateTracks(candidate.id).find((item)=>item.track==='social_cards');
     const editorial=store.getCardEditorial(candidate.id);
-    assert.equal(track.output_mode,'wechat-event-cards');assert.equal(editorial.output_mode,'wechat-event-cards');assert.equal(editorial.visual_style,'charcoal');assert.equal(editorial.recommended_pages,7);
+    assert.equal(track.output_mode,'wechat-event-cards');assert.equal(editorial.output_mode,'wechat-event-cards');assert.equal(editorial.visual_style,'auto');assert.equal(editorial.recommended_pages,7);
   }finally{store.close();fs.rmSync(root,{recursive:true,force:true});}
 });
 

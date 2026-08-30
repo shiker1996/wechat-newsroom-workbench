@@ -127,13 +127,45 @@ export function validateCoverSpec(input,expectedTitle=''){
   return {ok:true,issues:[],spec:{components:normalized}};
 }
 
-// 兜底构图：标题按标点/字数两行均分、无高亮、无装饰，对应效果图 v2 的极简形态。
-export function fallbackCoverSpec(title,{brand='',subtitle=''}={}){
+// 标题高亮候选：优先给读者最有用的「数字/期限 + 动作」信号，其次才是英文实体。
+// 只从标题原文取子串，不改写文案；最多两处，避免高亮变成第二套标题。
+const COVER_TITLE_HIGHLIGHT_PATTERNS=Object.freeze([
+  /(?:\d{4}年\d{1,2}月\d{1,2}日?(?:前|后)?|\d{1,2}月\d{1,2}日?(?:前|后)?|\d+(?:\.\d+)?(?:亿|万|%|倍))/g,
+  /(?:终止|合作|收购|发布|上线|融资|裁员|涨价|降价|开源|闭源|迁移|重构|入股|必须|转折|变天)/g,
+  /(?:OpenAI|Cursor|ChatGPT|Claude|Gemini|GPT[-\w.]*)/gi,
+]);
+
+export function selectCoverTitleHighlights(title,preferred=[],{useFallback=true}={}){
+  const text=String(title||'');
+  const highlights=[];
+  const ranges=[];
+  const candidates=[
+    ...(Array.isArray(preferred)?preferred:[]).map((word)=>({word:String(word||''),start:text.indexOf(String(word||''))})),
+    ...(useFallback?COVER_TITLE_HIGHLIGHT_PATTERNS.flatMap((sourcePattern)=>{
+      const pattern=new RegExp(sourcePattern.source,sourcePattern.flags);
+      return [...text.matchAll(pattern)].map((match)=>({word:match[0],start:match.index??-1}));
+    }):[]),
+  ];
+  for(const {word,start} of candidates){
+    const end=start+word.length;
+    if(!word||start<0||ranges.some((range)=>start<range.end&&end>range.start))continue;
+    highlights.push(word);
+    ranges.push({start,end});
+    if(highlights.length>=COVER_LIMITS.highlights)return highlights;
+  }
+  return highlights;
+}
+
+// 兜底构图：标题按标点/字数断行并自动强调关键信息；补一组低干扰装饰，避免主题异常时退化成「只有文字的素底图」。
+export function fallbackCoverSpec(title,{brand='',subtitle='',coverSemantics=null}={}){
   const text=String(title||'未命名文章').trim()||'未命名文章';
   const lines=splitTitleLines(text);
   const components=[
     {type:'canvas',colorRole:'ink'},
-    {type:'title',lines,highlights:[],align:'left'},
+    {type:'title',lines,highlights:selectCoverTitleHighlights(lines.join('\n'),coverSemantics?.highlightTerms,{useFallback:!coverSemantics}),align:'left'},
+    // 对应图文智能构图里的 orbit + index-line：都脱离内容流，不会挤压标题。
+    {type:'decoration',kind:'ring',position:'top-right'},
+    {type:'decoration',kind:'bar',position:'bottom-left'},
   ];
   if(subtitle)components.push({type:'subtitle',text:clampChars(subtitle,COVER_LIMITS.subtitleChars),withBar:true});
   if(brand)components.push({type:'meta',text:clampChars(brand,COVER_LIMITS.metaChars)});
@@ -186,6 +218,52 @@ export const COVER_THEME_SPEC_FIELDS=Object.freeze({
 // 占画布一半的侧边色块位置：这些布局下标题必须跨缝（span）。
 // full 不在此列——色块铺满画布时编译器本就按 hold 处理，没有缝可跨。
 const COVER_WIDE_BLOCK_POSITIONS=new Set(['left-half','right-half']);
+
+// 参考图文智能构图的低干扰装饰变体。主题显式声明 decoration 时优先使用主题自己的配置；
+// 不足两处时按构图补齐，且让侧边色块优先获得一处装饰，避免纯色色块显得空。
+const DEFAULT_COVER_DECORATION_VARIANTS=Object.freeze({
+  'side-panel':[
+    [{type:'decoration',kind:'bar',position:'bottom-left'},{type:'decoration',kind:'dots',position:'bottom-right'}],
+    [{type:'decoration',kind:'cross',position:'middle-left'},{type:'decoration',kind:'corner-marks',position:'top-right'}],
+    [{type:'decoration',kind:'bar',position:'bottom-left'},{type:'decoration',kind:'dots',position:'middle-left'}],
+    [{type:'decoration',kind:'corner-marks',position:'top-left'},{type:'decoration',kind:'cross',position:'bottom-right'}],
+    [{type:'decoration',kind:'dots',position:'middle-right'},{type:'decoration',kind:'cross',position:'top-right'}],
+  ],
+  'top-band':[
+    [{type:'decoration',kind:'corner-marks',position:'top-left'},{type:'decoration',kind:'cross',position:'bottom-right'}],
+    [{type:'decoration',kind:'bar',position:'bottom-center'},{type:'decoration',kind:'dots',position:'middle-right'}],
+  ],
+  'diagonal-split':[
+    [{type:'decoration',kind:'ring',position:'top-right'},{type:'decoration',kind:'grid',position:'bottom-left'}],
+    [{type:'decoration',kind:'cross',position:'top-left'},{type:'decoration',kind:'ring',position:'bottom-right'}],
+    [{type:'decoration',kind:'grid',position:'bottom-left'},{type:'decoration',kind:'cross',position:'top-right'}],
+    [{type:'decoration',kind:'ring',position:'middle-right'},{type:'decoration',kind:'cross',position:'bottom-left'}],
+    [{type:'decoration',kind:'grid',position:'top-left'},{type:'decoration',kind:'ring',position:'bottom-right'}],
+  ],
+  'centered-frame':[
+    [{type:'decoration',kind:'corner-marks',position:'top-left'},{type:'decoration',kind:'dots',position:'bottom-right'}],
+    [{type:'decoration',kind:'cross',position:'middle-left'},{type:'decoration',kind:'ring',position:'top-right'}],
+  ],
+  minimal:[
+    [{type:'decoration',kind:'bar',position:'bottom-left'},{type:'decoration',kind:'ring',position:'top-right'}],
+    [{type:'decoration',kind:'dots',position:'bottom-right'},{type:'decoration',kind:'cross',position:'top-left'}],
+  ],
+});
+
+function coverDecorationDefaults(layout,blockPosition='',theme=null){
+  const variants=DEFAULT_COVER_DECORATION_VARIANTS[layout||'minimal']||DEFAULT_COVER_DECORATION_VARIANTS.minimal;
+  const signature=[theme?.id||'',theme?.tokens?.colors?.page||'',theme?.tokens?.colors?.accent||'',blockPosition].join('|');
+  let hash=0;
+  for(const character of signature)hash=(hash*31+character.charCodeAt(0))>>>0;
+  const selected=variants[theme?hash%variants.length:0].map((component)=>({...component}));
+  // 右侧色块时，把面向色块的装饰镜像到右侧，保持“装饰属于构图”而不是漂在另一块留白上。
+  if(layout==='side-panel'&&String(blockPosition).startsWith('right')){
+    for(const component of selected){
+      component.position=component.position.replace('left','right');
+    }
+  }
+  return selected;
+}
 
 // 主题构图的组件级校验：返回 { clean, issues }；clean 为 null 表示该组件不合规
 function validateThemeSpecComponent(component,index){
@@ -273,13 +351,14 @@ export function sanitizeCoverThemeSpec(input){
 }
 
 // 按主题构图产出文章封面规格：标题确定性断行，副标题取文章摘要，信息行取品牌行。
-export function coverSpecFromTheme(themeSpec,{title,subtitle='',brand=''}={}){
+export function coverSpecFromTheme(themeSpec,{title,subtitle='',brand='',theme=null,coverSemantics=null}={}){
   const validation=validateCoverThemeSpec(themeSpec);
   if(!validation.ok)return null;
   const components=[];
   for(const component of validation.spec.components){
     if(component.type==='title'){
-      components.push({type:'title',lines:splitTitleLines(title),highlights:[],align:component.align||'left'});
+      const lines=splitTitleLines(title);
+      components.push({type:'title',lines,highlights:selectCoverTitleHighlights(lines.join('\n'),coverSemantics?.highlightTerms,{useFallback:!coverSemantics}),align:component.align||'left'});
       continue;
     }
     if(component.type==='subtitle'){
@@ -299,6 +378,20 @@ export function coverSpecFromTheme(themeSpec,{title,subtitle='',brand=''}={}){
       continue;
     }
     components.push(component);
+  }
+  // 让未配置或只有一处装饰的内置/存量主题也具备基本的视觉层次；显式配置优先，不重复同一装饰。
+  const existingDecorations=components.filter((component)=>component.type==='decoration');
+  if(existingDecorations.length<2){
+    const blockPosition=components.find((component)=>component.type==='color-block')?.position||'';
+    const defaults=coverDecorationDefaults(validation.spec.layout,blockPosition,theme);
+    for(const candidate of defaults){
+      if(existingDecorations.length>=2)break;
+      if(existingDecorations.some((component)=>component.kind===candidate.kind&&component.position===candidate.position))continue;
+      // 同一张封面尽量不重复同一种视觉符号（例如两个 ring），让主题差异落到真实画面上。
+      if(existingDecorations.some((component)=>component.kind===candidate.kind))continue;
+      components.push(candidate);
+      existingDecorations.push(candidate);
+    }
   }
   const spec={components};
   return validateCoverSpec(spec).ok?spec:null;

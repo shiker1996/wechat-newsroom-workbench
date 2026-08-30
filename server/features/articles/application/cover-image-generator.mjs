@@ -1,4 +1,4 @@
-// 公众号封面图生成（确定性方式）。
+// 公众号封面图生成：AI 只提取受限语义，构图与渲染仍由确定性规则完成。
 // 组件构图在主题创建时固化在主题定义的 cover.spec 里；生成时只做确定性填充：
 // 标题按 splitTitleLines 断行、副标题取文章摘要、信息行取品牌行，
 // 最终由 cover-theme-compiler 确定性渲染 HTML，html-pages-to-images 截图为 900×383 PNG。
@@ -11,29 +11,44 @@ import { getBuiltinThemeRegistry } from '../../../shared/themes/theme-registry.m
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
 import { buildCoverHtml } from '../../../shared/themes/cover-theme-compiler.mjs';
 import { coverSpecFromTheme, fallbackCoverSpec } from '../../../shared/themes/cover-components.mjs';
+import { analyzeCoverSemantics } from './cover-semantics.mjs';
+import { resolveAutoTheme } from '../../../platform/application/themes/auto-theme-router.mjs';
 import { getAccountContext } from '../../../shared/domain/account-context.mjs';
 import { candidateArticleDir, batchArticlesDir } from '../../../platform/core/workspace-paths.mjs';
 
 // 生成封面图主流程：主题解析 → 主题构图/兜底规格 → 渲染 → 截图 → 落 workdir/images/cover.png
-export async function generateCoverImage({ workspaceRoot, workdir, store = null, title, summary = '', brand = '', themeId = '', log = () => {} }) {
+export async function generateCoverImage({ workspaceRoot, workdir, store = null, gateway = null, provider = '', batchId = null, candidateId = null, title, summary = '', brand = '', themeId = '', log = () => {} }) {
   const registry = getBuiltinThemeRegistry();
   const resolvedTitle = String(title || '').trim() || '未命名文章';
   const requested = themeId && themeId !== 'auto' ? themeId : '';
   let theme = requested ? resolveWorkspaceTheme(store, requested, 'cover') || null : null;
   if (requested && !theme) log(`指定封面主题 ${requested} 不存在，使用默认主题`);
+  let themeRouting = null;
+  if (!theme && !requested) {
+    themeRouting = await resolveAutoTheme({
+      gateway, provider, store, batchId, candidateId, target: 'cover',
+      context: { title: resolvedTitle, summary, contentType: 'article-cover' },
+      log,
+    });
+    theme = themeRouting?.themeId ? resolveWorkspaceTheme(store, themeRouting.themeId, 'cover') : null;
+  }
   if (!theme) theme = registry.require('cover-navy-gold');
 
+  const coverSemantics=await analyzeCoverSemantics({gateway,provider,batchId,candidateId,title:resolvedTitle,summary,store,log});
+  if(coverSemantics)log(`封面已采用 AI 语义：${coverSemantics.highlightTerms.join('、')||'无标题高亮'}${coverSemantics.motifKind?` · ${coverSemantics.motifKind}`:''}`);
   let usedFallback = false;
-  let spec = theme.cover?.spec ? coverSpecFromTheme(theme.cover.spec, { title:resolvedTitle, subtitle:summary, brand }) : null;
+  let spec = theme.cover?.spec ? coverSpecFromTheme(theme.cover.spec, { title:resolvedTitle, subtitle:summary, brand, theme, coverSemantics }) : null;
   if (!spec) {
     usedFallback = true;
     if (theme.cover?.spec) log('主题内置构图不合规，回退默认构图');
-    spec = fallbackCoverSpec(resolvedTitle, { brand, subtitle: summary });
+    spec = fallbackCoverSpec(resolvedTitle, { brand, subtitle: summary, coverSemantics });
   }
 
-  const { html, width, height } = buildCoverHtml({ theme, spec });
+  const { html, width, height } = buildCoverHtml({ theme, spec, coverSemantics });
   const imageDir = path.join(workdir, 'images');
   fs.mkdirSync(imageDir, { recursive: true });
+  const routingPath = themeRouting ? path.join(imageDir, 'cover-theme-routing.json') : null;
+  if (routingPath) fs.writeFileSync(routingPath, JSON.stringify(themeRouting, null, 2), 'utf8');
   const htmlPath = path.join(imageDir, 'cover.html');
   fs.writeFileSync(htmlPath, html, 'utf8');
 
@@ -48,7 +63,7 @@ export async function generateCoverImage({ workspaceRoot, workdir, store = null,
     fs.renameSync(produced, target);
   }
   const stat = fs.statSync(target);
-  return { localPath: target, htmlPath, width, height, themeId: theme.id, themeLabel: theme.label, usedFallback, size: stat.size, modifiedAt: stat.mtime.toISOString() };
+  return { localPath: target, htmlPath, routingPath, width, height, themeId: theme.id, themeLabel: theme.label, themeRouting, usedFallback, size: stat.size, modifiedAt: stat.mtime.toISOString() };
 }
 
 // 从成稿 Markdown 取第一段正文作为封面副标题素材（去标题/引用/列表，≤60 字）
@@ -81,10 +96,14 @@ export async function runCoverImageJob({ gateway, store, batchId, candidateId, p
   const brand = `${accountContext?.name || ''} · ${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`;
   onProgress('正在生成封面排版规格…');
   const result = await generateCoverImage({
-    workspaceRoot, workdir, gateway, store, accountContext, title, summary, brand,
+    workspaceRoot, workdir, gateway, store, batchId, candidateId, accountContext, title, summary, brand,
     themeId: theme === 'auto' ? '' : theme, provider, log: onProgress,
   });
   store.upsertArtifact({ batchId, candidateId: candidate?.id ?? null, kind: '封面图', name: 'cover.png', path: result.localPath, size: result.size, modifiedAt: result.modifiedAt });
+  if (result.routingPath && fs.existsSync(result.routingPath)) {
+    const routingStat = fs.statSync(result.routingPath);
+    store.upsertArtifact({ batchId, candidateId: candidate?.id ?? null, kind: '封面主题路由', name: 'cover-theme-routing.json', path: result.routingPath, size: routingStat.size, modifiedAt: routingStat.mtime.toISOString() });
+  }
   onProgress(`封面已生成（${result.themeLabel}${result.usedFallback ? ' · 默认构图' : ''}）`);
   return { image: 'images/cover.png', themeId: result.themeId, themeLabel: result.themeLabel, usedFallback: result.usedFallback, width: result.width, height: result.height };
 }

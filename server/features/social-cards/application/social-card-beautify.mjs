@@ -153,7 +153,9 @@ function beautifyContentType(candidate, planEnvelope = null) {
 
 function syncAiThemeSnapshot({ workdir, store, editorial, candidate }) {
   const planEnvelope = readJsonFile(path.join(workdir, 'card-plan.json'), null);
-  const themeId = String(editorial?.visual_style || 'ice-blue');
+  const previousSnapshot = readJsonFile(path.join(workdir, 'social-theme-snapshot.json'), {});
+  const requestedThemeId = String(editorial?.visual_style || 'auto');
+  const themeId = requestedThemeId === 'auto' ? String(previousSnapshot.id || 'ice-blue') : requestedThemeId;
   const contentType = beautifyContentType(candidate, planEnvelope);
   const channelMode = normalizedChannelMode(planEnvelope?.channel_mode || editorial?.output_mode || 'wechat');
   const themeDefinition = resolveWorkspaceTheme(store, themeId, 'social')
@@ -234,7 +236,7 @@ export function buildBeautifyContext({ workdir, original, candidate, editorial }
     ? planEnvelope.pages
     : Array.isArray(editorialPlan) ? editorialPlan : [];
   const themeSnapshot = readJsonFile(path.join(workdir, 'social-theme-snapshot.json'), {});
-  const effectiveThemeSnapshot = editorial?.visual_style
+  const effectiveThemeSnapshot = editorial?.visual_style && editorial.visual_style !== 'auto'
     ? { ...themeSnapshot, id: String(editorial.visual_style) }
     : themeSnapshot;
   const rawChannelMode = planEnvelope?.channel_mode || themeSnapshot?.channelMode || bodyData(original, 'channel') || String(editorial?.output_mode || 'wechat');

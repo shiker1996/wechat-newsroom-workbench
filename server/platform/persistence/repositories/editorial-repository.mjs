@@ -42,7 +42,7 @@ export class EditorialRepository {
   getCard(candidateId) {
     return this.db.prepare('SELECT * FROM card_editorial_sessions WHERE candidate_row_id=?').get(Number(candidateId)) ?? {
       candidate_row_id: Number(candidateId), target_reader: '', pain_point: '', tool_positioning: '', must_highlight: '',
-      must_disclose: '', getting_started: '', forbidden_claims: '', output_mode: 'wechat-tool-cards', visual_style: 'ice-blue',
+      must_disclose: '', getting_started: '', forbidden_claims: '', output_mode: 'wechat-tool-cards', visual_style: 'auto',
       composition_mode: 'smart', layout_style: 'auto', storyboard_theme_snapshot_json: '{}', recommended_pages: 6, card_plan_json: '[]', status: 'DISCUSS', updated_at: '',
     };
   }

@@ -12,10 +12,19 @@ async function sources(){
   const select=document.getElementById('theme-clone-source');
   select.innerHTML=[...article.items,...social.items,...cover.items].filter((item)=>item.source==='builtin').map((item)=>`<option value="${item.id}">${escapeHtml(item.label)} · ${targetLabel(item.target)}</option>`).join('');
 }
+function themeRow(item){
+  const status=item.status==='published'?'已发布':item.status==='archived'?'已归档':'草稿';
+  return `<button type="button" class="user-theme-row ${active?.id===item.id?'active':''}" data-user-theme="${item.id}"><span><b>${escapeHtml(item.label)}</b><small>${targetLabel(item.target)} · ${status}</small></span><em>${item.activeVersion?`v${item.activeVersion}`:'未发布'}</em></button>`;
+}
 async function list(){
   const data=await request('/api/themes/manage');
   const node=document.getElementById('user-theme-list');
-  node.innerHTML=data.items.length?data.items.map((item)=>`<button type="button" class="user-theme-row ${active?.id===item.id?'active':''}" data-user-theme="${item.id}"><span><b>${escapeHtml(item.label)}</b><small>${targetLabel(item.target)} · ${item.status==='published'?'已发布':item.status==='archived'?'已归档':'草稿'}</small></span><em>${item.activeVersion?`v${item.activeVersion}`:'未发布'}</em></button>`).join(''):'<div class="empty-state">还没有用户主题。先从一个内置主题复制。</div>';
+  if(!data.items.length){
+    node.innerHTML='<div class="empty-state">还没有用户主题。先从一个内置主题复制。</div>';
+    return;
+  }
+  const activeItems=data.items.filter((item)=>item.status!=='archived'),archivedItems=data.items.filter((item)=>item.status==='archived'),archivedOpen=archivedItems.some((item)=>active?.id===item.id);
+  node.innerHTML=`${activeItems.map(themeRow).join('')}${archivedItems.length?`<details class="user-theme-archived-group" ${archivedOpen?'open':''}><summary><span>已归档</span><em>${archivedItems.length}</em></summary><div class="user-theme-archived-list">${archivedItems.map(themeRow).join('')}</div></details>`:''}`;
 }
 function fieldControl(group,field){
   const [key,label,type,a,b,step,unit]=field,value=active.draft.tokens[group][key],path=`tokens.${group}.${key}`;
@@ -210,6 +219,13 @@ function renderAiComparison(value){
   comparison.innerHTML=`<header><span>ORIGINALITY CHECK</span><b>与“${escapeHtml(value.nearestTheme.label)}”相似度 ${value.similarityPercent}%</b></header><p>${value.recommendRegenerate?'候选与现有主题过于接近，建议重新生成，或确认它正是你需要的方向。':value.verdict==='related'?'视觉方向有关联，但关键配置已形成差异。':'候选与现有主题具有明确差异。'}</p>${differences?`<ul>${differences}</ul>`:''}`;
   comparison.dataset.tone=tone;
 }
+function mountAiCandidatePreview(html){
+  const frame=document.getElementById('ai-theme-candidate-frame'),value=typeof html==='string'?html.trim():'';
+  if(!value)return false;
+  const mount=()=>{frame.srcdoc=value;};
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(mount);else mount();
+  return true;
+}
 function showAiThemeCandidate(result){
   aiCandidate=result;
   proposalCandidate=null;
@@ -230,7 +246,11 @@ function showAiThemeCandidate(result){
   renderAiComparison(result.comparison);
   const repairs=document.getElementById('ai-theme-repairs');
   repairs.innerHTML=result.repairs.length?`<details><summary>系统修正了 ${result.repairs.length} 项配置</summary><ul>${result.repairs.map((item)=>`<li><code>${escapeHtml(item.field)}</code><span>${escapeHtml(item.reason)}</span></li>`).join('')}</ul></details>`:'<p>候选无需系统修正，已通过全部发布门禁。</p>';
-  document.getElementById('ai-theme-candidate-frame').srcdoc=result.preview.html;
+  if(!mountAiCandidatePreview(result.preview?.html)){
+    document.getElementById('ai-theme-generate-status').textContent='候选已生成，但正式样稿为空，请重新生成';
+    document.getElementById('ai-theme-generate-status').classList.add('error');
+    return;
+  }
   const match=result.definition.social?.templateMatch,pack=result.definition.social?.templatePack,confidenceLabels={high:'高',medium:'中',low:'低'},reasonLabels={NO_DIRECTION_SIGNAL:'没有视觉方向信号',WEAK_DIRECTION_SIGNAL:'视觉方向信号较弱',AMBIGUOUS_DIRECTION_SIGNAL:'多个视觉方向接近'},confidence=confidenceLabels[match?.confidence]||'未记录',reason=reasonLabels[match?.reasonCode];
   document.getElementById('ai-theme-generate-status').textContent=`候选已生成 · ${pack?.id?`程序匹配 ${pack.id}（${confidence}置信度${reason?`，${reason}`:''}） · `:''}${new Date(result.expiresAt).toLocaleTimeString('zh-CN')} 前确认有效`;
   document.getElementById('ai-theme-candidate').scrollIntoView({behavior:'smooth',block:'start'});

@@ -105,7 +105,7 @@ export function compileThemePreview({target,definition,highlightField=''}){
   validateThemeDefinition(clean,{expectedTarget:target,expectedSource:clean.source||'user'});
   if(target==='cover'){
     // 主题带内置构图时按构图预览（样稿文案填充），否则用固定样稿构图
-    const themed=clean.cover?.spec?coverSpecFromTheme(clean.cover.spec,{title:'把复杂内容讲得清楚',subtitle:'固定封面样稿，用于检查配色与字阶',brand:'example · 2026.08'}):null;
+    const themed=clean.cover?.spec?coverSpecFromTheme(clean.cover.spec,{title:'把复杂内容讲得清楚',subtitle:'固定封面样稿，用于检查配色与字阶',brand:'example · 2026.08',theme:clean}):null;
     const {html:coverHtml}=buildCoverHtml({theme:clean,spec:themed||COVER_THEME_SPECIMEN});
     const style=previewStyle(target,highlightField);
     return {schemaVersion:1,target,html:coverHtml.replace('</head>',`${style}</head>`),usageMap:{},highlightField,theme:{id:clean.id,label:clean.label,version:clean.version}};
@@ -115,9 +115,8 @@ export function compileThemePreview({target,definition,highlightField=''}){
     ?markdownToHtml(ARTICLE_THEME_SPECIMEN,{themeDefinition:clean,kicker:'PRODUCTION SPECIMEN'})
     :renderStoryboardHtml({...SOCIAL_THEME_SPECIMEN,visualStyle:clean.id,themeDefinition:clean});
   const style=previewStyle(target,highlightField);
-  const html=target==='article'
-    ?`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${style}</head><body>${productionHtml}</body></html>`
-    :productionHtml.replace('</head>',`${style}</head>`);
+  // 文章和图文生产渲染器都已经返回完整 HTML 文档，不能再把它嵌套到另一层 body 中。
+  const html=productionHtml.replace('</head>',`${style}</head>`);
   const templateContext=target==='social'?resolveSocialCardTemplateContext({themeDefinition:clean,channelMode:clean.channelMode||'xiaohongshu'}):null;
   return {schemaVersion:1,target,html,usageMap:compiled.usageMap,highlightField,theme:{id:compiled.id,label:compiled.label,version:compiled.version,hash:compiled.hash},template:templateContext?{...getSocialCardTemplateCapabilities({themeDefinition:clean,channelMode:'xiaohongshu'}),pack:templateContext.pack.id,version:templateContext.pack.version,label:templateContext.pack.label,source:templateContext.source,compatibility:templateContext.pack.id==='standard-v1'||templateContext.fallback,roleTemplates:{...templateContext.pack.roleTemplates},matching:clean.social?.templateMatch||null}:null};
 }

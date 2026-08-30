@@ -273,7 +273,7 @@ export function applyWorkbenchSchema(db) {
         getting_started TEXT NOT NULL DEFAULT '',
         forbidden_claims TEXT NOT NULL DEFAULT '',
         output_mode TEXT NOT NULL DEFAULT 'wechat-tool-cards',
-        visual_style TEXT NOT NULL DEFAULT 'ice-blue',
+        visual_style TEXT NOT NULL DEFAULT 'auto',
         composition_mode TEXT NOT NULL DEFAULT 'smart',
         layout_style TEXT NOT NULL DEFAULT 'auto',
         storyboard_theme_snapshot_json TEXT NOT NULL DEFAULT '{}',
@@ -531,6 +531,25 @@ export function applyWorkbenchSchema(db) {
         UNIQUE(theme_id,version),
         FOREIGN KEY(theme_id) REFERENCES theme_definitions(id) ON DELETE RESTRICT
       );
+      CREATE TABLE IF NOT EXISTS theme_metadata (
+        theme_id TEXT PRIMARY KEY,
+        creation_method TEXT NOT NULL DEFAULT 'manual' CHECK(creation_method IN ('manual','ai','import','clone')),
+        based_on_json TEXT NOT NULL DEFAULT '{}',
+        intent_json TEXT NOT NULL DEFAULT '{}',
+        ai_provenance_json TEXT NOT NULL DEFAULT '{}',
+        design_summary_json TEXT NOT NULL DEFAULT '[]',
+        repairs_json TEXT NOT NULL DEFAULT '[]',
+        template_match_evidence_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(theme_id) REFERENCES theme_definitions(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS theme_version_metadata (
+        theme_version_id INTEGER PRIMARY KEY,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(theme_version_id) REFERENCES theme_versions(id) ON DELETE CASCADE
+      );
       CREATE TABLE IF NOT EXISTS theme_usage (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         theme_id TEXT NOT NULL,
@@ -540,6 +559,22 @@ export function applyWorkbenchSchema(db) {
         batch_id TEXT,
         candidate_row_id INTEGER,
         used_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS theme_routing_decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id TEXT,
+        candidate_row_id INTEGER,
+        candidate_key TEXT NOT NULL,
+        target TEXT NOT NULL CHECK(target IN ('article','social','cover')),
+        content_hash TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'auto' CHECK(mode IN ('auto','fallback','manual')),
+        selected_theme_id TEXT NOT NULL,
+        ranked_themes_json TEXT NOT NULL DEFAULT '[]',
+        reason TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(batch_id,candidate_key,target,content_hash),
+        FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE CASCADE,
+        FOREIGN KEY(candidate_row_id) REFERENCES candidates(id) ON DELETE SET NULL
       );
       CREATE TABLE IF NOT EXISTS social_template_metrics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -630,7 +665,11 @@ export function applyWorkbenchSchema(db) {
       CREATE INDEX IF NOT EXISTS idx_subscription_runs_source ON subscription_runs(source_key,id);
       CREATE INDEX IF NOT EXISTS idx_visual_decisions_type ON visual_decisions(visual_type,action);
       CREATE INDEX IF NOT EXISTS idx_theme_versions_theme ON theme_versions(theme_id,id DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_metadata_method ON theme_metadata(creation_method,updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_version_metadata_created ON theme_version_metadata(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_theme_usage_theme ON theme_usage(theme_id,used_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_routing_recent ON theme_routing_decisions(target,created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_theme_routing_batch ON theme_routing_decisions(batch_id,target,created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_social_template_metrics_pack ON social_template_metrics(requested_template_id,recorded_at DESC);
       CREATE INDEX IF NOT EXISTS idx_social_template_metrics_candidate ON social_template_metrics(candidate_row_id,recorded_at DESC);
       CREATE INDEX IF NOT EXISTS idx_social_template_proposal_metrics_pack ON social_template_proposal_metrics(template_pack_id,recorded_at DESC);

@@ -70,7 +70,7 @@ function titleLineHtml(line,highlights,highlightColor){
   let html=escapeHtml(line);
   for(const word of highlights||[]){
     const escaped=escapeHtml(word);
-    if(html.includes(escaped))html=html.replace(escaped,`<em style="color:${highlightColor}">${escaped}</em>`);
+    if(html.includes(escaped))html=html.replace(escaped,`<em style="color:${highlightColor};font-weight:900;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:4px">${escaped}</em>`);
   }
   return `<span class="cover-title-line">${html}</span>`;
 }
@@ -89,8 +89,40 @@ function decorationHtml(deco,accentColor){
   return `<div class="cover-deco deco-ring deco-${deco.position||'top-right'}" style="border-color:${accentColor}"></div>`;
 }
 
+// 受控 SVG 视觉母题：只根据标题语义与主题签名选用内置图形，不把标题文本或模型输出直接写进 SVG。
+const MOTIF_VARIANTS={
+  tech:['circuit','network','brackets','signal'],
+  data:['chart','network','orbit'],
+  editorial:['orbit','brackets','signal','network'],
+};
+const MOTIF_SHAPES={
+  circuit:'<path d="M18 42h62V18h58M80 42v46h62v34h54M142 18v30h46v48h46M80 88H38v44h42"/><circle cx="18" cy="42" r="6"/><circle cx="138" cy="18" r="6"/><circle cx="142" cy="122" r="6"/><circle cx="242" cy="96" r="6"/><circle cx="38" cy="132" r="6"/>',
+  network:'<path d="M42 54 118 28l58 58 58-38M42 54l22 96 112-64 58 38M64 150l-4 42 116 8 58-50"/><circle cx="42" cy="54" r="9"/><circle cx="118" cy="28" r="9"/><circle cx="176" cy="86" r="9"/><circle cx="234" cy="48" r="9"/><circle cx="64" cy="150" r="9"/><circle cx="176" cy="86" r="5" fill="var(--motif-secondary)" stroke="none"/>',
+  brackets:'<path d="M72 18 28 18 28 184 72 184M178 18h44v166h-44M92 52h66M92 84h44M92 116h66M92 148h34"/><path d="M96 18v18M154 166v18"/>',
+  signal:'<path d="M28 180V34M28 180h220"/><path d="M48 142 84 126 118 136 152 98 184 108 222 54"/><path d="m208 54h14v14"/><circle cx="48" cy="142" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="84" cy="126" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="118" cy="136" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="152" cy="98" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="184" cy="108" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="222" cy="54" r="6" fill="var(--motif-secondary)" stroke="none"/>',
+  chart:'<path d="M28 184V42M28 184h220M62 158V112h28v46M108 158V76h28v82M154 158V52h28v106M200 158V96h28v62"/><path d="m62 88 46-28 46 16 46-34"/><circle cx="62" cy="88" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="108" cy="60" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="154" cy="76" r="5" fill="var(--motif-secondary)" stroke="none"/><circle cx="200" cy="42" r="5" fill="var(--motif-secondary)" stroke="none"/>',
+  orbit:'<ellipse cx="136" cy="102" rx="96" ry="48"/><ellipse cx="136" cy="102" rx="48" ry="96" transform="rotate(36 136 102)"/><circle cx="136" cy="102" r="18"/><circle cx="224" cy="74" r="8" fill="var(--motif-secondary)" stroke="none"/><circle cx="74" cy="166" r="6" fill="var(--motif-secondary)" stroke="none"/>',
+};
+
+function motifKind(title,themeId,preferred=''){
+  const text=String(title||'');
+  if(MOTIF_SHAPES[preferred])return preferred;
+  const family=/数据|指标|排行|对比|增长|成本|价格|性能/.test(text)?'data':/终止|依赖|供应|风险/.test(text)?'editorial':/AI|模型|开发|代码|API|工具|编程|Cursor|OpenAI/i.test(text)?'tech':'editorial';
+  const variants=MOTIF_VARIANTS[family];
+  const signature=`${themeId||''}|${text}`;let hash=0;
+  for(const character of signature)hash=(hash*31+character.charCodeAt(0))>>>0;
+  return variants[hash%variants.length];
+}
+
+function motifHtml({title,themeId,position,color,secondary,preferred}){
+  const kind=motifKind(title,themeId,preferred),shape=MOTIF_SHAPES[kind];
+  if(!shape)return '';
+  const placement=position==='left'?'motif-left':position==='right'?'motif-right':'motif-canvas-right';
+  return `<svg class="cover-motif motif-${kind} ${placement}" viewBox="0 0 272 204" aria-hidden="true" focusable="false" style="color:${color};--motif-secondary:${secondary}"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="round" opacity=".72">${shape}</g></svg>`;
+}
+
 // 构建封面 HTML。spec 须先经 validateCoverSpec 校验（或 fallbackCoverSpec 产出）。
-export function buildCoverHtml({theme,spec}){
+export function buildCoverHtml({theme,spec,coverSemantics=null}){
   const definition=typeof theme==='string'?coverThemeDefinition(theme):theme;
   const colors=resolveColors(definition);
   const t=definition.tokens.typography,s=definition.tokens.spacing||{},sh=definition.tokens.shape||{};
@@ -139,6 +171,30 @@ export function buildCoverHtml({theme,spec}){
     return {title:pick([colors.ink,colors.inverse],bg,4.5),highlight:pick([colors.accent,colors.accent2,colors.inverse,colors.page],bg,3),muted:pick([colors.muted,colors.ink,colors.inverse],bg,3),eyebrow:pick([colors.accent,colors.accent2,colors.ink,colors.inverse],bg,3),badgeBg,badgeText:pick([colors.inverse,colors.ink],badgeBg,4.5)};
   };
   const canvasPalette=paletteFor(canvasColor),blockPalette=block?paletteFor(blockColor):null;
+
+  // 装饰可能落在色块上，不能固定使用 accent，否则会与纯色色块撞色而「生成了但看不见」。
+  // 按装饰位置估算局部底色，再从主题角色中挑一个足够醒目的颜色。
+  const decorationBackground=(position)=>{
+    if(!block)return [canvasColor];
+    if(block.position==='full')return [blockColor];
+    if(block.position==='top-band')return [/^top-/.test(position||'')?blockColor:canvasColor];
+    const leftBlock=block.position==='left-third'||block.position==='left-half';
+    const onBlock=leftBlock?/left/.test(position||''):/right/.test(position||'');
+    return [onBlock?blockColor:canvasColor];
+  };
+  const decorationColor=(deco)=>{
+    const backgrounds=deco.kind==='corner-marks'&&block?[canvasColor,blockColor]:decorationBackground(deco.position);
+    const candidates=[colors.accent2,colors.ink,colors.inverse,colors.muted,colors.page,colors.accent];
+    const valid=candidates.filter((value)=>/^#[0-9a-f]{6}$/i.test(value||''));
+    const best=valid.sort((a,b)=>Math.min(...backgrounds.map((bg)=>colorContrast(b,bg)))-Math.min(...backgrounds.map((bg)=>colorContrast(a,bg))))[0];
+    return best||colors.accent;
+  };
+  const motifPosition=block&&String(block.position).startsWith('left')?'left':block&&String(block.position).startsWith('right')?'right':'canvas';
+  const motifPositionKey=motifPosition==='left'?'middle-left':motifPosition==='right'?'middle-right':'bottom-right';
+  const motifBackground=decorationBackground(motifPositionKey)[0];
+  const motifColor=pick([colors.accent2,colors.ink,colors.inverse,colors.muted,colors.page],motifBackground,3);
+  const motifSecondary=pick([colors.accent,colors.accent2,colors.ink,colors.inverse,colors.muted],motifBackground,2.2);
+  const motif=motifHtml({title:title.lines.join(''),themeId:definition.id,position:motifPosition,color:motifColor,secondary:motifSecondary,preferred:coverSemantics?.motifKind});
 
   // 文字与色块的关系：avoid（默认，内容区避开色块）、hold（内容区落进色块，整块用色块配色板）、
   // span（内容横跨色块分界线，双层渲染各自 clip 到自己区域着色——同一标题在块上/画布上两种颜色）
@@ -210,7 +266,7 @@ export function buildCoverHtml({theme,spec}){
     .eyebrow-numbering{font-size:${eyebrowPx-1}px;letter-spacing:.22em}
     .cover-title{margin:0;font-weight:800;line-height:${titleLineHeight};letter-spacing:-.01em}
     .cover-title-line{display:block;overflow-wrap:anywhere}
-    .cover-title em{font-style:normal}
+    .cover-title em{font-style:normal;font-weight:900}
     .cover-subtitle{margin:0;font-size:${subtitlePx}px;line-height:1.5}
     .cover-subtitle.with-bar{border-left:4px solid transparent;padding-left:16px}
     .cover-meta{position:absolute;font-size:${metaPx}px;letter-spacing:.06em}
@@ -239,6 +295,11 @@ export function buildCoverHtml({theme,spec}){
     .deco-middle-right{right:32px;top:50%;transform:translateY(-50%)}
     .deco-bottom-center{left:50%;bottom:32px;transform:translateX(-50%)}
     .deco-bar.deco-top-left,.deco-bar.deco-bottom-left{left:48px}
+    .deco-bar.deco-top-left{top:48px}.deco-bar.deco-top-right{right:48px;top:48px}.deco-bar.deco-bottom-right{right:48px;bottom:48px}.deco-bar.deco-bottom-center{bottom:48px}
+    .deco-cross.deco-top-left{left:32px;top:32px}.deco-cross.deco-top-right{right:32px;top:32px}.deco-cross.deco-bottom-left{left:32px;bottom:32px}.deco-cross.deco-bottom-right{right:32px;bottom:32px}
+    .cover-motif{position:absolute;pointer-events:none;overflow:visible;z-index:0;opacity:.72}
+    .cover-motif-left,.motif-left{left:14px;top:88px;width:272px;height:204px}.cover-motif-right,.motif-right{right:14px;top:88px;width:272px;height:204px}.cover-motif-canvas-right,.motif-canvas-right{right:22px;bottom:22px;width:272px;height:204px}
+    .cover-motif>g{vector-effect:non-scaling-stroke}
   `;
 
   const blockGeometry=block?`${layout.block.left!==undefined?`left:${layout.block.left}px;`:''}${layout.block.right!==undefined?`right:${layout.block.right}px;`:''}top:${layout.block.top}px;width:${layout.block.width}px;height:${layout.block.height}px;`:'';
@@ -248,7 +309,8 @@ export function buildCoverHtml({theme,spec}){
 ${block?`<div class="cover-block" style="${blockGeometry}background:${blockColor};${arrowClip}"></div>`:''}
 ${textureHtml}
 ${giantHtml}
-${decorations.map((deco)=>decorationHtml(deco,colors.accent)).join('\n')}
+${decorations.map((deco)=>decorationHtml(deco,decorationColor(deco))).join('\n')}
+${motif}
 ${frameHtml}
 ${mainLayers}
 ${metaHtml}

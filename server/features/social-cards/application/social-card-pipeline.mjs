@@ -12,6 +12,7 @@ import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skill
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { compileSocialTheme, socialThemeDefinition } from '../../../shared/themes/social-theme-compiler.mjs';
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
+import { buildSocialThemeRoutingContext, resolveAutoTheme } from '../../../platform/application/themes/auto-theme-router.mjs';
 import { budgetCardPlan, layoutAuditFailureMessage, normalizeCoverTitleLines, underfilledDensityTier } from '../../../shared/rendering/social-card-plan.mjs';
 import { compileTemplateAwareCardPlan, estimateSocialCardPageLoad, normalizeEventStoryboardPages, normalizeOpenSourceTechnologyStoryboardPages, normalizeOpenSourceTrendStoryboardPages, normalizeRepositoryStoryboardPages, rebalanceContinuationPages, scaleSocialCardCapacityProfile } from '../../../shared/rendering/social-card-reflow.mjs';
 import { applySocialCardRestructureOperations, buildDeterministicSocialCardRestructureOperations, cardPlanHash, socialCardRepairStateSignature, structuralLayoutPages } from '../../../shared/rendering/social-card-repair-policy.mjs';
@@ -243,7 +244,17 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const facts = store.getRepositoryFactSheet(candidateId);
   let eventAnalysisRecord=contentType==='event'?resolveEventAnalysis({store,workspaceRoot,candidate}):null;
   const editorial = store.getCardEditorial(candidateId);
-  const themeDefinition=resolveWorkspaceTheme(store,editorial.visual_style||'ice-blue','social')||socialThemeDefinition(editorial.visual_style||'ice-blue',{fallback:false});
+  let themeRouting = null;
+  let visualStyle = editorial.visual_style || 'auto';
+  if (visualStyle === 'auto') {
+    themeRouting = await resolveAutoTheme({
+      gateway, provider, store, batchId, candidateId, target: 'social',
+      context: buildSocialThemeRoutingContext({ candidate, contentType, channelMode, facts }),
+      log: onProgress,
+    });
+    visualStyle = themeRouting?.themeId || 'ice-blue';
+  }
+  const themeDefinition=resolveWorkspaceTheme(store,visualStyle,'social')||socialThemeDefinition(visualStyle,{fallback:false});
   if(!themeDefinition)throw new Error(`未知图文视觉主题：${editorial.visual_style}`);
   const templateCapabilities=getSocialCardTemplateCapabilities({themeDefinition,channelMode,contentType});
   const rolloutProfile=getSocialCardPlanRolloutProfile(templateCapabilities.templatePack.id);
@@ -269,7 +280,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   const gate = contentType==='event'?(storyboardClass==='technology'||storyboardClass==='trend'?evaluateClassifiedCardGate(candidate,storyboardClass,eventAnalysisRecord,editorial):evaluateEventCardGate(candidate,eventAnalysisRecord,editorial)):contentType==='custom'?evaluateCustomCardGate(candidate,facts,editorial):evaluateCardGate(candidate, facts, editorial);
   if (!gate.ready) throw new Error(`卡片故事板尚未就绪：${gate.issues.join('；')}`);
   store.saveCardEditorial?.(candidateId,{...editorial,storyboard_theme_snapshot_json:JSON.stringify(createSocialCardStoryboardThemeSnapshot({themeDefinition,channelMode,contentType}))});
-  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,templatePack:templateCapabilities.templatePack,templateSource:templateCapabilities.source,templateFallback:templateCapabilities.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
+  writeFile(themeSnapshotPath,JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,autoRouting:themeRouting,templatePack:templateCapabilities.templatePack,templateSource:templateCapabilities.source,templateFallback:templateCapabilities.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
 
   const stages = [];
   const storyboardSnapshot=store.findLatestGenerationSnapshot?.({
@@ -493,7 +504,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     // 生成链路中的内容页统一按实际内容高度收缩并居中；
     // fitContentPages 仍保留在状态中，用于记录“补充后仍偏空”的额外处理。
     const adaptiveContentPages=adaptiveContentPageIndexes(cardPlan,fitContentPages);
-    return renderStoryboardHtml({ topic:candidate.hotspot_title, repository:facts?.data?.repository, pages:cardPlan, visualStyle:editorial.visual_style, themeDefinition, layoutStyle:editorial.layout_style, compositionMode:editorial.composition_mode||'template',
+    return renderStoryboardHtml({ topic:candidate.hotspot_title, repository:facts?.data?.repository, pages:cardPlan, visualStyle, themeDefinition, layoutStyle:editorial.layout_style, compositionMode:editorial.composition_mode||'template',
       compositionSeed:`${candidate.batch_id}|${candidate.id}`,forceSafeComposition:safeCompositionApplied?(safeCompositionPageKeys.size?resolveSafeCompositionPages():safeCompositionPages.size?[...safeCompositionPages]:true):false,relaxedDensityPages,expandedDensityPages,fitContentPages:adaptiveContentPages,contentType,channelMode,coverTitleLines,sourceLabel:contentType==='event'?(storyboardClass==='technology'?'事件专题 · 开源技术':storyboardClass==='trend'?'事件专题 · 开源趋势':'事件专题'):contentType==='custom'?facts?.data?.content_type_label||'自定义':'',disclosure:contentType==='event'?'据公开素材整理 · 未核实内容已标注':'' });
   };
   let html = renderCurrentStoryboard();
@@ -1127,7 +1138,7 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   writeFile(planPath, JSON.stringify({ ...planningMeta, composition_seed:`${candidate.batch_id}|${candidate.id}`, composition_safety:safeCompositionApplied?'safe':'standard', pages:cardPlan }, null, 2));
   persistEffectiveCardPlan(cardPlan, 'AI_READY');
   persistContentAtomSnapshot('final');
-  writeFile(themeSnapshotPath, JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,templatePack:templateCompatibility.templatePack,templateSource:templateCompatibility.source,templateFallback:templateCompatibility.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
+  writeFile(themeSnapshotPath, JSON.stringify({schemaVersion:2,id:themeDefinition.id,label:themeDefinition.label,version:themeDefinition.version,source:themeDefinition.source,hash:themeDefinition.hash,autoRouting:themeRouting,templatePack:templateCompatibility.templatePack,templateSource:templateCompatibility.source,templateFallback:templateCompatibility.fallback,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile},null,2));
   recordRepairPhase({attempt:auditAttempts.length,phase:'final-gate',action:report?.valid===true?'pass':'fail',changed:false,rerender:false,details:`valid=${report?.valid===true?'true':'false'}`});
   persistPlanBaseline();
   persistTemplateMetrics();
@@ -1164,5 +1175,5 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   for (const image of images) addArtifact(store,batchId,candidateId,'图文卡片 PNG',image);
   store.updateCandidateTrack(candidateId, 'social_cards', { status:'completed' });
   onProgress(`图文 6/6：完成，共生成 ${images.length} 张卡片`);
-  return { workdir, copy:copyPath, html:htmlPath, layoutReport:reportPath, deliveryReport:deliveryPath, templateMetrics:templateMetricsPath, contentPlanAdjustments:contentPlanAdjustmentsPath, jointPackingAudit:jointPackingAuditPath, theme:{id:themeDefinition.id,version:themeDefinition.version,hash:themeDefinition.hash}, template:{pack:templateCompatibility.templatePack,source:templateCompatibility.source,fallback:templateCompatibility.fallback,warnings:templateCompatibility.warnings,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile}, pageBudget, themeSnapshot:themeSnapshotPath, images, pageCount:images.length };
+  return { workdir, copy:copyPath, html:htmlPath, layoutReport:reportPath, deliveryReport:deliveryPath, templateMetrics:templateMetricsPath, contentPlanAdjustments:contentPlanAdjustmentsPath, jointPackingAudit:jointPackingAuditPath, theme:{id:themeDefinition.id,version:themeDefinition.version,hash:themeDefinition.hash}, themeRouting, template:{pack:templateCompatibility.templatePack,source:templateCompatibility.source,fallback:templateCompatibility.fallback,warnings:templateCompatibility.warnings,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile}, pageBudget, themeSnapshot:themeSnapshotPath, images, pageCount:images.length };
 }

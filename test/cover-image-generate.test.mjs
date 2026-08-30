@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, validateCoverThemeSpec, sanitizeCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../server/shared/themes/cover-components.mjs';
+import { validateCoverSpec, fallbackCoverSpec, splitTitleLines, selectCoverTitleHighlights, validateCoverThemeSpec, sanitizeCoverThemeSpec, coverSpecFromTheme, COVER_LIMITS } from '../server/shared/themes/cover-components.mjs';
 import { buildCoverHtml } from '../server/shared/themes/cover-theme-compiler.mjs';
+import { analyzeCoverSemantics, normalizeCoverSemantics } from '../server/features/articles/application/cover-semantics.mjs';
 import { loadThemeDirectory } from '../server/shared/themes/theme-loader.mjs';
 
 const validSpec = {
@@ -70,10 +71,37 @@ test('fallbackCoverSpec splits long titles into two constrained lines', () => { 
   assert.ok(validateCoverSpec(spec).ok);
   assert.ok(spec.components.some((c) => c.type === 'subtitle'));
   assert.ok(spec.components.some((c) => c.type === 'meta'));
+  assert.deepEqual(spec.components.filter((c) => c.type === 'decoration').map((c) => c.kind), ['ring', 'bar']);
   // 无品牌/副标题时不产出对应组件，但仍合规
   const minimal = fallbackCoverSpec('短标题');
   assert.ok(validateCoverSpec(minimal).ok);
   assert.deepEqual(splitTitleLines('短标题'), ['短标题']);
+});
+
+test('title highlights are selected deterministically from key information', () => {
+  const highlights=selectCoverTitleHighlights('OpenAI终止与Cursor合作，开发者11月12日前必须行动');
+  assert.deepEqual(highlights, ['11月12日前', '终止']);
+  assert.deepEqual(selectCoverTitleHighlights('一个普通的短标题'), []);
+});
+
+test('AI cover semantics are constrained to title substrings and SVG allowlist', async () => {
+  const normalized=normalizeCoverSemantics({highlightTerms:['11月12日前','模型不存在'],motifKind:'network'}, {title:'开发者11月12日前必须行动'});
+  assert.deepEqual(normalized.highlightTerms, ['11月12日前']);
+  assert.equal(normalized.motifKind, 'network');
+
+  const calls=[];
+  const semantics=await analyzeCoverSemantics({
+    gateway:{complete:async (request)=>{calls.push(request);return {content:JSON.stringify({highlightTerms:['终止','11月12日前'],motifKind:'network'}),callId:'cover-semantics-1'};}},
+    provider:'fake',batchId:1066,candidateId:1066,title:'OpenAI终止与Cursor合作，开发者11月12日前必须行动',summary:'摘要',
+  });
+  assert.deepEqual(semantics.highlightTerms, ['终止','11月12日前']);
+  assert.equal(semantics.motifKind, 'network');
+  assert.equal(calls[0].purpose, 'cover-semantic-analysis');
+  assert.equal(calls[0].jsonMode, true);
+  assert.equal(calls[0].thinking, false);
+  assert.match(calls[0].messages[0].content, /必须结合标题的核心主旨、动作和对象/);
+  assert.match(calls[0].messages[0].content, /不要根据配色、主题名称或随机性选择/);
+  assert.deepEqual(selectCoverTitleHighlights('合作将在11月12日前终止', ['终止'], {useFallback:false}), ['终止']);
 });
 
 test('buildCoverHtml escapes content and reports 900x383', () => {
@@ -84,6 +112,47 @@ test('buildCoverHtml escapes content and reports 900x383', () => {
   assert.ok(!html.includes('<script>alert'));
   assert.equal(width, 900);
   assert.equal(height, 383);
+
+  const highlighted=buildCoverHtml({
+    theme: 'cover-navy-gold',
+    spec: { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['终止合作'], highlights: ['终止'] }] },
+  }).html;
+  assert.match(highlighted, /<em style="color:[^\"]+;font-weight:900;text-decoration:underline/);
+  const signal=buildCoverHtml({
+    theme: 'cover-navy-gold',
+    spec: { components: [{ type: 'canvas', colorRole: 'ink' }, { type: 'title', lines: ['趋势变化'], highlights: [] }] },
+    coverSemantics: { motifKind: 'signal' },
+  }).html;
+  assert.match(signal, /M28 180V34M28 180h220/);
+  assert.match(signal, /m208 54h14v14/);
+  assert.match(signal, /\.cover-motif-left,\.motif-left\{left:14px;top:88px;width:272px;height:204px\}/);
+});
+
+test('cover decorations choose contrast against a pure color block', () => {
+  const { html } = buildCoverHtml({
+    theme: 'cover-navy-gold',
+    spec: { components: [
+      { type: 'canvas', colorRole: 'page' },
+      { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent' },
+      { type: 'title', lines: ['测试标题'], highlights: [] },
+      { type: 'decoration', kind: 'bar', position: 'bottom-left' },
+    ] },
+  });
+  assert.match(html, /deco-bar[^>]*style="background:#1f3a5f"/i);
+  assert.doesNotMatch(html, /deco-bar[^>]*style="background:#e8b84b"/i);
+  assert.match(html, /\.deco-bar\.deco-bottom-right\{right:48px;bottom:48px\}/);
+  assert.match(html, /\.deco-cross\.deco-bottom-right\{right:32px;bottom:32px\}/);
+  assert.match(html, /<svg class="cover-motif motif-[a-z-]+ motif-left"/);
+  const semanticHtml = buildCoverHtml({
+    theme: 'cover-navy-gold',
+    spec: { components: [
+      { type: 'canvas', colorRole: 'page' },
+      { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent' },
+      { type: 'title', lines: ['OpenAI终止与Cursor合作'], highlights: [] },
+    ] },
+    coverSemantics: { motifKind: 'network' },
+  }).html;
+  assert.match(semanticHtml, /<svg class="cover-motif motif-network motif-left"/);
 });
 
 test('unknown theme id falls back to default cover theme', () => {
@@ -177,10 +246,26 @@ test('theme-baked cover spec: validation and deterministic article fill-in', () 
   const title = spec.components.find((c) => c.type === 'title');
   assert.equal(title.lines.join(''), 'DeepSeek 1.4亿入股宇树，人形机器人要变天了？');
   assert.equal(title.align, 'center');
-  assert.deepEqual(title.highlights, []);
+  assert.deepEqual(title.highlights, ['1.4亿', '变天']);
   assert.equal(spec.components.find((c) => c.type === 'subtitle').text, '一段来自正文的摘要，作为副标题素材。');
   assert.equal(spec.components.find((c) => c.type === 'meta').text, '测试号 · 2026.08');
   assert.equal(spec.components.find((c) => c.type === 'eyebrow').text, '深度观察');
+  // 主题未声明装饰时，按构图骨架补一组稳定的视觉变体
+  const undecorated = coverSpecFromTheme({ layout: 'diagonal-split', components: [
+    { type: 'canvas' },
+    { type: 'color-block', position: 'left-half', shape: 'diagonal', colorRole: 'accent', text: 'span' },
+    { type: 'title' },
+  ] }, { title: '短标题' });
+  assert.deepEqual(undecorated.components.filter((c) => c.type === 'decoration').map((c) => c.kind), ['ring', 'grid']);
+  const sidePanel = coverSpecFromTheme({ layout: 'side-panel', components: [
+    { type: 'canvas' },
+    { type: 'color-block', position: 'left-third', shape: 'rect', colorRole: 'accent' },
+    { type: 'title' },
+    { type: 'decoration', kind: 'bar', position: 'bottom-left' },
+  ] }, { title: '短标题' });
+  const sideDecorations = sidePanel.components.filter((c) => c.type === 'decoration');
+  assert.equal(sideDecorations.length, 2);
+  assert.equal(new Set(sideDecorations.map((c) => c.kind)).size, 2);
   // 无摘要时不产出 subtitle 组件
   const bare = coverSpecFromTheme(themeSpec, { title: '短标题' });
   assert.ok(!bare.components.some((c) => c.type === 'subtitle'));
@@ -194,9 +279,12 @@ test('all builtin cover themes carry a valid baked spec', () => {
   for (const theme of covers) {
     const result = validateCoverThemeSpec(theme.cover?.spec);
     assert.ok(result.ok, `${theme.id}: ${JSON.stringify(result.issues)}`);
-    const spec = coverSpecFromTheme(theme.cover.spec, { title: '一个用于检查构图的文章标题', subtitle: '摘要', brand: '账号 · 2026.08' });
+    const spec = coverSpecFromTheme(theme.cover.spec, { title: '一个用于检查构图的文章标题', subtitle: '摘要', brand: '账号 · 2026.08', theme });
     assert.ok(spec, theme.id);
     assert.ok(validateCoverSpec(spec).ok, theme.id);
+    assert.ok(spec.components.some((component) => component.type === 'decoration'), `${theme.id}: 缺少封面装饰`);
+    const decorations = spec.components.filter((component) => component.type === 'decoration');
+    assert.equal(new Set(decorations.map((component) => component.kind)).size, decorations.length, `${theme.id}: 重复装饰类型`);
   }
 });
 
