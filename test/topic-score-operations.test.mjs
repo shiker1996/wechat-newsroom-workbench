@@ -13,13 +13,20 @@ function writeDualRun(root, batch, summary) {
   fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, summary, items: [] }), 'utf8');
 }
 
+function batchDate(offsetDays = 0) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
 test('阶段7 聚合多个批次的评分双跑并给出校准状态', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'topic-score-ops-'));
   let store;
   try {
     store = new Store(path.join(root, 'workbench.db'));
-    const first = store.createBatch({ date: '2026-08-22', title: '昨日批次' });
-    const second = store.createBatch({ date: '2026-08-23', title: '今日批次' });
+    const first = store.createBatch({ date: batchDate(-1), title: '昨日批次' });
+    const second = store.createBatch({ date: batchDate(), title: '今日批次' });
     writeDualRun(root, first, { candidateCount: 10, legacyDraftableCount: 6, currentDraftableCount: 7, poolChangedCount: 2, rankChangedCount: 4,
       meanDelta: 8, highTLowACount: 1, lowTHighACount: 2, repeatPenaltyCount: 3, readerStakeMissingCount: 1 });
     writeDualRun(root, second, { candidateCount: 10, legacyDraftableCount: 6, currentDraftableCount: 6, poolChangedCount: 1, rankChangedCount: 3,

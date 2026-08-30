@@ -20,13 +20,20 @@ function shadow(eventId, hotspotId, state = null) {
     last_seen_at: '2026-08-23T08:00:00Z' }] };
 }
 
+function batchDate(offsetDays = 0) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
 test('阶段 E 记录人工校正并计算近期开环指标', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'event-resolution-ops-'));
   let store;
   try {
     store = new Store(path.join(root, 'workbench.db'));
-    const older = store.createBatch({ date: '2026-08-22', title: '昨日批次' });
-    const current = store.createBatch({ date: '2026-08-23', title: '今日批次' });
+    const older = store.createBatch({ date: batchDate(-1), title: '昨日批次' });
+    const current = store.createBatch({ date: batchDate(), title: '今日批次' });
     store.addHotspots(older.id, 'rsshub', [{ id: 'old', title: '旧报道', url: 'https://example.com/old' }]);
     store.addHotspots(current.id, 'rsshub', [{ id: 'new', title: '新报道', url: 'https://example.com/new' }]);
     const oldHotspot = store.getBatch(older.id).hotspots[0];
