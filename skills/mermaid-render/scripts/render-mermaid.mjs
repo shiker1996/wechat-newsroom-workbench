@@ -40,24 +40,42 @@ const mmdcCandidates = [
 const mmdcCli = mmdcCandidates.find((candidate) => fs.existsSync(candidate)) || '';
 
 // mmdc 自带的 puppeteer 可能找不到它期望的 Chrome 版本；
-// 在 puppeteer 缓存里挑一个真实存在的 chrome.exe，通过 -p 配置文件喂给它。
+// 优先使用 Puppeteer 缓存中的 headless shell，避免 Windows Runner 上系统 Chrome
+// 的自动更新、首次启动检查和已有用户进程影响渲染，再回退到普通 Chrome/系统 Chrome。
 function findChromeExecutable() {
+  const explicit = process.env.PUPPETEER_EXECUTABLE_PATH || '';
+  if (explicit && fs.existsSync(explicit)) return explicit;
+
+  const cacheRoots = [...new Set([
+    process.env.PUPPETEER_CACHE_DIR || '',
+    path.join(os.homedir(), '.cache', 'puppeteer'),
+  ].filter(Boolean))];
+  const cachedCandidates = [];
+  for (const root of cacheRoots) {
+    const headlessShell = path.join(root, 'chrome-headless-shell');
+    if (fs.existsSync(headlessShell)) {
+      cachedCandidates.push(...fs.readdirSync(headlessShell)
+        .sort()
+        .reverse()
+        .map((version) => path.join(headlessShell, version, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe')));
+    }
+    const chrome = path.join(root, 'chrome');
+    if (fs.existsSync(chrome)) {
+      cachedCandidates.push(...fs.readdirSync(chrome)
+        .sort()
+        .reverse()
+        .map((version) => path.join(chrome, version, 'chrome-win64', 'chrome.exe')));
+    }
+  }
+  const cached = cachedCandidates.find((candidate) => fs.existsSync(candidate));
+  if (cached) return cached;
+
   const programFilesX86 = process.env['ProgramFiles(x86)'] || '';
-  const explicitCandidates = [
-    process.env.PUPPETEER_EXECUTABLE_PATH || '',
+  return [
     path.join(process.env.PROGRAMFILES || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
     programFilesX86 ? path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
     path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-  ].filter(Boolean);
-  const explicit = explicitCandidates.find((candidate) => fs.existsSync(candidate));
-  if (explicit) return explicit;
-  const base = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
-  if (!fs.existsSync(base)) return '';
-  const versions = fs.readdirSync(base)
-    .map((dir) => path.join(base, dir, 'chrome-win64', 'chrome.exe'))
-    .filter((exe) => fs.existsSync(exe))
-    .sort();
-  return versions.at(-1) || '';
+  ].filter(Boolean).find((candidate) => fs.existsSync(candidate)) || '';
 }
 
 const markdown = fs.readFileSync(input, 'utf8');
@@ -72,7 +90,20 @@ if (fences.length) {
   const pptrConfig = path.join(imageDir, '.mmdc-puppeteer-config.json');
   const mermaidConfig = path.join(imageDir, '.mmdc-theme-config.json');
   fs.writeFileSync(mermaidConfig, JSON.stringify(mermaidConfigForTheme(tokens)));
-  if (chrome) fs.writeFileSync(pptrConfig, JSON.stringify({ executablePath: chrome, args: ['--no-sandbox'] }));
+  if (chrome) fs.writeFileSync(pptrConfig, JSON.stringify({
+    executablePath: chrome,
+    timeout: 90000,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-background-networking',
+    ],
+  }));
   for (const [index, fence] of fences.entries()) {
     const name = `mermaid-${index + 1}`;
     const mmdPath = path.join(imageDir, `${name}.mmd`);
@@ -91,7 +122,8 @@ if (fences.length) {
           break;
         } catch (error) {
           lastError = error;
-          if (!/Failed to launch the browser/i.test(String(error.stderr || error.message))) break;
+          const details = [error.stderr, error.stdout, error.message].filter(Boolean).join('\n');
+          if (!/Failed to launch the browser|Timed out after \d+ ms while waiting for the WS endpoint URL|TimeoutError/i.test(details)) break;
         }
       }
       if (lastError) throw lastError;
