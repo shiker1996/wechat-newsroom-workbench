@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { buildImagesMarkdown, imageManifestFile, registerGeneratedImageAssets, uploadImageToCdn } from './image-workflow.mjs';
+import { buildImagesMarkdown, imageManifestFile, parseImagePlaceholders, registerGeneratedImageAssets, registerGeneratedSlotImage, uploadImageToCdn } from './image-workflow.mjs';
+import { generateArticleImage } from './article-image-generator.mjs';
 import { loadSkillBundle } from '../../../platform/llm/skill-runtime.mjs';
 import { batchArticlesDir, candidateArticleDir } from '../../../platform/core/workspace-paths.mjs';
 import { executeCapability } from '../../../platform/tools/capability-runtime.mjs';
@@ -90,7 +91,7 @@ async function runScript(script, args, cwd) {
   }
 }
 
-export async function runTypesetPipeline({ gateway, store, batchId, candidateId, documentKind = null, provider, workspaceRoot, skillsWorkspaceRoot = workspaceRoot, snapshotId=null, draftMode = 'deterministic', theme = 'auto', autoUploadGeneratedImages = true, onProgress = () => {} }) {
+export async function runTypesetPipeline({ gateway, store, batchId, candidateId, documentKind = null, provider, workspaceRoot, skillsWorkspaceRoot = workspaceRoot, snapshotId=null, draftMode = 'deterministic', theme = 'auto', autoUploadGeneratedImages = true, onProgress = () => {}, generateArticleImageFn = generateArticleImage, uploadImageToCdnFn = uploadImageToCdn }) {
   const candidate = candidateId==null?null:store.getCandidate(candidateId);
   const daily=documentKind==='daily-final';
   if ((!daily&&(!candidate||candidate.batch_id!==batchId))||(daily&&candidate)) throw new Error('待排版文稿不存在或不属于当前批次');
@@ -151,7 +152,9 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   const htmlTokens = normalizeDesignTokens(design.tokens);
   writeFile(tokensPath, JSON.stringify(htmlTokens, null, 2));
   const chartTokensPath = path.join(workdir, 'chart-design-tokens.json');
-  const themeColors = compiledTheme.tokens.colors;
+  // 文章主题的完整颜色契约用于正文、结构化卡片和图表；设计模型只补充排版节奏，
+  // 不应让它的简化颜色结果把 surface/line/accentSecondary 覆盖成另一套视觉语言。
+  const themeColors = themeDefinition.tokens.colors;
   const chartThemeColors=themeDefinition.tokens.colors;
   const articleRenderTokens={...compiledTheme.tokens,...htmlTokens,colors:{...(htmlTokens.colors||{}),...themeColors},theme,themeDefinition};
   writeFile(chartTokensPath, JSON.stringify({ ...htmlTokens, colors:{ ...(htmlTokens.colors || {}), ...chartThemeColors }, theme, themeVersion:themeDefinition.version, themeHash:themeDefinition.hash }, null, 2));
@@ -195,6 +198,29 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
     }
     addArtifact(store, batchId, `${label} 转图文章`, path.basename(chartPath), chartPath);
     chartNotes.push(`${label} ${chartReport.converted} 张${pendingUploads.length ? '（已重新上传 CDN）' : '（内容未变，复用 CDN）'}`);
+  }
+  // 统计卡/时间线与 Mermaid/ECharts 走同一条排版期生成链：每次排版都按当前主题
+  // 重新截图，随后自动上传 CDN，工作台不再要求逐张点击“生成图片”。
+  const structuredImages = parseImagePlaceholders(fs.readFileSync(chartReadyPath, 'utf8')).filter((item) => item.generate);
+  for (const item of structuredImages) {
+    const label = item.generate.kind === 'timeline' ? '时间线' : '统计卡';
+    try {
+      onProgress(`排版 3/6：${label}「${item.content}」按当前主题生成`);
+      const generated = await generateArticleImageFn({
+        workspaceRoot, workdir, slotId:item.id, generate:item.generate, ratio:item.ratio,
+        theme, tokens:articleRenderTokens,
+      });
+      registerGeneratedSlotImage(workdir, item.id, generated.localPath);
+      if (autoUploadGeneratedImages) {
+        onProgress(`排版 3/6：${label}「${item.content}」图片已更新，正在上传 CDN`);
+        await uploadImageToCdnFn(workdir, item.id, { authorizedExternalWrite:true, allowedCapabilities:typesetRuntime.allowedCapabilities,
+          store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset' });
+      }
+      chartNotes.push(`${label} 1 张（按 ${theme} 主题生成${autoUploadGeneratedImages ? '并已上传 CDN' : ''}）`);
+    } catch (error) {
+      record('images', 'wechat-article-typeset', '', 'blocked', `${label} 生成失败：${error.message}`);
+      throw new Error(`${label} 图片生成失败，已停止排版以避免使用旧图：${error.message}`);
+    }
   }
   const imageResult = buildImagesMarkdown(workdir, fs.readFileSync(chartReadyPath, 'utf8'));
   if (imageResult.unresolved.length) throw new Error(`配图尚未就绪：${imageResult.unresolved.join('、')}，请先提供图片并上传 CDN`);

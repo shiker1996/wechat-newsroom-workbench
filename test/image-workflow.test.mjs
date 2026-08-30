@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applyImagePlan, parseImagePlaceholders, getImageWorkspace, saveLocalImage,
-  saveImageMetadata, buildImagesMarkdown, registerGeneratedImageAssets } from '../server/features/articles/application/image-workflow.mjs';
+  saveImageMetadata, buildImagesMarkdown, registerGeneratedImageAssets, registerGeneratedSlotImage } from '../server/features/articles/application/image-workflow.mjs';
 
 test('配图规划只插入结构化注释且不改写正文', () => {
   const markdown = '# 标题\n\n第一段说明事实。\n\n第二段给出判断。';
@@ -13,6 +13,21 @@ test('配图规划只插入结构化注释且不改写正文', () => {
   assert.match(planned, /IMAGE-SUPPLY-LIST/);
   assert.equal(planned.replace(/<!--[^]*?-->/g, '').replace(/\s+/g, ''), markdown.replace(/\s+/g, ''));
   assert.equal(parseImagePlaceholders(planned)[0].id, '资料:01');
+});
+
+test('结构化图片属于排版期自动生成，不计入人工配图阻断', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'automatic-structured-images-'));
+  try {
+    const planned = applyImagePlan('# 标题\n\n正文。', [{
+      type:'资料', content:'统计卡', afterExact:'正文。', ratio:'16:9',
+      generate:{ kind:'datacard', title:'数据速览', items:[{ label:'完成', value:'4 周' }, { label:'任务', value:'86 项' }] },
+    }]);
+    fs.writeFileSync(path.join(root, '09-FINAL.md'), planned, 'utf8');
+    const workspace = getImageWorkspace(root);
+    assert.deepEqual(workspace.manualUnresolved, []);
+    assert.deepEqual(workspace.generatedPending, ['资料:01']);
+    assert.deepEqual(workspace.unresolved, ['资料:01']);
+  } finally { fs.rmSync(root, { recursive:true, force:true }); }
 });
 
 test('自动生成图必须上传 CDN 后才进入排版副本', () => {
@@ -76,6 +91,29 @@ test('本地图片保留原文件，取得 HTTPS 映射后才替换排版副本'
     assert.deepEqual(resolved.unresolved, []);
     assert.match(resolved.content, /!\[官方页面截图\]\(https:\/\/img\.example\.com\/source\.png\)/);
     assert.doesNotMatch(resolved.content, /IMAGE-SUPPLY-LIST|<!-- IMG:/);
+  } finally { fs.rmSync(root, { recursive:true, force:true }); }
+});
+
+test('结构化图片重新生成时清空旧 CDN 地址', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'structured-image-regeneration-'));
+  try {
+    const planned = applyImagePlan('# 标题\n\n正文。', [{
+      type:'资料', content:'统计卡', afterExact:'正文。', ratio:'16:9',
+      generate:{ kind:'datacard', title:'数据速览', items:[{ label:'完成', value:'4 周' }, { label:'任务', value:'86 项' }] },
+    }]);
+    fs.writeFileSync(path.join(root, '09-FINAL.md'), planned, 'utf8');
+    const manifestPath = path.join(root, 'image-assets.json');
+    fs.writeFileSync(manifestPath, JSON.stringify({ version:1, items:{ '资料:01': {
+      url:'https://img.example.com/old.png', key:'old.png', uploadedAt:'yesterday',
+    } } }), 'utf8');
+    const localPath = path.join(root, 'images', '资料-01.png');
+    fs.mkdirSync(path.dirname(localPath), { recursive:true });
+    fs.writeFileSync(localPath, 'new-png');
+    const updated = registerGeneratedSlotImage(root, '资料:01', localPath);
+    assert.equal(updated.url, '');
+    assert.equal(updated.key, '');
+    assert.equal(updated.uploadedAt, null);
+    assert.equal(updated.status, 'local');
   } finally { fs.rmSync(root, { recursive:true, force:true }); }
 });
 

@@ -144,8 +144,14 @@ export function getImageWorkspace(workdir) {
     });
   const items = [...placeholderItems, ...generatedItems];
   const existingImages = [...markdown.matchAll(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)].map((match) => ({ alt:match[1], url:match[2] }));
-  const manualUnresolved = placeholderItems.filter((item) => item.status !== 'cdn').map((item) => item.id);
-  const generatedPending = generatedItems.filter((item) => item.status !== 'cdn').map((item) => item.id);
+  // 带有结构化 generate 数据的占位与 Mermaid/ECharts 一样，属于排版阶段自动生成，
+  // 不应被当成人工配图拦截排版；只有没有 generate 的占位才需要作者提供素材。
+  const automaticPlaceholders = placeholderItems.filter((item) => item.generate);
+  const manualUnresolved = placeholderItems.filter((item) => !item.generate && item.status !== 'cdn').map((item) => item.id);
+  const generatedPending = [
+    ...automaticPlaceholders.filter((item) => item.status !== 'cdn').map((item) => item.id),
+    ...generatedItems.filter((item) => item.status !== 'cdn').map((item) => item.id),
+  ];
   return { planned:placeholders.length > 0 || PLAN_NONE_RE.test(markdown) || generatedItems.length > 0, total:items.length, ready:items.filter((item) => item.status === 'cdn').length,
     unresolved:[...manualUnresolved, ...generatedPending], manualUnresolved, generatedPending, items, existingImages,
     uploaderAvailable:true };
@@ -186,8 +192,9 @@ export function registerGeneratedSlotImage(workdir, id, localPath) {
   const manifest = readManifest(workdir);
   manifest.items[id] = { ...(manifest.items[id] || {}), generated:true, localPath,
     originalName:path.basename(localPath), mimeType:'image/png',
-    source:'工作台确定性生成（正文数据）', copyright:'无需授权',
-    url:'', key:'', updatedAt:new Date().toISOString() };
+    source:'排版阶段确定性生成（正文数据）', copyright:'无需授权',
+    // 重新生成后旧 CDN 地址不能继续进入最终 HTML，必须视为新的待上传版本。
+    url:'', key:'', uploadedAt:null, updatedAt:new Date().toISOString() };
   writeJson(manifestPath(workdir), manifest);
   return getImageWorkspace(workdir).items.find((entry) => entry.id === id);
 }

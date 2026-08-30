@@ -206,6 +206,8 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(index.includes('id="goto-cover"'));
   assert.ok(index.includes('id="download-cover"'));
   assert.ok(index.includes('id="cover-mode"'));
+  assert.ok(index.includes('<option value="ai-visual" selected>AI 视觉封面</option>'));
+  assert.ok(index.includes('<option value="standard">标准封面</option>'));
   assert.ok(index.includes('id="cover-ai-html"'));
   assert.ok(index.includes('AI 视觉封面'));
   assert.ok(index.includes('data-theme-picker="cover"'));
@@ -215,6 +217,7 @@ test('cover routes, job type and navigation are wired', () => {
   assert.ok(main.includes('cover: "文章封面图"'));
   // $ 是 querySelector：按 id 取元素必须带 # 前缀
   const view = fs.readFileSync('public/src/views/cover.js', 'utf8');
+  assert.ok(view.includes('value || "ai-visual"'));
   assert.doesNotMatch(view, /\$\("(?!#)/);
   const catalog = fs.readFileSync('public/src/core/theme-catalog.js', 'utf8');
   assert.ok(catalog.includes("cover:'cover-theme'"));

@@ -25,7 +25,7 @@ function currentCandidateId() {
 }
 
 function currentMode() {
-  return $("#cover-mode")?.value || "standard";
+  return $("#cover-mode")?.value || "ai-visual";
 }
 
 function renderModeHelp() {

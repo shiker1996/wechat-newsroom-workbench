@@ -25,6 +25,15 @@ test('visual plan accepts sequence/state Mermaid and rejects executable ECharts'
   assert.equal(plan.placements[0].type, 'mermaid');
 });
 
+test('visual plan can emphasize Mermaid focus nodes without fixing composition', () => {
+  const plan = normalizeVisualPlan({ placements:[
+    { type:'mermaid', afterHeading:'正文', focusNodes:['B','MISSING'], code:'flowchart LR\nA[输入] --> B[核心判断]\nB --> C[结果]' },
+  ] }, '# 标题\n\n## 正文\n');
+  assert.deepEqual(plan.placements[0].focusNodes, ['B']);
+  assert.match(plan.placements[0].code, /classDef aiFocus/);
+  assert.match(plan.placements[0].code, /class B aiFocus/);
+});
+
 test('mobile complexity flags oversized diagrams', () => {
   const code='flowchart TB\n'+Array.from({length:9},(_,index)=>`N${index}[节点${index}] --> N${index+1}[节点${index+1}]`).join('\n');
   const result=analyzeVisualComplexity('mermaid',code);

@@ -44,7 +44,8 @@ export async function handleMediaRoutes(context) {
     const item = getImageWorkspace(workdir).items.find((entry) => entry.id === id);
     if (!item?.generate) return json(response, 400, { error:'该占位未标记为可生成' });
     try {
-      const { localPath } = await generateArticleImage({ workspaceRoot:root, workdir, slotId:id, generate:item.generate, ratio:item.ratio });
+      const input = await body(request);
+      const { localPath } = await generateArticleImage({ workspaceRoot:root, workdir, slotId:id, generate:item.generate, ratio:item.ratio, theme:input.theme || '' });
       const updated = registerGeneratedSlotImage(workdir, id, localPath);
       const manifestPath = imageManifestFile(workdir); const stat = fs.statSync(manifestPath);
       store.upsertArtifact({ batchId:batch.id, kind:'配图资产清单', name:path.basename(manifestPath), path:manifestPath, size:stat.size, modifiedAt:stat.mtime.toISOString() });
@@ -177,7 +178,8 @@ export async function handleMediaRoutes(context) {
     const item = getImageWorkspace(workdir).items.find((entry) => entry.id === id);
     if (!item?.generate) return json(response, 400, { error:'该占位未标记为可生成' });
     try {
-      const { localPath } = await generateArticleImage({ workspaceRoot: root, workdir, slotId: id, generate: item.generate, ratio: item.ratio });
+      const input = await body(request);
+      const { localPath } = await generateArticleImage({ workspaceRoot: root, workdir, slotId: id, generate: item.generate, ratio: item.ratio, theme:input.theme || '' });
       const updated = registerGeneratedSlotImage(workdir, id, localPath);
       const manifestPath = imageManifestFile(workdir); const stat = fs.statSync(manifestPath);
       store.upsertArtifact({ batchId:batch.id, kind:'配图资产清单', name:path.basename(manifestPath), path:manifestPath, size:stat.size, modifiedAt:stat.mtime.toISOString() });

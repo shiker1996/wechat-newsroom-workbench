@@ -38,7 +38,39 @@ test('generated html escapes content and honors ratio sizes', () => {
   assert.throws(() => buildGenerateImageHtml({ kind:'unknown', items:[] }), /未知的可生成图片类型/);
 });
 
-test('generate endpoint and workbench button are wired', () => {
+test('generated structured images use article tokens and adapt card layout to item count', () => {
+  const { html } = buildGenerateImageHtml({ kind:'datacard', title:'指标', items:[
+    { label:'核心', value:'42%' }, { label:'增长', value:'18%' }, { label:'覆盖', value:'9' },
+  ] }, '16:9', { colors:{ background:'#101820', surface:'#1B2733', text:'#FFFFFF', muted:'#A7B4C2', accent:'#FF7A59', line:'#3D5368', inverseText:'#101820' }, shape:{ radiusPx:4, borderWidthPx:2, shadow:'none' }, typography:{ headingFamily:'sans' } });
+  assert.match(html, /--bg:#101820/);
+  assert.match(html, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(html, /class="stat"/);
+  assert.match(html, /--accent:#FF7A59/);
+  assert.match(html, /background:color-mix\(in srgb,var\(--surface\) 88%,var\(--accent\)\)/);
+  assert.doesNotMatch(html, /d-card|d-value|d-label/);
+});
+
+test('timeline image uses the social-card rail component structure', () => {
+  const { html } = buildGenerateImageHtml({ kind:'timeline', title:'演进', items:[
+    { label:'2024', value:'开始试点' }, { label:'2025', value:'规模化应用' },
+  ] }, '16:9');
+  assert.match(html, /class="content-block timeline-block"/);
+  assert.match(html, /class="tl"/);
+  assert.match(html, /class="tl-node"/g);
+  assert.match(html, /class="tl-time"/g);
+  assert.doesNotMatch(html, /class="t-(?:list|row|dot|label|value)"/);
+});
+
+test('dense timeline scales down before the fixed 16:9 canvas clips its last node', () => {
+  const { html } = buildGenerateImageHtml({ kind:'timeline', title:'六周演进', items:[
+    { label:'第1周', value:'一' }, { label:'第2周', value:'二' }, { label:'第3周', value:'三' },
+    { label:'第4周', value:'四' }, { label:'第5周', value:'五' }, { label:'第6周', value:'六' },
+  ] }, '16:9');
+  assert.match(html, /--component-scale:1\.15/);
+  assert.match(html, /第6周[\s\S]*六/);
+});
+
+test('结构化图片由排版期自动生成，工作台不再提供逐张生成按钮', () => {
   const routes = fs.readFileSync('server/platform/http/routes/media-routes.mjs', 'utf8');
   assert.ok(routes.includes('/generate$'));
   assert.ok(routes.includes('dailyImageGenerateMatch'));
@@ -46,8 +78,8 @@ test('generate endpoint and workbench button are wired', () => {
   assert.ok(routes.includes('generateArticleImage'));
   assert.ok(routes.includes('registerGeneratedSlotImage'));
   const preview = fs.readFileSync('public/src/views/preview.js', 'utf8');
-  assert.ok(preview.includes('data-generate-image'));
-  assert.ok(preview.includes('generateImageAsset'));
+  assert.match(preview, /排版自动生成/);
+  assert.doesNotMatch(preview, /data-generate-image|generateImageAsset|data-generate-trigger/);
 });
 
 test('concurrent article image generation uses isolated screenshot directories', async () => {

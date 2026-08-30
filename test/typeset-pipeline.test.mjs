@@ -289,6 +289,34 @@ test('Mermaid 转图后必须上传 CDN 才能继续排版', { timeout: 180000 }
   const manifest = JSON.parse(fs.readFileSync(path.join(workdir, 'image-assets.json'), 'utf8'));
   assert.equal(manifest.items['生成图:mermaid-1'].localPath, path.join(workdir, 'images', 'mermaid-1.png'));
 });
+
+test('统计卡在排版阶段自动生成，不需要工作台逐张点击', async (t) => {
+  const markdown = '# 测试文章\n\n正文。\n\n<!-- IMG:资料:01 | 内容:四周统计 | 建议位置:“正文。”段后 | 比例:16:9 | 出处:工作台自动生成 | 版权:无需授权 -->\n<!-- IMG-DATA:资料:01 {"kind":"datacard","title":"四周统计","items":[{"label":"周期","value":"4 周"},{"label":"任务","value":"86 项"}]} -->\n';
+  const { root, store, gateway } = createTypesetFixture(t, markdown);
+  const calls = [];
+  await assert.rejects(
+    runTypesetPipeline({
+      gateway, store, batchId:'batch-1', candidateId:1, provider:'fake',
+      workspaceRoot:root, skillsWorkspaceRoot:process.cwd(), theme:'tech-wire', autoUploadGeneratedImages:false,
+      generateArticleImageFn: async ({ workdir, slotId, generate, tokens }) => {
+        calls.push({ slotId, kind:generate.kind, colors:tokens.colors });
+        const localPath = path.join(workdir, 'images', '资料-01.png');
+        fs.mkdirSync(path.dirname(localPath), { recursive:true });
+        fs.writeFileSync(localPath, 'fake-png');
+        return { localPath };
+      },
+    }),
+    /配图尚未就绪：资料:01/,
+  );
+  assert.deepEqual(calls, [{ slotId:'资料:01', kind:'datacard', colors:{
+    background:'#0D1117', surface:'#161B22', text:'#E6EDF3', muted:'#8B949E',
+    accent:'#39D353', accentSecondary:'#58A6FF', line:'#30363D', inverseText:'#0D1117',
+    codeBackground:'#161B22',
+  } }]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'articles', '2026-07-19-c01', 'image-assets.json'), 'utf8'));
+  assert.equal(manifest.items['资料:01'].generated, true);
+  assert.equal(manifest.items['资料:01'].source, '排版阶段确定性生成（正文数据）');
+});
 test('Markdown converter renders fenced code blocks and GFM tables', () => {
   const html = markdownToHtml(`# Example
 

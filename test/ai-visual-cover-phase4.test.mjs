@@ -28,7 +28,8 @@ test('AI 封面技能加载布局、契约和语义组件三份内置参考', ()
   assert.match(bundle.prompt, /禁止自行创造以下信息[\s\S]*期号/);
   assert.match(bundle.prompt, /构图位置、方向、视觉面板和具体组件由模型自行判断/);
   assert.match(bundle.prompt, /标题、摘要和信息行必须完整落在画布内/);
-  assert.match(bundle.prompt, /主视觉和辅助视觉应形成有关系的整体系统/);
+  assert.match(bundle.prompt, /视觉隐喻候选中选择或组合方向/);
+  assert.match(bundle.prompt, /连续、有层次、有面积和视觉重量/);
   assert.doesNotMatch(bundle.prompt, /compositionHint/);
   assert.doesNotMatch(bundle.prompt, /secondaryFocus/);
 });

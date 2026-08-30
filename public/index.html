@@ -606,7 +606,7 @@
       <section class="image-stage" id="image-stage">
         <div class="image-stage-head"><div><span class="kicker">IMAGE DESK</span><h3>配图工作台</h3><p id="image-stage-status">正在读取当前文章的配图计划…</p></div><button class="outline-button" id="plan-article-images">AI 规划必要配图</button></div>
         <div class="image-slot-list" id="image-slot-list"></div>
-        <small class="image-stage-note">本地保存不会上传。只有点击某张素材的“上传 CDN”才会产生外部写入；来源和版权状态未明确时禁止上传。</small>
+        <small class="image-stage-note">人工素材本地保存不会上传，只有点击某张素材的“上传 CDN”才会产生外部写入；统计卡、时间线等自动生成图会在排版时按当前主题生成并自动上传 CDN。</small>
       </section>
       <div class="proof-layout">
         <aside class="production-checklist" id="production-checklist"></aside>
@@ -620,19 +620,19 @@
     </section>
 
     <section class="view" id="view-cover">
-      <div class="section-intro"><div><span class="kicker">COVER IMAGE</span></div><p>以文章标题为主体生成 900×383 公众号封面。AI 只做排版决策（断行、关键词高亮、组件组合），图片由确定性模板渲染，不满意可重新生成。</p></div>
+      <div class="section-intro"><div><span class="kicker">COVER IMAGE</span></div><p>以文章标题为主体生成 900×383 公众号封面。默认使用 AI 视觉生成 HTML/CSS 并直接截图，也可切换为标准封面。</p></div>
       <div class="typeset-toolbar cover-toolbar">
         <select id="cover-candidate" aria-label="封面文章"></select>
         <select id="cover-theme" class="visually-hidden" aria-label="封面主题"></select>
         <button type="button" class="theme-picker-trigger" id="cover-theme-trigger" data-theme-picker="cover"><span>封面主题</span><b>自动匹配</b></button>
         <select id="cover-provider" aria-label="封面设计模型"></select>
         <select id="cover-mode" aria-label="封面生成模式">
+          <option value="ai-visual" selected>AI 视觉封面</option>
           <option value="standard">标准封面</option>
-          <option value="ai-visual">AI 视觉封面</option>
         </select>
         <button class="primary-button" id="generate-cover">生成封面图</button>
         <small id="cover-status" class="muted">选择文章与主题后生成封面；重复生成会覆盖旧图。</small>
-        <small id="cover-mode-help" class="muted">标准封面：AI 只做主题与构图决策，图片由本地确定性模板渲染。</small>
+        <small id="cover-mode-help" class="muted">AI 视觉封面：AI 生成 HTML/CSS 后直接截图，不调用文生图；生成或截图失败时任务直接失败。</small>
         <small id="cover-ai-status" class="cover-ai-status" aria-live="polite" hidden></small>
       </div>
       <div class="cover-layout">

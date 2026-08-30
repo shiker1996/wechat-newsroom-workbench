@@ -3,7 +3,7 @@ import { parseJsonText } from '../../../platform/llm/model-json.mjs';
 
 // 技能缺失时的内置回退，与 skills/article-visual-planner/SKILL.md 保持一致
 const FALLBACK_SYSTEM = `你是公众号文章可视化编辑，只提出真正提升理解效率的图表建议。
-返回严格 JSON：{"summary":"一句话判断","placements":[{"id":"visual-01","type":"mermaid|echarts","afterHeading":"必须逐字存在于文章中的标题文本，不含#","purpose":"图表帮助读者理解什么","reason":"为什么文字不如图表清晰","sourceRefs":["事实基座中的引用标识"],"code":"围栏内部代码"}]}。
+返回严格 JSON：{"summary":"一句话判断","placements":[{"id":"visual-01","type":"mermaid|echarts","afterHeading":"必须逐字存在于文章中的标题文本，不含#","purpose":"图表帮助读者理解什么","reason":"为什么文字不如图表清晰","sourceRefs":["事实基座中的引用标识"],"focusNodes":["可选的 Mermaid 核心节点 ID"],"code":"围栏内部代码"}]}。
 规则：
 1. 最多3项；没有必要时 placements 返回空数组。
 2. Mermaid 允许 flowchart、sequenceDiagram、stateDiagram-v2；只表达正文已有关系，不新增事实。
@@ -36,6 +36,18 @@ function normalizeMermaidCode(value) {
   let code=String(value||'').trim().replace(/^```mermaid\s*/i,'').replace(/\s*```$/,'');
   code=code.replace(/^graph\s+TD\b/i,'flowchart TB').replace(/^flowchart\s+TD\b/i,'flowchart TB').replace(/^graph\s+LR\b/i,'flowchart LR');
   return code;
+}
+
+function mermaidNodeIds(code) {
+  return new Set([...String(code).matchAll(/^\s*([A-Za-z][\w-]*)\s*(?:\[|\(|\{|-->|---)/gm)].map((match) => match[1]));
+}
+
+function applyMermaidFocus(code, focusNodes) {
+  const available = mermaidNodeIds(code);
+  const valid = [...new Set(Array.isArray(focusNodes) ? focusNodes.map((item) => String(item).trim()).filter((item) => available.has(item)) : [])].slice(0, 4);
+  if (!valid.length) return { code, focusNodes:[] };
+  if (/\baiFocus\b/.test(code)) return { code, focusNodes:valid };
+  return { code:`${code.trim()}\nclassDef aiFocus stroke-width:4px\nclass ${valid.join(',')} aiFocus`, focusNodes:valid };
 }
 
 export function analyzeVisualComplexity(type, code) {
@@ -94,12 +106,14 @@ export function normalizeVisualPlan(value, markdown, factBase = '') {
         code = JSON.stringify(option, null, 2);
       } catch { rejections.push('ECharts 配置不是严格 JSON');continue; }
     }
+    const mermaidFocus = type === 'mermaid' ? applyMermaidFocus(code, raw?.focusNodes) : { code, focusNodes:[] };
+    code = mermaidFocus.code;
     const complexity = analyzeVisualComplexity(type, code);
     placements.push({
       id:`visual-${String(index + 1).padStart(2, '0')}`, type, afterHeading,
       purpose:String(raw.purpose || '').trim(), reason:String(raw.reason || '').trim(),
       sourceRefs:Array.isArray(raw.sourceRefs) ? raw.sourceRefs.map(String).filter(Boolean).slice(0, 8) : [],
-      code, fence:`\`\`\`${type}\n${code}\n\`\`\``, complexity,
+      focusNodes:mermaidFocus.focusNodes, code, fence:`\`\`\`${type}\n${code}\n\`\`\``, complexity,
     });
   }
   const summary=placements.length
@@ -144,7 +158,7 @@ export async function planArticleVisuals({ gateway, provider, batchId, candidate
       provider,purpose:'article-visual-plan-mobile-retry',batchId,candidateId,jsonMode:true,maxOutputTokens,
       messages:[
         ...messages,
-        {role:'assistant',content:JSON.stringify({summary:plan.summary,placements:plan.placements.map(({type,afterHeading,purpose,reason,sourceRefs,code})=>({type,afterHeading,purpose,reason,sourceRefs,code}))})},
+        {role:'assistant',content:JSON.stringify({summary:plan.summary,placements:plan.placements.map(({type,afterHeading,purpose,reason,sourceRefs,focusNodes,code})=>({type,afterHeading,purpose,reason,sourceRefs,focusNodes,code}))})},
         {role:'user',protected:true,content:'上版方案存在移动端超限图。请保持事实与表达目标不变，把超过 8 个节点或 12 条关系线的 Mermaid 拆成两张独立图；返回完整 JSON，不要解释。'},
       ],
     });

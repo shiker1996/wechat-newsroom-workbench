@@ -43,35 +43,11 @@ function bindPreview() {
       withLoading(uploadCdnButton, "正在上传…", () => uploadImageAsset(uploadCdnButton.dataset.uploadCdn).catch((error) => toast(error.message, "error")));
       return;
     }
-    // 「生成图片」：可生成占位调用确定性生成链，仅产出本地 PNG，不自动上传
-    const generateButton = event.target.closest("[data-generate-image]");
-    if (generateButton) {
-      const card = generateButton.closest("[data-image-id]");
-      card?.classList.add("generating");
-      withLoading(generateButton, "正在生成…", () => generateImageAsset(generateButton.dataset.generateImage).catch((error) => {
-        card?.classList.remove("generating");
-        toast(error.message, "error");
-      }));
-      return;
-    }
     // 点击图片区域只打开文件选择器，选中后仅保存到本地
     const manualPick = event.target.closest("[data-manual-pick]");
     if (manualPick) {
       const card = manualPick.closest("[data-image-id]");
       card?.querySelector("[data-image-file]")?.click();
-      return;
-    }
-    // 可生成空态：点击占位区直接触发生成（生成中禁用，防止重复点击）
-    const generateTrigger = event.target.closest("[data-generate-trigger]");
-    if (generateTrigger) {
-      // 生成中（卡片带 generating 标记）忽略重复点击
-      if (generateTrigger.closest("[data-image-id]")?.classList.contains("generating")) return;
-      const card = generateTrigger.closest("[data-image-id]");
-      card?.classList.add("generating");
-      generateImageAsset(generateTrigger.dataset.generateTrigger).catch((error) => {
-        card?.classList.remove("generating");
-        toast(error.message, "error");
-      });
       return;
     }
     // 已生成的图片点击放大查看，替换图片仍可拖拽到卡片上
@@ -81,19 +57,10 @@ function bindPreview() {
       return;
     }
     const pickArea = event.target.closest("[data-upload-image]");
-    if (pickArea && !event.target.matches("[data-image-file]") && !event.target.closest("[data-generate-trigger],[data-zoom-image]")) {
+    if (pickArea && !event.target.matches("[data-image-file]") && !event.target.closest("[data-zoom-image]")) {
       const card = pickArea.closest("[data-image-id]");
       card?.querySelector("[data-image-file]")?.click();
     }
-  });
-  // .generate-empty 是 role="button" 的占位区：支持 Enter/Space 触发，与点击同逻辑
-  //（仅当焦点就在占位区本身时触发，避免吞掉内部「手动供图」等交互的按键）
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const trigger = event.target instanceof Element && event.target.matches('.generate-empty[data-generate-trigger]') ? event.target : null;
-    if (!trigger) return;
-    event.preventDefault();
-    trigger.click();
   });
   // 图片文件选择后仅保存到本地，不自动上传 CDN（与页面文案承诺一致）
   document.addEventListener("change", (event) => {
@@ -136,32 +103,32 @@ function imageCard(item) {
   const encoded = encodeURIComponent(item.id);
   const generatable = Boolean(item.generate);
   const hasImage = !!item.localPath;
-  const statusLabel = item.status === "cdn" ? "CDN 已就绪" : item.generated && !generatable ? "排版时自动上传" : hasImage ? "本地待上传" : generatable ? "等待生成" : "等待供图";
-  const fileInput = item.generated && !generatable ? '' : '<input class="image-slot-file" data-image-file type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>';
+  const statusLabel = item.status === "cdn" ? "CDN 已就绪" : item.generated ? "排版时自动上传" : generatable ? "排版时自动生成" : hasImage ? "本地待上传" : "等待供图";
+  const fileInput = item.generated || generatable ? '' : '<input class="image-slot-file" data-image-file type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>';
   let preview;
   if (hasImage) {
     preview = `<img src="${imageApiBase()}/${encoded}/local?v=${encodeURIComponent(item.updatedAt || "")}" alt="${escapeHtml(item.content)}" data-zoom-image title="点击放大查看；拖拽图片到此处可替换">`;
   } else if (generatable) {
-    // 可生成空态：占位区本身是主行动按钮，手动供图降级为次级文字入口
-    preview = `<div class="generate-empty" data-generate-trigger="${escapeHtml(item.id)}" role="button" tabindex="0" title="点击生成，或把图片拖到这里手动供图">
+    // 结构化图片与 Mermaid/ECharts 一样在正式排版阶段生成，工作台只展示预期状态。
+    preview = `<div class="generate-empty auto-generate-empty" role="status" title="点击“生成 / 更新排版 HTML”时按当前主题自动生成">
       <span class="generate-empty-mark">✦</span>
-      <span class="generate-empty-label">生成图片</span>
-      <span class="generate-empty-hint">${escapeHtml(item.ratio)} · <span class="generate-empty-manual" data-manual-pick>手动供图</span></span>
+      <span class="generate-empty-label">排版时生成</span>
+      <span class="generate-empty-hint">${escapeHtml(item.ratio)} · 跟随当前主题</span>
     </div>`;
   } else {
     preview = `<span>${escapeHtml(item.ratio)}<br>点击选择图片</span>`;
   }
-  const cdnAllowed = !item.generated || generatable;
-  const uploadTarget = item.generated && !generatable ? '' : ` data-upload-image="${escapeHtml(item.id)}"`;
+  const cdnAllowed = !item.generated && !generatable;
+  const uploadTarget = item.generated || generatable ? '' : ` data-upload-image="${escapeHtml(item.id)}"`;
   const cardClass = item.status === "cdn" ? "ready" : hasImage ? "local" : generatable ? "generatable" : "";
   return `<article class="image-slot ${cardClass}" data-image-id="${escapeHtml(item.id)}">
-    <div class="image-slot-top"><span class="image-slot-tags"><span class="image-slot-id">${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span>${generatable ? '<span class="image-slot-kind">✦ 可生成</span>' : ""}</span><span class="image-slot-status">${statusLabel}</span></div>
+    <div class="image-slot-top"><span class="image-slot-tags"><span class="image-slot-id">${escapeHtml(item.id)} · ${escapeHtml(item.type)}</span>${generatable ? '<span class="image-slot-kind">✦ 排版自动生成</span>' : ""}</span><span class="image-slot-status">${statusLabel}</span></div>
     <h4>${escapeHtml(item.content)}</h4>
     <div class="image-slot-body"><div class="image-contact-sheet"${uploadTarget}>${preview}
       ${fileInput}
     </div></div>
     <div class="image-slot-meta"><span>位置：${escapeHtml(item.position)}</span><span>比例：${escapeHtml(item.ratio)}</span><span>建议来源：${escapeHtml(item.suggestedSource)}</span></div>
-    <div class="image-slot-actions">${generatable && item.status !== "cdn" && hasImage ? `<button class="outline-button" data-generate-image="${escapeHtml(item.id)}">重新生成图片</button>` : ""}${hasImage ? `<span class="muted">${item.status === "cdn" ? "已上传 CDN" : item.generated && !generatable ? "排版任务将自动上传" : "本地已保存"}</span>` : ""}${cdnAllowed && item.status === "local" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">上传 CDN</button>` : ""}${cdnAllowed && item.status === "cdn" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">重新上传 CDN</button>` : ""}</div>
+    <div class="image-slot-actions">${hasImage ? `<span class="muted">${item.generated ? "排版任务将按当前主题生成并上传" : "本地已保存"}</span>` : ""}${cdnAllowed && item.status === "local" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">上传 CDN</button>` : ""}${cdnAllowed && item.status === "cdn" ? `<button class="ghost-button" data-upload-cdn="${escapeHtml(item.id)}">重新上传 CDN</button>` : ""}</div>
     ${item.url ? `<a class="image-cdn-url" href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(item.url)}</a>` : ""}
   </article>`;
 }
@@ -219,7 +186,7 @@ function renderImageWorkspace() {
       status.textContent = manual.length
         ? `人工配图待处理 ${manual.length} 张：${manual.join('、')}`
         : automatic.length
-          ? `人工配图已就绪；${automatic.length} 张 Mermaid/ECharts 图片将在排版时自动生成并上传 CDN`
+          ? `人工配图已就绪；${automatic.length} 张自动生成图片（Mermaid、ECharts、统计卡或时间线）将在排版时按当前主题生成并上传 CDN`
           : `配图已就绪 ${data.ready||0} / ${data.total} · 可以进入正式排版`;
     }
   }
@@ -410,13 +377,6 @@ async function uploadImageAsset(id) {
     if (status?.isConnected) status.textContent = "本地待上传";
     toast(error.message, "error");
   }
-}
-
-// 可生成占位：调用确定性生成链产出本地 PNG（数据来自占位结构化清单，仅本地写入）
-async function generateImageAsset(id) {
-  await request(`${imageApiBase()}/${encodeURIComponent(id)}/generate`, { method: "POST", body: "{}" });
-  await loadImageWorkspace(state.imageWorkspace.candidateId);
-  toast(`${id} 已生成，确认后可上传 CDN`);
 }
 
 function fileAsDataUrl(file) {
