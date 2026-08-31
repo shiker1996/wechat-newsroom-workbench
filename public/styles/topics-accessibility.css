@@ -194,6 +194,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .cal-content-type { flex:0 0 auto;display:inline-block;padding:0 3px;border-radius:2px;background:var(--red);color:#fff;font-size:11px;line-height:1.5;vertical-align:1px; }
 .cal-social .cal-content-type { background:#357f78; }
 
+.wechat-weekly-report{overflow:auto}.wechat-weekly-head,.wechat-week-row{display:grid;grid-template-columns:1.2fr repeat(4,minmax(70px,1fr));gap:10px;align-items:center;min-width:520px;padding:10px 0;border-bottom:1px solid var(--line);font-size:11px}.wechat-weekly-head{color:var(--muted);font-weight:800}.wechat-weekly-head span:not(:first-child),.wechat-week-row span:not(:first-child){text-align:right;font-family:var(--mono)}.wechat-week-row b{color:var(--red);font:800 11px var(--mono)}
+
 /* Similar articles hint */
 .similar-hint { margin-top:8px;padding:8px 10px;font-size: 11px;border-left:3px solid var(--yellow);background:rgba(238,196,70,.1); }
 .similar-hint b { display:block;margin-bottom:3px;color:var(--ink); }
