@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 28;
+export const WORKBENCH_SCHEMA_VERSION = 29;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -561,6 +561,14 @@ export function runDatabaseMigrations(db, migrateSchema) {
       );
       CREATE INDEX IF NOT EXISTS idx_content_feedback_generated ON content_feedback_snapshots(generated_at DESC);`);
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(28,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v29：公众号指标允许独立保存内容类型；未匹配记录保持待判定，不再默认归入文章。
+    if(applied<29){db.exec('BEGIN IMMEDIATE');try{
+      const columns = new Set(db.prepare('PRAGMA table_info(wechat_article_metric_matches)').all().map((column) => column.name));
+      if (!columns.has('content_type')) db.exec("ALTER TABLE wechat_article_metric_matches ADD COLUMN content_type TEXT NOT NULL DEFAULT 'unknown' CHECK(content_type IN ('unknown','article','social'))");
+      db.exec("UPDATE wechat_article_metric_matches SET content_type=CASE WHEN content_type='unknown' AND article_artifact_id IS NOT NULL AND EXISTS (SELECT 1 FROM article_artifact_index aa WHERE aa.id=wechat_article_metric_matches.article_artifact_id AND aa.artifact_type='图文发布文案') THEN 'social' WHEN content_type='unknown' AND article_artifact_id IS NOT NULL THEN 'article' ELSE content_type END WHERE content_type='unknown'");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(29,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

@@ -16,7 +16,7 @@ const viewModules = {
   themes: "./views/theme-manager.js",
   models: "./views/models.js", logs: "./views/logs.js",
   calendar: "./views/calendar.js",
-  "material-inbox": "./views/material-inbox.js", "wechat-review": "./views/wechat-review.js",
+  "material-inbox": "./views/material-inbox.js", "wechat-review-prep": "./views/wechat-review-prep.js", "wechat-review": "./views/wechat-review.js", "content-feedback": "./views/content-feedback.js",
 };
 
 // 三个导航入口共用同一视图 DOM：工具图文 / 自定义图文 / 事件图文都落在 #view-social-editor
@@ -26,14 +26,14 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260831-wechat-insights";
+const moduleVersion = "20260831-wechat-feedback-page-1";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
   topics: "文章选题池", daily: "批次早报", tutorial: "自主写作", "social-topics": "图文选题池", "social-editor": "工具图文", "social-custom": "自定义图文", "social-event": "事件图文", editorial: "热点事件创作", editor: "文章编辑器",
   preview: "公众号排版", cover: "文章封面图", publication: "发布中心", hotspots: "热点档案", artifacts: "产物中心",
   system: "运行与配置中心", themes: "主题中心", skills: "技能与工具", sources: "采集源", models: "模型运行",
-  logs: "任务日志", calendar: "内容日历", "material-inbox": "素材入箱", "wechat-review": "公众号复盘",
+  logs: "任务日志", calendar: "内容日历", "material-inbox": "素材入箱", "wechat-review-prep": "复盘数据台", "wechat-review": "公众号复盘", "content-feedback": "内容反哺",
 };
 
 async function go(route) {

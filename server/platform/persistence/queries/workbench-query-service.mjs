@@ -56,14 +56,14 @@ export class WorkbenchQueryService {
 
   listCalendarContent({ month, limit = 400 } = {}) {
     const articleWhere = ["d.kind='final'"];
-    // copy.txt 是程序版和 AI 视觉版共同具备的交付标志。预览产物则按 AI 视觉版、
-    // 程序版、文案文件的顺序回退，避免把 HTML 文件名当成内容是否生成的判断条件。
-    const socialWhere = ["copy.track='social_cards'", "copy.name='copy.txt'", "copy.status='ready'"];
+    // 内容日历只把最终 HTML 视为图文已交付：AI 视觉版优先，程序版回退。
+    // copy.txt 是发布文案，不代表图文页面已经生成，因此不能单独进入日历。
+    const socialWhere = ["marker.track='social_cards'", "marker.name IN ('ai-beautified.html','my-design.html')", "marker.status='ready'", "marker.id=(SELECT fallback_marker.id FROM artifacts fallback_marker WHERE fallback_marker.track='social_cards' AND fallback_marker.batch_id=marker.batch_id AND fallback_marker.candidate_row_id=marker.candidate_row_id AND fallback_marker.name IN ('ai-beautified.html','my-design.html') AND fallback_marker.status='ready' ORDER BY CASE fallback_marker.name WHEN 'ai-beautified.html' THEN 0 ELSE 1 END,fallback_marker.id DESC LIMIT 1)"];
     const articleValues = [];
     const socialValues = [];
     if (month) {
       articleWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,d.updated_at))=?");
-      socialWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,copy.modified_at))=?");
+      socialWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,marker.modified_at))=?");
       articleValues.push(month);
       socialValues.push(month);
     }
@@ -76,20 +76,20 @@ export class WorkbenchQueryService {
       LEFT JOIN hotspots h ON h.id=c.hotspot_id
       WHERE ${articleWhere.join(' AND ')}`).all(...articleValues);
     const socialCards = this.db.prepare(`SELECT 'social_cards' AS content_type,
-      COALESCE(ai.id,original.id,copy.id) AS id, copy.batch_id,
-      copy.candidate_row_id, COALESCE(h.title,c.hotspot_titles,'图文内容') AS title,
-      COALESCE(ai.status,original.status,copy.status) AS status,
-      COALESCE(ai.modified_at,original.modified_at,copy.modified_at) AS updated_at, c.candidate_id,
+      COALESCE(ai.id,original.id,marker.id) AS id, marker.batch_id,
+      marker.candidate_row_id, COALESCE(h.title,c.hotspot_titles,'图文内容') AS title,
+      COALESCE(ai.status,original.status,marker.status) AS status,
+      COALESCE(ai.modified_at,original.modified_at,marker.modified_at) AS updated_at, c.candidate_id,
       COALESCE(NULLIF(ct.pool_role,''),c.pool_role) AS pool_role, b.batch_date, b.title AS batch_title,
       COALESCE(h.title,c.hotspot_titles,'图文内容') AS hotspot_title
-      FROM artifacts copy
+      FROM artifacts marker
       LEFT JOIN artifacts ai ON ai.track='social_cards' AND ai.name='ai-beautified.html' AND ai.status='ready'
-        AND ai.batch_id=copy.batch_id AND ai.candidate_row_id=copy.candidate_row_id
+        AND ai.batch_id=marker.batch_id AND ai.candidate_row_id=marker.candidate_row_id
       LEFT JOIN artifacts original ON original.track='social_cards' AND original.name='my-design.html' AND original.status='ready'
-        AND original.batch_id=copy.batch_id AND original.candidate_row_id=copy.candidate_row_id
-      LEFT JOIN candidates c ON c.id=copy.candidate_row_id
+        AND original.batch_id=marker.batch_id AND original.candidate_row_id=marker.candidate_row_id
+      LEFT JOIN candidates c ON c.id=marker.candidate_row_id
       LEFT JOIN candidate_tracks ct ON ct.candidate_row_id=c.id AND ct.track='social_cards'
-      LEFT JOIN batches b ON b.id=copy.batch_id
+      LEFT JOIN batches b ON b.id=marker.batch_id
       LEFT JOIN hotspots h ON h.id=c.hotspot_id
       WHERE ${socialWhere.join(' AND ')}`).all(...socialValues);
     return [...articles, ...socialCards]

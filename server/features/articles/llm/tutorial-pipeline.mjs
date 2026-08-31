@@ -9,7 +9,6 @@ import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skill
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { resolveArticleStageSkills } from '../../../platform/skills/entry-routing.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
-import { buildContentFeedbackPromptContext } from '../../content-planning/wechat-content-feedback.mjs';
 
 function writeFile(filePath,content){fs.mkdirSync(path.dirname(filePath),{recursive:true});const temp=`${filePath}.tmp`;fs.writeFileSync(temp,`${String(content).trimEnd()}\n`,'utf8');fs.renameSync(temp,filePath);return fs.statSync(filePath);}
 function clean(value){return String(value||'').trim().replace(/^```(?:markdown)?\s*/i,'').replace(/\s*```$/,'');}
@@ -39,9 +38,6 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const reviewer=loadSkillBundle({workspaceRoot,skillName:resolvedStages.reviewer?.selectedSkill||'article-reviewer'});
   const humanizer=loadSkillBundle({workspaceRoot,skillName:resolvedStages.humanizer?.selectedSkill||'humanizer-zh'});
   const seoOptimizer=loadSkillBundle({workspaceRoot,skillName:resolvedStages.seo?.selectedSkill||'seo-content-optimizer'});
-  const contentFeedback=store.getLatestContentFeedbackSnapshot?.() || null;
-  const writingFeedback=buildContentFeedbackPromptContext(contentFeedback,{target:'writing'});
-  const titleFeedback=buildContentFeedbackPromptContext(contentFeedback,{target:'title'});
   const runtime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:articleMode==='experience'?'personal-writing':'tutorial',bundles:[skill,titleGenerator,humanizer,reviewer,seoOptimizer],provider,snapshotId,
     selection:{...(skillSelection||{requestedSkill:'',selectedSkill:skill.skillName,selectionSource:'builtin-recommendation'}),entryPoint:'independent-writing',contentType:articleMode,stages:resolvedStages}});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
@@ -53,11 +49,11 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const repairAttempts=configuredRepairAttempts(runtime.config,1);
   const label=articleMode==='experience'?'心得经验':'使用教程';
   onProgress(`${label} 1/7 根据自主写作事实基座生成初稿`);
-  const draftResult=await textCall(gateway,{provider,purpose:'tutorial-drafting',batchId,candidateId},`${skill.prompt}${writingFeedback?`\n\n${writingFeedback}`:''}`,`${articleMode==='experience'?'personal_writing_fact_base':'tutorial_fact_base'}:\n${JSON.stringify(fact)}`,maxTokens);
+  const draftResult=await textCall(gateway,{provider,purpose:'tutorial-drafting',batchId,candidateId},skill.prompt,`${articleMode==='experience'?'personal_writing_fact_base':'tutorial_fact_base'}:\n${JSON.stringify(fact)}`,maxTokens);
   const draft=clean(draftResult.content),draftPath=path.join(workdir,'04-draft.md');writeFile(draftPath,draft);
   onProgress(`${label} 2/7 根据初稿生成并锁定标题`);
   const titleResult=await gateway.complete({provider,purpose:'tutorial-title-generation',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
-    {role:'system',content:`${titleGenerator.prompt}${titleFeedback?`\n\n${titleFeedback}`:''}\n\n根据完整初稿生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入初稿没有的事实、数字、人物或结论。`,protected:true},
+    {role:'system',content:`${titleGenerator.prompt}\n\n根据完整初稿生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入初稿没有的事实、数字、人物或结论。`,protected:true},
     {role:'user',content:JSON.stringify({topic:fact.topic,articleMode,draft}),protected:true},
   ]});
   let titlePlan={};try{titlePlan=parseJson(titleResult,store);}catch{}

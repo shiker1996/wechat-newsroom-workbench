@@ -3,12 +3,12 @@ import path from 'node:path';
 import { isInsideRoots } from '../../platform/artifacts/artifact-indexer.mjs';
 import { fetchUrlContent } from '../../platform/integrations/source-fetcher.mjs';
 
-const LOCAL_PRIORITY = { '文章终稿': 6, '排版 HTML': 5, '审阅稿': 4, '去 AI 稿': 3, '文章初稿': 2, '文章简报': 1 };
+const LOCAL_PRIORITY = { '文章终稿': 6, '早报终稿': 6, '排版 HTML': 5, '审阅稿': 4, '去 AI 稿': 3, '文章初稿': 2, '文章简报': 1 };
 const MAX_CONTENT_CHARS = 1_000_000;
 const SOCIAL_COPY_TYPE = '图文发布文案';
 
 function sourceKind(artifactType = '') {
-  if (artifactType === '文章终稿') return 'local_final';
+  if (artifactType === '文章终稿' || artifactType === '早报终稿') return 'local_final';
   if (artifactType === '审阅稿') return 'local_reviewed';
   if (artifactType === '去 AI 稿') return 'local_humanized';
   if (artifactType === '文章初稿') return 'local_draft';

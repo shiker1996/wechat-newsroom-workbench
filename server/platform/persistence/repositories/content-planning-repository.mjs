@@ -1,5 +1,7 @@
 const SOURCE_TYPES = new Set(['conversation', 'reading', 'life', 'project', 'text']);
 const PLAN_STATUSES = new Set(['idea', 'planned', 'writing', 'done', 'cancelled']);
+const WECHAT_CONTENT_TYPES = new Set(['unknown', 'article', 'social']);
+const ARTICLE_MATCH_ARTIFACT_TYPES = new Set(['文章终稿', '早报终稿', '图文发布文案']);
 
 function jsonValue(value, fallback) {
   if (value === undefined || value === null) return fallback;
@@ -291,6 +293,11 @@ export class ContentPlanningRepository {
       LEFT JOIN article_artifact_index aa ON aa.id=mm.article_artifact_id
       WHERE ${where.join(' AND ')} ORDER BY CASE mm.status WHEN 'pending' THEN 0 WHEN 'unmatched' THEN 1 ELSE 2 END,wm.published_date DESC,mm.id DESC LIMIT ?`).all(...values).map((row) => this.#decorateMatch(row));
   }
+  listWechatMatchArtifacts() {
+    return this.db.prepare(`SELECT id,title,artifact_type,article_date,version_label,file_path,content_url
+      FROM article_artifact_index WHERE artifact_type IN ('文章终稿','早报终稿','图文发布文案')
+      ORDER BY CASE artifact_type WHEN '文章终稿' THEN 0 WHEN '早报终稿' THEN 1 ELSE 2 END,article_date DESC,modified_at DESC,id DESC`).all();
+  }
   wechatArticleMetricMatchStats() {
     const rows = this.db.prepare('SELECT status,COUNT(*) AS count FROM wechat_article_metric_matches GROUP BY status').all();
     return Object.fromEntries(rows.map((row) => [row.status, Number(row.count)]));
@@ -302,31 +309,39 @@ export class ContentPlanningRepository {
     const timestamp = now();
     const candidateIds = (result.candidates || []).map((item) => Number(item.id)).filter(Number.isFinite);
     const matchedTitle = result.articleArtifactId ? (result.candidates || []).find((item) => Number(item.id) === Number(result.articleArtifactId))?.title || '' : '';
+    const artifact = result.articleArtifactId ? this.db.prepare('SELECT artifact_type,title FROM article_artifact_index WHERE id=?').get(Number(result.articleArtifactId)) : null;
+    const contentType = WECHAT_CONTENT_TYPES.has(result.contentType) ? result.contentType : artifact?.artifact_type === '图文发布文案' ? 'social' : artifact ? 'article' : 'unknown';
     if (current) {
-      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=?,match_method=?,confidence=?,status=?,candidate_ids_json=?,candidate_snapshot_json=?,matched_title=?,note=?,updated_at=?,confirmed_at=? WHERE id=?`)
-        .run(result.articleArtifactId ?? null, result.method || 'unmatched', result.confidence || 'none', result.status || 'unmatched', JSON.stringify(candidateIds), JSON.stringify(result.candidates || []), matchedTitle, '', timestamp, result.status === 'auto_confirmed' ? timestamp : null, current.id);
+      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=?,content_type=?,match_method=?,confidence=?,status=?,candidate_ids_json=?,candidate_snapshot_json=?,matched_title=?,note=?,updated_at=?,confirmed_at=? WHERE id=?`)
+        .run(result.articleArtifactId ?? null, contentType, result.method || 'unmatched', result.confidence || 'none', result.status || 'unmatched', JSON.stringify(candidateIds), JSON.stringify(result.candidates || []), matchedTitle || artifact?.title || '', '', timestamp, result.status === 'auto_confirmed' ? timestamp : null, current.id);
       this.db.prepare(`INSERT INTO wechat_article_match_logs(match_id,action,from_artifact_id,to_artifact_id,match_method,confidence,note,created_at) VALUES(?,?,?,?,?,?,?,?)`)
         .run(current.id, 'rematch', current.article_artifact_id ?? null, result.articleArtifactId ?? null, result.method || 'unmatched', result.confidence || 'none', '', timestamp);
       return this.getWechatArticleMetricMatch(current.id);
     }
-    const inserted = this.db.prepare(`INSERT INTO wechat_article_metric_matches(metric_id,article_artifact_id,match_method,confidence,status,candidate_ids_json,candidate_snapshot_json,matched_title,note,created_at,updated_at,confirmed_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(metricId, result.articleArtifactId ?? null, result.method || 'unmatched', result.confidence || 'none', result.status || 'unmatched', JSON.stringify(candidateIds), JSON.stringify(result.candidates || []), matchedTitle, '', timestamp, timestamp, result.status === 'auto_confirmed' ? timestamp : null);
+    const inserted = this.db.prepare(`INSERT INTO wechat_article_metric_matches(metric_id,article_artifact_id,content_type,match_method,confidence,status,candidate_ids_json,candidate_snapshot_json,matched_title,note,created_at,updated_at,confirmed_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(metricId, result.articleArtifactId ?? null, contentType, result.method || 'unmatched', result.confidence || 'none', result.status || 'unmatched', JSON.stringify(candidateIds), JSON.stringify(result.candidates || []), matchedTitle || artifact?.title || '', '', timestamp, timestamp, result.status === 'auto_confirmed' ? timestamp : null);
     this.db.prepare(`INSERT INTO wechat_article_match_logs(match_id,action,to_artifact_id,match_method,confidence,note,created_at) VALUES(?,?,?,?,?,?,?)`)
       .run(Number(inserted.lastInsertRowid), result.status === 'auto_confirmed' ? 'auto_match' : 'rematch', result.articleArtifactId ?? null, result.method || 'unmatched', result.confidence || 'none', '', timestamp);
     return this.getWechatArticleMetricMatch(Number(inserted.lastInsertRowid));
   }
-  updateWechatArticleMetricMatch(id, { action, articleArtifactId = null, note = '' } = {}) {
+  updateWechatArticleMetricMatch(id, { action, articleArtifactId = null, contentType = 'unknown', note = '' } = {}) {
     const current = this.getWechatArticleMetricMatch(id); if (!current) return null;
     const timestamp = now();
     if (action === 'confirm') {
-      const artifact = this.db.prepare('SELECT id,title FROM article_artifact_index WHERE id=?').get(Number(articleArtifactId));
+      const artifact = this.db.prepare('SELECT id,title,artifact_type FROM article_artifact_index WHERE id=?').get(Number(articleArtifactId));
       if (!artifact) throw new Error('文章产物候选不存在');
-      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=?,match_method='manual_confirm',confidence='high',status='confirmed',matched_title=?,note=?,updated_at=?,confirmed_at=? WHERE id=?`).run(artifact.id, artifact.title || '', String(note || '').trim(), timestamp, timestamp, current.id);
+      if (!ARTICLE_MATCH_ARTIFACT_TYPES.has(artifact.artifact_type)) throw new Error('只能匹配文章终稿、早报终稿或图文发布文案');
+      const resolvedType = artifact.artifact_type === '图文发布文案' ? 'social' : 'article';
+      if (contentType !== 'unknown' && contentType !== resolvedType) throw new Error('内容类型与所选产物类型不一致');
+      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=?,content_type=?,match_method='manual_confirm',confidence='high',status='confirmed',matched_title=?,note=?,updated_at=?,confirmed_at=? WHERE id=?`).run(artifact.id, resolvedType, artifact.title || '', String(note || '').trim(), timestamp, timestamp, current.id);
     } else if (action === 'reject') {
-      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=NULL,match_method='manual_reject',confidence='none',status='rejected',matched_title='',note=?,updated_at=?,confirmed_at=NULL WHERE id=?`).run(String(note || '').trim(), timestamp, current.id);
+      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=NULL,content_type='unknown',match_method='manual_reject',confidence='none',status='rejected',matched_title='',note=?,updated_at=?,confirmed_at=NULL WHERE id=?`).run(String(note || '').trim(), timestamp, current.id);
+    } else if (action === 'skip') {
+      if (!['article', 'social'].includes(contentType)) throw new Error('请先选择内容类型');
+      this.db.prepare(`UPDATE wechat_article_metric_matches SET article_artifact_id=NULL,content_type=?,match_method='manual_skip',confidence='none',status='rejected',matched_title='',note=?,updated_at=?,confirmed_at=NULL WHERE id=?`).run(contentType, String(note || '跳过本地产物匹配').trim(), timestamp, current.id);
     } else throw new Error('匹配确认动作无效');
     this.db.prepare(`INSERT INTO wechat_article_match_logs(match_id,action,from_artifact_id,to_artifact_id,match_method,confidence,note,created_at) VALUES(?,?,?,?,?,?,?,?)`)
-      .run(current.id, action, current.article_artifact_id ?? null, action === 'confirm' ? Number(articleArtifactId) : null, action === 'confirm' ? 'manual_confirm' : 'manual_reject', action === 'confirm' ? 'high' : 'none', String(note || '').trim(), timestamp);
+      .run(current.id, action === 'skip' ? 'reject' : action, current.article_artifact_id ?? null, action === 'confirm' ? Number(articleArtifactId) : null, action === 'confirm' ? 'manual_confirm' : action === 'skip' ? 'manual_skip' : 'manual_reject', action === 'confirm' ? 'high' : 'none', String(note || '').trim(), timestamp);
     return this.getWechatArticleMetricMatch(id);
   }
   getCurrentArticleContentSnapshot(metricId) {

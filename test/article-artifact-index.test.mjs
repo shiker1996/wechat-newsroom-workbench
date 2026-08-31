@@ -60,3 +60,18 @@ test('本地文章索引提取标题、日期、版本、证据并关联发布�
   assert.equal(store.articleArtifactStats().total, 4);
   assert.equal(store.articleArtifactStats().latest_run.status, 'completed');
 });
+
+test('批次早报 daily/03-FINAL.md 进入可匹配的文章终稿索引', (t) => {
+  const { root, store } = fixture(t);
+  const dailyPath = path.join(root, 'articles', 'batch-early-report', 'daily', '03-FINAL.md');
+  fs.mkdirSync(path.dirname(dailyPath), { recursive: true });
+  fs.writeFileSync(dailyPath, '# 今天的大厂早报\n\n早报正文。', 'utf8');
+
+  const result = indexArticleArtifacts(store, [root]);
+  assert.equal(result.files_seen, 1);
+  const daily = store.listArticleArtifacts().find((item) => item.file_path === dailyPath);
+  assert.equal(daily.artifact_type, '早报终稿');
+  assert.equal(daily.version_label, '早报终稿');
+  assert.equal(daily.title, '今天的大厂早报');
+  assert.ok(store.listWechatMatchArtifacts().some((item) => item.id === daily.id));
+});

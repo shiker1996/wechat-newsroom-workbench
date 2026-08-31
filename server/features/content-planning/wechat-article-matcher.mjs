@@ -16,8 +16,8 @@ function dice(left, right) {
   return (2 * overlap) / Math.max(1, a.size + b.size);
 }
 
-const VERSION_PRIORITY = { '文章终稿': 5, '排版 HTML': 4, '审阅稿': 3, '去 AI 稿': 2, '文章初稿': 1 };
-const ARTICLE_FINAL_TYPE = '文章终稿';
+const VERSION_PRIORITY = { '文章终稿': 5, '早报终稿': 5, '排版 HTML': 4, '审阅稿': 3, '去 AI 稿': 2, '文章初稿': 1 };
+const ARTICLE_FINAL_TYPES = new Set(['文章终稿', '早报终稿']);
 const SOCIAL_COPY_TYPE = '图文发布文案';
 
 function dedupeArtifacts(artifacts) {
@@ -36,14 +36,14 @@ function snapshot(item, score, method) {
 
 export function matchWechatArticle(metric = {}, artifacts = []) {
   const title = String(metric.title || '').trim(); const normalizedTitle = normalize(title);
-  const pool = dedupeArtifacts((artifacts || []).filter((item) => item.artifact_type === ARTICLE_FINAL_TYPE));
+  const pool = dedupeArtifacts((artifacts || []).filter((item) => ARTICLE_FINAL_TYPES.has(item.artifact_type)));
   const byPriority = (items) => [...items].sort((left, right) => (VERSION_PRIORITY[right.artifact_type] || 0) - (VERSION_PRIORITY[left.artifact_type] || 0));
   const url = String(metric.content_url || '').trim();
   const urlMatches = url ? byPriority(pool.filter((item) => String(item.content_url || '').trim() === url)) : [];
-  if (urlMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: urlMatches[0].id, method: 'url_exact', confidence: 'high', candidates: [snapshot(urlMatches[0], 1, 'url_exact')] };
+  if (urlMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: urlMatches[0].id, contentType: 'article', method: 'url_exact', confidence: 'high', candidates: [snapshot(urlMatches[0], 1, 'url_exact')] };
 
   const rawMatches = byPriority(pool.filter((item) => String(item.title || '').trim() === title));
-  if (rawMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: rawMatches[0].id, method: 'title_exact', confidence: 'high', candidates: [snapshot(rawMatches[0], 0.98, 'title_exact')] };
+  if (rawMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: rawMatches[0].id, contentType: 'article', method: 'title_exact', confidence: 'high', candidates: [snapshot(rawMatches[0], 0.98, 'title_exact')] };
 
   const normalizedMatches = byPriority(pool.filter((item) => normalize(item.title) === normalizedTitle));
   if (normalizedMatches.length) {
@@ -67,7 +67,7 @@ export function matchWechatSocialCopy(metric = {}, artifacts = []) {
   const pool = dedupeArtifacts((artifacts || []).filter((item) => item.artifact_type === SOCIAL_COPY_TYPE));
   const byPriority = (items) => [...items].sort((left, right) => Number(right.modified_at > left.modified_at) - Number(left.modified_at > right.modified_at));
   const rawMatches = byPriority(pool.filter((item) => String(item.title || '').trim() === title));
-  if (rawMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: rawMatches[0].id, method: 'social_copy_exact', confidence: 'high', candidates: [snapshot(rawMatches[0], 0.98, 'social_copy_exact')] };
+  if (rawMatches.length === 1) return { status: 'auto_confirmed', articleArtifactId: rawMatches[0].id, contentType: 'social', method: 'social_copy_exact', confidence: 'high', candidates: [snapshot(rawMatches[0], 0.98, 'social_copy_exact')] };
   const normalizedMatches = byPriority(pool.filter((item) => normalize(item.title) === normalizedTitle));
   if (normalizedMatches.length) {
     const candidates = normalizedMatches.slice(0, 5).map((item) => snapshot(item, dateDistance(metric.published_date, item.article_date) === 0 ? 0.97 : 0.92, 'social_copy_normalized'));
@@ -110,9 +110,12 @@ export function matchWechatArticles(store, { force = false } = {}) {
         : articleResult.status === 'pending' && socialResult.status === 'pending'
           ? combinePendingResults(articleResult, socialResult)
           : articleResult.status === 'pending' ? articleResult : socialResult;
-    store.upsertWechatArticleMetricMatch({ metricId: metric.id, ...result, force });
-    if (result.status === 'auto_confirmed') matched += 1;
-    else if (result.status === 'pending') pending += 1;
+    const normalizedResult = result.status === 'unmatched'
+      ? { ...result, contentType: 'unknown', method: 'unmatched' }
+      : result;
+    store.upsertWechatArticleMetricMatch({ metricId: metric.id, ...normalizedResult, force });
+    if (normalizedResult.status === 'auto_confirmed') matched += 1;
+    else if (normalizedResult.status === 'pending') pending += 1;
     else unmatched += 1;
   }
   return { metrics: metrics.length, matched, pending, unmatched, preserved };

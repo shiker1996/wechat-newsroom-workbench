@@ -17,6 +17,7 @@ function fixture(t) {
 test('公众号文章匹配按 URL、标题、规范化标题和相似度分级', () => {
   const artifacts = [{ id: 1, title: 'PDF 处理神器：10ms 分类', normalized_title: 'pdf处理神器10ms分类', article_date: '2026-08-20', version_label: '终稿', artifact_type: '文章终稿', content_url: 'https://mp.weixin.qq.com/s/exact' }];
   assert.equal(matchWechatArticle({ title: '其他标题', published_date: '2026-08-20', content_url: 'https://mp.weixin.qq.com/s/exact' }, artifacts).status, 'auto_confirmed');
+  assert.equal(matchWechatArticle({ title: '其他标题', published_date: '2026-08-20', content_url: 'https://mp.weixin.qq.com/s/exact' }, artifacts).contentType, 'article');
   assert.equal(matchWechatArticle({ title: 'PDF 处理神器：10ms 分类', published_date: '2026-08-20' }, artifacts).method, 'title_exact');
   const normalized = matchWechatArticle({ title: 'PDF处理神器10ms分类', published_date: '2026-08-20' }, artifacts);
   assert.equal(normalized.status, 'pending'); assert.equal(normalized.method, 'title_normalized'); assert.equal(normalized.candidates[0].id, 1);
@@ -32,7 +33,16 @@ test('图文发布文案可作为独立候选参与匹配，普通文章池只�
   const social = matchWechatSocialCopy({ title: '图文发布标题：部署简单很多', published_date: '2026-08-20' }, artifacts);
   assert.equal(social.status, 'auto_confirmed');
   assert.equal(social.method, 'social_copy_exact');
+  assert.equal(social.contentType, 'social');
   assert.equal(matchWechatArticle({ title: '图文发布标题：部署简单很多', published_date: '2026-08-20' }, artifacts).status, 'unmatched');
+});
+
+test('批次早报终稿可按文章类型自动匹配', () => {
+  const daily = { id: 9, title: '今天的大厂早报', artifact_type: '早报终稿', article_date: '2026-08-24', version_label: '早报终稿' };
+  const result = matchWechatArticle({ title: '今天的大厂早报', published_date: '2026-08-24' }, [daily]);
+  assert.equal(result.status, 'auto_confirmed');
+  assert.equal(result.contentType, 'article');
+  assert.equal(result.articleArtifactId, daily.id);
 });
 
 test('自动匹配会落库，人工确认后后续重匹配保留人工决策并留下日志', (t) => {
@@ -44,7 +54,7 @@ test('自动匹配会落库，人工确认后后续重匹配保留人工决策�
   const first = matchWechatArticles(store); assert.equal(first.pending, 1);
   const pending = store.listWechatArticleMetricMatches({ status: 'pending' })[0]; assert.equal(pending.candidate_snapshot[0].id, artifact.id);
   const confirmed = store.updateWechatArticleMetricMatch(pending.id, { action: 'confirm', articleArtifactId: artifact.id, note: '人工核对标题和日期' });
-  assert.equal(confirmed.status, 'confirmed'); assert.equal(confirmed.article_artifact_id, artifact.id);
+  assert.equal(confirmed.status, 'confirmed'); assert.equal(confirmed.article_artifact_id, artifact.id); assert.equal(confirmed.content_type, 'article');
   matchWechatArticles(store); assert.equal(store.getWechatArticleMetricMatch(pending.id).status, 'confirmed');
   const indexed = store.listArticleArtifacts()[0];
   assert.equal(indexed.metric_match_count, 1);
@@ -53,6 +63,27 @@ test('自动匹配会落库，人工确认后后续重匹配保留人工决策�
   assert.equal(indexed.metric_follows, 2);
   const logs = store.db.prepare('SELECT action FROM wechat_article_match_logs WHERE match_id=? ORDER BY id').all(pending.id).map((item) => item.action);
   assert.deepEqual(logs, ['rematch', 'confirm']); assert.equal(metric.lastInsertRowid > 0, true);
+});
+
+test('未匹配公众号内容保持待判定，并支持按类型手动匹配或跳过产物', (t) => {
+  const { root, store } = fixture(t);
+  const articlePath = path.join(root, 'articles', '2026-08-22-manual', '09-FINAL.md'); fs.mkdirSync(path.dirname(articlePath), { recursive: true }); fs.writeFileSync(articlePath, '# 手动文章\n', 'utf8');
+  const article = store.upsertArticleArtifact({ filePath: articlePath, rootPath: root, artifactType: '文章终稿', title: '手动文章', normalizedTitle: '手动文章', articleDate: '2026-08-22', versionLabel: '终稿', fileSize: 10, modifiedAt: new Date().toISOString() });
+  const socialPath = path.join(root, 'social-cards', '2026-08-23-manual', 'copy.txt'); fs.mkdirSync(path.dirname(socialPath), { recursive: true }); fs.writeFileSync(socialPath, '# 手动图文\n', 'utf8');
+  const social = store.upsertArticleArtifact({ filePath: socialPath, rootPath: root, artifactType: '图文发布文案', title: '手动图文', normalizedTitle: '手动图文', articleDate: '2026-08-23', versionLabel: '图文发布文案', fileSize: 10, modifiedAt: new Date().toISOString() });
+  const batch = store.db.prepare("INSERT INTO wechat_import_batches(file_name,import_type,format,imported_at) VALUES('manual.csv','notified_articles','csv',?)").run(new Date().toISOString());
+  const first = store.db.prepare("INSERT INTO wechat_article_metrics(import_batch_id,notified,title,published_date,reads,shares,follows_after_read,content_url) VALUES(?,?,?,?,?,?,?,?)").run(Number(batch.lastInsertRowid), 1, '无法自动匹配的文章', '2026-08-22', 100, 2, 1, '');
+  const second = store.db.prepare("INSERT INTO wechat_article_metrics(import_batch_id,notified,title,published_date,reads,shares,follows_after_read,content_url) VALUES(?,?,?,?,?,?,?,?)").run(Number(batch.lastInsertRowid), 0, '无法自动匹配的图文', '2026-08-23', 80, 3, 2, '');
+  matchWechatArticles(store);
+  const firstMatch = store.getWechatArticleMetricMatchByMetric(Number(first.lastInsertRowid));
+  const secondMatch = store.getWechatArticleMetricMatchByMetric(Number(second.lastInsertRowid));
+  assert.equal(firstMatch.content_type, 'unknown'); assert.equal(secondMatch.content_type, 'unknown');
+  assert.equal(store.listWechatMatchArtifacts().some((item) => item.id === article.id), true);
+  assert.equal(store.listWechatMatchArtifacts().some((item) => item.id === social.id), true);
+  const skipped = store.updateWechatArticleMetricMatch(secondMatch.id, { action: 'skip', contentType: 'social' });
+  assert.equal(skipped.status, 'rejected'); assert.equal(skipped.content_type, 'social'); assert.equal(skipped.article_artifact_id, null);
+  const confirmed = store.updateWechatArticleMetricMatch(firstMatch.id, { action: 'confirm', contentType: 'article', articleArtifactId: article.id });
+  assert.equal(confirmed.status, 'confirmed'); assert.equal(confirmed.content_type, 'article');
 });
 
 test('已确认文章优先关联本地终稿并分类证据资产，公开 URL 失败会保存失败快照', async (t) => {

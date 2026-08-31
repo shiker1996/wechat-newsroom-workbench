@@ -15,9 +15,74 @@ import { getAccountContext } from '../../../shared/domain/account-context.mjs';
 
 const ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
 
-function enrichWechatReview(review) {
+function aggregateWechatTrack(items, notified) {
+  const rows = items.filter((item) => Boolean(item.notified) === notified);
+  return {
+    count: rows.length,
+    reads: rows.reduce((sum, item) => sum + Number(item.reads || 0), 0),
+    shares: rows.reduce((sum, item) => sum + Number(item.shares || 0), 0),
+    follows: rows.reduce((sum, item) => sum + Number(item.follows_after_read || 0), 0),
+    delivery: rows.reduce((sum, item) => sum + Number(item.delivery || 0), 0),
+  };
+}
+
+function weekKey(dateValue) {
+  const date = new Date(`${String(dateValue || '').slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return '';
+  const mondayIndex = (date.getUTCDay() + 6) % 7;
+  const monday = new Date(date);
+  monday.setUTCDate(date.getUTCDate() - mondayIndex);
+  const yearStart = new Date(Date.UTC(monday.getUTCFullYear(), 0, 1));
+  const firstMondayIndex = (yearStart.getUTCDay() + 6) % 7;
+  const firstMonday = new Date(yearStart);
+  firstMonday.setUTCDate(1 - firstMondayIndex);
+  const week = Math.max(0, Math.floor((monday - firstMonday) / 604800000));
+  return `${monday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function buildWechatTrack(articles) {
+  const weeklyMap = new Map();
+  for (const item of articles) {
+    const week = weekKey(item.published_date);
+    if (!week) continue;
+    const current = weeklyMap.get(week) || { week, articles: 0, reads: 0, shares: 0, follows: 0 };
+    current.articles += 1;
+    current.reads += Number(item.reads || 0);
+    current.shares += Number(item.shares || 0);
+    current.follows += Number(item.follows_after_read || 0);
+    weeklyMap.set(week, current);
+  }
+  const topArticles = [...articles].sort((left, right) => Number(right.reads || 0) - Number(left.reads || 0)).slice(0, 8);
+  return {
+    count: articles.length,
+    articles,
+    top_articles: topArticles,
+    weekly: [...weeklyMap.values()].sort((left, right) => right.week.localeCompare(left.week)).slice(0, 12),
+    notified: aggregateWechatTrack(articles, true),
+    unnotified: aggregateWechatTrack(articles, false),
+    insights: buildWechatInsights(articles),
+  };
+}
+
+function enrichWechatReview(review, matches = []) {
   const articles = (review.articles || []).map(classifyWechatArticle);
-  return { ...review, articles, top_articles: [...articles].sort((left, right) => Number(right.reads || 0) - Number(left.reads || 0)).slice(0, 8), insights: buildWechatInsights(review.articles || []) };
+  const kindByMetric = new Map();
+  for (const match of matches || []) {
+    if (!['confirmed', 'auto_confirmed', 'rejected'].includes(match.status) || !match.metric_id) continue;
+    const metricId = Number(match.metric_id);
+    if (match.content_type === 'social' || match.artifact_type === '图文发布文案') kindByMetric.set(metricId, 'social');
+    else if (match.content_type === 'article' || match.artifact_type) kindByMetric.set(metricId, 'article');
+  }
+  const classifiedArticles = articles.filter((item) => kindByMetric.has(Number(item.id)));
+  const articleTrack = classifiedArticles.filter((item) => kindByMetric.get(Number(item.id)) === 'article');
+  const socialTrack = articles.filter((item) => kindByMetric.get(Number(item.id)) === 'social');
+  return {
+    ...review,
+    articles,
+    top_articles: [...classifiedArticles].sort((left, right) => Number(right.reads || 0) - Number(left.reads || 0)).slice(0, 8),
+    insights: buildWechatInsights(classifiedArticles),
+    review_tracks: { article: buildWechatTrack(articleTrack), social: buildWechatTrack(socialTrack) },
+  };
 }
 
 function enrichMaterial(material, insights, feedback) {
@@ -91,9 +156,12 @@ export async function handleContentRoutes(context) {
     catch (error) { json(response, 400, { error: error.message }); }
     return true;
   }
-  if (request.method === 'GET' && pathname === '/api/wechat/review') { json(response, 200, enrichWechatReview(store.getWechatReview({ month: searchParams.get('month') || '' }))); return true; }
+  if (request.method === 'GET' && pathname === '/api/wechat/review') {
+    const matches = store.listWechatArticleMetricMatches({ limit: 1000 });
+    json(response, 200, enrichWechatReview(store.getWechatReview({ month: searchParams.get('month') || '' }), matches)); return true;
+  }
   if (request.method === 'GET' && pathname === '/api/wechat/matches') {
-    json(response, 200, { items: store.listWechatArticleMetricMatches({ status: searchParams.get('status') || '', limit: boundedLimit(searchParams, 200, 1000) }), stats: store.wechatArticleMetricMatchStats() }); return true;
+    json(response, 200, { items: store.listWechatArticleMetricMatches({ status: searchParams.get('status') || '', limit: boundedLimit(searchParams, 200, 1000) }), stats: store.wechatArticleMetricMatchStats(), artifacts: store.listWechatMatchArtifacts() }); return true;
   }
   if (request.method === 'POST' && pathname === '/api/wechat/matches/rematch') {
     const index = indexArticleArtifacts(store, artifactRoots);

@@ -557,7 +557,7 @@ test('内容日历同时返回文章终稿与图文最终 HTML', () => {
   } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
 });
 
-test('内容日历以 copy.txt 作为图文交付标志', () => {
+test('内容日历以最终 HTML 作为图文交付标志', () => {
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-calendar-copy-marker-'));let store;
   try {
     store=new Store(path.join(tempRoot,'test.db'));
@@ -565,8 +565,38 @@ test('内容日历以 copy.txt 作为图文交付标志', () => {
     store.addHotspots(batch.id,'rsshub',[{title:'仅有文案的图文',url:'https://github.com/o/copy-only'}]);
     store.addCandidates(batch.id,[store.getBatch(batch.id).hotspots[0].id]);
     const candidate=store.listCandidates(batch.id)[0];
+    const html=path.join(tempRoot,'my-design.html');fs.writeFileSync(html,'<html></html>');const stat=fs.statSync(html);
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文设计 HTML',name:'my-design.html',path:html,size:stat.size,modifiedAt:'2026-07-24T08:00:00.000Z'});
+    const social=store.listCalendarContent({month:'2026-07'}).find((item)=>item.content_type==='social_cards');
+    assert.equal(social.candidate_row_id,candidate.id);
+    assert.equal(social.id,store.listArtifacts({batchId:batch.id})[0].id);
+  } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('内容日历不把 copy.txt 单独当作图文交付标志', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-calendar-copy-only-'));let store;
+  try {
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-25',title:'仅有文案'});
+    store.addHotspots(batch.id,'rsshub',[{title:'仅有文案的图文',url:'https://github.com/o/copy-only'}]);
+    store.addCandidates(batch.id,[store.getBatch(batch.id).hotspots[0].id]);
+    const candidate=store.listCandidates(batch.id)[0];
     const copy=path.join(tempRoot,'copy.txt');fs.writeFileSync(copy,'标题\n正文');const stat=fs.statSync(copy);
-    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文配套文案',name:'copy.txt',path:copy,size:stat.size,modifiedAt:'2026-07-24T08:00:00.000Z'});
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文配套文案',name:'copy.txt',path:copy,size:stat.size,modifiedAt:'2026-07-25T08:00:00.000Z'});
+    assert.equal(store.listCalendarContent({month:'2026-07'}).some((item)=>item.content_type==='social_cards'),false);
+  } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('内容日历兼容只有最终 HTML、尚未登记 copy.txt 的图文', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-calendar-html-fallback-'));let store;
+  try {
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-26',title:'HTML 回退'});
+    store.addHotspots(batch.id,'rsshub',[{title:'仅有 HTML 的图文',url:'https://github.com/o/html-only'}]);
+    store.addCandidates(batch.id,[store.getBatch(batch.id).hotspots[0].id]);
+    const candidate=store.listCandidates(batch.id)[0];
+    const html=path.join(tempRoot,'my-design.html');fs.writeFileSync(html,'<html></html>');const stat=fs.statSync(html);
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文设计 HTML',name:'my-design.html',path:html,size:stat.size,modifiedAt:'2026-07-26T08:00:00.000Z'});
     const social=store.listCalendarContent({month:'2026-07'}).find((item)=>item.content_type==='social_cards');
     assert.equal(social.candidate_row_id,candidate.id);
     assert.equal(social.id,store.listArtifacts({batchId:batch.id})[0].id);

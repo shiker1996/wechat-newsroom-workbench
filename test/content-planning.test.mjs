@@ -9,6 +9,7 @@ import { buildWechatInsights, classifyWechatArticle, matchWechatPerformance } fr
 import { buildContentFeedbackSnapshot, buildContentFeedbackPromptContext, extractArticleContentFeatures } from '../server/features/content-planning/wechat-content-feedback.mjs';
 import { buildContentPlanningRecommendation, sortMaterialsByPlanningRecommendation } from '../server/features/content-planning/content-planning-recommendations.mjs';
 import { buildWechatStrategyRecommendations } from '../server/features/content-planning/wechat-strategy-recommendations.mjs';
+import { handleContentRoutes } from '../server/platform/http/routes/content-routes.mjs';
 
 function workspace(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'content-planning-'));
@@ -93,6 +94,22 @@ test('历史文章会初步识别题材和标题结构，并提供软性表现�
   assert.equal(signal.level, 'low');
   assert.ok(signal.sample_count > 0);
   assert.match(signal.reason, /历史题材|标题结构/);
+});
+
+test('公众号复盘看板按已确认产物拆分文章和图文数据轨道', async () => {
+  let responseBody;
+  const store = {
+    getWechatReview: () => ({ articles: [
+      { id: 1, title: '文章终稿：真实复盘', published_date: '2026-08-29', reads: 1200, shares: 10, follows_after_read: 4, notified: 1 },
+      { id: 2, title: '工具图文：三步上手', published_date: '2026-08-30', reads: 800, shares: 18, follows_after_read: 3, notified: 0 },
+    ], growth: [], weekly: [], notified: { count: 1, reads: 1200 }, unnotified: { count: 1, reads: 800 }, channels: [], regular_readers: [], imports: [] }),
+    listWechatArticleMetricMatches: () => [{ metric_id: 1, status: 'confirmed', artifact_type: '文章终稿' }, { metric_id: 2, status: 'confirmed', artifact_type: '图文发布文案' }],
+  };
+  const handled = await handleContentRoutes({ request: { method: 'GET' }, response: {}, pathname: '/api/wechat/review', searchParams: new URLSearchParams(), store, artifactRoots: [], mime: {}, json: (_response, _status, value) => { responseBody = value; } });
+  assert.equal(handled, true);
+  assert.deepEqual(responseBody.review_tracks.article.articles.map((item) => item.id), [1]);
+  assert.deepEqual(responseBody.review_tracks.social.articles.map((item) => item.id), [2]);
+  assert.equal(responseBody.review_tracks.social.top_articles[0].reads, 800);
 });
 
 test('正文特征抽取覆盖结构、证据、结果和标题兑现线索', () => {

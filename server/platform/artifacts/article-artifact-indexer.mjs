@@ -98,6 +98,7 @@ function contentUrl(text, metadata) {
 function versionLabel(name) {
   const lower = name.toLowerCase();
   if (lower === SOCIAL_COPY_FILE) return '图文发布文案';
+  if (lower === '03-final.md') return '早报终稿';
   if (lower === '09-final.md') return '终稿';
   if (lower === '04-draft.md') return '初稿';
   if (lower === 'article.ai.html') return '排版 HTML';
@@ -109,8 +110,9 @@ function versionLabel(name) {
 
 function artifactDefinition(filePath) {
   const name = path.basename(filePath).toLowerCase();
-  if (ARTICLE_FILES.has(name)) return { name, artifactType: ARTICLE_FILES.get(name) };
   const parts = path.resolve(filePath).split(path.sep).map((item) => item.toLowerCase());
+  if (name === '03-final.md' && path.basename(path.dirname(filePath)).toLowerCase() === 'daily') return { name, artifactType: '早报终稿' };
+  if (ARTICLE_FILES.has(name)) return { name, artifactType: ARTICLE_FILES.get(name) };
   if (name === SOCIAL_COPY_FILE && parts.includes('social-cards')) return { name, artifactType: SOCIAL_COPY_TYPE };
   return null;
 }

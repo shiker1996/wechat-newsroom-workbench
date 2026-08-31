@@ -592,6 +592,7 @@ export class Store {
   getWechatArticleMetricMatchByMetric(metricId) { return this.repositories.contentPlanning.getWechatArticleMetricMatchByMetric(metricId); }
   getWechatArticleMetricMatch(id) { return this.repositories.contentPlanning.getWechatArticleMetricMatch(id); }
   listWechatArticleMetricMatches(input = {}) { return this.repositories.contentPlanning.listWechatArticleMetricMatches(input); }
+  listWechatMatchArtifacts() { return this.repositories.contentPlanning.listWechatMatchArtifacts(); }
   wechatArticleMetricMatchStats() { return this.repositories.contentPlanning.wechatArticleMetricMatchStats(); }
   upsertWechatArticleMetricMatch(input = {}) { return this.repositories.contentPlanning.upsertWechatArticleMetricMatch(input); }
   updateWechatArticleMetricMatch(id, input = {}) { return this.repositories.contentPlanning.updateWechatArticleMetricMatch(id, input); }
