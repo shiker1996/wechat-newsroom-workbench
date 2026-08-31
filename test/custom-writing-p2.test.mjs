@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const server=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8');
+const materialInbox=fs.readFileSync(new URL('../public/src/views/material-inbox.js',import.meta.url),'utf8');
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
 
 test('自主写作项目统一输出四种可恢复状态',()=>{
@@ -39,4 +40,17 @@ test('导航与文章池使用单一职责命名并提供类型筛选',()=>{
   assert.match(html,/选题管理[\s\S]*data-view="topics"[\s\S]*主动写作[\s\S]*data-view="material-inbox"[\s\S]*data-view="editorial"[\s\S]*data-view="daily"[\s\S]*data-view="tutorial"[\s\S]*统一编辑与交付/);
   assert.match(html,/data-article-type="hotspot">热点事件/);
   assert.match(html,/data-article-type="independent">自主写作/);
+});
+
+test('素材入箱可以单条或多选进入自主写作，并把素材 ID 交给服务端事实基座',()=>{
+  assert.match(html,/data-material-write-selected/);
+  assert.match(materialInbox,/data-material-select=/);
+  assert.match(materialInbox,/data-material-write-selected/);
+  assert.match(html,/id="tutorial-selected-materials"/);
+  assert.match(tutorial,/pendingIndependentWritingMaterials/);
+  assert.match(tutorial,/selectedMaterialIds/);
+  assert.match(tutorial,/hydrateSelectedMaterials/);
+  assert.match(server,/resolveSelectedWritingMaterials/);
+  assert.match(server,/writing_materials = writingMaterialContext/);
+  assert.match(server,/store\.updateWritingMaterial\(material\.id, \{ status: 'developing' \}\)/);
 });

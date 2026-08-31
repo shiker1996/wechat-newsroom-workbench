@@ -39,7 +39,7 @@ export function writeUtf8(filePath, content) {
 
 export function customArticleFingerprint(batchId, input = {}) {
   const normalized = {};
-  for (const key of ['articleMode', 'skillId', 'topic', 'audience', 'thesis', 'environment', 'points', 'steps', 'prerequisites', 'expected_results', 'common_errors', 'limitations', 'materialUrls', 'localProjectPath']) {
+  for (const key of ['articleMode', 'skillId', 'topic', 'audience', 'thesis', 'environment', 'points', 'steps', 'prerequisites', 'expected_results', 'common_errors', 'limitations', 'materialUrls', 'selectedMaterialIds', 'localProjectPath']) {
     const value = input[key];
     normalized[key] = Array.isArray(value)
       ? value.map((item) => String(item || '').trim()).filter(Boolean)

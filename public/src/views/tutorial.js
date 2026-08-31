@@ -77,9 +77,47 @@ function payload() {
   return Object.fromEntries([...new FormData(form()).entries()].map(([key, value]) => [key, String(value)]));
 }
 
+function selectedMaterials() {
+  return Array.isArray(state.pendingIndependentWritingMaterials) ? state.pendingIndependentWritingMaterials.filter((item) => item && Number(item.id) > 0) : [];
+}
+
+function selectedMaterialPointLines(items) {
+  return items.flatMap((item) => {
+    const title = String(item.title || "未命名素材").trim();
+    const chunks = String(item.raw_text || "").split(/\r?\n|(?<=[。！？])/).map((value) => value.trim()).filter(Boolean).slice(0, 8);
+    return chunks.map((value) => `【素材】${title}：${value.slice(0, 900)}`);
+  }).slice(0, 24);
+}
+
+function renderSelectedMaterials() {
+  const section = document.getElementById("tutorial-selected-materials");
+  const list = document.getElementById("tutorial-selected-material-list");
+  const items = selectedMaterials();
+  if (!section || !list) return;
+  section.hidden = !items.length;
+  if (!items.length) { list.innerHTML = ""; return; }
+  list.innerHTML = items.map((item) => `<article><span>${escapeHtml(item.source_type || "text")}</span><div><b>${escapeHtml(item.title || "未命名素材")}</b><small>${escapeHtml(String(item.raw_text || "").replace(/\s+/g, " ").slice(0, 180))}${String(item.raw_text || "").length > 180 ? "…" : ""}</small></div></article>`).join("");
+}
+
+function hydrateSelectedMaterials() {
+  const items = selectedMaterials();
+  renderSelectedMaterials();
+  if (!items.length) return;
+  const topic = field("topic");
+  if (topic && !topic.value.trim()) topic.value = String(items[0].title || "").trim();
+  const points = field("points");
+  if (points) {
+    const additions = selectedMaterialPointLines(items);
+    const existing = new Set(lines(points.value));
+    points.value = [...lines(points.value), ...additions.filter((item) => !existing.has(item))].join("\n");
+  }
+  updateProgress();
+}
+
 function draft() {
   const value = payload();
   for (const key of ["points", "steps", "prerequisites", "expected_results", "common_errors", "materialUrls"]) value[key] = lines(value[key]);
+  value.selectedMaterialIds = selectedMaterials().map((item) => Number(item.id));
   return value;
 }
 
@@ -279,6 +317,7 @@ async function submit() {
   updateWritingSteps(3);
   try {
     const input=payload();
+    input.selectedMaterialIds = selectedMaterials().map((item) => Number(item.id));
     input.stageSkills=selectedStageSkills(document.getElementById("tutorial-stage-skills"));
     input.creationRequestId=globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const url=retrying
@@ -349,6 +388,11 @@ function bind() {
   });
   document.getElementById("tutorial-read-project").addEventListener("click", () => withLoading(document.getElementById("tutorial-read-project"), "读取中…", () => inspectProject().catch((error) => { toast(error.message, "error"); throw error; })));
   document.getElementById("tutorial-local-project").addEventListener("input", (event) => { if (!event.currentTarget.value.trim()) setProjectStatus("尚未读取，不影响继续对话或填写表单。", "idle"); });
+  document.getElementById("clear-tutorial-materials")?.addEventListener("click", () => {
+    state.pendingIndependentWritingMaterials = [];
+    renderSelectedMaterials();
+    updateProgress();
+  });
   document.querySelectorAll("[data-writing-mode]").forEach((button) => button.addEventListener("click", () => {
     field("articleMode").value = button.dataset.writingMode;
     syncMode();
@@ -391,6 +435,7 @@ function bind() {
 export default async function loadTutorial() {
   bind();
   document.getElementById("tutorial-provider").innerHTML = providerOptions(state.models?.defaultProvider || "");
+  hydrateSelectedMaterials();
   syncMode();
   await loadProjects();
 }

@@ -19,6 +19,42 @@ function readJsonFile(filePath) {
   try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
 }
 
+function selectedWritingMaterialIds(input = {}) {
+  const raw = Array.isArray(input.selectedMaterialIds)
+    ? input.selectedMaterialIds
+    : String(input.selectedMaterialIds || '').split(/[\s,，]+/).filter(Boolean);
+  return [...new Set(raw.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))].slice(0, 20);
+}
+
+function resolveSelectedWritingMaterials(store, input = {}) {
+  const ids = selectedWritingMaterialIds(input);
+  const materials = ids.map((id) => store.getWritingMaterial(id));
+  const missing = ids.filter((id, index) => !materials[index]);
+  if (missing.length) throw new Error(`选中的素材不存在：${missing.join('、')}`);
+  return materials;
+}
+
+function materialPointLines(materials = []) {
+  return materials.flatMap((material) => {
+    const title = String(material.title || '未命名素材').trim();
+    const chunks = String(material.raw_text || '').split(/\r?\n|(?<=[。！？])/).map((value) => value.trim()).filter(Boolean).slice(0, 8);
+    return chunks.map((value) => `【素材】${title}：${value.slice(0, 900)}`);
+  }).slice(0, 24);
+}
+
+function mergeWritingMaterialPoints(points, materials) {
+  const existing = Array.isArray(points) ? points.map((value) => String(value || '').trim()).filter(Boolean) : String(points || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+  return [...existing, ...materialPointLines(materials).filter((value) => !existing.includes(value))];
+}
+
+function writingMaterialContext(materials = []) {
+  return materials.map((material) => ({
+    id: Number(material.id), title: String(material.title || '').trim(), source_type: material.source_type,
+    captured_at: material.captured_at, tags: material.tags || [],
+    raw_text: String(material.raw_text || '').slice(0, 6000),
+  }));
+}
+
 function saveSocialClassification(store, candidateId, route) {
   const values = [route.contentClass, 'snapshot', '手动从事件热榜加入图文池', new Date().toISOString(), candidateId];
   if (store.db?.prepare) store.db.prepare('UPDATE candidates SET content_class=?, classification_status=?, classification_reason=?, updated_at=? WHERE id=?').run(...values);
@@ -222,7 +258,12 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
   // agent-callsite: independent-writing
   if (tutorialChatMatch && request.method === 'POST') {
     const batchId = decodeURIComponent(tutorialChatMatch[1]); if (!store.getBatch(batchId)) return respond(json, response, 404, { error: '批次不存在' });
-    const input = await body(request); const draft = input.draft && typeof input.draft === 'object' ? { ...input.draft } : {}; const suppliedPath = String(draft.localProjectPath || '').trim() || extractLocalProjectPath(input.answer); const tutorialMode = String(draft.articleMode || '').trim() === 'tutorial' || Boolean(suppliedPath) || /教程|项目|仓库/.test(String(input.answer || '')); const detectedPath = tutorialMode ? suppliedPath : '';
+    const input = await body(request); let selectedWritingMaterials;
+    try { selectedWritingMaterials = resolveSelectedWritingMaterials(store, input.draft && typeof input.draft === 'object' ? input.draft : {}); }
+    catch (error) { return respond(json, response, 400, { error: error.message }); }
+    const rawDraft = input.draft && typeof input.draft === 'object' ? { ...input.draft } : {};
+    const draft = selectedWritingMaterials.length ? { ...rawDraft, points: mergeWritingMaterialPoints(rawDraft.points, selectedWritingMaterials), selectedMaterialContext: writingMaterialContext(selectedWritingMaterials) } : rawDraft;
+    const suppliedPath = String(draft.localProjectPath || '').trim() || extractLocalProjectPath(input.answer); const tutorialMode = String(draft.articleMode || '').trim() === 'tutorial' || Boolean(suppliedPath) || /教程|项目|仓库/.test(String(input.answer || '')); const detectedPath = tutorialMode ? suppliedPath : '';
     if (detectedPath && !localSecurity?.consume(request, 'local-project-read')) return respond(json, response, 403, { code: 'CONFIRMATION_REQUIRED', error: '请先确认允许读取该本地项目' });
     let projectContext = null; const projectReadError = ''; if (detectedPath) draft.localProjectPath = detectedPath;
     response.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no', connection: 'keep-alive' }); const stream=createNdjsonSession(request,response);const send=stream.send;
@@ -243,6 +284,8 @@ async function handleIndependentCreation({ request, response, pathname, root, co
     const batchId = decodeURIComponent(tutorialMatch[1]); const batch = store.getBatch(batchId); if (!batch) return respond(json, response, 404, { error: '批次不存在' }); const input = await body(request);
     try {
       const articleMode = String(input.articleMode || 'tutorial').trim() === 'experience' ? 'experience' : 'tutorial';
+      const selectedWritingMaterials = resolveSelectedWritingMaterials(store, input);
+      const factInput = { ...input, points: mergeWritingMaterialPoints(input.points, selectedWritingMaterials) };
       if (articleMode === 'tutorial' && String(input.localProjectPath || '').trim() && !localSecurity?.consume(request, 'local-project-read')) return respond(json, response, 403, { code: 'CONFIRMATION_REQUIRED', error: '请先确认允许读取该本地项目' });
       const recommendedSkillId = articleMode === 'experience' ? 'wechat-mp-personal-writing' : 'wechat-mp-tutorial';
       const skillSelection = await resolveEntryWriterSkill({ workspaceRoot: root, entryPoint: 'independent-writing', contentType: articleMode, requestedSkillId: String(input.skillId || ''), recommendedSkillId });
@@ -252,15 +295,15 @@ async function handleIndependentCreation({ request, response, pathname, root, co
       if (creation?.candidate_row_id) { const candidate = store.getCandidate(creation.candidate_row_id); let job = creation.latest_job_id ? aiJobs.get(creation.latest_job_id) : null; if (candidate && !job) { job = aiJobs.start({ batchId, candidateId: candidate.id, provider: input.provider, type: 'tutorial', skillSelection, stageSelections }); store.updateCustomArticleRequest(creation.id, { latestJobId: job.id }); } if (candidate && job) return respond(json, response, 200, { ...job, candidate, reused: true }); }
       let project = null; if (articleMode === 'tutorial' && String(input.localProjectPath || '').trim()) { const cached=getFactAttachment(store,{batchId,capability:'filesystem.project.read',arguments:tutorialProjectAttachmentArguments(input.localProjectPath)});if(cached)project={root:String(input.localProjectPath).trim(),...cached.data};else{const toolPolicy = await resolveSkillToolPolicy({ workspaceRoot: root, skillId: skillSelection.selectedSkill }); project = await readLocalProject(input.localProjectPath, { toolContext: { store, batchId, skillId: skillSelection.selectedSkill, allowedCapabilities: toolPolicy.allowedCapabilities } });} }
       const cachedAttachments=store.listConversationFactAttachments({batchId}),materialCache=new Map(cachedAttachments.filter((item)=>item.capability==='content.url.fetch').map((item)=>[item.data.final_url||item.data.url||item.data.requested_url,item.data]).filter(([url])=>url));
-      const fact = await buildCustomFactSheet({ input: { ...input, content_type: articleMode === 'experience' ? 'opinion' : 'tutorial', scenario: input.environment }, root, hasUserMaterialContext: Boolean(project),materialCache }); fact.article_mode = articleMode; fact.environment = String(input.environment || '').trim();
+      const fact = await buildCustomFactSheet({ input: { ...factInput, content_type: articleMode === 'experience' ? 'opinion' : 'tutorial', scenario: input.environment }, root, hasUserMaterialContext: Boolean(project || selectedWritingMaterials.length),materialCache }); fact.article_mode = articleMode; fact.environment = String(input.environment || '').trim(); fact.selected_material_ids = selectedWritingMaterials.map((item) => Number(item.id)); fact.writing_materials = writingMaterialContext(selectedWritingMaterials);
       fact.prerequisites = String(input.prerequisites || '').split(/\r?\n/).map((item) => item.trim()).filter(Boolean); fact.expected_results = String(input.expected_results || '').split(/\r?\n/).map((item) => item.trim()).filter(Boolean); fact.common_errors = String(input.common_errors || '').split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
       if (project) fact.local_project = { root: project.root, files: project.files.map(({ path: filePath, size, excerpt, truncated }) => ({ path: filePath, size, excerpt, truncated })), summary: project.summary, truncated: project.truncated };
       if (articleMode === 'tutorial' && !fact.environment) throw new Error('请填写实际运行环境或版本边界'); if (articleMode === 'tutorial' && fact.steps.length < 2) throw new Error('教程步骤至少需要 2 步'); if (articleMode === 'experience' && !fact.thesis) throw new Error('心得经验文章需要明确核心观点');
       if (fact.materials.some((item) => item.status !== 'ok')) throw new Error(`素材抓取失败：${fact.materials.filter((item) => item.status !== 'ok').map((item) => item.url).join('、')}`);
       for(const [capability,attachment] of selectConversationSearchAttachments(store.listConversationFactAttachments({batchId}),fact.topic)){const query=String(attachment.data?._agentQuery||fact.topic||'');if(capability==='content.web.search')fact.web_search={query,provider:'conversation-agent',answer:attachment.data.answer||'',results:attachment.data.results||[],warnings:attachment.data.warnings||[],searched_at:attachment.updated_at};if(capability==='content.news.search')fact.news_search={query,provider:'conversation-agent',answer:attachment.data.answer||'',results:attachment.data.results||[],warnings:attachment.data.warnings||[],searched_at:attachment.updated_at};if(capability==='content.document.search')fact.document_search={query,provider:'conversation-agent',documents:attachment.data.documents||[],warnings:attachment.data.warnings||[],searched_at:attachment.updated_at};}
       const toolPolicy = await resolveSkillToolPolicy({ workspaceRoot: root, skillId: skillSelection.selectedSkill }); await attachInformationSearch({ fact, input, root, toolContext: { store, batchId, skillId: skillSelection.selectedSkill, allowedCapabilities: toolPolicy.allowedCapabilities }, documentRoots: config.documentSearch?.roots || [] });
-      const materialUrls = fact.materials.map((item) => item.url); const hotspot = store.addManualHotspot(batchId, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自主写作（${articleMode === 'experience' ? '心得经验' : '使用教程'}）`, researchEligible: false }); store.addCandidates(batchId, [hotspot.id], { tracks: ['article'] });
-      const candidate = store.listCandidates(batchId, 'article').find((item) => Number(item.hotspot_id) === Number(hotspot.id)); if (!candidate) throw new Error('自主写作项目创建失败'); store.updateCandidate(candidate.id, { angle: articleMode === 'experience' ? `经验分享：${fact.topic}` : `实操教程：${fact.topic}`, thesis: articleMode === 'experience' ? fact.thesis : `帮助 ${fact.audience || '目标读者'} 在 ${fact.environment} 完成 ${fact.topic}`, status: 'locked' }); store.updateCandidateTrack(candidate.id, 'article', { status: 'locked', pool_role: '自主写作', output_mode: articleMode === 'experience' ? 'wechat-experience' : 'wechat-tutorial' });
+      const materialUrls = fact.materials.map((item) => item.url); const hotspot = store.addManualHotspot(batchId, { title: fact.topic, url: materialUrls[0] || null, materialUrls, notes: `自主写作（${articleMode === 'experience' ? '心得经验' : '使用教程'}）${selectedWritingMaterials.length ? ` · 素材入箱 ${selectedWritingMaterials.map((item) => item.id).join('、')}` : ''}`, researchEligible: false }); store.addCandidates(batchId, [hotspot.id], { tracks: ['article'] });
+      const candidate = store.listCandidates(batchId, 'article').find((item) => Number(item.hotspot_id) === Number(hotspot.id)); if (!candidate) throw new Error('自主写作项目创建失败'); store.updateCandidate(candidate.id, { angle: articleMode === 'experience' ? `经验分享：${fact.topic}` : `实操教程：${fact.topic}`, thesis: articleMode === 'experience' ? fact.thesis : `帮助 ${fact.audience || '目标读者'} 在 ${fact.environment} 完成 ${fact.topic}`, status: 'locked' }); store.updateCandidateTrack(candidate.id, 'article', { status: 'locked', pool_role: '自主写作', output_mode: articleMode === 'experience' ? 'wechat-experience' : 'wechat-tutorial' }); for (const material of selectedWritingMaterials) store.updateWritingMaterial(material.id, { status: 'developing' });
       const experiences = fact.points.filter((item) => item.source_level === 'author_experience').map((item) => item.text).join('\n'); const facts = fact.points.filter((item) => item.source_level !== 'model_suggestion').map((item) => item.text).join('\n'); store.saveEditorial(candidate.id, { editor_question: '', confirmed_facts: facts, author_opinions: articleMode === 'experience' ? fact.thesis : '', confirmed_experiences: experiences, rejected_angles: '', open_questions: '', forbidden_claims: '不得将模型建议写成实测或确定结果，不得虚构作者经历', next_action: 'WRITE_NOW', experience_required: articleMode === 'experience' || Boolean(experiences), brief_status: 'LOCKED' });
       const dir = articleWorkdir(batch, candidate); const factPath = path.join(dir, '01-tutorial-fact-base.json'); const briefPath = path.join(dir, 'article-brief.md'); const factFile = writeUtf8(factPath, JSON.stringify(fact, null, 2)); const briefFile = writeUtf8(briefPath, `---\nbrief_status: LOCKED\ncandidate_id: ${candidate.candidate_id}\narticle_mode: ${articleMode}\nexperience_required: ${articleMode === 'experience' || Boolean(experiences)}\nfinal_readiness: WRITE_NOW\n---\n\n# ${fact.topic}\n`); store.upsertArtifact({ batchId, candidateId: candidate.id, track: 'article', kind: '自主写作事实基座', name: '01-tutorial-fact-base.json', path: factPath, ...factFile }); store.upsertArtifact({ batchId, candidateId: candidate.id, track: 'article', kind: '锁定简报', name: 'article-brief.md', path: briefPath, ...briefFile });
       store.updateCustomArticleRequest(creation.id, { candidateId: candidate.id }); const job = aiJobs.start({ batchId, candidateId: candidate.id, provider: input.provider, type: 'tutorial', skillSelection, stageSelections }); store.updateCustomArticleRequest(creation.id, { latestJobId: job.id }); return respond(json, response, 202, { ...job, candidate: store.getCandidate(candidate.id) });
