@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260827-generation-labels">
+  <link rel="stylesheet" href="/styles.css?v=20260831-wechat-insights">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -17,11 +17,13 @@
     </div>
     <nav id="nav">
       <details class="nav-group" data-nav-group="today" open>
-        <summary><span>01</span><b>今日工作</b><small>总览 · 批次 · 日历</small></summary>
+        <summary><span>01</span><b>今日工作</b><small>总览 · 批次 · 日历 · 复盘</small></summary>
         <div class="nav-group-items">
           <button class="nav-item active" data-view="dashboard" aria-current="page">工作台总览</button>
           <button class="nav-item" data-view="batches">批次管理</button>
           <button class="nav-item" data-view="calendar">内容日历</button>
+          <div class="nav-section-label">内容复盘</div>
+          <button class="nav-item" data-view="wechat-review">公众号复盘</button>
         </div>
       </details>
       <details class="nav-group" data-nav-group="discovery">
@@ -37,7 +39,8 @@
         <div class="nav-group-items">
           <div class="nav-section-label">选题管理</div>
           <button class="nav-item" data-view="topics">文章选题池</button>
-          <div class="nav-section-label">创作方式</div>
+          <div class="nav-section-label">主动写作</div>
+          <button class="nav-item" data-view="material-inbox">素材入箱</button>
           <button class="nav-item" data-view="editorial">热点事件</button>
           <button class="nav-item" data-view="daily">批次早报</button>
           <button class="nav-item" data-view="tutorial">自主写作</button>
@@ -62,6 +65,7 @@
         <summary><span>05</span><b>资产与审计</b><small>产物 · 日志</small></summary>
         <div class="nav-group-items">
           <button class="nav-item" data-view="artifacts">产物中心</button>
+          <button class="nav-item" data-view="publication">发布中心</button>
           <button class="nav-item" data-view="logs">任务日志</button>
         </div>
       </details>
@@ -272,6 +276,43 @@
         <div id="tutorial-result" class="daily-result" hidden><div class="workspace-head"><div><span class="kicker">READY</span><h3>自主写作已进入文章链路</h3></div><button type="button" class="primary-button" id="open-tutorial-editor">到文章编辑器</button></div><p id="tutorial-result-copy"></p></div>
         </div>
       </form>
+    </section>
+
+    <section class="view" id="view-material-inbox">
+      <div class="section-intro"><div><span class="kicker">MATERIAL INBOX · ACTIVE WRITING</span></div><p>把会话、阅读、生活和项目里的真实片段先放进来。这里不急着生成文章，先保留证据、判断和下一步追问。</p></div>
+      <div class="material-inbox-layout">
+        <form class="panel material-capture-panel" id="material-capture-form">
+          <div class="panel-head"><div><span class="kicker">CAPTURE FIRST</span><h3>放入一段素材</h3><small>第一阶段支持 Markdown / 纯文本粘贴</small></div><span class="material-mark">01</span></div>
+          <div class="material-form-grid">
+            <label>来源<select name="sourceType"><option value="conversation">与 AI 的会话</option><option value="reading">读书 / 阅读</option><option value="life">生活经历</option><option value="project">项目 / 开发</option><option value="text">其他文本</option></select></label>
+            <label>发生 / 记录日期<input type="date" name="capturedAt"></label>
+            <label class="wide">素材标题（可选）<input name="title" placeholder="例如：我第一次发现自动化也会制造残局"></label>
+            <label class="wide">正文 / Markdown<textarea name="rawText" rows="13" required placeholder="可以直接粘贴会话片段、读书笔记、当天日记、项目日志或失败记录……"></textarea></label>
+            <label class="wide">标签（用逗号分隔）<input name="tags" placeholder="AI写作，失败复盘，工作流"></label>
+          </div>
+          <div class="material-form-actions"><span>先保留原话，后续再做账号化整理</span><button class="primary-button" type="submit">存入素材箱 →</button></div>
+        </form>
+        <section class="panel column-panel">
+          <div class="panel-head"><div><span class="kicker">WRITING COLUMNS</span><h3>主动写作栏目</h3><small>栏目配置独立保存，不修改账号定位文件</small></div><button class="ghost-button" type="button" id="toggle-column-form">＋ 添加栏目</button></div>
+          <form id="column-form" class="column-form" hidden><input name="name" placeholder="栏目名称" required><input name="description" placeholder="一句话说明这个栏目写什么"><div><label><input type="checkbox" name="experience" checked> 心得经验</label><label><input type="checkbox" name="tutorial"> 使用教程</label></div><button class="outline-button" type="submit">保存栏目</button></form>
+          <div id="column-list" class="column-list"></div>
+        </section>
+      </div>
+      <section class="panel material-list-panel"><div class="panel-head"><div><span class="kicker">RAW MATERIALS</span><h3>素材箱</h3><small>每条素材都可以单独评估、发展成内容计划</small></div><div class="material-filters"><select id="material-status-filter"><option value="">全部状态</option><option value="inbox">待整理</option><option value="developing">整理中</option><option value="planned">已排期</option></select><select id="material-sort-filter" aria-label="素材排序"><option value="latest">最近更新</option><option value="feedback">复盘优先</option></select><span id="material-count"></span></div></div><div id="material-list" class="material-list"></div></section>
+    </section>
+
+    <section class="view" id="view-wechat-review">
+      <div class="section-intro"><div><span class="kicker">WECHAT EXPORT REVIEW</span></div><p>公众号个人号无法直接读取后台，这里通过后台导出的 5 类文件逐个导入、合并，在工作台内复盘内容表现和涨粉信号。</p></div>
+      <section class="panel wechat-import-panel"><div class="panel-head"><div><span class="kicker">MANUAL IMPORT</span><h3>导入后台数据</h3><small>支持你提供的用户分析、已通知内容分析、未通知内容分析、内容趋势、常读用户趋势格式</small></div><span class="import-note">可重复导入 · 自动合并</span></div><div class="wechat-import-form"><label>文件类型<select id="wechat-import-type"><option value="user_growth">用户分析</option><option value="notified_articles">已通知内容分析</option><option value="unnotified_articles">未通知内容分析</option><option value="content_trends">内容趋势</option><option value="regular_readers">常读用户趋势</option></select></label><label class="file-picker">选择导出文件<input id="wechat-import-file" type="file" accept=".xls,.csv,.tsv,.txt"></label><button class="primary-button" type="button" id="wechat-import-submit">导入并合并 →</button><span id="wechat-import-status" class="wechat-import-status"></span></div><div id="wechat-import-history" class="wechat-import-history"></div></section>
+      <section class="panel wechat-match-panel"><div class="panel-head"><div><span class="kicker">ARTICLE MATCHING</span><h3>公众号文章关联</h3><small>先把数据和本地文章产物对上，再进入正文分析。精确匹配自动落定，相似匹配必须人工确认。</small></div><div class="wechat-match-actions"><span id="wechat-match-summary" class="muted">尚未匹配</span><button class="outline-button" type="button" id="wechat-rematch">重新匹配</button></div></div><div id="wechat-match-list" class="wechat-match-list"><div class="empty-state">导入文章数据并建立本地文章索引后，这里会出现匹配候选。</div></div></section>
+      <section class="panel wechat-content-panel"><div class="panel-head"><div><span class="kicker">BODY &amp; EVIDENCE</span><h3>正文与证据关联</h3><small>已确认文章优先读取本地终稿；本地缺失时，才由你手动触发公开 URL 获取。</small></div><div class="wechat-match-actions"><span id="wechat-content-summary" class="muted">尚未关联</span><button class="outline-button" type="button" id="wechat-content-relink">关联本地正文</button></div></div><div id="wechat-content-list" class="wechat-content-list"><div class="empty-state">先完成文章匹配，再关联正文和截图、日志、代码差异等证据资产。</div></div></section>
+      <section class="panel wechat-feedback-panel"><div class="panel-head"><div><span class="kicker">CONTENT FEEDBACK SNAPSHOT</span><h3>创作反馈快照</h3><small>从已关联正文中提取结构、证据和标题兑现线索，当前只展示为可验证假设。</small></div><div class="wechat-match-actions"><span id="wechat-feedback-summary" class="muted">尚未生成</span><button class="outline-button" type="button" id="wechat-feedback-rebuild">生成本轮反馈</button></div></div><div id="wechat-feedback-content" class="wechat-feedback-content"><div class="empty-state">先关联正文，再生成反馈快照。</div></div></section>
+      <section class="panel wechat-strategy-panel"><div class="panel-head"><div><span class="kicker">ACCOUNT STRATEGY DRAFT</span><h3>账号策略建议</h3><small>至少两个不同内容周期后生成；这里只给待确认草案，不会自动修改账号定位。</small></div><span id="wechat-strategy-summary" class="muted">等待两个内容周期</span></div><div id="wechat-strategy-content" class="wechat-strategy-content"><div class="empty-state">积累两个不同指标周期，并生成反馈快照后，这里会出现策略建议。</div></div></section>
+      <section class="wechat-review-metrics" id="wechat-review-metrics"></section>
+      <div class="wechat-review-grid"><section class="panel"><div class="panel-head"><div><span class="kicker">TOP CONTENT</span><h3>内容表现</h3></div></div><div id="wechat-top-articles" class="wechat-top-articles"></div></section><section class="panel"><div class="panel-head"><div><span class="kicker">GROWTH SIGNAL</span><h3>涨粉与常读</h3></div></div><div id="wechat-growth-summary" class="wechat-growth-summary"></div><div id="wechat-regular-readers" class="wechat-regular-readers"></div></section></div>
+      <section class="panel"><div class="panel-head"><div><span class="kicker">WEEKLY REPORT</span><h3>周报</h3><small>按发表日期聚合，便于观察内容节奏和涨粉信号</small></div></div><div id="wechat-weekly-report" class="wechat-weekly-report"></div></section>
+      <section class="panel"><div class="panel-head"><div><span class="kicker">HISTORICAL SIGNALS</span><h3>历史文章分析</h3><small>规则初判题材和标题结构，用于软性推荐，不替代人工判断</small></div></div><div id="wechat-insights" class="wechat-insights"></div></section>
+      <section class="panel"><div class="panel-head"><div><span class="kicker">DISTRIBUTION CHANNELS</span><h3>内容趋势 · 渠道入口</h3></div></div><div id="wechat-channels" class="wechat-channel-bars"></div></section>
     </section>
 
     <section class="view" id="view-social-topics">
@@ -539,7 +580,7 @@
       <div class="writing-toolbar">
         <div class="document-identity"><select id="writing-candidate" aria-label="文章候选"></select><input id="article-title" placeholder="文章标题"></div>
         <div class="document-state"><div class="document-kind" role="radiogroup" aria-label="文稿阶段"><label class="kind-toggle"><input type="radio" name="doc-kind" value="draft" checked><span>草稿</span></label><label class="kind-toggle"><input type="radio" name="doc-kind" value="final"><span>终稿</span></label></div><span id="char-count">0 / 1,500</span><span id="document-save-state" class="document-save-state saved" role="status" aria-live="polite">已保存</span></div>
-        <div class="document-actions"><button class="ghost-button" id="document-find" title="查找替换（Ctrl/⌘+F）">查找替换</button><button class="ghost-button" id="document-history">版本历史</button><button class="primary-button" id="save-document">保存文稿</button></div>
+        <div class="document-actions"><button class="ghost-button" id="document-find" title="查找替换（Ctrl/⌘+F）">查找替换</button><button class="ghost-button" id="document-history">版本历史</button><button class="ghost-button" id="open-publication-meta">发布信息</button><button class="primary-button" id="save-document">保存文稿</button><small id="publication-meta-summary" class="publication-meta-summary pending">发布信息未登记</small></div>
       </div>
       <div class="editor-assist-grid">
         <section class="ai-writing-bar" aria-labelledby="model-assist-title">
@@ -679,6 +720,22 @@
         <button class="ghost-button" id="reindex-button">重新扫描工作区</button>
       </div>
       <div class="artifact-grid" id="artifact-list"></div>
+    </section>
+
+    <section class="view" id="view-publication">
+      <div class="section-intro"><div><span class="kicker">PUBLICATION DESK</span></div><p>只看已经形成文章产物的发布关系：终稿、发布日期、发布 URL 和公众号复盘数据。中间过程仍留在产物中心。</p></div>
+      <div class="cabinet-tools">
+        <div class="article-stats" id="publication-article-stats"></div>
+        <button class="ghost-button" id="publication-reindex-button">刷新发布索引</button>
+      </div>
+      <section class="article-index-panel publication-index-panel" aria-labelledby="article-index-title">
+        <header class="article-index-head">
+          <div><span class="kicker">FINAL &amp; PUBLICATION INDEX</span><h2 id="article-index-title">文章发布索引</h2><p>只展示可用于发布关联的终稿及图文发布文案；草稿、初稿、排版过程文件不会混进这里。</p></div>
+          <div class="article-index-actions"><span id="article-index-status" class="muted">尚未扫描</span><button type="button" class="outline-button" id="article-index-reindex">建立发布索引</button></div>
+        </header>
+        <div class="article-index-stats" id="article-index-stats"></div>
+        <div class="article-index-list" id="article-index-list"><div class="empty-state">点击“建立发布索引”，扫描本机终稿和图文发布文案。</div></div>
+      </section>
     </section>
 
     <section class="view skill-registry-view capability-studio" id="view-skills">
@@ -1152,6 +1209,7 @@
   <dialog id="revision-dialog" class="modal revision-dialog"><div class="modal-head"><div><span class="kicker">DOCUMENT HISTORY</span><h2>版本历史</h2></div><button class="close-button" data-close-revisions aria-label="关闭">×</button></div><div class="revision-layout"><div id="revision-list" class="revision-list"></div><div class="revision-preview"><div id="revision-summary" class="muted">选择一个版本查看差异</div><pre id="revision-diff" class="revision-diff"></pre><button class="ink-button" id="restore-revision" disabled>恢复此版本</button></div></div></dialog>
   <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>
   <dialog id="writing-goal-dialog" class="modal"><form id="writing-goal-form"><div class="modal-head"><div><span class="kicker">WRITING TARGET</span><h2>设置写作目标</h2></div><button type="button" class="close-button" data-close-writing-goal aria-label="关闭">×</button></div><label>目标可见字数<input id="writing-goal-input" type="number" min="200" max="10000" step="100" required></label><p class="fine-print">目标仅用于进度反馈；草稿和终稿可以分别设置，不改变保存与终稿门禁规则。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-writing-goal>取消</button><button type="submit" class="ink-button">保存目标</button></div></form></dialog>
+  <dialog id="publication-dialog" class="modal publication-dialog"><form id="publication-form"><div class="modal-head"><div><span class="kicker">PUBLICATION RECORD</span><h2 id="publication-dialog-title">登记公众号发布信息</h2><p id="publication-dialog-context" class="modal-form-intro">发布后补充最终信息，方便关联后台数据。</p></div><button type="button" class="close-button" data-close-publication aria-label="关闭">×</button></div><div class="publication-status-strip"><span>当前状态</span><b id="publication-status">待登记</b><small id="publication-status-note">发布后补充 URL 和发布日期，系统才能关联后台数据。</small></div><div class="publication-form-grid"><label>公众号文章 URL<input id="publication-url" name="contentUrl" type="url" placeholder="https://mp.weixin.qq.com/s/..." autocomplete="url"><small>可以先不填，发布后再补。</small></label><label>实际发布日期<input id="publication-date" name="publishedAt" type="date"><small>优先填写真实发布日期，而不是计划日期。</small></label><label class="publication-span">发布时最终标题<input id="publication-title" name="titleAtPublish" maxlength="120" placeholder="默认带入当前标题"></label><label>内容支柱<input id="publication-pillar" name="contentPillar" placeholder="例如：开源与工程实践"></label><label>内容角色<select id="publication-role" name="contentRole"><option value="">未指定</option><option value="拉新">拉新</option><option value="涨粉">涨粉</option><option value="分享">分享</option><option value="讨论">讨论</option><option value="实验">实验</option></select></label><label>分发方式<select id="publication-lane" name="distributionLane"><option value="">未指定</option><option value="推荐">推荐</option><option value="通知">通知</option><option value="实验">实验</option></select></label><label>主动写作栏目<select id="publication-column" name="columnId"><option value="">未指定栏目</option></select></label></div><p class="fine-print publication-footnote">保存后不会抓取或发布文章；这里只记录发布关系，供后续文章匹配和复盘使用。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-publication>取消</button><button type="submit" class="ink-button">保存发布信息</button></div></form></dialog>
   <dialog id="preflight-dialog" class="modal preflight-dialog"><div class="preflight-dialog-body"><div class="modal-head"><div><span class="kicker">PUBLISH READINESS</span><h2>发布前检查</h2></div><button type="button" class="close-button" data-close-preflight aria-label="关闭">×</button></div><div class="preflight-hero"><b id="preflight-title">正在检查当前文稿</b><span id="preflight-summary"></span></div><div id="preflight-list" class="preflight-list"></div><p class="fine-print">检查结果仅用于发布前确认，不会自动修改正文，也不会影响草稿自动保存。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-preflight>稍后处理</button><button type="button" class="ink-button" id="preflight-primary">查看待处理项</button></div></div></dialog>
   <dialog id="quality-dialog" class="modal quality-dialog"><div class="quality-dialog-body"><div class="modal-head"><div><span class="kicker">QUALITY REVIEW</span><h2>文稿质量检查</h2></div><button type="button" class="close-button" data-close-quality aria-label="关闭">×</button></div><p id="quality-summary" class="quality-summary"></p><div id="quality-issue-list" class="quality-issue-list"></div><div class="modal-actions"><button type="button" class="ink-button" data-close-quality>完成检查</button></div></div></dialog>
   <dialog id="theme-picker-dialog" class="theme-picker-dialog"><div class="theme-picker-shell"><div class="theme-picker-head"><div><span class="kicker">VISUAL THEME</span><h2 id="theme-picker-title">选择主题</h2><p>颜色只是第一眼，版式语气与内容类型同样重要。</p></div><button type="button" class="close-button" id="close-theme-picker" aria-label="关闭主题选择">×</button></div><div class="theme-picker-tabs" role="tablist"><button type="button" class="active" data-theme-filter="all">全部</button><button type="button" data-theme-filter="builtin">内置主题</button><button type="button" data-theme-filter="user">我的主题</button><select id="theme-picker-scene" aria-label="按内容场景筛选"><option value="all">全部场景</option></select></div><div id="theme-picker-grid" class="theme-picker-grid"></div><div class="theme-picker-foot"><span id="theme-picker-selection">请选择一个主题</span><button type="button" class="primary-button" id="confirm-theme-picker">使用此主题</button></div></div></dialog>

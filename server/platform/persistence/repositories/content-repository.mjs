@@ -56,6 +56,12 @@ export class ContentRepository {
       WHERE d.batch_id=? ORDER BY d.updated_at DESC`).all(batchId);
   }
 
+  listAllDocuments() {
+    return this.db.prepare(`SELECT d.*, c.candidate_id, h.title AS hotspot_title FROM documents d
+      LEFT JOIN candidates c ON c.id=d.candidate_row_id LEFT JOIN hotspots h ON h.id=c.hotspot_id
+      ORDER BY d.updated_at DESC`).all();
+  }
+
   upsertArtifact(artifact) {
     this.db.prepare(`INSERT INTO artifacts
       (batch_id, kind, name, file_path, size, modified_at, status, candidate_row_id, track)
@@ -75,4 +81,6 @@ export class ContentRepository {
   }
 
   getArtifact(id) { return this.db.prepare('SELECT * FROM artifacts WHERE id=?').get(id) ?? null; }
+
+  getArtifactByPath(filePath) { return this.db.prepare('SELECT * FROM artifacts WHERE file_path=?').get(filePath) ?? null; }
 }

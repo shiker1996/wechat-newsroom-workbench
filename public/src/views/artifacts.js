@@ -6,7 +6,7 @@ import loadOverview from "./dashboard.js";
 
 export async function reindex() {
   const result = await request("/api/artifacts/reindex", { method: "POST" });
-  toast(`扫描完成，发现 ${result.indexed} 份产物`);
+  toast(`扫描完成，发现 ${result.indexed} 份产物`, "success");
   await Promise.all([loadArtifacts(), loadOverview()]);
 }
 
@@ -19,8 +19,7 @@ function bindArtifacts() {
   });
   document.addEventListener("click", (event) => {
     const artifact = event.target.closest("[data-artifact]");
-    if (!artifact || !artifact.closest("#view-artifacts")) return;
-    openArtifactPreview(`/api/artifacts/${artifact.dataset.artifact}/preview`, {
+    if (artifact && artifact.closest("#view-artifacts")) openArtifactPreview(`/api/artifacts/${artifact.dataset.artifact}/preview`, {
       originalUrl: `/api/artifacts/${artifact.dataset.artifact}/content`,
     });
   });
@@ -50,6 +49,7 @@ async function loadArtifacts() {
       }).join("")
     : `<div class="empty-state"><strong>${escapeHtml(batchLabel)}</strong> 下没有产物。尝试切换到其他批次或重新扫描工作区。</div>`;
 }
+
 export default async function loadArtifactsView() {
   bindArtifacts();
   return loadArtifacts();

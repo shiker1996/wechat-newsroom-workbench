@@ -56,12 +56,14 @@ export class WorkbenchQueryService {
 
   listCalendarContent({ month, limit = 400 } = {}) {
     const articleWhere = ["d.kind='final'"];
-    const socialWhere = ["a.track='social_cards'", "a.name='my-design.html'", "a.status='ready'"];
+    // copy.txt 是程序版和 AI 视觉版共同具备的交付标志。预览产物则按 AI 视觉版、
+    // 程序版、文案文件的顺序回退，避免把 HTML 文件名当成内容是否生成的判断条件。
+    const socialWhere = ["copy.track='social_cards'", "copy.name='copy.txt'", "copy.status='ready'"];
     const articleValues = [];
     const socialValues = [];
     if (month) {
       articleWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,d.updated_at))=?");
-      socialWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,a.modified_at))=?");
+      socialWhere.push("strftime('%Y-%m', COALESCE(b.batch_date,copy.modified_at))=?");
       articleValues.push(month);
       socialValues.push(month);
     }
@@ -73,15 +75,21 @@ export class WorkbenchQueryService {
       LEFT JOIN batches b ON b.id=d.batch_id
       LEFT JOIN hotspots h ON h.id=c.hotspot_id
       WHERE ${articleWhere.join(' AND ')}`).all(...articleValues);
-    const socialCards = this.db.prepare(`SELECT 'social_cards' AS content_type, a.id, a.batch_id,
-      a.candidate_row_id, COALESCE(h.title,c.hotspot_titles,'图文内容') AS title,
-      a.status, a.modified_at AS updated_at, c.candidate_id,
+    const socialCards = this.db.prepare(`SELECT 'social_cards' AS content_type,
+      COALESCE(ai.id,original.id,copy.id) AS id, copy.batch_id,
+      copy.candidate_row_id, COALESCE(h.title,c.hotspot_titles,'图文内容') AS title,
+      COALESCE(ai.status,original.status,copy.status) AS status,
+      COALESCE(ai.modified_at,original.modified_at,copy.modified_at) AS updated_at, c.candidate_id,
       COALESCE(NULLIF(ct.pool_role,''),c.pool_role) AS pool_role, b.batch_date, b.title AS batch_title,
       COALESCE(h.title,c.hotspot_titles,'图文内容') AS hotspot_title
-      FROM artifacts a
-      LEFT JOIN candidates c ON c.id=a.candidate_row_id
+      FROM artifacts copy
+      LEFT JOIN artifacts ai ON ai.track='social_cards' AND ai.name='ai-beautified.html' AND ai.status='ready'
+        AND ai.batch_id=copy.batch_id AND ai.candidate_row_id=copy.candidate_row_id
+      LEFT JOIN artifacts original ON original.track='social_cards' AND original.name='my-design.html' AND original.status='ready'
+        AND original.batch_id=copy.batch_id AND original.candidate_row_id=copy.candidate_row_id
+      LEFT JOIN candidates c ON c.id=copy.candidate_row_id
       LEFT JOIN candidate_tracks ct ON ct.candidate_row_id=c.id AND ct.track='social_cards'
-      LEFT JOIN batches b ON b.id=a.batch_id
+      LEFT JOIN batches b ON b.id=copy.batch_id
       LEFT JOIN hotspots h ON h.id=c.hotspot_id
       WHERE ${socialWhere.join(' AND ')}`).all(...socialValues);
     return [...articles, ...socialCards]

@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 22;
+export const WORKBENCH_SCHEMA_VERSION = 28;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -10,7 +10,13 @@ export function runDatabaseMigrations(db, migrateSchema) {
     migrateSchema();
   } else {
     db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');
-    let applied=Number(db.prepare('SELECT COALESCE(MAX(version),0) AS version FROM schema_migrations').get().version||0);
+    const recordedVersions = new Set(db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map((row) => Number(row.version)));
+    let applied = 0;
+    while (recordedVersions.has(applied + 1)) applied += 1;
+    // 兼容测试/历史库中间版本被删除的情况：高版本记录不能掩盖缺失的迁移，
+    // 后续版本记录会在事务中重新写入，迁移始终按连续版本推进。
+    const recordedMax = Number(db.prepare('SELECT COALESCE(MAX(version),0) AS version FROM schema_migrations').get().version || 0);
+    if (recordedMax > applied) db.prepare('DELETE FROM schema_migrations WHERE version > ?').run(applied);
     if(applied>WORKBENCH_SCHEMA_VERSION)throw new Error(`数据库版本 ${applied} 高于当前支持版本 ${WORKBENCH_SCHEMA_VERSION}`);
     if(applied<1){
       db.exec('BEGIN IMMEDIATE');
@@ -224,6 +230,337 @@ export function runDatabaseMigrations(db, migrateSchema) {
       CREATE INDEX IF NOT EXISTS idx_theme_metadata_method ON theme_metadata(creation_method,updated_at DESC);
       CREATE INDEX IF NOT EXISTS idx_theme_version_metadata_created ON theme_version_metadata(created_at DESC);`);
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(22,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v23：自主写作素材池、栏目配置、内容计划与公众号导出复盘数据。
+    if(applied<23){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS content_columns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT NOT NULL DEFAULT '',
+        writing_modes_json TEXT NOT NULL DEFAULT '["experience"]',
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS writing_materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_type TEXT NOT NULL DEFAULT 'text' CHECK(source_type IN ('conversation','reading','life','project','text')),
+        title TEXT NOT NULL DEFAULT '',
+        raw_text TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'inbox' CHECK(status IN ('inbox','developing','planned','archived')),
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        evidence_json TEXT NOT NULL DEFAULT '[]',
+        iteration_json TEXT NOT NULL DEFAULT '{}',
+        assessment_json TEXT NOT NULL DEFAULT '{}',
+        recommended_column_id INTEGER,
+        next_teaser TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(recommended_column_id) REFERENCES content_columns(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_writing_materials_status_updated ON writing_materials(status,updated_at DESC);
+      CREATE TABLE IF NOT EXISTS material_content_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        material_id INTEGER NOT NULL,
+        column_id INTEGER,
+        title_direction TEXT NOT NULL DEFAULT '',
+        title_intent TEXT NOT NULL DEFAULT '',
+        plan_type TEXT NOT NULL DEFAULT 'draft',
+        planned_date TEXT,
+        status TEXT NOT NULL DEFAULT 'idea' CHECK(status IN ('idea','planned','writing','done','cancelled')),
+        teaser TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(material_id) REFERENCES writing_materials(id) ON DELETE CASCADE,
+        FOREIGN KEY(column_id) REFERENCES content_columns(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_material_plans_date ON material_content_plans(planned_date,status);
+      CREATE TABLE IF NOT EXISTS article_publications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id INTEGER,
+        document_id INTEGER,
+        content_url TEXT NOT NULL DEFAULT '',
+        published_at TEXT NOT NULL DEFAULT '',
+        title_at_publish TEXT NOT NULL DEFAULT '',
+        column_id INTEGER,
+        content_pillar TEXT NOT NULL DEFAULT '',
+        content_role TEXT NOT NULL DEFAULT '',
+        distribution_lane TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','registered','awaiting_metrics','reviewed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        CHECK(plan_id IS NOT NULL OR document_id IS NOT NULL),
+        FOREIGN KEY(plan_id) REFERENCES material_content_plans(id) ON DELETE CASCADE,
+        FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
+        FOREIGN KEY(column_id) REFERENCES content_columns(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_publications_plan ON article_publications(plan_id) WHERE plan_id IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_publications_document ON article_publications(document_id) WHERE document_id IS NOT NULL;
+      CREATE TABLE IF NOT EXISTS wechat_import_batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_name TEXT NOT NULL,
+        import_type TEXT NOT NULL,
+        format TEXT NOT NULL,
+        row_count INTEGER NOT NULL DEFAULT 0,
+        imported_at TEXT NOT NULL,
+        error TEXT NOT NULL DEFAULT ''
+      );
+      CREATE TABLE IF NOT EXISTS wechat_user_growth_daily (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_batch_id INTEGER NOT NULL,
+        stat_date TEXT NOT NULL,
+        new_followers INTEGER,
+        unfollowers INTEGER,
+        net_followers INTEGER,
+        total_followers INTEGER,
+        UNIQUE(stat_date),
+        FOREIGN KEY(import_batch_id) REFERENCES wechat_import_batches(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS wechat_article_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_batch_id INTEGER NOT NULL,
+        notified INTEGER NOT NULL DEFAULT 0,
+        title TEXT NOT NULL,
+        published_date TEXT NOT NULL,
+        reads INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        follows_after_read INTEGER NOT NULL DEFAULT 0,
+        delivery INTEGER,
+        delivery_rate REAL,
+        completion_rate REAL,
+        content_url TEXT NOT NULL DEFAULT '',
+        UNIQUE(notified,title,published_date),
+        FOREIGN KEY(import_batch_id) REFERENCES wechat_import_batches(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS wechat_content_trends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_batch_id INTEGER NOT NULL,
+        stat_date TEXT NOT NULL,
+        channel TEXT NOT NULL DEFAULT '',
+        reads INTEGER,
+        shares INTEGER,
+        original_reads INTEGER,
+        favorites INTEGER,
+        published_count INTEGER,
+        article_channel TEXT NOT NULL DEFAULT '',
+        article_title TEXT NOT NULL DEFAULT '',
+        article_date TEXT NOT NULL DEFAULT '',
+        article_reads INTEGER,
+        article_read_share REAL,
+        UNIQUE(stat_date,channel,article_channel,article_title),
+        FOREIGN KEY(import_batch_id) REFERENCES wechat_import_batches(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS wechat_regular_reader_trends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_batch_id INTEGER NOT NULL,
+        period TEXT NOT NULL UNIQUE,
+        regular_readers INTEGER,
+        regular_reader_rate REAL,
+        FOREIGN KEY(import_batch_id) REFERENCES wechat_import_batches(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_wechat_article_date ON wechat_article_metrics(published_date,notified);
+      CREATE INDEX IF NOT EXISTS idx_wechat_trend_date ON wechat_content_trends(stat_date);
+      CREATE INDEX IF NOT EXISTS idx_wechat_import_type ON wechat_import_batches(import_type,imported_at DESC);`);
+      db.prepare(`INSERT OR IGNORE INTO content_columns(name,description,writing_modes_json,created_at,updated_at)
+        VALUES ('真实复盘','从项目、生活和工作经历中提炼可复用判断。','["experience"]',?,?)`).run(new Date().toISOString(), new Date().toISOString());
+      db.prepare(`INSERT OR IGNORE INTO content_columns(name,description,writing_modes_json,created_at,updated_at)
+        VALUES ('工具与实践','记录工具使用、工程过程和可复现的方法。','["experience","tutorial"]',?,?)`).run(new Date().toISOString(), new Date().toISOString());
+      db.prepare(`INSERT OR IGNORE INTO content_columns(name,description,writing_modes_json,created_at,updated_at)
+        VALUES ('读书与观察','把阅读和日常观察转成带有个人判断的内容。','["experience"]',?,?)`).run(new Date().toISOString(), new Date().toISOString());
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(23,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v24：文章发布元数据，统一承接内容计划和文章编辑器的公众号发布关联。
+    if(applied<24){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS article_publications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id INTEGER,
+        document_id INTEGER,
+        content_url TEXT NOT NULL DEFAULT '',
+        published_at TEXT NOT NULL DEFAULT '',
+        title_at_publish TEXT NOT NULL DEFAULT '',
+        column_id INTEGER,
+        content_pillar TEXT NOT NULL DEFAULT '',
+        content_role TEXT NOT NULL DEFAULT '',
+        distribution_lane TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','registered','awaiting_metrics','reviewed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        CHECK(plan_id IS NOT NULL OR document_id IS NOT NULL),
+        FOREIGN KEY(plan_id) REFERENCES material_content_plans(id) ON DELETE CASCADE,
+        FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
+        FOREIGN KEY(column_id) REFERENCES content_columns(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_publications_plan ON article_publications(plan_id) WHERE plan_id IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_publications_document ON article_publications(document_id) WHERE document_id IS NOT NULL;`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(24,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v25：本地文章产物索引与扫描记录，供公众号数据匹配正文和证据资产。
+    if(applied<25){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS article_artifact_index (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        artifact_id INTEGER,
+        file_path TEXT NOT NULL UNIQUE,
+        root_path TEXT NOT NULL,
+        artifact_type TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        normalized_title TEXT NOT NULL DEFAULT '',
+        article_date TEXT NOT NULL DEFAULT '',
+        version_label TEXT NOT NULL DEFAULT '',
+        content_url TEXT NOT NULL DEFAULT '',
+        batch_id TEXT,
+        document_id INTEGER,
+        plan_id INTEGER,
+        material_id INTEGER,
+        column_id INTEGER,
+        evidence_paths_json TEXT NOT NULL DEFAULT '[]',
+        relation_method TEXT NOT NULL DEFAULT '',
+        relation_confidence TEXT NOT NULL DEFAULT 'none',
+        status TEXT NOT NULL DEFAULT 'indexed' CHECK(status IN ('indexed','ambiguous','unreadable')),
+        scan_error TEXT NOT NULL DEFAULT '',
+        file_size INTEGER NOT NULL DEFAULT 0,
+        modified_at TEXT NOT NULL,
+        indexed_at TEXT NOT NULL,
+        FOREIGN KEY(artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL,
+        FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE SET NULL,
+        FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE SET NULL,
+        FOREIGN KEY(plan_id) REFERENCES material_content_plans(id) ON DELETE SET NULL,
+        FOREIGN KEY(material_id) REFERENCES writing_materials(id) ON DELETE SET NULL,
+        FOREIGN KEY(column_id) REFERENCES content_columns(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_article_artifact_title ON article_artifact_index(normalized_title);
+      CREATE INDEX IF NOT EXISTS idx_article_artifact_date ON article_artifact_index(article_date);
+      CREATE INDEX IF NOT EXISTS idx_article_artifact_plan ON article_artifact_index(plan_id);
+      CREATE TABLE IF NOT EXISTS article_artifact_index_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        roots_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('running','completed','partial','failed')),
+        files_seen INTEGER NOT NULL DEFAULT 0,
+        indexed_count INTEGER NOT NULL DEFAULT 0,
+        skipped_count INTEGER NOT NULL DEFAULT 0,
+        error_json TEXT NOT NULL DEFAULT '[]',
+        started_at TEXT NOT NULL,
+        finished_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_article_artifact_runs_started ON article_artifact_index_runs(started_at DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(25,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v26：公众号文章指标与本地文章产物的匹配、确认和重匹配日志。
+    if(applied<26){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS wechat_article_metric_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        metric_id INTEGER NOT NULL UNIQUE,
+        article_artifact_id INTEGER,
+        match_method TEXT NOT NULL DEFAULT 'unmatched',
+        confidence TEXT NOT NULL DEFAULT 'none' CHECK(confidence IN ('high','medium','low','none')),
+        status TEXT NOT NULL DEFAULT 'unmatched' CHECK(status IN ('pending','confirmed','auto_confirmed','rejected','unmatched')),
+        candidate_ids_json TEXT NOT NULL DEFAULT '[]',
+        candidate_snapshot_json TEXT NOT NULL DEFAULT '[]',
+        matched_title TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        confirmed_at TEXT,
+        FOREIGN KEY(metric_id) REFERENCES wechat_article_metrics(id) ON DELETE CASCADE,
+        FOREIGN KEY(article_artifact_id) REFERENCES article_artifact_index(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_wechat_metric_matches_status ON wechat_article_metric_matches(status,updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_wechat_metric_matches_artifact ON wechat_article_metric_matches(article_artifact_id);
+      CREATE TABLE IF NOT EXISTS wechat_article_match_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match_id INTEGER NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('auto_match','rematch','confirm','reject','reset')),
+        from_artifact_id INTEGER,
+        to_artifact_id INTEGER,
+        match_method TEXT NOT NULL DEFAULT '',
+        confidence TEXT NOT NULL DEFAULT 'none',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(match_id) REFERENCES wechat_article_metric_matches(id) ON DELETE CASCADE,
+        FOREIGN KEY(from_artifact_id) REFERENCES article_artifact_index(id) ON DELETE SET NULL,
+        FOREIGN KEY(to_artifact_id) REFERENCES article_artifact_index(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_wechat_match_logs_match ON wechat_article_match_logs(match_id,id DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(26,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v27：已匹配公众号文章的正文快照与证据资产关联。
+    if(applied<27){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS article_content_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        metric_id INTEGER NOT NULL,
+        article_artifact_id INTEGER,
+        source_kind TEXT NOT NULL CHECK(source_kind IN ('local_final','local_reviewed','local_humanized','local_draft','local_html','external_url')),
+        source_path TEXT NOT NULL DEFAULT '',
+        source_url TEXT NOT NULL DEFAULT '',
+        final_url TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        content_chars INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'ok' CHECK(status IN ('ok','error')),
+        error TEXT NOT NULL DEFAULT '',
+        fetched_at TEXT NOT NULL,
+        is_current INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(metric_id) REFERENCES wechat_article_metrics(id) ON DELETE CASCADE,
+        FOREIGN KEY(article_artifact_id) REFERENCES article_artifact_index(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_article_content_current ON article_content_snapshots(metric_id,is_current,id DESC);
+      CREATE INDEX IF NOT EXISTS idx_article_content_artifact ON article_content_snapshots(article_artifact_id,id DESC);
+      CREATE TABLE IF NOT EXISTS article_evidence_assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_artifact_id INTEGER NOT NULL,
+        content_snapshot_id INTEGER,
+        asset_path TEXT NOT NULL,
+        asset_type TEXT NOT NULL CHECK(asset_type IN ('screenshot','log','code_diff','chart','failure','result','other')),
+        label TEXT NOT NULL DEFAULT '',
+        detected_method TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(article_artifact_id,asset_path),
+        FOREIGN KEY(article_artifact_id) REFERENCES article_artifact_index(id) ON DELETE CASCADE,
+        FOREIGN KEY(content_snapshot_id) REFERENCES article_content_snapshots(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_article_evidence_artifact ON article_evidence_assets(article_artifact_id,id DESC);
+      CREATE INDEX IF NOT EXISTS idx_article_evidence_type ON article_evidence_assets(asset_type);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(27,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v28：正文确定性特征与公众号创作反馈快照。
+    if(applied<28){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS article_content_features (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content_snapshot_id INTEGER NOT NULL UNIQUE,
+        metric_id INTEGER NOT NULL,
+        extraction_version TEXT NOT NULL DEFAULT 'v1',
+        features_json TEXT NOT NULL DEFAULT '{}',
+        extracted_at TEXT NOT NULL,
+        FOREIGN KEY(content_snapshot_id) REFERENCES article_content_snapshots(id) ON DELETE CASCADE,
+        FOREIGN KEY(metric_id) REFERENCES wechat_article_metrics(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_article_content_features_metric ON article_content_features(metric_id,extracted_at DESC);
+      CREATE TABLE IF NOT EXISTS content_feedback_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        generated_at TEXT NOT NULL,
+        metric_window_start TEXT NOT NULL DEFAULT '',
+        metric_window_end TEXT NOT NULL DEFAULT '',
+        source_metric_ids_json TEXT NOT NULL DEFAULT '[]',
+        source_batch_ids_json TEXT NOT NULL DEFAULT '[]',
+        linked_article_count INTEGER NOT NULL DEFAULT 0,
+        feature_count INTEGER NOT NULL DEFAULT 0,
+        confidence TEXT NOT NULL DEFAULT 'low' CHECK(confidence IN ('low','medium','high')),
+        topic_signals_json TEXT NOT NULL DEFAULT '[]',
+        title_signals_json TEXT NOT NULL DEFAULT '[]',
+        body_signals_json TEXT NOT NULL DEFAULT '[]',
+        channel_signals_json TEXT NOT NULL DEFAULT '[]',
+        recommendations_json TEXT NOT NULL DEFAULT '[]',
+        unresolved_questions_json TEXT NOT NULL DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS idx_content_feedback_generated ON content_feedback_snapshots(generated_at DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(28,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

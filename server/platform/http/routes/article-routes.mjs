@@ -63,7 +63,14 @@ export async function handleArticleRoutes(context) {
   if (docContentMatch && request.method === "GET") {
     const doc = store.getDocumentContent(Number(docContentMatch[1]));
     if (!doc) return json(response, 404, { code: 'DOCUMENT_NOT_FOUND', error: '文稿不存在' });
-    response.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    // 内容日历将终稿放进同源预览 iframe；覆盖全局的 frame-ancestors 'none'，
+    // 否则 Chromium 会把合法的本地文稿显示成“拒绝连接”。正文仍保持纯文本，
+    // 不执行文章里的任何 HTML、脚本或资源。
+    response.writeHead(200, {
+      "content-type": "text/plain; charset=utf-8",
+      "content-security-policy": "default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'none'; style-src 'none'; img-src 'none'; connect-src 'none';",
+      "cache-control": "no-store",
+    });
     return response.end(doc.content || doc.title || "");
   }
 

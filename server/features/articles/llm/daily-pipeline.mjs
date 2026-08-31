@@ -10,6 +10,7 @@ import { markdownVisibleChars } from '../../../shared/domain/markdown-visible-ch
 import { resolveArticleStageSkills } from '../../../platform/skills/entry-routing.mjs';
 import { illustrateArticle } from '../application/article-illustration.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
+import { buildContentFeedbackPromptContext } from '../../content-planning/wechat-content-feedback.mjs';
 
 function writeFile(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -120,6 +121,7 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
     selection:{requestedSkill:'',selectedSkill:'wechat-mp-daily',selectionSource:'builtin-default',entryPoint:'batch-daily',stages:resolvedStages}});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
   provider=runtime.provider;const providerConfig=runtime.providerConfig;
+  const titleFeedback=buildContentFeedbackPromptContext(store.getLatestContentFeedbackSnapshot?.() || null,{target:'title'});
   const configuredLength=runtime.config?.gates?.length;
   // 技能覆盖层 > config.local.json articleLength（pipelines.daily 差异覆盖）> 默认 1300–2000
   const resolvedLength=resolveArticleLength({articleLength},'daily');
@@ -136,7 +138,7 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
 
   onProgress('早报 3/7 根据完整初稿生成并锁定标题');
   const titleResult=await gateway.complete({provider,purpose:'daily-title-generation',batchId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
-    {role:'system',protected:true,content:`${titleGenerator.prompt}\n\n根据完整早报生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入事件事实卡没有的事实、数字、人物或结论。`},
+    {role:'system',protected:true,content:`${titleGenerator.prompt}${titleFeedback?`\n\n${titleFeedback}`:''}\n\n根据完整早报生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入事件事实卡没有的事实、数字、人物或结论。`},
     {role:'user',protected:true,content:JSON.stringify({batchDate:batch.batch_date,focus:focusContext,draft})},
   ]});
   let titlePlan={};try{titlePlan=parseJson(titleResult,store);}catch{}

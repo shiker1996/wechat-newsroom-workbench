@@ -21,6 +21,8 @@ import { EventResolutionReviewRepository } from '../persistence/repositories/eve
 import { AgentRunRepository } from '../persistence/repositories/agent-run-repository.mjs';
 import { SocialTemplateMetricsRepository } from '../persistence/repositories/social-template-metrics-repository.mjs';
 import { SocialTemplateProposalMetricsRepository } from '../persistence/repositories/social-template-proposal-metrics-repository.mjs';
+import { ContentPlanningRepository } from '../persistence/repositories/content-planning-repository.mjs';
+import { ArticleArtifactRepository } from '../persistence/repositories/article-artifact-repository.mjs';
 import { BatchQueryService } from '../persistence/queries/batch-query-service.mjs';
 import { CandidateQueryService } from '../persistence/queries/candidate-query-service.mjs';
 import { EventResolutionQueryService } from '../persistence/queries/event-resolution-query-service.mjs';
@@ -54,6 +56,8 @@ export class Store {
       agentRuns: new AgentRunRepository(this.db),
       socialTemplateMetrics: new SocialTemplateMetricsRepository(this.db),
       socialTemplateProposalMetrics: new SocialTemplateProposalMetricsRepository(this.db),
+      contentPlanning: new ContentPlanningRepository(this.db),
+      articleArtifacts: new ArticleArtifactRepository(this.db),
     });
     this.queries = Object.freeze({
       batches: new BatchQueryService(this.db),
@@ -386,6 +390,10 @@ export class Store {
     return this.repositories.content.listDocuments(batchId);
   }
 
+  listAllDocuments() {
+    return this.repositories.content.listAllDocuments();
+  }
+
   upsertArtifact(artifact) {
     return this.repositories.content.upsertArtifact(artifact);
   }
@@ -396,6 +404,10 @@ export class Store {
 
   getArtifact(id) {
     return this.repositories.content.getArtifact(id);
+  }
+
+  getArtifactByPath(filePath) {
+    return this.repositories.content.getArtifactByPath(filePath);
   }
 
   recordModelCall(input) {
@@ -554,8 +566,52 @@ export class Store {
   }
 
   listCalendarContent(input = {}) {
-    return this.queries.workbench.listCalendarContent(input);
+    return [...this.queries.workbench.listCalendarContent(input), ...this.repositories.contentPlanning.listCalendarPlans(input.month)]
+      .sort((left, right) => String(right.updated_at || '').localeCompare(String(left.updated_at || '')));
   }
+
+  listContentColumns(options = {}) { return this.repositories.contentPlanning.listColumns(options); }
+  saveContentColumn(input) { return this.repositories.contentPlanning.saveColumn(input); }
+  createWritingMaterial(input) { return this.repositories.contentPlanning.createMaterial(input); }
+  getWritingMaterial(id) { return this.repositories.contentPlanning.getMaterial(id); }
+  listWritingMaterials(input = {}) { return this.repositories.contentPlanning.listMaterials(input); }
+  updateWritingMaterial(id, input = {}) { return this.repositories.contentPlanning.updateMaterial(id, input); }
+  saveWritingAssessment(id, assessment) { return this.repositories.contentPlanning.saveAssessment(id, assessment); }
+  createWritingPlan(input) { return this.repositories.contentPlanning.createPlan(input); }
+  getWritingPlan(id) { return this.repositories.contentPlanning.getPlan(id); }
+  listWritingPlans(input = {}) { return this.repositories.contentPlanning.listPlans(input); }
+  updateWritingPlan(id, input = {}) { return this.repositories.contentPlanning.updatePlan(id, input); }
+  getArticlePublication(input = {}) { return this.repositories.contentPlanning.getArticlePublication(input); }
+  saveArticlePublication(input = {}) { return this.repositories.contentPlanning.saveArticlePublication(input); }
+  listArticlePublications() { return this.repositories.contentPlanning.listArticlePublications(); }
+  listColumnPerformance() { return this.repositories.contentPlanning.listColumnPerformance(); }
+  importWechatExport(input) { return this.repositories.contentPlanning.importWechat(input); }
+  listWechatImports(input = {}) { return this.repositories.contentPlanning.listWechatImports(input); }
+  getWechatReview(input = {}) { return this.repositories.contentPlanning.getWechatReview(input); }
+  listWechatArticleMetrics() { return this.repositories.contentPlanning.listWechatArticleMetrics(); }
+  getWechatArticleMetricMatchByMetric(metricId) { return this.repositories.contentPlanning.getWechatArticleMetricMatchByMetric(metricId); }
+  getWechatArticleMetricMatch(id) { return this.repositories.contentPlanning.getWechatArticleMetricMatch(id); }
+  listWechatArticleMetricMatches(input = {}) { return this.repositories.contentPlanning.listWechatArticleMetricMatches(input); }
+  wechatArticleMetricMatchStats() { return this.repositories.contentPlanning.wechatArticleMetricMatchStats(); }
+  upsertWechatArticleMetricMatch(input = {}) { return this.repositories.contentPlanning.upsertWechatArticleMetricMatch(input); }
+  updateWechatArticleMetricMatch(id, input = {}) { return this.repositories.contentPlanning.updateWechatArticleMetricMatch(id, input); }
+  getCurrentArticleContentSnapshot(metricId) { return this.repositories.contentPlanning.getCurrentArticleContentSnapshot(metricId); }
+  listArticleContentLinks(input = {}) { return this.repositories.contentPlanning.listArticleContentLinks(input); }
+  listArticleContentAnalyses(input = {}) { return this.repositories.contentPlanning.listArticleContentAnalyses(input); }
+  saveArticleContentSnapshot(input = {}) { return this.repositories.contentPlanning.saveArticleContentSnapshot(input); }
+  getArticleContentFeatures(snapshotId) { return this.repositories.contentPlanning.getArticleContentFeatures(snapshotId); }
+  saveArticleContentFeatures(input = {}) { return this.repositories.contentPlanning.saveArticleContentFeatures(input); }
+  getLatestContentFeedbackSnapshot() { return this.repositories.contentPlanning.getLatestContentFeedbackSnapshot(); }
+  listContentFeedbackSnapshots(input = {}) { return this.repositories.contentPlanning.listContentFeedbackSnapshots(input); }
+  saveContentFeedbackSnapshot(input = {}) { return this.repositories.contentPlanning.saveContentFeedbackSnapshot(input); }
+  listArticleEvidenceAssets(input = {}) { return this.repositories.contentPlanning.listArticleEvidenceAssets(input); }
+  replaceArticleEvidenceAssets(input = {}) { return this.repositories.contentPlanning.replaceArticleEvidenceAssets(input); }
+
+  upsertArticleArtifact(input = {}) { return this.repositories.articleArtifacts.upsert(input); }
+  listArticleArtifacts(input = {}) { return this.repositories.articleArtifacts.list(input); }
+  articleArtifactStats() { return this.repositories.articleArtifacts.stats(); }
+  pruneArticleArtifacts(input = {}) { return this.repositories.articleArtifacts.pruneMissing(input); }
+  recordArticleArtifactIndexRun(input = {}) { return this.repositories.articleArtifacts.recordRun(input); }
 
   findSimilarArticles(candidateId) {
     return this.queries.workbench.findSimilarArticles(candidateId);

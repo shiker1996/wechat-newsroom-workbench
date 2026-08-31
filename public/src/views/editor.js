@@ -3,6 +3,7 @@ import { request } from "../core/http.js";
 import { escapeHtml, toast, providerOptions, withLoading, confirmAction, ensureModelOptions, debounce } from "../core/ui.js";
 import { state } from "../core/state.js";
 import { AUTOSAVE_DELAY_MS } from "../core/constants.js";
+import { loadPublicationMeta, openPublicationDialog, renderPublicationSummary } from "../core/publication-meta.js";
 import { lineDiff as documentLineDiff, markdownHeadings as documentMarkdownHeadings, qualityIssues as documentQualityIssues, visibleChars as documentVisibleChars, writingStatistics as documentWritingStatistics } from "./editor-document-model.js";
 
 let markdownRenderer;
@@ -440,6 +441,7 @@ function setWritingDeskAvailability(available) {
   view.classList.toggle("writing-desk-empty",!available);
   const selectors=[
     "#article-title","#save-document","#document-find","#document-history",
+    "#open-publication-meta",
     "#draft-provider","#draft-instructions","#ai-draft",
     ".markdown-toolbar button","#markdown-editor","#writing-goal-open"
   ];
@@ -508,6 +510,7 @@ async function loadSelectedDocument() {
     if (titleEl) titleEl.value = "";
     lastTitleValue = "";
     if (editor) { editor.value = ""; renderMarkdown(); }
+    renderPublicationSummary(null);
     resetHistory(editor?.value || "");
     setSaveState("saved","等待锁定候选");
     renderPreflightSummary("");
@@ -532,6 +535,8 @@ async function loadSelectedDocument() {
     editor.value = docResult?.content || (candidate ? `# ${candidate.hotspot_title}\n\n` : "");
     renderMarkdown();
   }
+  try { renderPublicationSummary(currentDocument?.id ? await loadPublicationMeta({ documentId: currentDocument.id }) : null); }
+  catch (error) { renderPublicationSummary(null); toast(`发布信息加载失败：${error.message}`, "error"); }
   resetHistory(editor?.value || "");
   editorDirty = false;
   clearAutoSave();
@@ -783,6 +788,17 @@ function bindEditor() {
   document.getElementById("writing-candidate").addEventListener("change", async (event) => {
     if (!await confirmDiscardEdits()) { event.target.value = lastCandidateValue; return; }
     loadSelectedDocument().catch((error) => toast(error.message, "error"));
+  });
+  document.getElementById("open-publication-meta")?.addEventListener("click", async () => {
+    try {
+      if (!currentDocument?.id) await saveDocument();
+      if (!currentDocument?.id) return toast("请先保存当前文稿");
+      await openPublicationDialog({
+        documentId: currentDocument.id,
+        title: document.getElementById("article-title")?.value.trim() || currentDocument.title || "当前文章",
+        onSaved: (publication) => renderPublicationSummary(publication),
+      });
+    } catch (error) { toast(error.message, "error"); }
   });
   $$("input[name=doc-kind]").forEach((item) => item.addEventListener("change", async () => {
     if (!await confirmDiscardEdits()) {

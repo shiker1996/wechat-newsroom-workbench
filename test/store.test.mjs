@@ -542,12 +542,34 @@ test('内容日历同时返回文章终稿与图文最终 HTML', () => {
     const candidate=store.listCandidates(batch.id)[0];
     store.addCandidateTracks(candidate.id,['social_cards'],{pool_role:'AI 图文预选'});
     store.saveDocument({batchId:batch.id,candidateId:candidate.id,kind:'final',title:'文章终稿',content:'正文',status:'ready'});
+    const copy=path.join(tempRoot,'copy.txt');fs.writeFileSync(copy,'标题\n正文');const copyStat=fs.statSync(copy);
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文配套文案',name:'copy.txt',path:copy,size:copyStat.size,modifiedAt:'2026-07-22T07:59:00.000Z'});
     const html=path.join(tempRoot,'my-design.html');fs.writeFileSync(html,'<html></html>');const stat=fs.statSync(html);
     store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文设计 HTML',name:'my-design.html',path:html,size:stat.size,modifiedAt:'2026-07-22T08:00:00.000Z'});
+    const aiHtml=path.join(tempRoot,'ai-beautified.html');fs.writeFileSync(aiHtml,'<html>AI视觉</html>');const aiStat=fs.statSync(aiHtml);
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'AI 视觉 HTML',name:'ai-beautified.html',path:aiHtml,size:aiStat.size,modifiedAt:'2026-07-22T08:01:00.000Z'});
     const entries=store.listCalendarContent({month:'2026-07'});
     assert.equal(entries.filter((item)=>item.content_type==='article').length,1);
-    assert.equal(entries.filter((item)=>item.content_type==='social_cards').length,1);
-    assert.equal(entries.find((item)=>item.content_type==='social_cards').candidate_row_id,candidate.id);
+    const socialEntries=entries.filter((item)=>item.content_type==='social_cards');
+    assert.equal(socialEntries.length,1);
+    assert.equal(socialEntries[0].candidate_row_id,candidate.id);
+    assert.equal(socialEntries[0].id,store.listArtifacts({batchId:batch.id}).find((item)=>item.name==='ai-beautified.html').id);
+  } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
+});
+
+test('内容日历以 copy.txt 作为图文交付标志', () => {
+  const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-calendar-copy-marker-'));let store;
+  try {
+    store=new Store(path.join(tempRoot,'test.db'));
+    const batch=store.createBatch({date:'2026-07-24',title:'copy 标志'});
+    store.addHotspots(batch.id,'rsshub',[{title:'仅有文案的图文',url:'https://github.com/o/copy-only'}]);
+    store.addCandidates(batch.id,[store.getBatch(batch.id).hotspots[0].id]);
+    const candidate=store.listCandidates(batch.id)[0];
+    const copy=path.join(tempRoot,'copy.txt');fs.writeFileSync(copy,'标题\n正文');const stat=fs.statSync(copy);
+    store.upsertArtifact({batchId:batch.id,candidateId:candidate.id,track:'social_cards',kind:'图文配套文案',name:'copy.txt',path:copy,size:stat.size,modifiedAt:'2026-07-24T08:00:00.000Z'});
+    const social=store.listCalendarContent({month:'2026-07'}).find((item)=>item.content_type==='social_cards');
+    assert.equal(social.candidate_row_id,candidate.id);
+    assert.equal(social.id,store.listArtifacts({batchId:batch.id})[0].id);
   } finally {store?.close();fs.rmSync(tempRoot,{recursive:true,force:true});}
 });
 

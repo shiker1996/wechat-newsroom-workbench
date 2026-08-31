@@ -622,6 +622,14 @@ AI 规划配图占位
 重新扫描工作区，建立产物索引
 → 产物柜
 
+### GET /api/article-artifacts
+读取本地文章产物索引与扫描统计。支持 `?q=`、`?status=`、`?limit=`。
+→ 发布中心文章索引
+
+### POST /api/article-artifacts/reindex
+扫描文章目录和配置的内容根目录，提取文章标题、日期、版本、URL、文档/计划/栏目/素材及证据资产关联。
+→ 发布中心文章索引
+
 ### GET /api/artifacts/:id/content
 产物内容预览（返回文件流）
 → 产物柜（点击卡片）
@@ -645,7 +653,10 @@ AI 规划配图占位
 → 产物柜
 
 ### GET /api/calendar
-返回文章和图文合并后的内容日历数据。
+返回文章、图文和主动写作计划合并后的内容日历数据；主动写作计划会附带复盘软推荐 `planning_recommendation`，包括建议目标、题材、标题结构和验证问题。
+
+### GET /api/wechat/strategy
+读取账号策略建议草案。至少有两个不同指标周期且每个周期至少关联 3 篇正文时才返回建议；建议只读，不自动写入 `account-context.json`。
 
 ### GET /api/documents/:id/content
 文档正文（返回 text/plain）
@@ -957,3 +968,87 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 ### PATCH /api/system/collector-tools/:id
 
 更新采集工具的启用状态或优先级。停用操作受能力影响门禁保护。
+
+### GET|POST /api/content-columns
+
+读取或保存主动写作栏目。栏目是工作台独立实体，不写入 `account-context.json`。
+
+### GET|POST /api/writing-materials
+
+读取素材箱或保存一条 Markdown/纯文本素材。保存后会按账号定位给出账号切合度、内容完整度、话题潜力、深挖方向和标题方向建议；已有评估读取时还会动态附带公众号历史表现软信号，并返回 `planning_recommendation`。传 `?sort=feedback` 可按复盘优先级排序；该排序不改变热点主评分。
+
+### GET|PATCH|PUT /api/writing-materials/:id
+
+读取或编辑一条素材。
+
+### POST /api/writing-materials/:id/assessment
+
+重新生成该素材的轻量评估和推荐结果。
+
+### GET|POST /api/writing-material-plans
+
+读取或创建主动写作内容计划。设置 `plannedDate` 后会进入现有内容日历；创建时可传 `columnId`、`titleDirection`、`titleIntent` 和 `teaser`，用于保留本次目标、标题方向和下一篇预告。
+
+### PATCH|PUT /api/writing-material-plans/:id
+
+修改主动写作内容计划的栏目、标题方向、日期或状态。
+
+### GET /api/article-publications
+
+按 `documentId`、`planId` 或 `id` 读取文章的公众号发布元数据；不存在时返回 404。
+
+### POST /api/article-publications
+
+保存或更新文章的公众号发布元数据。请求体支持 `planId` 或 `documentId`，以及 `contentUrl`、`publishedAt`、`titleAtPublish`、`columnId`、`contentPillar`、`contentRole` 和 `distributionLane`。填写 URL 与发布日期后状态自动进入“等待数据”。
+
+### GET /api/wechat/matches
+
+读取公众号文章指标与本地文章产物的匹配结果。支持 `?status=pending`、`?limit=`。
+→ 公众号复盘
+
+### POST /api/wechat/matches/rematch
+
+先自动扫描配置的文章目录，再重新生成匹配结果：文章匹配池只使用 `09-FINAL.md`，同时把 `social-cards/**/copy.txt` 的发布文案作为独立候选，按发布文案首行标题与日期做匹配；已人工确认或拒绝的记录保持不变。
+→ 公众号复盘
+
+### PATCH /api/wechat/matches/:id
+
+人工确认或拒绝一条匹配。确认请求体为 `{ "action": "confirm", "articleArtifactId": 1 }`，拒绝请求体为 `{ "action": "reject" }`。
+→ 公众号复盘
+
+### GET /api/wechat/content-links
+
+读取已确认公众号文章的正文快照、来源类型和证据资产。来源区分本地终稿、审阅稿、初稿、排版 HTML 与公开 URL。
+→ 公众号复盘
+
+### POST /api/wechat/content-links/relink
+
+只使用本地文章索引重新关联已确认文章的正文，并按文件名和目录识别截图、日志、代码差异、图表、失败及结果证据；不会访问外部 URL。
+→ 公众号复盘
+
+### POST /api/wechat/content-links/:id/fetch
+
+在本地正文不可用时，按已确认匹配记录中的公开 URL 手动获取正文；本地正文存在时不会覆盖。
+→ 公众号复盘
+
+### GET /api/wechat/feedback
+
+读取最近一次正文特征与公众号表现反馈快照，以及已关联正文和已提取特征的数量。快照只提供历史相关性、写作提示和待确认问题，不自动修改技能或账号配置。
+→ 公众号复盘
+
+### POST /api/wechat/feedback/rebuild
+
+对已确认且正文状态为 `ok` 的文章执行确定性特征抽取，并生成新的 `ContentFeedbackSnapshot`。当前不调用模型、不抓取外部 URL，也不注入标题、选题或写作流程。
+→ 公众号复盘
+
+### GET /api/wechat/review
+
+返回已经导入的公众号后台数据、文章表现、用户增长、常读用户和渠道聚合结果；文章会附带规则初判的题材标签、标题结构，`insights` 提供按题材/标题结构聚合的平均阅读、阅读后关注和样本量，供选题与主动写作软性参考。
+
+### GET /api/wechat/imports
+
+返回公众号导出文件的导入记录。
+
+### POST /api/wechat/import
+
+导入一份后台导出文件并与历史数据合并。导入后会先自动建立本地文章索引，再执行公众号文章匹配，无需先手动进入发布中心建立索引。请求体为 `{ fileName, importType, data }`，其中 `data` 是文件 Base64；`importType` 支持 `user_growth`、`notified_articles`、`unnotified_articles`、`content_trends`、`regular_readers`。支持 HTML 表格伪 `.xls`、BIFF `.xls`、CSV/TSV。

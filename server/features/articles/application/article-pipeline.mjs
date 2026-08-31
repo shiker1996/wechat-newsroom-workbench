@@ -17,6 +17,7 @@ import {
   buildDraftUserPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill,
   sourceCacheIssue, unverifiedFactBaseIssue,
 } from './article-pipeline-contract.mjs';
+import { buildContentFeedbackPromptContext } from '../../content-planning/wechat-content-feedback.mjs';
 export {
   ARTICLE_LENGTH_RANGE, articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief,
   buildDraftUserPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill,
@@ -192,6 +193,9 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
     selection:(skillSelection||stageSelections)?{...(skillSelection||{requestedSkill:'',selectedSkill:chosenWriterSkill,selectionSource:'builtin-recommendation'}),entryPoint:'hotspot-article',stages:stageSelections||{}}:null});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
   provider=runtime.provider;providerConfig=runtime.providerConfig;
+  const contentFeedback=store.getLatestContentFeedbackSnapshot?.() || null;
+  const writingFeedback=buildContentFeedbackPromptContext(contentFeedback,{target:'writing'});
+  const titleFeedback=buildContentFeedbackPromptContext(contentFeedback,{target:'title'});
   const configuredLength=writerSkillBundle.config?.gates?.length;
   // 优先级：技能覆盖层 gates.length > config.local.json articleLength（含 pipelines.article 差异覆盖）> 默认 1300–2000
   const articleLengthRange=configuredLength
@@ -242,7 +246,7 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   const p01=path.join(workdir,'01-personal-materials.md'),p02=path.join(workdir,'02-outline.md'),p03=path.join(workdir,'03-titles.md'); writeFile(p01,materials);writeFile(p02,outline);writeFile(p03,titles);
   recordStage('planning',orchestratorSkill,['00-article-brief.md','02-fact-base.json'],['01-personal-materials.md','02-outline.md','03-titles.md']);
   onProgress(`Step 4 使用 ${chosenWriterSkill} 完整技能生成初稿`);
-  const skillPrompt = buildArticleStageSystem(orchestratorSkill,'drafting',writerSkillBundle);
+  const skillPrompt = `${buildArticleStageSystem(orchestratorSkill,'drafting',writerSkillBundle)}${writingFeedback?`\n\n${writingFeedback}`:''}`;
   const draftResult=await textCall(gateway,{provider,purpose:'article-drafting-pipeline',batchId,candidateId},skillPrompt,buildDraftUserPrompt(selectedTitle, writingBrief, outline),Math.min(6500,providerConfig.maxOutputTokens));
   let draft=cleanMarkdown(draftResult.content);
   const draftGateSystem=buildArticleStageSystem(orchestratorSkill,'draft-quality-gate',writerSkillBundle,stageSkills['article-reviewer']);
@@ -259,7 +263,7 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   recordStage('drafting',writerSkillBundle,['01-personal-materials.md','02-outline.md','03-titles.md','02-fact-base.json'],'04-draft.md');
   recordStage('draft-quality-gate',stageSkills['article-reviewer'],['04-draft.md','02-fact-base.json'],'04-quality-gate.json');
   onProgress('Step 4.5 根据初稿正文生成标题');
-  const titleGenSystem = buildArticleStageSystem(orchestratorSkill,'title-generation',stageSkills['title-generator']);
+  const titleGenSystem = `${buildArticleStageSystem(orchestratorSkill,'title-generation',stageSkills['title-generator'])}${titleFeedback?`\n\n${titleFeedback}`:''}`;
   const titleGenResult=await gateway.complete({provider,purpose:'article-title-generation',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),
     messages:[{role:'system',content:titleGenSystem,protected:true},{role:'user',content:JSON.stringify({topic:candidate.hotspot_title,
       distribution_lane:brief.distributionLane,reader_stake:brief.readerStake,draft}),protected:true}]});
