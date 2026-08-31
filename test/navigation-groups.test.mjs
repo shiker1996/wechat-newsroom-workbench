@@ -15,7 +15,11 @@ test('侧栏按五个任务阶段组织并自动展开当前阶段', () => {
   assert.match(html, /data-view="wechat-review">公众号复盘/);
   assert.match(html, /data-view="artifacts">产物中心/);
   assert.match(html, /data-view="publication">发布中心/);
-  assert.ok(html.indexOf('data-view="artifacts"') < html.indexOf('data-view="publication"'));
+  assert.match(html, /data-view="wechat-review">公众号复盘/);
+  assert.match(html, /id="quick-material-button">＋ 快速记素材/);
+  assert.match(html, /id="quick-material-dialog"/);
+  assert.match(main, /bindQuickMaterialCapture/);
+  assert.ok(html.indexOf('data-view="publication"') < html.indexOf('data-view="artifacts"'));
   assert.ok(html.indexOf('data-view="material-inbox"') < html.indexOf('data-view="skills"'));
   assert.ok(html.indexOf('data-view="wechat-review"') < html.indexOf('data-view="skills"'));
   assert.match(html,/data-view="topics">文章选题池/);

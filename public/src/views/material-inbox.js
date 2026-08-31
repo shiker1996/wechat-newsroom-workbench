@@ -50,6 +50,7 @@ async function load() {
 
 function bind() {
   if (bound) return; bound = true;
+  window.addEventListener("material-created", () => load().catch((error) => toast(error.message, "error")));
   document.getElementById("material-capture-form").addEventListener("submit", async (event) => {
     event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     try { await request("/api/writing-materials", { method: "POST", body: JSON.stringify({ sourceType: data.get("sourceType"), capturedAt: data.get("capturedAt"), title: data.get("title"), rawText: data.get("rawText"), tags: String(data.get("tags") || "").split(/[，,]/).map((item) => item.trim()).filter(Boolean) }) }); form.reset(); form.querySelector('[name="capturedAt"]').value = new Date().toISOString().slice(0, 10); toast("素材已放入素材箱", "success"); await load(); } catch (error) { toast(error.message, "error"); }

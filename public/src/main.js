@@ -5,6 +5,7 @@ import { toast, bindTablistKeyboardNavigation, bindDismissableDetails } from "./
 import { bindBatchDrawer } from "./views/batch-drawer.js";
 import loadOverview from "./views/dashboard.js";
 import { hydrateThemePickers } from "./core/theme-catalog.js";
+import { bindQuickMaterialCapture } from "./core/quick-material.js";
 
 const viewModules = {
   dashboard: "./views/dashboard.js", batches: "./views/batches.js", overview: "./views/atlas.js",
@@ -215,6 +216,7 @@ async function pollJobNotifications() {
 async function onReady() {
   await init();
   bindGlobal();
+  bindQuickMaterialCapture();
   bindBatchDrawer();
   startClock();
   pollJobNotifications();

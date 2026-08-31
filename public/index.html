@@ -17,13 +17,11 @@
     </div>
     <nav id="nav">
       <details class="nav-group" data-nav-group="today" open>
-        <summary><span>01</span><b>今日工作</b><small>总览 · 批次 · 日历 · 复盘</small></summary>
+          <summary><span>01</span><b>今日工作</b><small>总览 · 批次 · 日历</small></summary>
         <div class="nav-group-items">
           <button class="nav-item active" data-view="dashboard" aria-current="page">工作台总览</button>
           <button class="nav-item" data-view="batches">批次管理</button>
           <button class="nav-item" data-view="calendar">内容日历</button>
-          <div class="nav-section-label">内容复盘</div>
-          <button class="nav-item" data-view="wechat-review">公众号复盘</button>
         </div>
       </details>
       <details class="nav-group" data-nav-group="discovery">
@@ -62,10 +60,12 @@
         </div>
       </details>
       <details class="nav-group" data-nav-group="system">
-        <summary><span>05</span><b>资产与审计</b><small>产物 · 日志</small></summary>
+          <summary><span>05</span><b>发布与复盘</b><small>发布 · 复盘 · 资产</small></summary>
         <div class="nav-group-items">
-          <button class="nav-item" data-view="artifacts">产物中心</button>
           <button class="nav-item" data-view="publication">发布中心</button>
+          <button class="nav-item" data-view="wechat-review">公众号复盘</button>
+          <div class="nav-section-label">资产与审计</div>
+          <button class="nav-item" data-view="artifacts">产物中心</button>
           <button class="nav-item" data-view="logs">任务日志</button>
         </div>
       </details>
@@ -92,6 +92,7 @@
       <div class="top-actions">
         <select id="batch-switcher" class="batch-switcher" aria-label="当前批次"><option value="">选择批次</option></select>
         <time id="clock"></time>
+        <button class="ghost-button" id="quick-material-button">＋ 快速记素材</button>
         <button class="ghost-button" id="health-button">采集环境设置</button>
         <button class="ghost-button" id="new-breaking-button">⚡ 突发热点</button>
         <button class="primary-button" id="new-batch-button">＋ 新建今日批次</button>
@@ -1210,6 +1211,7 @@
   <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>
   <dialog id="writing-goal-dialog" class="modal"><form id="writing-goal-form"><div class="modal-head"><div><span class="kicker">WRITING TARGET</span><h2>设置写作目标</h2></div><button type="button" class="close-button" data-close-writing-goal aria-label="关闭">×</button></div><label>目标可见字数<input id="writing-goal-input" type="number" min="200" max="10000" step="100" required></label><p class="fine-print">目标仅用于进度反馈；草稿和终稿可以分别设置，不改变保存与终稿门禁规则。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-writing-goal>取消</button><button type="submit" class="ink-button">保存目标</button></div></form></dialog>
   <dialog id="publication-dialog" class="modal publication-dialog"><form id="publication-form"><div class="modal-head"><div><span class="kicker">PUBLICATION RECORD</span><h2 id="publication-dialog-title">登记公众号发布信息</h2><p id="publication-dialog-context" class="modal-form-intro">发布后补充最终信息，方便关联后台数据。</p></div><button type="button" class="close-button" data-close-publication aria-label="关闭">×</button></div><div class="publication-status-strip"><span>当前状态</span><b id="publication-status">待登记</b><small id="publication-status-note">发布后补充 URL 和发布日期，系统才能关联后台数据。</small></div><div class="publication-form-grid"><label>公众号文章 URL<input id="publication-url" name="contentUrl" type="url" placeholder="https://mp.weixin.qq.com/s/..." autocomplete="url"><small>可以先不填，发布后再补。</small></label><label>实际发布日期<input id="publication-date" name="publishedAt" type="date"><small>优先填写真实发布日期，而不是计划日期。</small></label><label class="publication-span">发布时最终标题<input id="publication-title" name="titleAtPublish" maxlength="120" placeholder="默认带入当前标题"></label><label>内容支柱<input id="publication-pillar" name="contentPillar" placeholder="例如：开源与工程实践"></label><label>内容角色<select id="publication-role" name="contentRole"><option value="">未指定</option><option value="拉新">拉新</option><option value="涨粉">涨粉</option><option value="分享">分享</option><option value="讨论">讨论</option><option value="实验">实验</option></select></label><label>分发方式<select id="publication-lane" name="distributionLane"><option value="">未指定</option><option value="推荐">推荐</option><option value="通知">通知</option><option value="实验">实验</option></select></label><label>主动写作栏目<select id="publication-column" name="columnId"><option value="">未指定栏目</option></select></label></div><p class="fine-print publication-footnote">保存后不会抓取或发布文章；这里只记录发布关系，供后续文章匹配和复盘使用。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-publication>取消</button><button type="submit" class="ink-button">保存发布信息</button></div></form></dialog>
+  <dialog id="quick-material-dialog" class="modal quick-material-dialog"><form id="quick-material-form"><div class="modal-head"><div><span class="kicker">QUICK CAPTURE</span><h2>记一条素材</h2><p class="modal-form-intro">先保存真实片段，稍后再去素材箱分析、补全和排进日历。</p></div><button type="button" class="close-button" data-close-quick-material aria-label="关闭">×</button></div><div class="quick-material-form-grid"><label>来源<select name="sourceType"><option value="conversation">AI 会话</option><option value="reading">阅读</option><option value="life">生活</option><option value="project">项目</option><option value="text">其他文本</option></select></label><label>记录日期<input name="capturedAt" type="date" required></label><label class="quick-material-span">标题（可选）<input name="title" placeholder="例如：这次自动化为什么反而变慢了"></label><label class="quick-material-span">正文 / 原话<textarea name="rawText" rows="8" required placeholder="粘贴一段会话、笔记、日记、日志或刚刚想到的片段……"></textarea></label><label class="quick-material-span">标签（可选）<input name="tags" placeholder="用逗号分隔，例如：失败复盘，AI写作"></label></div><div class="modal-actions"><span class="quick-material-hint">快捷键：Ctrl + Shift + M</span><button type="button" class="ghost-button" data-close-quick-material>取消</button><button type="submit" class="ink-button">存入素材箱</button></div></form></dialog>
   <dialog id="preflight-dialog" class="modal preflight-dialog"><div class="preflight-dialog-body"><div class="modal-head"><div><span class="kicker">PUBLISH READINESS</span><h2>发布前检查</h2></div><button type="button" class="close-button" data-close-preflight aria-label="关闭">×</button></div><div class="preflight-hero"><b id="preflight-title">正在检查当前文稿</b><span id="preflight-summary"></span></div><div id="preflight-list" class="preflight-list"></div><p class="fine-print">检查结果仅用于发布前确认，不会自动修改正文，也不会影响草稿自动保存。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-preflight>稍后处理</button><button type="button" class="ink-button" id="preflight-primary">查看待处理项</button></div></div></dialog>
   <dialog id="quality-dialog" class="modal quality-dialog"><div class="quality-dialog-body"><div class="modal-head"><div><span class="kicker">QUALITY REVIEW</span><h2>文稿质量检查</h2></div><button type="button" class="close-button" data-close-quality aria-label="关闭">×</button></div><p id="quality-summary" class="quality-summary"></p><div id="quality-issue-list" class="quality-issue-list"></div><div class="modal-actions"><button type="button" class="ink-button" data-close-quality>完成检查</button></div></div></dialog>
   <dialog id="theme-picker-dialog" class="theme-picker-dialog"><div class="theme-picker-shell"><div class="theme-picker-head"><div><span class="kicker">VISUAL THEME</span><h2 id="theme-picker-title">选择主题</h2><p>颜色只是第一眼，版式语气与内容类型同样重要。</p></div><button type="button" class="close-button" id="close-theme-picker" aria-label="关闭主题选择">×</button></div><div class="theme-picker-tabs" role="tablist"><button type="button" class="active" data-theme-filter="all">全部</button><button type="button" data-theme-filter="builtin">内置主题</button><button type="button" data-theme-filter="user">我的主题</button><select id="theme-picker-scene" aria-label="按内容场景筛选"><option value="all">全部场景</option></select></div><div id="theme-picker-grid" class="theme-picker-grid"></div><div class="theme-picker-foot"><span id="theme-picker-selection">请选择一个主题</span><button type="button" class="primary-button" id="confirm-theme-picker">使用此主题</button></div></div></dialog>
