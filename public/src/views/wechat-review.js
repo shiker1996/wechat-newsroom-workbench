@@ -114,8 +114,24 @@ async function loadFeedback() { renderFeedback(await request("/api/wechat/feedba
 async function loadStrategy() { renderStrategy(await request("/api/wechat/strategy")); }
 async function load() { const [review] = await Promise.all([request("/api/wechat/review"), loadMatches(), loadContentLinks(), loadFeedback(), loadStrategy()]); render(review); }
 
+function scrollToReviewSection(id, focusImport = false) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  const disclosure = target.closest("details");
+  if (disclosure) disclosure.open = true;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (focusImport) window.setTimeout(() => document.getElementById("wechat-import-file")?.focus(), 260);
+}
+
 function bind() {
   if (bound) return; bound = true;
+  document.getElementById("wechat-import-file")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0]; const status = document.getElementById("wechat-import-status");
+    if (!status) return;
+    if (!file) { status.textContent = ""; return; }
+    const type = document.getElementById("wechat-import-type")?.selectedOptions?.[0]?.textContent || "当前类型";
+    status.textContent = `已选择：${file.name} · ${type}，点击“导入并合并”继续`;
+  });
   document.getElementById("wechat-import-submit").addEventListener("click", async () => {
     const file = document.getElementById("wechat-import-file").files[0]; const type = document.getElementById("wechat-import-type").value; const status = document.getElementById("wechat-import-status");
     if (!file) { toast("请先选择一个导出文件", "error"); return; }
@@ -141,6 +157,10 @@ function bind() {
     finally { button.disabled = false; button.textContent = "生成本轮反馈"; }
   });
   document.addEventListener("click", async (event) => {
+    const anchor = event.target.closest("[data-wechat-anchor]");
+    const focusImport = event.target.closest("[data-wechat-focus-import]");
+    if (anchor) { scrollToReviewSection(anchor.dataset.wechatAnchor); return; }
+    if (focusImport) { scrollToReviewSection("wechat-import-panel", true); return; }
     const confirm = event.target.closest("[data-wechat-confirm]"); const reject = event.target.closest("[data-wechat-reject]");
     const fetchContent = event.target.closest("[data-wechat-fetch-content]");
     if (fetchContent) {

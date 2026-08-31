@@ -23,6 +23,9 @@ export function bindQuickMaterialCapture() {
     form.querySelector('[name="rawText"]')?.focus();
   };
   openButton.addEventListener("click", open);
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-open-quick-material]")) open();
+  });
   dialog.querySelectorAll("[data-close-quick-material]").forEach((button) => button.addEventListener("click", () => dialog.close()));
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

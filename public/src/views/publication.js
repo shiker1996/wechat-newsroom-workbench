@@ -3,6 +3,9 @@ import { escapeHtml, formatDate, openArtifactPreview, toast } from "../core/ui.j
 
 const formatMetric = (value) => new Intl.NumberFormat("zh-CN").format(Number(value || 0));
 const PUBLICATION_ARTIFACT_TYPES = new Set(["文章终稿", "图文发布文案"]);
+let publicationItems = [];
+let publicationFilter = "all";
+let publicationQuery = "";
 
 function articleStatus(status) {
   return { indexed: "已索引", ambiguous: "待确认", unreadable: "不可读取" }[status] || status || "未知";
@@ -12,9 +15,44 @@ function isPublicationArtifact(item) {
   return PUBLICATION_ARTIFACT_TYPES.has(item?.artifact_type);
 }
 
+function publicationState(item) {
+  if (item.artifact_type === "图文发布文案") return { id: "social", label: "图文文案" };
+  if (item.metric_match_count) return { id: "reviewed", label: "已复盘" };
+  if (item.content_url) return { id: "published", label: "已发布" };
+  return { id: "pending", label: "待发布" };
+}
+
+function visiblePublicationItems() {
+  const query = publicationQuery.trim().toLowerCase();
+  return publicationItems.filter((item) => {
+    const state = publicationState(item);
+    const searchable = `${item.title || ""} ${item.relative_path || item.file_path || ""}`.toLowerCase();
+    return (publicationFilter === "all" || state.id === publicationFilter) && (!query || searchable.includes(query));
+  });
+}
+
+function renderPublicationList() {
+  const list = document.getElementById("article-index-list");
+  if (!list) return;
+  const items = visiblePublicationItems();
+  const emptyText = publicationQuery.trim() || publicationFilter !== "all"
+    ? "没有符合当前筛选的发布候选。可以切回“全部”，或前往产物中心查看所有中间产物。"
+    : "点击“建立发布索引”，扫描本机终稿和图文发布文案。";
+  list.innerHTML = items.length ? items.map((item) => {
+    const state = publicationState(item);
+    return `<article class="article-index-row ${item.status === "ambiguous" ? "is-ambiguous" : ""}">
+      <div class="article-index-main"><div class="article-index-kicker"><time>${escapeHtml(item.article_date || "无日期")}</time><span>${escapeHtml(item.version_label || item.artifact_type)}</span><em class="article-index-status ${item.status}">${escapeHtml(articleStatus(item.status))}</em><em class="publication-state publication-state-${state.id}">${state.label}</em></div>
+        <h3>${escapeHtml(item.title || "未识别标题")}</h3><p>${escapeHtml(item.relative_path || item.file_path || item.name || "")}</p>
+        <div class="article-index-links">${item.artifact_type === "图文发布文案" ? "<span>图文发布文案</span>" : ""}${item.document_id ? "<span>文档已关联</span>" : ""}${item.plan_id ? `<span>计划：${escapeHtml(item.plan_title || "已关联")}</span>` : ""}${item.column_name ? `<span>栏目：${escapeHtml(item.column_name)}</span>` : ""}${item.evidence_paths?.length ? `<span>证据线索 ${item.evidence_paths.length} 个</span>` : ""}${item.metric_match_count ? `<span class="article-index-performance">公众号：${formatMetric(item.metric_reads)} 阅读 · ${formatMetric(item.metric_shares)} 分享 · ${formatMetric(item.metric_follows)} 关注</span>` : "<span>尚未关联公众号数据</span>"}${item.content_url ? `<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener">打开发布页 ↗</a>` : ""}</div>
+      </div>${item.artifact_id ? `<button type="button" class="text-button article-index-open" data-article-artifact="${item.artifact_id}">打开产物</button>` : ""}
+    </article>`;
+  }).join("") : `<div class="empty-state">${emptyText}</div>`;
+}
+
 function renderArticleIndex(data) {
   const allItems = data?.items || [];
-  const items = allItems.filter(isPublicationArtifact);
+  publicationItems = allItems.filter(isPublicationArtifact);
+  const items = publicationItems;
   const stats = data?.stats || {};
   const finalCount = items.filter((item) => item.artifact_type === "文章终稿").length;
   const copyCount = items.filter((item) => item.artifact_type === "图文发布文案").length;
@@ -29,14 +67,7 @@ function renderArticleIndex(data) {
   const run = stats.latest_run;
   const statusEl = document.getElementById("article-index-status");
   if (statusEl) statusEl.textContent = run ? `上次扫描 ${formatDate(run.finished_at || run.started_at)} · ${run.indexed_count} 条` : "尚未扫描";
-  const list = document.getElementById("article-index-list");
-  if (!list) return;
-  list.innerHTML = items.length ? items.map((item) => `<article class="article-index-row ${item.status === "ambiguous" ? "is-ambiguous" : ""}">
-    <div class="article-index-main"><div class="article-index-kicker"><time>${escapeHtml(item.article_date || "无日期")}</time><span>${escapeHtml(item.version_label || item.artifact_type)}</span><em class="article-index-status ${item.status}">${escapeHtml(articleStatus(item.status))}</em></div>
-      <h3>${escapeHtml(item.title || "未识别标题")}</h3><p>${escapeHtml(item.relative_path || item.file_path || item.name || "")}</p>
-      <div class="article-index-links">${item.artifact_type === "图文发布文案" ? "<span>图文发布文案</span>" : ""}${item.document_id ? "<span>文档已关联</span>" : ""}${item.plan_id ? `<span>计划：${escapeHtml(item.plan_title || "已关联")}</span>` : ""}${item.column_name ? `<span>栏目：${escapeHtml(item.column_name)}</span>` : ""}${item.evidence_paths?.length ? `<span>证据线索 ${item.evidence_paths.length} 个</span>` : ""}${item.metric_match_count ? `<span class="article-index-performance">公众号：${formatMetric(item.metric_reads)} 阅读 · ${formatMetric(item.metric_shares)} 分享 · ${formatMetric(item.metric_follows)} 关注</span>` : "<span>尚未关联公众号数据</span>"}${item.content_url ? `<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener">发布 URL ↗</a>` : ""}</div>
-    </div>${item.artifact_id ? `<button type="button" class="text-button article-index-open" data-article-artifact="${item.artifact_id}">打开产物</button>` : ""}
-  </article>`).join("") : '<div class="empty-state">点击“建立发布索引”，扫描本机终稿和图文发布文案。</div>';
+  renderPublicationList();
 }
 
 async function loadPublicationIndex() {
@@ -69,6 +100,19 @@ function bindPublication() {
     try { await reindexPublication(); }
     catch (error) { toast(error.message, "error"); }
     finally { button.disabled = false; button.textContent = "建立发布索引"; }
+  });
+  document.querySelectorAll("[data-publication-filter]").forEach((button) => button.addEventListener("click", () => {
+    publicationFilter = button.dataset.publicationFilter || "all";
+    document.querySelectorAll("[data-publication-filter]").forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-selected", String(active));
+    });
+    renderPublicationList();
+  }));
+  document.getElementById("publication-query")?.addEventListener("input", (event) => {
+    publicationQuery = event.currentTarget.value || "";
+    renderPublicationList();
   });
   document.addEventListener("click", (event) => {
     const indexedArtifact = event.target.closest("[data-article-artifact]");

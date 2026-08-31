@@ -14,7 +14,6 @@ let extensionType = "";
 function bindSystem() {
   if (bound) return;
   bound = true;
-  document.getElementById("health-button").addEventListener("click", () => window.go("system"));
   document.getElementById("system-health").addEventListener("click", () => {
     loadSystem().catch((error) => toast(error.message, "error"));
   });
