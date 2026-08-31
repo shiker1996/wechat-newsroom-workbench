@@ -9,8 +9,12 @@ import { buildWechatInsights, classifyWechatArticle, matchWechatPerformance } fr
 import { matchWechatArticles } from '../../../features/content-planning/wechat-article-matcher.mjs';
 import { fetchWechatArticleContent, linkWechatArticlesContent } from '../../../features/content-planning/article-content-linker.mjs';
 import { buildContentFeedbackSnapshot, extractArticleContentFeatures } from '../../../features/content-planning/wechat-content-feedback.mjs';
+import { buildSocialContentFeedbackSnapshot } from '../../../features/content-planning/social-content-feedback.mjs';
 import { buildContentPlanningRecommendation, sortMaterialsByPlanningRecommendation } from '../../../features/content-planning/content-planning-recommendations.mjs';
 import { buildWechatStrategyRecommendations } from '../../../features/content-planning/wechat-strategy-recommendations.mjs';
+import { buildAdjustmentDraft, buildFeedbackAdjustmentMessages, buildFeedbackAdjustmentPatchMessages, confirmAdjustmentDraft, currentSkillFile, currentSkillPackageFiles, FEEDBACK_ADJUSTMENT_VERSION, listWriterSkillCatalog, resolveTitleSkillTarget, WRITER_SKILL_IDS, WRITER_SKILL_LABELS } from '../../../features/content-planning/feedback-adjustment.mjs';
+import { buildSocialFeedbackAdjustmentDraft, buildSocialFeedbackAdjustmentPatchMessages, buildSocialFeedbackAdjustmentPlanningMessages, resolveSocialSkillTargets } from '../../../features/content-planning/social-feedback-adjustment.mjs';
+import { parseModelJson } from '../../llm/model-json.mjs';
 import { getAccountContext } from '../../../shared/domain/account-context.mjs';
 
 const ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
@@ -85,6 +89,17 @@ function enrichWechatReview(review, matches = []) {
   };
 }
 
+function confirmedSocialMatches(store) {
+  return store.listWechatArticleMetricMatches({ limit: 1000 }).filter((item) => ['confirmed', 'auto_confirmed'].includes(item?.status)
+    && (item?.content_type === 'social' || item?.artifact_type === '图文发布文案'));
+}
+
+function buildSocialFeedbackTrack(store) {
+  const matches = confirmedSocialMatches(store);
+  const track = enrichWechatReview(store.getWechatReview(), matches).review_tracks?.social || {};
+  return { ...track, content_feedback: buildSocialContentFeedbackSnapshot(matches) };
+}
+
 function enrichMaterial(material, insights, feedback) {
   if (!material) return material;
   const assessment = material.assessment?.account_fit
@@ -110,7 +125,7 @@ function enrichCalendarEntry(entry, insights, feedback) {
 }
 
 export async function handleContentRoutes(context) {
-  const { request, response, pathname, searchParams, store, artifactRoots, mime, json, body, root } = context;
+  const { request, response, pathname, searchParams, store, artifactRoots, mime, json, body, root, models } = context;
 
   if (request.method === 'GET' && pathname === '/api/content-columns') {
     json(response, 200, store.listContentColumns({ includeInactive: searchParams.get('all') === '1' })); return true;
@@ -158,7 +173,13 @@ export async function handleContentRoutes(context) {
   }
   if (request.method === 'GET' && pathname === '/api/wechat/review') {
     const matches = store.listWechatArticleMetricMatches({ limit: 1000 });
-    json(response, 200, enrichWechatReview(store.getWechatReview({ month: searchParams.get('month') || '' }), matches)); return true;
+    const review = enrichWechatReview(store.getWechatReview({ month: searchParams.get('month') || '' }), matches);
+    const social = buildSocialFeedbackTrack(store);
+    json(response, 200, { ...review, review_tracks: { ...review.review_tracks, social } }); return true;
+  }
+  if (request.method === 'POST' && pathname === '/api/wechat/feedback/rebuild-social') {
+    const track = buildSocialFeedbackTrack(store);
+    json(response, 200, { status: 'ok', generated_at: new Date().toISOString(), count: Number(track.count || 0), track }); return true;
   }
   if (request.method === 'GET' && pathname === '/api/wechat/matches') {
     json(response, 200, { items: store.listWechatArticleMetricMatches({ status: searchParams.get('status') || '', limit: boundedLimit(searchParams, 200, 1000) }), stats: store.wechatArticleMetricMatchStats(), artifacts: store.listWechatMatchArtifacts() }); return true;
@@ -186,6 +207,117 @@ export async function handleContentRoutes(context) {
   if (request.method === 'GET' && pathname === '/api/wechat/strategy') {
     const review = enrichWechatReview(store.getWechatReview());
     json(response, 200, buildWechatStrategyRecommendations({ snapshots: store.listContentFeedbackSnapshots({ limit: 100 }), columnPerformance: store.listColumnPerformance(), review, accountContext: getAccountContext({ workspaceRoot: root }) })); return true;
+  }
+  if (request.method === 'GET' && pathname === '/api/wechat/feedback/adjustments') {
+    json(response, 200, { version: FEEDBACK_ADJUSTMENT_VERSION, items: store.listContentFeedbackAdjustmentDrafts({ limit: boundedLimit(searchParams, 20, 100) }), writerSkills: WRITER_SKILL_IDS.map((id) => ({ id, label: WRITER_SKILL_LABELS[id] || id })) }); return true;
+  }
+  if (request.method === 'POST' && pathname === '/api/wechat/feedback/adjustments/generate') {
+    const streamProgress = typeof response?.writeHead === 'function' && typeof response?.write === 'function' && typeof response?.end === 'function';
+    const emitProgress = (event) => { if (streamProgress && !response.writableEnded) response.write(`${JSON.stringify(event)}\n`); };
+    try {
+      if (!models?.complete) throw new Error('模型服务尚未配置，无法生成调整草案');
+      if (streamProgress) response.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      emitProgress({ type: 'progress', stage: 'snapshot', message: '正在检查并刷新反馈快照…' });
+      const input = await body(request);
+      let feedback = input.feedbackSnapshotId
+        ? store.listContentFeedbackSnapshots({ limit: 100 }).find((item) => Number(item.id) === Number(input.feedbackSnapshotId))
+        : store.getLatestContentFeedbackSnapshot();
+      if (!feedback && input.scope !== 'social') throw new Error('还没有反馈快照，请先生成文章反馈');
+      const currentAnalyses = store.listArticleContentAnalyses({ limit: 2000 });
+      if (!input.feedbackSnapshotId && feedback) {
+        const refreshed = buildContentFeedbackSnapshot(currentAnalyses, { review: store.getWechatReview() });
+        const storedEvidence = JSON.stringify(feedback.writer_skill_evidence || []);
+        const currentEvidence = JSON.stringify(refreshed.writer_skill_evidence || []);
+        if (Number(feedback.linked_article_count || 0) !== Number(refreshed.linked_article_count || 0)
+          || Number(feedback.feature_count || 0) !== Number(refreshed.feature_count || 0)
+          || (currentEvidence !== storedEvidence && refreshed.writer_skill_evidence?.length)) {
+          feedback = store.saveContentFeedbackSnapshot(refreshed);
+        }
+      }
+      const titleSkillTarget = resolveTitleSkillTarget({ workspaceRoot: root, analyses: currentAnalyses, feedback });
+      if (input.scope === 'social') {
+        const reviewMatches = store.listWechatArticleMetricMatches({ limit: 1000 });
+        const social = buildSocialFeedbackTrack(store);
+        const socialFeedback = social.content_feedback || buildSocialContentFeedbackSnapshot(reviewMatches);
+        const socialTarget = resolveSocialSkillTargets({ matches: reviewMatches });
+        const socialSkills = Object.fromEntries(socialTarget.targets.map((item) => {
+          const skillPaths = currentSkillPackageFiles(root, item.skill_id);
+          const skillContents = Object.fromEntries(Object.entries(skillPaths).map(([file, filePath]) => {
+            try { return [file, fs.readFileSync(filePath, 'utf8')]; } catch { return [file, '']; }
+          }).filter(([, content]) => content));
+          return [item.skill_id, skillContents];
+        }).filter(([, files]) => Object.keys(files).length));
+        emitProgress({ type: 'progress', stage: 'planning', message: '第一阶段：AI 正在判断图文故事板与文案技能调整目标（thinking）…' });
+        const planningMessages = buildSocialFeedbackAdjustmentPlanningMessages({ feedback: socialFeedback, targets: socialTarget.targets });
+        const planningResult = await models.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
+        const planning = parseModelJson(planningResult, { store, label: '图文复盘调整目标判断' });
+        emitProgress({ type: 'progress', stage: 'patch', message: '第二阶段：AI 正在生成图文技能的精确 diff（thinking）…' });
+        const patchMessages = buildSocialFeedbackAdjustmentPatchMessages({ feedback: socialFeedback, plan: planning, skills: socialSkills });
+        const patchResult = await models.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
+        const patchOutput = parseModelJson(patchResult, { store, label: '图文复盘调整精确修改' });
+        emitProgress({ type: 'progress', stage: 'validate', message: '正在校验图文技能原文定位并保存草案…' });
+        const draft = buildSocialFeedbackAdjustmentDraft({ workspaceRoot: root, feedback: socialFeedback, targets: socialTarget.targets, targetEvidence: socialTarget.evidence, modelResult: { planning, patch: patchOutput }, provider: patchResult.provider || planningResult.provider || input.provider || '', model: patchResult.model || planningResult.model || '' });
+        if (!draft.changes.length) {
+          const result = { ...draft, status: 'no_change', saved: false, message: '未发现可安全融合到图文技能包的规则修改，不创建草案。' };
+          if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
+          else json(response, 200, result);
+          return true;
+        }
+        const saved = store.saveContentFeedbackAdjustmentDraft(draft);
+        if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: '图文技能草案已生成，请检查 diff。', draft: saved }); response.end(); }
+        else json(response, 201, saved);
+        return true;
+      }
+      const writerSkillHint = WRITER_SKILL_IDS.includes(String(input.writerSkillId || '')) ? String(input.writerSkillId) : '';
+      const read = (filePath) => filePath && fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+      const writerSkillCatalog = listWriterSkillCatalog({ workspaceRoot: root });
+      const accountContext = getAccountContext({ workspaceRoot: root, refresh: true });
+      const strategy = buildWechatStrategyRecommendations({ snapshots: store.listContentFeedbackSnapshots({ limit: 100 }), columnPerformance: store.listColumnPerformance(), review: enrichWechatReview(store.getWechatReview()), accountContext });
+      emitProgress({ type: 'progress', stage: 'planning', message: '第一阶段：AI 正在判断调整目标（thinking）…' });
+      const planningMessages = buildFeedbackAdjustmentMessages({ feedback, strategy, accountContext, titleSkillId: titleSkillTarget.skillId, titleSkillEvidence: titleSkillTarget.evidence, writerSkillId: writerSkillHint, writerSkillCatalog });
+      const planningResult = await models.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
+      const planning = parseModelJson(planningResult, { store, label: '复盘调整目标判断' });
+      const planningWriterSkillId = String(planning.selected_writer_skill_id || '');
+      const hasInferenceEvidence = Number(feedback.linked_article_count || 0) >= 3 && Array.isArray(feedback.body_signals) && feedback.body_signals.length > 0;
+      const selectedWriterSkillId = WRITER_SKILL_IDS.includes(planningWriterSkillId)
+        && ((feedback.writer_skill_evidence || []).some((item) => String(item?.skill_id || '') === planningWriterSkillId && Number(item?.sample_count || 0) >= 3) || hasInferenceEvidence)
+        ? planningWriterSkillId : '';
+      const resolvedTitlePath = currentSkillFile(root, titleSkillTarget.skillId);
+      const writerPath = selectedWriterSkillId ? (writerSkillCatalog.find((item) => item.id === selectedWriterSkillId)?.sourcePath || '') : '';
+      emitProgress({ type: 'progress', stage: 'patch', message: '第二阶段：AI 正在生成原有规则的精确 diff（thinking）…' });
+      const patchMessages = buildFeedbackAdjustmentPatchMessages({ feedback, strategy, accountContext, plan: planning, titleSkillId: titleSkillTarget.skillId, titleSkill: read(resolvedTitlePath), writerSkill: read(writerPath) });
+      const patchResult = await models.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
+      const patchOutput = parseModelJson(patchResult, { store, label: '复盘调整精确修改' });
+      emitProgress({ type: 'progress', stage: 'validate', message: '正在校验原文定位并保存草案…' });
+      const draft = buildAdjustmentDraft({ workspaceRoot: root, feedback, strategy, accountContext, modelResult: { planning, patch: patchOutput }, titleSkillId: titleSkillTarget.skillId, titleSkillEvidence: titleSkillTarget.evidence, writerSkillId: writerSkillHint, provider: patchResult.provider || planningResult.provider || input.provider || '', model: patchResult.model || planningResult.model || '' });
+      if (!draft.changes.length) {
+        const result = { ...draft, status: 'no_change', saved: false, message: '未发现可安全融合到现有配置或技能的规则修改，不创建草案。' };
+        if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
+        else json(response, 200, result);
+        return true;
+      }
+      const saved = store.saveContentFeedbackAdjustmentDraft(draft);
+      if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: '草案已生成，请检查 diff。', draft: saved }); response.end(); }
+      else json(response, 201, saved);
+    } catch (error) {
+      if (streamProgress && response.headersSent) { emitProgress({ type: 'error', error: error.message, code: error.code || 'FEEDBACK_ADJUSTMENT_FAILED' }); response.end(); }
+      else json(response, error.code === 'MODEL_JSON_INVALID' ? 422 : 400, { error: error.message, code: error.code || 'FEEDBACK_ADJUSTMENT_FAILED' });
+    }
+    return true;
+  }
+  const adjustmentMatch = pathname.match(/^\/api\/wechat\/feedback\/adjustments\/(\d+)\/(confirm|reject|delete)$/);
+  if (adjustmentMatch && request.method === 'POST') {
+    try {
+      const id = Number(adjustmentMatch[1]); const action = adjustmentMatch[2] || '';
+      const draft = store.getContentFeedbackAdjustmentDraft(id);
+      if (!draft) { json(response, 404, { error: '调整草案不存在' }); return true; }
+      if (action === 'reject') { json(response, 200, store.updateContentFeedbackAdjustmentDraftStatus(id, 'rejected')); return true; }
+      if (action === 'delete') { json(response, 200, store.deleteContentFeedbackAdjustmentDraft(id)); return true; }
+      if (action !== 'confirm') { json(response, 400, { error: '请指定 confirm、reject 或 delete' }); return true; }
+      const result = confirmAdjustmentDraft({ workspaceRoot: root, draft });
+      json(response, 200, { ...store.updateContentFeedbackAdjustmentDraftStatus(id, 'confirmed'), ...result });
+    } catch (error) { json(response, error.code === 'ADJUSTMENT_SOURCE_CONFLICT' ? 409 : 400, { error: error.message, code: error.code || 'FEEDBACK_ADJUSTMENT_CONFIRM_FAILED' }); }
+    return true;
   }
   if (request.method === 'POST' && pathname === '/api/wechat/feedback/rebuild') {
     const analyses = store.listArticleContentAnalyses({ limit: 2000 });

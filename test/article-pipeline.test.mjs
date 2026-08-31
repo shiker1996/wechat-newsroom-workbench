@@ -135,11 +135,11 @@ test('成稿执行器将分发池和读者利益写入规划、标题与锁定�
   assert.match(server,/reader_stake: \$\{candidate\.reader_stake/);
 });
 
-test('阶段子技能从项目 skills 目录加载', () => {
+test('阶段子技能从项目 skills 目录加载，覆盖层只替换正文', () => {
   for (const skillName of ['title-generator','humanizer-zh','article-reviewer','seo-keyword-scoring','seo-content-optimizer','article-image-placeholders','wechat-mp-composite']) {
     const bundle = loadSkillBundle({ workspaceRoot: process.cwd(), skillName });
     assert.equal(bundle.fallback, false, skillName);
-    assert.ok(bundle.files[0].startsWith(path.join(process.cwd(),'skills',skillName)), skillName+' 应从项目 skills 目录加载：'+bundle.files[0]);
+    assert.ok(bundle.root.startsWith(path.join(process.cwd(),'skills')), skillName+' 的技能包应从项目 skills 目录加载：'+bundle.root);
     assert.match(bundle.hash, /^[a-f0-9]{64}$/);
   }
 });

@@ -164,6 +164,14 @@ export function buildContentFeedbackSnapshot(rows = [], { review = {} } = {}) {
     const group = classified.filter(signal.test);
     return { id: signal.id, label: signal.label, hypothesis: signal.hypothesis, target: '正文写作提醒', ...performance(group) };
   }).filter((item) => item.sample_count > 0).sort((left, right) => right.avg_reads - left.avg_reads || right.follows_per_thousand_reads - left.follows_per_thousand_reads);
+  const writerSkillEvidence = [...new Set(classified.map((item) => String(item.writer_skill_id || '').trim()).filter(Boolean))].map((skillId) => {
+    const group = classified.filter((item) => String(item.writer_skill_id || '').trim() === skillId);
+    return {
+      skill_id: skillId,
+      ...performance(group),
+      body_signals: BODY_SIGNALS.map((signal) => ({ id: signal.id, label: signal.label, ...performance(group.filter(signal.test)) })).filter((item) => item.sample_count > 0),
+    };
+  }).sort((left, right) => right.sample_count - left.sample_count || right.avg_reads - left.avg_reads);
   const channelSignals = (review.channels || []).map((item) => ({ label: item.channel || '其他', reads: Number(item.reads || 0), note: '当前导出没有渠道级阅读后关注字段，不能单独判断渠道涨粉。' }));
   const recommendations = [];
   if (topics[0]) recommendations.push({ type: 'topic', target: '选题', text: `下一轮可优先验证“${topics[0].label}”题材，当前平均 ${topics[0].avg_reads.toLocaleString('zh-CN')} 阅读/篇。`, basis: `${topics[0].sample_count} 篇历史样本`, confidence: topics[0].confidence });
@@ -172,6 +180,7 @@ export function buildContentFeedbackSnapshot(rows = [], { review = {} } = {}) {
   const unresolvedQuestions = [];
   if (items.length < 3) unresolvedQuestions.push('已关联正文少于 3 篇，正文结构与表现的关系只能作为低置信度提示。');
   if (items.some((item) => !item.features?.evidence?.asset_count)) unresolvedQuestions.push('部分文章没有证据资产，暂时无法比较“有证据”和“无证据”的表现差异。');
+  if (!writerSkillEvidence.length) unresolvedQuestions.push('当前正文产物没有可靠的写作技能映射，不能把整体正文信号归因到某一个写作技能。');
   if (!channelSignals.length) unresolvedQuestions.push('暂无内容趋势渠道样本，无法比较不同渠道的阅读入口。');
   else unresolvedQuestions.push('渠道数据目前只有阅读/分享等结果，没有渠道级阅读后关注，不能据此断言哪个渠道更涨粉。');
   unresolvedQuestions.push('以上是历史相关性和可验证假设，不代表正文结构直接造成了表现差异。');
@@ -192,6 +201,7 @@ export function buildContentFeedbackSnapshot(rows = [], { review = {} } = {}) {
     title_signals: titles.slice(0, 8),
     body_signals: bodySignals,
     channel_signals: channelSignals.slice(0, 8),
+    writer_skill_evidence: writerSkillEvidence,
     recommendations,
     unresolved_questions: unresolvedQuestions,
   };

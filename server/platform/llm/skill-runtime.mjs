@@ -31,6 +31,12 @@ function readSkill(root, name) {
   return { name, filePath, content: fs.readFileSync(filePath, 'utf8') };
 }
 
+function readWorkspaceSkillOverride(workspaceRoot, name) {
+  const filePath = path.join(workspaceRoot, 'writing-skills', name, 'SKILL.md');
+  if (!fs.existsSync(filePath)) return null;
+  return { name, filePath, content: fs.readFileSync(filePath, 'utf8') };
+}
+
 function collectMarkdown(dir,{excludedDirectories=new Set()}={}) {
   if (!fs.existsSync(dir)) return [];
   const files = [];
@@ -47,8 +53,10 @@ function collectMarkdown(dir,{excludedDirectories=new Set()}={}) {
 export function loadSkillBundle({ workspaceRoot, skillName }) {
   for (const root of skillRoots(workspaceRoot)) {
     if (path.resolve(root) === path.resolve(installedSkillsRoot(workspaceRoot)) && !isInstalledSkillEnabled(workspaceRoot, skillName)) continue;
-    const skill = readSkill(root, skillName);
-    if (!skill) continue;
+    const builtinSkill = readSkill(root, skillName);
+    if (!builtinSkill) continue;
+    const skill = readWorkspaceSkillOverride(workspaceRoot, skillName) || builtinSkill;
+    // 覆盖版本只替换 SKILL.md；references、manifest 和附属文件仍来自技能包目录。
     const skillDir = path.join(root, skillName);
     const structuredManifest=readSkillManifest(skillDir,skillName);
     const rootFiles = fs.readdirSync(skillDir, { withFileTypes:true })
@@ -73,24 +81,18 @@ export function loadSkillBundle({ workspaceRoot, skillName }) {
 }
 
 export function loadArticleSkillBundle({ workspaceRoot, writerSkill }) {
-  for (const root of skillRoots(workspaceRoot)) {
-    const orchestrator = readSkill(root, 'wechat-mp-topic-to-article');
-    const writer = readSkill(root, writerSkill);
-    if (!writer) continue;
-    const referenceFiles = orchestrator ? collectMarkdown(path.join(root, 'wechat-mp-topic-to-article', 'references')) : [];
-    const parts = [orchestrator, writer].filter(Boolean).map((item) => `## SKILL: ${item.name}\n\n${item.content}`);
-    for (const filePath of referenceFiles) parts.push(`## REFERENCE: ${path.relative(path.join(root, 'wechat-mp-topic-to-article'), filePath)}\n\n${fs.readFileSync(filePath, 'utf8')}`);
-    const prompt = parts.join('\n\n---\n\n');
-    return {
-      root,
-      writerSkill,
-      prompt,
-      files: [orchestrator?.filePath, writer.filePath, ...referenceFiles].filter(Boolean),
-      hash: crypto.createHash('sha256').update(prompt).digest('hex'),
-      fallback: false,
-    };
-  }
-  return { writerSkill, prompt: '', files: [], hash: '', fallback: true };
+  const orchestrator = loadSkillBundle({ workspaceRoot, skillName: 'wechat-mp-topic-to-article' });
+  const writer = loadSkillBundle({ workspaceRoot, skillName: writerSkill });
+  if (writer.fallback) return { writerSkill, prompt: '', files: [], hash: '', fallback: true };
+  const prompt = [orchestrator.prompt, writer.prompt].filter(Boolean).join('\n\n---\n\n');
+  return {
+    root: writer.root,
+    writerSkill,
+    prompt,
+    files: [...new Set([...(orchestrator.files || []), ...(writer.files || [])])],
+    hash: crypto.createHash('sha256').update(prompt).digest('hex'),
+    fallback: false,
+  };
 }
 
 export function selectSkillPromptReferences(prompt,{include=[]}={}) {

@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 29;
+export const WORKBENCH_SCHEMA_VERSION = 31;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -569,6 +569,33 @@ export function runDatabaseMigrations(db, migrateSchema) {
       if (!columns.has('content_type')) db.exec("ALTER TABLE wechat_article_metric_matches ADD COLUMN content_type TEXT NOT NULL DEFAULT 'unknown' CHECK(content_type IN ('unknown','article','social'))");
       db.exec("UPDATE wechat_article_metric_matches SET content_type=CASE WHEN content_type='unknown' AND article_artifact_id IS NOT NULL AND EXISTS (SELECT 1 FROM article_artifact_index aa WHERE aa.id=wechat_article_metric_matches.article_artifact_id AND aa.artifact_type='图文发布文案') THEN 'social' WHEN content_type='unknown' AND article_artifact_id IS NOT NULL THEN 'article' ELSE content_type END WHERE content_type='unknown'");
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(29,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v30：公众号复盘反馈的 AI 调整草案，确认前只保存在数据库，不改变运行中的配置和技能。
+    if(applied<30){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS content_feedback_adjustment_drafts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        feedback_snapshot_id INTEGER,
+        generated_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','rejected')),
+        provider TEXT NOT NULL DEFAULT '',
+        model TEXT NOT NULL DEFAULT '',
+        summary TEXT NOT NULL DEFAULT '',
+        source_json TEXT NOT NULL DEFAULT '{}',
+        changes_json TEXT NOT NULL DEFAULT '[]',
+        warnings_json TEXT NOT NULL DEFAULT '[]',
+        confirmed_at TEXT,
+        FOREIGN KEY(feedback_snapshot_id) REFERENCES content_feedback_snapshots(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_content_feedback_adjustment_status ON content_feedback_adjustment_drafts(status,id DESC);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(30,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v31：正文反馈按实际写作技能保留映射；没有映射时禁止反推技能配置。
+    if(applied<31){db.exec('BEGIN IMMEDIATE');try{
+      const columns = new Set(db.prepare('PRAGMA table_info(content_feedback_snapshots)').all().map((column) => column.name));
+      if (!columns.has('writer_skill_evidence_json')) db.exec("ALTER TABLE content_feedback_snapshots ADD COLUMN writer_skill_evidence_json TEXT NOT NULL DEFAULT '[]'");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(31,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

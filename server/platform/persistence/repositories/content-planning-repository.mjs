@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 const SOURCE_TYPES = new Set(['conversation', 'reading', 'life', 'project', 'text']);
 const PLAN_STATUSES = new Set(['idea', 'planned', 'writing', 'done', 'cancelled']);
 const WECHAT_CONTENT_TYPES = new Set(['unknown', 'article', 'social']);
@@ -17,6 +20,23 @@ function dateValue(value) {
   if (/^\d{8}$/.test(text)) return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6)}`;
   if (/^\d{4}[./-]\d{1,2}[./-]\d{1,2}$/.test(text)) return text.replace(/[./]/g, '-').replace(/-(\d)(?!\d)/g, '-0$1');
   return text;
+}
+
+function writerSkillFromManifest(filePath) {
+  if (!filePath) return '';
+  const directory = path.dirname(filePath);
+  const manifestPaths = [
+    path.join(directory, '00-skill-manifest.json'),
+    path.join(directory, '..', '00-skill-manifest.json'),
+  ];
+  for (const manifestPath of manifestPaths) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const skill = manifest.writerSkill || manifest.writerSkillSelection?.selectedSkill || manifest.stageSkills?.drafting?.skill;
+      if (skill) return String(skill).trim();
+    } catch { /* Try the parent article directory for daily artifacts. */ }
+  }
+  return '';
 }
 function rowsFromSheet(sheets = []) { return sheets.flatMap((sheet) => sheet?.rows || []); }
 function headerIndex(rows, required) {
@@ -414,7 +434,7 @@ export class ContentPlanningRepository {
       LEFT JOIN article_content_features f ON f.content_snapshot_id=s.id
       WHERE mm.status IN ('confirmed','auto_confirmed')
       ORDER BY wm.published_date DESC,wm.id DESC LIMIT ?`).all(Math.min(Math.max(Number(limit) || 1000, 1), 2000));
-    return rows.map((row) => ({ ...row, features: jsonValue(row.features_json, null), evidence_assets: row.snapshot_id ? this.listArticleEvidenceAssets({ artifactId: row.article_artifact_id }) : [] }));
+    return rows.map((row) => ({ ...row, writer_skill_id: writerSkillFromManifest(row.file_path), features: jsonValue(row.features_json, null), evidence_assets: row.snapshot_id ? this.listArticleEvidenceAssets({ artifactId: row.article_artifact_id }) : [] }));
   }
   getArticleContentFeatures(snapshotId) {
     const row = this.db.prepare('SELECT * FROM article_content_features WHERE content_snapshot_id=?').get(Number(snapshotId));
@@ -438,13 +458,40 @@ export class ContentPlanningRepository {
   }
   saveContentFeedbackSnapshot(input = {}) {
     const result = this.db.prepare(`INSERT INTO content_feedback_snapshots
-      (generated_at,metric_window_start,metric_window_end,source_metric_ids_json,source_batch_ids_json,linked_article_count,feature_count,confidence,topic_signals_json,title_signals_json,body_signals_json,channel_signals_json,recommendations_json,unresolved_questions_json)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      (generated_at,metric_window_start,metric_window_end,source_metric_ids_json,source_batch_ids_json,linked_article_count,feature_count,confidence,topic_signals_json,title_signals_json,body_signals_json,channel_signals_json,recommendations_json,unresolved_questions_json,writer_skill_evidence_json)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       String(input.generatedAt || input.generated_at || now()), String(input.metricWindowStart || input.metric_window_start || ''), String(input.metricWindowEnd || input.metric_window_end || ''),
       JSON.stringify(input.sourceMetricIds || input.source_metric_ids || []), JSON.stringify(input.sourceBatchIds || input.source_batch_ids || []), Number(input.linkedArticleCount ?? input.linked_article_count ?? 0), Number(input.featureCount ?? input.feature_count ?? 0),
-      ['low', 'medium', 'high'].includes(input.confidence) ? input.confidence : 'low', JSON.stringify(input.topicSignals || input.topic_signals || []), JSON.stringify(input.titleSignals || input.title_signals || []), JSON.stringify(input.bodySignals || input.body_signals || []), JSON.stringify(input.channelSignals || input.channel_signals || []), JSON.stringify(input.recommendations || []), JSON.stringify(input.unresolvedQuestions || input.unresolved_questions || []),
+      ['low', 'medium', 'high'].includes(input.confidence) ? input.confidence : 'low', JSON.stringify(input.topicSignals || input.topic_signals || []), JSON.stringify(input.titleSignals || input.title_signals || []), JSON.stringify(input.bodySignals || input.body_signals || []), JSON.stringify(input.channelSignals || input.channel_signals || []), JSON.stringify(input.recommendations || []), JSON.stringify(input.unresolvedQuestions || input.unresolved_questions || []), JSON.stringify(input.writerSkillEvidence || input.writer_skill_evidence || []),
     );
     return this.#decorateFeedbackSnapshot(this.db.prepare('SELECT * FROM content_feedback_snapshots WHERE id=?').get(Number(result.lastInsertRowid)));
+  }
+  listContentFeedbackAdjustmentDrafts({ limit = 20 } = {}) {
+    return this.db.prepare('SELECT * FROM content_feedback_adjustment_drafts ORDER BY id DESC LIMIT ?').all(Math.min(Math.max(Number(limit) || 20, 1), 100)).map((row) => this.#decorateAdjustmentDraft(row));
+  }
+  getContentFeedbackAdjustmentDraft(id) {
+    return this.#decorateAdjustmentDraft(this.db.prepare('SELECT * FROM content_feedback_adjustment_drafts WHERE id=?').get(Number(id)));
+  }
+  saveContentFeedbackAdjustmentDraft(input = {}) {
+    const result = this.db.prepare(`INSERT INTO content_feedback_adjustment_drafts
+      (feedback_snapshot_id,generated_at,status,provider,model,summary,source_json,changes_json,warnings_json)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(
+      input.feedback_snapshot_id ? Number(input.feedback_snapshot_id) : null, String(input.generated_at || now()), 'pending', String(input.provider || ''), String(input.model || ''), String(input.summary || ''),
+      JSON.stringify(input.source || {}), JSON.stringify(input.changes || []), JSON.stringify(input.warnings || []),
+    );
+    return this.getContentFeedbackAdjustmentDraft(Number(result.lastInsertRowid));
+  }
+  updateContentFeedbackAdjustmentDraftStatus(id, status) {
+    if (!['confirmed', 'rejected'].includes(status)) throw new Error('调整草案状态无效');
+    this.db.prepare('UPDATE content_feedback_adjustment_drafts SET status=?,confirmed_at=? WHERE id=? AND status=?').run(status, now(), Number(id), 'pending');
+    return this.getContentFeedbackAdjustmentDraft(id);
+  }
+  deleteContentFeedbackAdjustmentDraft(id) {
+    const draft = this.getContentFeedbackAdjustmentDraft(id);
+    if (!draft) { const error = new Error('调整草案不存在'); error.code = 'ADJUSTMENT_DRAFT_NOT_FOUND'; throw error; }
+    if (draft.status !== 'rejected') { const error = new Error('只有已跳过的调整草案可以删除'); error.code = 'ADJUSTMENT_DRAFT_DELETE_NOT_ALLOWED'; throw error; }
+    this.db.prepare("DELETE FROM content_feedback_adjustment_drafts WHERE id=? AND status='rejected'").run(Number(id));
+    return { id: Number(id), deleted: true };
   }
   getWechatReview({ month = '' } = {}) {
     const monthWhere = month ? 'WHERE substr(published_date,1,7)=?' : ''; const values = month ? [month] : [];
@@ -481,6 +528,16 @@ export class ContentPlanningRepository {
       channel_signals: jsonValue(row.channel_signals_json, []),
       recommendations: jsonValue(row.recommendations_json, []),
       unresolved_questions: jsonValue(row.unresolved_questions_json, []),
+      writer_skill_evidence: jsonValue(row.writer_skill_evidence_json, []),
+    } : null;
+  }
+  #decorateAdjustmentDraft(row) {
+    return row ? {
+      ...row,
+      feedback_snapshot_id: row.feedback_snapshot_id ? Number(row.feedback_snapshot_id) : null,
+      source: jsonValue(row.source_json, {}),
+      changes: jsonValue(row.changes_json, []),
+      warnings: jsonValue(row.warnings_json, []),
     } : null;
   }
 }

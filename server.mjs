@@ -293,7 +293,7 @@ async function api(request, response, url) {
   }
   if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
   if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body, models })) return;
-  if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json, body, root })) return;
+  if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json, body, root, models })) return;
   if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
     binaryBody, createWorkbenchBackup, models })) return;
   const mediaResult = await handleMediaRoutes({ request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity });

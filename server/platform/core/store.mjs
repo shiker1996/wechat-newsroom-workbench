@@ -605,6 +605,11 @@ export class Store {
   getLatestContentFeedbackSnapshot() { return this.repositories.contentPlanning.getLatestContentFeedbackSnapshot(); }
   listContentFeedbackSnapshots(input = {}) { return this.repositories.contentPlanning.listContentFeedbackSnapshots(input); }
   saveContentFeedbackSnapshot(input = {}) { return this.repositories.contentPlanning.saveContentFeedbackSnapshot(input); }
+  listContentFeedbackAdjustmentDrafts(input = {}) { return this.repositories.contentPlanning.listContentFeedbackAdjustmentDrafts(input); }
+  getContentFeedbackAdjustmentDraft(id) { return this.repositories.contentPlanning.getContentFeedbackAdjustmentDraft(id); }
+  saveContentFeedbackAdjustmentDraft(input = {}) { return this.repositories.contentPlanning.saveContentFeedbackAdjustmentDraft(input); }
+  updateContentFeedbackAdjustmentDraftStatus(id, status) { return this.repositories.contentPlanning.updateContentFeedbackAdjustmentDraftStatus(id, status); }
+  deleteContentFeedbackAdjustmentDraft(id) { return this.repositories.contentPlanning.deleteContentFeedbackAdjustmentDraft(id); }
   listArticleEvidenceAssets(input = {}) { return this.repositories.contentPlanning.listArticleEvidenceAssets(input); }
   replaceArticleEvidenceAssets(input = {}) { return this.repositories.contentPlanning.replaceArticleEvidenceAssets(input); }
 

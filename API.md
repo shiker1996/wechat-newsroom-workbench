@@ -1041,6 +1041,36 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 对已确认且正文状态为 `ok` 的文章执行确定性特征抽取，并生成新的 `ContentFeedbackSnapshot`。当前不调用模型、不抓取外部 URL，也不注入标题、选题或写作流程。
 → 公众号复盘
 
+### POST /api/wechat/feedback/rebuild-social
+
+按已确认的图文发布文案与公众号指标重新计算图文题材、发布文案结构及传播信号。图文反馈直接由当前匹配数据计算，不创建独立反馈快照。
+→ 公众号复盘
+
+### GET /api/wechat/feedback/adjustments
+
+读取最近生成的公众号反馈调整草案。草案包含账号配置、标题技能和 AI 根据题材、正文结构及已映射样本自动判定的写作技能原文与新版本 diff；无映射但有足够正文信号时会标记为 AI 推断。旧版本待确认草案会标记为过期，不能写入。
+→ 内容反哺
+
+### POST /api/wechat/feedback/adjustments/generate
+
+根据最近一次反馈快照调用模型生成最小调整草案。模型以 thinking 开启的两阶段调用完成：第一阶段判断调整目标和正文技能，第二阶段读取被选中目标的完整文件并生成针对原有规则的 `old_text -> new_text` 精确编辑。正文技能优先使用至少 3 个已映射样本；没有映射但有至少 3 篇正文和正文结构信号时允许低置信度 AI 推断；请求体可传 `{ provider, feedbackSnapshotId }`，旧版传入 `writerSkillId` 仅作为兼容提示，不会绕过正文信号门槛；传入 `{ scope: "social" }` 时改走图文反哺，按图文产物的阶段执行记录识别故事板技能与文案生成技能，并只生成这两个技能的精确修改草案；如果没有任何可安全应用的文件变化，返回 `status: "no_change"` 且不创建草案；生成结果只入库，不直接写文件。接口默认以 NDJSON 流式返回阶段进度，最后返回草案结果。
+→ 内容反哺
+
+### POST /api/wechat/feedback/adjustments/:id/confirm
+
+确认调整草案。服务端会校验草案生成时的文件哈希，成功后原子写入 `account-context.json` 和 `writing-skills/<skillId>/SKILL.md` 覆盖文件；文件已被修改时返回冲突，不覆盖当前内容。
+→ 内容反哺
+
+### POST /api/wechat/feedback/adjustments/:id/reject
+
+跳过一份待确认的反馈调整草案，不写入配置或技能文件。
+→ 内容反哺
+
+### POST /api/wechat/feedback/adjustments/:id/delete
+
+删除一份已经跳过（`rejected`）的反馈调整草案记录。待确认或已写入草案不能删除，不影响任何配置、技能覆盖文件或已写入结果。
+→ 内容反哺
+
 ### GET /api/wechat/review
 
 返回已经导入的公众号后台数据、文章表现、用户增长、常读用户和渠道聚合结果；文章会附带规则初判的题材标签、标题结构，`insights` 提供按题材/标题结构聚合的平均阅读、阅读后关注和样本量，供选题与主动写作软性参考。
