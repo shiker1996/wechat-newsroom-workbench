@@ -18,8 +18,8 @@ function trackElements(track) {
 
 function isDraftEligible(item) { return item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD; }
 const articleScoreFields = [
-  ["event_value", "事件价值 T"], ["article_value", "文章化 A"], ["h_score", "历史 H"],
-  ["b_score", "潜力 B"], ["p_score", "账号契合 P"], ["s_score", "饱和 S"], ["d_score", "修正 D"], ["f_score", "总分 F"],
+  ["event_value", "事件 T"], ["research_value", "研判 J"], ["article_value", "文章 A"],
+  ["competition_penalty", "竞争 C"], ["f_score", "最终 F"],
 ];
 const editorialStatusLabels = {
   DISCUSS: "讨论中", WRITE_NOW: "可成稿", TEST_FIRST: "待实践验证", RESEARCH_FIRST: "待补事实",
@@ -32,6 +32,114 @@ const contentClassLabels = {
   github_project: "纯项目",
 };
 function statusLabel(value) { return editorialStatusLabels[String(value || "")] || String(value || "待处理"); }
+
+const researchSignalLabels = {
+  timeline_change: "时间线出现变化",
+  new_source_evidence: "出现新增信息",
+  source_disagreement: "来源之间有分歧",
+  unverified_boundary: "仍有信息待确认",
+  anomaly: "反常点",
+  interest_conflict: "利益冲突",
+  divergence: "可发散方向",
+};
+const researchRelationLabels = {
+  same_subject_sequence: "同一主体的连续动作",
+  shared_object_comparison: "围绕同一对象的对比",
+  action_comparison: "同类动作的对比",
+  context_comparison: "同一场合下的不同反应",
+  shared_dimension: "共享维度关系",
+  trend_sequence: "趋势关系",
+  sequence: "前后变化",
+  response: "回应关系",
+  comparison: "对比关系",
+};
+
+function uniqueBy(items, keyOf) {
+  const seen = new Set();
+  return (items || []).filter((item) => {
+    const key = keyOf(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function researchSignalGroups(items = []) {
+  const groups = new Map();
+  for (const event of items || []) {
+    const eventTitle = event.title || event.event_id || "相关事件";
+    const semantic = event.internal_research || {};
+    for (const signal of [...(semantic.anomalies || event.anomaly_points || []), ...(semantic.interest_conflicts || event.interest_conflicts || []), ...(semantic.divergence_directions || event.divergence_directions || [])]) {
+      const key = `${signal.kind || "observation"}|${signal.statement || ""}`;
+      const current = groups.get(key) || { ...signal, eventTitles: [] };
+      if (!current.eventTitles.includes(eventTitle)) current.eventTitles.push(eventTitle);
+      groups.set(key, current);
+    }
+  }
+  return [...groups.values()];
+}
+
+function researchSignalList(items = []) {
+  if (!items.length) return '<p class="muted">暂无可由现有事件卡直接确认的信号。</p>';
+  return `<div class="candidate-research-signal-grid">${items.map((item) => `<article class="candidate-research-signal"><span class="research-signal-label">${escapeHtml(researchSignalLabels[item.kind] || "观察点")}</span><p>${escapeHtml(item.statement || "暂无说明")}</p>${item.eventTitles?.length ? `<small>涉及：${escapeHtml(item.eventTitles.join("、"))}</small>` : ""}</article>`).join("")}</div>`;
+}
+
+function relationView(item, titleById) {
+  const names = (item.event_ids || []).map((id) => titleById.get(String(id)) || `事件 ${String(id).slice(0, 8)}`).filter(Boolean);
+  const temporal = String(item.temporal_order || "");
+  const temporalText = item.relation_label || researchRelationLabels[item.relation_kind] || (temporal.includes("_before_") ? "时间上前后相接" : "时间先后仍待确认");
+  const dimensions = (item.shared_dimensions || []).filter(Boolean).join("、");
+  return { ...item, names, label: researchRelationLabels[item.relation_kind] || researchRelationLabels[item.relation_type] || "事件关系", temporalText, dimensions };
+}
+
+function researchContextHtml(context) {
+  if (!context) return '<p class="muted">本批次尚未生成阶段 0 讨论研判产物。</p>';
+  const scope = context.scope?.events || [];
+  const signals = context.internal_research || context.internal_signals || [];
+  const relations = context.inter_event_research || context.relations || [];
+  const topicCandidates = context.topic_candidates || (context.topic_candidate?.candidate_title ? [context.topic_candidate] : []);
+  const titleById = new Map(scope.map((item) => [String(item.event_id), item.title || `事件 ${String(item.event_id).slice(0, 8)}`]));
+  const signalGroups = researchSignalGroups(signals);
+  const relationGroups = uniqueBy(relations, (item) => `${item.relation_kind || item.relation_type || "relation"}|${[...(item.event_ids || [])].map(String).sort().join(",")}`).map((item) => relationView(item, titleById));
+  const relationItemHtml = (item) => `<article class="candidate-research-relation"><div><span class="research-relation-label">${escapeHtml(item.label)}</span><span class="research-confidence">${escapeHtml(item.confidence === "high" ? "较强依据" : item.confidence === "medium" ? "有一定依据" : "待进一步确认")}</span></div><p>${escapeHtml(item.relationship_statement || item.names.join(" 与 "))}</p><small>涉及：${escapeHtml(item.names.join("、"))}${item.dimensions ? ` · 研判依据：${escapeHtml(item.dimensions)}` : ""}</small></article>`;
+  const relationHtml = relationGroups.length ? relationGroups.map(relationItemHtml).join("") : '<p class="muted">目前没有足够证据形成前后、回应、对比或趋势关系；不会因为关键词相同强行拼题。</p>';
+  const openQuestions = uniqueBy([
+    ...(context.evidence_boundary?.open_questions || []),
+    ...signals.flatMap((item) => (item.internal_research?.divergence_directions || item.divergence_directions || []).map((signal) => signal.question || signal.statement)),
+  ], (item) => item).filter(Boolean);
+  const eventNames = uniqueBy(scope.map((item) => item.title).filter(Boolean), (item) => item);
+  const stageLabel = topicCandidates.length ? "已形成候选选题" : "研判中";
+  const signalCard = (item) => `<article class="candidate-research-signal"><span class="research-signal-label">${escapeHtml(researchSignalLabels[item.kind] || item.label || "研判点")}</span><p>${escapeHtml(item.statement || item.question || "暂无说明")}</p>${item.expected ? `<small>预期：${escapeHtml(item.expected)}</small>` : ""}${item.question && item.statement !== item.question ? `<small>可继续追问：${escapeHtml(item.question)}</small>` : ""}${item.eventTitles?.length ? `<small>涉及：${escapeHtml(item.eventTitles.join("、"))}</small>` : ""}</article>`;
+  const signalSection = (title, kind, empty) => { const values = signalGroups.filter((item) => item.kind === kind); return `<section class="research-subsection"><div class="research-section-head"><h4>${title}</h4><span>${values.length} 条</span></div>${values.length ? `<div class="candidate-research-signal-grid">${values.map(signalCard).join("")}</div>` : `<p class="muted">${empty}</p>`}</section>`; };
+  const topicHtml = topicCandidates.length ? topicCandidates.map((topic) => `<article class="research-topic-seed"><span class="research-signal-label">候选选题 · ${escapeHtml(topic.topic_type || "讨论命题")}</span><h4>${escapeHtml(topic.candidate_title || topic.title || "未命名候选")}</h4><p><b>核心问题：</b>${escapeHtml(topic.core_question || topic.discussion_question || "待编辑确认")}</p><p><b>切入角度：</b>${escapeHtml(topic.angle || "待编辑确认")}</p><p><b>命题种子：</b>${escapeHtml(topic.thesis_seed || "待编辑确认")}</p><small>仅供编辑会确认，不代表作者最终立场。</small></article>`).join("") : '<p class="muted">当前研判还没有形成候选选题，不展示泛化的新闻复述。</p>';
+  return `<div class="candidate-research-summary"><div class="candidate-research-badges"><span>${stageLabel}</span><span>T 榜前 ${escapeHtml(context.scope?.top_k ?? "—")}</span><span>涉及 ${scope.length} 个事件</span>${context.event_value == null ? "" : `<span>事件价值 T ${escapeHtml(context.event_value)}</span>`}</div>
+    <p class="muted">先看研判如何形成选题，再回看事件事实。这里不是新闻摘要，也不是作者最终观点。</p>
+    <section class="candidate-research-topic-section"><div class="research-section-head"><h3>由研判形成的候选选题</h3><span>${topicCandidates.length} 条</span></div>${topicHtml}</section>
+    ${eventNames.length ? `<section class="candidate-research-involved"><h3>涉及哪些事件</h3><div class="research-event-chips">${eventNames.map((name) => `<span>${escapeHtml(name)}</span>`).join("")}</div></section>` : ""}
+    <section class="candidate-research-internal"><div class="research-section-head"><h3>事件内部的研判</h3><span>反常 / 利益冲突 / 可发散</span></div>${signalSection("反常点", "anomaly", "暂无可确认的反常点")}${signalSection("利益冲突", "interest_conflict", "事件卡没有提供可确认的参与方利益冲突；来源分歧不直接等同于利益冲突")}${signalSection("可发散方向", "divergence", "暂无可发散方向")}</section>
+    <section class="candidate-research-inter-event"><div class="research-section-head"><h3>事件之间的研判</h3><span>前后 / 回应 / 对比 / 趋势</span></div>${relationHtml}</section>
+    <section class="candidate-research-boundary"><div class="research-section-head"><h3>写作前还要确认</h3><span>不是已确认事实</span></div>${openQuestions.length ? `<ul>${openQuestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : '<p class="muted">当前没有额外的待确认问题。</p>'}</section>
+    <details class="candidate-research-raw"><summary>查看原始证据字段（高级）</summary><pre>${escapeHtml(JSON.stringify({ scope: context.scope, internal_research: signals, inter_event_research: relations }, null, 2))}</pre></details>
+  </div>`;
+}
+
+async function openCandidateResearch(candidateId) {
+  const dialog = document.getElementById("candidate-research-dialog");
+  const title = document.getElementById("candidate-research-title");
+  const content = document.getElementById("candidate-research-content");
+  if (!dialog || !title || !content) return;
+  title.textContent = "正在读取选题研判…";
+  content.innerHTML = '<p class="muted">正在读取事件信息与研判内容…</p>';
+  dialog.showModal();
+  try {
+    const candidate = await request(`/api/candidates/${Number(candidateId)}`);
+    title.textContent = candidate.event_card?.conclusion || candidate.hotspot_title || "选题研判";
+    content.innerHTML = `<section class="candidate-research-candidate"><span class="kicker">${escapeHtml(candidate.candidate_id || "候选选题")}</span><p>${escapeHtml(candidate.angle || "研判角度尚未锁定")}</p><p>${escapeHtml(candidate.thesis || "作者命题尚未锁定")}</p></section>${researchContextHtml(candidate.research_context)}<section class="candidate-research-events"><h3>关联事件信息</h3>${(candidate.events || []).map((event) => `<article><b>${escapeHtml(event.title || "事件")}</b><p>${escapeHtml(event.card?.conclusion || "事件卡暂无结论")}</p>${event.card?.confirmed_facts?.length ? `<ul>${event.card.confirmed_facts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}</ul>` : ""}</article>`).join("") || '<p class="muted">暂无关联事件信息。</p>'}</section>`;
+  } catch (error) {
+    title.textContent = "选题研判读取失败";
+    content.innerHTML = `<p class="pipeline-error">${escapeHtml(error.message)}</p>`;
+  }
+}
 
 function renderCandidates(candidates, track = activeTrack()) {
   const elements = trackElements(track);
@@ -116,7 +224,7 @@ function renderCandidates(candidates, track = activeTrack()) {
           <div class="candidate-meta"><span>${escapeHtml(item.track_pool_role || item.pool_role)}</span><span>${item.composite ? `多源综合${item.hotspot_count ? ` · ${item.hotspot_count}条报道` : ""}` : escapeHtml(item.source_name || item.source_group || item.source)}</span><span>风险 ${escapeHtml(item.risk_level)}</span></div>
           ${overlapByCandidate.has(item.id) ? `<p class="candidate-overlap">与「${overlapByCandidate.get(item.id).map((name) => escapeHtml(name)).join("」「")}」共享事件素材</p>` : ""}
           ${scoreStrip}
-          <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" && item.score_status === "needs_source_data" ? "needs_source_data" : track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster">${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
+          <div class="candidate-actions"><span class="status-pill">${escapeHtml(statusLabel(track === "article" && item.score_status === "needs_source_data" ? "needs_source_data" : track === "article" ? (item.brief_status || item.track_status || item.status) : (item.track_status || "pooled")))}</span><div class="candidate-action-cluster"><button type="button" class="text-button" data-topic-research="${item.id}">查看研判</button>${primaryAction}<details class="candidate-more"><summary aria-label="更多选题操作">更多</summary><button class="text-button muted" data-remove-track="${track}" data-candidate-id="${item.id}">移出本池</button></details></div></div>
         </article>`;
         return card;
       }).join("")
@@ -215,6 +323,16 @@ async function loadTopicPool() {
 if (!window.__candidateTrackActionsBound) {
   window.__candidateTrackActionsBound = true;
   document.addEventListener("click", async (event) => {
+    const researchDialog = document.getElementById("candidate-research-dialog");
+    if (event.target.closest("[data-close-candidate-research]") || event.target === researchDialog) {
+      researchDialog?.close();
+      return;
+    }
+    const research = event.target.closest("[data-topic-research]");
+    if (research) {
+      await openCandidateResearch(research.dataset.topicResearch);
+      return;
+    }
     const toggleHidden = event.target.closest("[data-toggle-hidden-candidates]");
     if (toggleHidden) {
       state.topicShowAll = !state.topicShowAll;

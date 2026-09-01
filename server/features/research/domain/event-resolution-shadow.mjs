@@ -28,6 +28,15 @@ const GENERIC_TERMS = new Set([
   '背后', '到底', '为何', '什么', '谁在', '能不能', '教授', '公司', '平台', '集团',
 ]);
 
+// 用于判断“同一事件的不同报道”时，排除职位、动作和新闻套话；
+// 具体人名、项目名等实体仍会保留，避免把同一事件拆成多个历史 ID。
+const CONTINUITY_STOP_TERMS = new Set([
+  ...GENERIC_TERMS,
+  '苹果', 'ceo', '职位', '交接', '换帅', '上任', '卸任', '接任', '人事', '变动',
+  '项目', '产品', '工具', '插件', '版本', '开发', '开源', '用户', '团队', '服务',
+]);
+const POSITION_TERMS = new Set(['ceo', '总裁', '董事长', '负责人', '经理', '部长', '首席', '掌门']);
+
 function clean(value) {
   return String(value ?? '').normalize('NFKC').trim().toLowerCase()
     .replace(/[“”‘’"'`]/g, '')
@@ -145,6 +154,32 @@ function triggerMatch(left, right) {
   return 0;
 }
 
+function distinctiveEntitySet(record) {
+  const structural = new Set([
+    ...tokens(record?.whoKey),
+    ...tokens(record?.objectKey),
+    ...tokens(record?.actionType),
+  ]);
+  return new Set([...setOf(record?.entityKeys)].filter((value) => {
+    const token = clean(value);
+    return token.length >= 2 && !structural.has(token) && !CONTINUITY_STOP_TERMS.has(token)
+      && !/^\d+(?:\.\d+)?$/.test(token);
+  }));
+}
+
+function isSameEventContinuity(left, right, objectScore, triggerScore) {
+  if (!left?.whoKey || left.whoKey !== right?.whoKey) return false;
+  if (timeCompatibility(left.timeWindow, right.timeWindow) < 0.5) return false;
+  if (!left.actionType || left.actionType !== right.actionType) return false;
+  if (objectScore < 0.7) return false;
+  const sharedObjectTerms = [...new Set(tokens(left.objectKey))].filter((value) => tokens(right.objectKey).includes(value));
+  if (!sharedObjectTerms.some((value) => POSITION_TERMS.has(value))) return false;
+  const sharedEntities = [...distinctiveEntitySet(left)].filter((value) => distinctiveEntitySet(right).has(value));
+  // 两个以上具体实体通常意味着同一人物/项目链；一个具体实体再加上较强触发词重合，
+  // 也可视为同一事件的后续报道。仅主体、职位或动作相同不触发。
+  return sharedEntities.length >= 2 || (sharedEntities.length >= 1 && triggerScore >= 0.6);
+}
+
 function actionCompatibility(left, right) {
   if (!left || !right || left === '其他' || right === '其他') return 0.5;
   if (left === right) return 1;
@@ -185,6 +220,9 @@ export function structuredMatch(left, right) {
   // 仍视为同一事件候选；后续增量状态再区分“新进展”和“持续讨论”。
   if (trigger === 0 && whoMatch === 1 && objectMatch === 1 && time >= 0.5) trigger = 0.8;
   const score = Math.round(30 * whoMatch + 25 * objectMatch + 20 * trigger + 10 * action + 10 * time + 5 * entity);
+  if (isSameEventContinuity(left, right, objectMatch, trigger)) {
+    return { score: Math.max(score, EVENT_RESOLUTION_POLICY.autoMergeScore), method: 'structured-continuity' };
+  }
   return { score, method: score >= EVENT_RESOLUTION_POLICY.autoMergeScore ? 'structured' : score >= EVENT_RESOLUTION_POLICY.reviewScore ? 'review' : 'new' };
 }
 
@@ -307,6 +345,39 @@ function buildGroups(reports) {
   return { groups, reviewQueue };
 }
 
+function mergeResolvedEventsById(events, { splitConflictingHistory = false } = {}) {
+  const merged = new Map();
+  const collisions = [];
+  for (const [index, event] of events.entries()) {
+    const current = merged.get(event.event_id);
+    if (!current) {
+      merged.set(event.event_id, { ...event, hotspot_ids: [...new Set(event.hotspot_ids || [])], legacy_event_ids: [...new Set(event.legacy_event_ids || [])], new_information_hotspot_ids: [...new Set(event.new_information_hotspot_ids || [])] });
+      continue;
+    }
+    if (splitConflictingHistory && structuredMatch(current.normalized || {}, event.normalized || {}).score < EVENT_RESOLUTION_POLICY.autoMergeScore) {
+      const detachedId = makeEventId(`${event.canonical_key || event.event_id}|collision:${index}`);
+      const detached = { ...event, event_id: detachedId, historical_match: null, update_type: 'new_event', event_state: 'new_event', new_information_hotspot_ids: [...new Set(event.hotspot_ids || [])] };
+      merged.set(detachedId, detached);
+      collisions.push({ event_id: event.event_id, action: 'split_conflicting_history', reassigned_event_id: detachedId, hotspot_ids: event.hotspot_ids || [] });
+      continue;
+    }
+    collisions.push({ event_id: event.event_id, hotspot_ids: event.hotspot_ids || [], merged_into_hotspot_ids: current.hotspot_ids || [] });
+    const normalized = aggregate([current.normalized || {}, event.normalized || {}]);
+    current.normalized = normalized;
+    current.canonical_key = canonicalKey(normalized);
+    current.title = buildEventTitle(normalized);
+    current.hotspot_ids = [...new Set([...(current.hotspot_ids || []), ...(event.hotspot_ids || [])])];
+    current.legacy_event_ids = [...new Set([...(current.legacy_event_ids || []), ...(event.legacy_event_ids || [])])];
+    current.new_information_hotspot_ids = [...new Set([...(current.new_information_hotspot_ids || []), ...(event.new_information_hotspot_ids || [])])];
+    current.first_seen_at = [current.first_seen_at, event.first_seen_at].filter(Boolean).sort()[0] || null;
+    current.last_seen_at = [current.last_seen_at, event.last_seen_at].filter(Boolean).sort().at(-1) || null;
+    if (event.update_type === 'new_update' || current.update_type === 'new_update') current.update_type = 'new_update';
+    if (event.event_state === 'new_update' || current.event_state === 'new_update') current.event_state = 'new_update';
+    if ((event.historical_match?.score || 0) > (current.historical_match?.score || 0)) current.historical_match = event.historical_match;
+  }
+  return { events: [...merged.values()], collisions };
+}
+
 function buildHistoryIndex(history) {
   const index = new Map();
   const add = (key, event) => {
@@ -361,7 +432,7 @@ export function resolveEventShadow({ batch, hotspots = [], legacyClusters = [], 
   const { groups, reviewQueue } = buildGroups(reports);
   const legacyByHotspot = buildLegacyMap(legacyClusters);
   const historyIndex = buildHistoryIndex(history);
-  const events = groups.map((group) => {
+  const resolvedEvents = groups.map((group) => {
     const normalized = aggregate(group.records);
     const canonical = canonicalKey(normalized);
     let historicalMatch = null;
@@ -411,6 +482,7 @@ export function resolveEventShadow({ batch, hotspots = [], legacyClusters = [], 
     };
   });
 
+  const { events, collisions: historicalCollisions } = mergeResolvedEventsById(resolvedEvents, { splitConflictingHistory: true });
   const shadowByHotspot = new Map(events.flatMap((event) => event.hotspot_ids.map((id) => [id, event.event_id])));
   const merges = events.filter((event) => event.legacy_event_ids.length > 1).map((event) => ({
     event_id: event.event_id, legacy_event_ids: event.legacy_event_ids, hotspot_ids: event.hotspot_ids,
@@ -440,7 +512,7 @@ export function resolveEventShadow({ batch, hotspots = [], legacyClusters = [], 
     legacy: { event_count: legacyClusters.length, hotspot_count: legacyByHotspot.size },
     shadow: { event_count: events.length, hotspot_count: shadowByHotspot.size },
     conservation: { input_count: reports.length, assigned_count: shadowByHotspot.size, ok: reports.length === shadowByHotspot.size },
-    differences: { merges, splits, review_queue: reviewQueue },
+    differences: { merges, splits, review_queue: reviewQueue, historical_collisions: historicalCollisions },
     events,
   };
 }
@@ -475,7 +547,7 @@ function repositoryMetaOfHotspot(hotspot) {
 // 将稳定事件直接装配为研究用事件对象。它不读取 legacy cluster，旧结构只在迁移工具中保留。
 export function materializeStableEvents({ shadowEvents = [], hotspots = [], heatByEvent = new Map() } = {}) {
   const hotspotById = new Map(hotspots.map((hotspot) => [Number(hotspot.id), hotspot]));
-  return shadowEvents.map((stableEvent) => {
+  return mergeResolvedEventsById(shadowEvents).events.map((stableEvent) => {
     const members = (stableEvent.hotspot_ids || []).map((hotspotId) => {
       const hotspot = hotspotById.get(Number(hotspotId));
       if (!hotspot) return null;

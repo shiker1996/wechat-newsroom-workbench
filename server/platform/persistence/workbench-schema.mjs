@@ -167,8 +167,10 @@ export function applyWorkbenchSchema(db) {
         h_score REAL,
         b_score REAL,
         p_score REAL,
+        research_value REAL,
         s_score REAL,
         d_score REAL,
+        competition_penalty REAL,
         f_score REAL,
         topic_value REAL,
         event_value REAL,
@@ -287,6 +289,7 @@ export function applyWorkbenchSchema(db) {
         candidate_row_id INTEGER PRIMARY KEY,
         editor_question TEXT NOT NULL DEFAULT '',
         confirmed_facts TEXT NOT NULL DEFAULT '',
+        research_basis TEXT NOT NULL DEFAULT '',
         author_opinions TEXT NOT NULL DEFAULT '',
         confirmed_experiences TEXT NOT NULL DEFAULT '',
         rejected_angles TEXT NOT NULL DEFAULT '',
@@ -871,6 +874,8 @@ export function applyWorkbenchSchema(db) {
     if(!finalCandidateCols.has('topic_value'))db.exec("ALTER TABLE candidates ADD COLUMN topic_value REAL");
     if(!finalCandidateCols.has('event_value'))db.exec("ALTER TABLE candidates ADD COLUMN event_value REAL");
     if(!finalCandidateCols.has('article_value'))db.exec("ALTER TABLE candidates ADD COLUMN article_value REAL");
+    if(!finalCandidateCols.has('research_value'))db.exec("ALTER TABLE candidates ADD COLUMN research_value REAL");
+    if(!finalCandidateCols.has('competition_penalty'))db.exec("ALTER TABLE candidates ADD COLUMN competition_penalty REAL");
     if(!finalCandidateCols.has('content_route'))db.exec("ALTER TABLE candidates ADD COLUMN content_route TEXT NOT NULL DEFAULT 'article'");
     if(!finalCandidateCols.has('score_status'))db.exec("ALTER TABLE candidates ADD COLUMN score_status TEXT NOT NULL DEFAULT 'ready'");
     if(!finalCandidateCols.has('score_warning'))db.exec("ALTER TABLE candidates ADD COLUMN score_warning TEXT NOT NULL DEFAULT ''");
@@ -895,6 +900,7 @@ export function applyWorkbenchSchema(db) {
     }
     const cardEditorialColumns=new Set(db.prepare('PRAGMA table_info(card_editorial_sessions)').all().map((column)=>column.name));
     const editorialSessionColumns=new Set(db.prepare('PRAGMA table_info(editorial_sessions)').all().map((column)=>column.name));
+    if(!editorialSessionColumns.has('research_basis'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN research_basis TEXT NOT NULL DEFAULT ''");
     if(!editorialSessionColumns.has('excluded_events'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN excluded_events TEXT NOT NULL DEFAULT '[]'");
     if(!cardEditorialColumns.has('card_plan_json'))db.exec("ALTER TABLE card_editorial_sessions ADD COLUMN card_plan_json TEXT NOT NULL DEFAULT '[]'");
     if(!cardEditorialColumns.has('layout_style'))db.exec("ALTER TABLE card_editorial_sessions ADD COLUMN layout_style TEXT NOT NULL DEFAULT 'auto'");

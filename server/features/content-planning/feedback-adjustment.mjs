@@ -23,7 +23,7 @@ export const WRITER_SKILL_LABELS = Object.freeze({
   'wechat-mp-composite': '综合热点文章',
 });
 
-const ALLOWED_SCORING_KEYS = new Set(['weights', 'eventValueWeight', 'accountFit', 'accountFitByCategory', 'accountFitBonus', 'toolEngineeringBonus', 'minimumToolCandidates', 'categoryPreference', 'pBase', 'hBase', 'notificationPolicy']);
+const ALLOWED_SCORING_KEYS = new Set(['weights', 'eventValueWeight', 'researchValueWeight', 'accountFit', 'accountFitByCategory', 'accountFitBonus', 'toolEngineeringBonus', 'minimumToolCandidates', 'categoryPreference', 'pBase', 'hBase', 'notificationPolicy']);
 const MIN_WRITER_SKILL_SAMPLES = 3;
 const MAX_SKILL_EDITS = 8;
 const MAX_EDIT_TEXT_CHARS = 2400;

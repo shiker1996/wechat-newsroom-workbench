@@ -5,7 +5,7 @@ export class EditorialRepository {
 
   getArticle(candidateId) {
     return this.db.prepare('SELECT * FROM editorial_sessions WHERE candidate_row_id=?').get(candidateId) ?? {
-      candidate_row_id: Number(candidateId), editor_question: '', confirmed_facts: '', author_opinions: '',
+      candidate_row_id: Number(candidateId), editor_question: '', confirmed_facts: '', research_basis: '', author_opinions: '',
       confirmed_experiences: '', rejected_angles: '', open_questions: '', forbidden_claims: '',
       next_action: 'DISCUSS', experience_required: 0, brief_status: 'DISCUSS',
     };
@@ -14,7 +14,7 @@ export class EditorialRepository {
   saveArticle(candidateId, input) {
     const now = new Date().toISOString();
     // excluded_events 列保留在表结构中（避免动迁移历史），但机制已回滚，不再读写
-    const fields = ['editor_question', 'confirmed_facts', 'author_opinions', 'confirmed_experiences',
+    const fields = ['editor_question', 'confirmed_facts', 'research_basis', 'author_opinions', 'confirmed_experiences',
       'rejected_angles', 'open_questions', 'forbidden_claims', 'next_action', 'experience_required', 'brief_status'];
     const current = this.getArticle(candidateId);
     const values = fields.map((key) => {

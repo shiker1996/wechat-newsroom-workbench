@@ -198,7 +198,7 @@ async function openEditorial(id) {
   form.elements.angle.value = candidate.angle || "";
   form.elements.thesis.value = candidate.thesis || "";
   const editorial = candidate.editorial || {};
-  for (const key of ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "open_questions", "forbidden_claims"]) {
+  for (const key of ["editor_question", "confirmed_facts", "research_basis", "author_opinions", "confirmed_experiences", "rejected_angles", "open_questions", "forbidden_claims"]) {
     const el = form.elements[key];
     if (el) el.value = editorial[key] || "";
   }
@@ -223,6 +223,7 @@ async function openEditorial(id) {
   // 事件卡与原文：选题与事件一对多，原文绑定在事件下，逐事件渲染
   const events = candidate.events || [];
   renderEventCards(events);
+  renderEditorialResearch(candidate.research_context);
   // Messages
   const messages = document.getElementById("editorial-messages");
   if (messages) {
@@ -237,6 +238,33 @@ async function openEditorial(id) {
   renderEditorialReadiness();
   updateEditorialPrepareGate(candidate);
   loadSimilarArticles(id);
+}
+
+function renderEditorialResearch(context) {
+  const panel = document.getElementById("editorial-research-panel");
+  const content = document.getElementById("editorial-research-content");
+  if (!panel || !content) return;
+  if (!context) { panel.hidden = true; return; }
+  const signals = context.internal_research || context.internal_signals || [];
+  const relations = context.inter_event_research || context.relations || [];
+  const topics = context.topic_candidates || (context.topic_candidate?.candidate_title ? [context.topic_candidate] : []);
+  const names = new Map((context.scope?.events || []).map((event) => [String(event.event_id), event.title || "相关事件"]));
+  const semanticSignals = (kind) => signals.flatMap((event) => {
+    const research = event.internal_research || {};
+    const values = kind === "anomaly" ? (research.anomalies || event.anomaly_points || []) : kind === "interest_conflict" ? (research.interest_conflicts || event.interest_conflicts || []) : (research.divergence_directions || event.divergence_directions || []);
+    return values.map((item) => ({ ...item, eventTitle: event.title || event.event_id || "相关事件" }));
+  });
+  const signalList = (kind, title, empty) => {
+    const items = semanticSignals(kind);
+    return `<section class="editorial-research-subsection"><div class="research-section-head"><h5>${title}</h5><span>${items.length} 条</span></div>${items.length ? `<ul>${items.map((item) => `<li><b>${escapeHtml(item.statement || item.question || "")}</b>${item.expected ? `<small>预期：${escapeHtml(item.expected)}</small>` : ""}${item.question && item.statement !== item.question ? `<small>可继续追问：${escapeHtml(item.question)}</small>` : ""}${item.evidence_count > 1 ? `<small>已合并 ${item.evidence_count} 条证据</small>` : ""}<small>涉及：${escapeHtml(item.eventTitle)}</small></li>`).join("")}</ul>` : `<p class="muted">${empty}</p>`}</section>`;
+  };
+  const topicHtml = topics.length ? topics.map((topic) => `<article class="editorial-research-topic"><span class="research-signal-label">候选选题 · ${escapeHtml(topic.topic_type || "讨论命题")}</span><h5>${escapeHtml(topic.candidate_title || topic.title || "未命名候选")}</h5><p><b>核心问题：</b>${escapeHtml(topic.core_question || topic.discussion_question || "待编辑确认")}</p><p><b>切入角度：</b>${escapeHtml(topic.angle || "待编辑确认")}</p><p><b>命题种子：</b>${escapeHtml(topic.thesis_seed || "待编辑确认")}</p><small>仅供本轮编辑会确认，不代表作者最终立场。</small></article>`).join("") : '<p class="muted">当前研判还没有形成候选命题，请先补充事实或关系依据。</p>';
+  const relationHtml = relations.length ? relations.map((item) => {
+    const eventNames = (item.event_ids || []).map((id) => names.get(String(id)) || "相关事件");
+    return `<article class="editorial-research-relation"><span class="research-relation-label">${escapeHtml(item.relation_label || ({ sequence: "前后变化", response: "回应关系", comparison: "对比关系", trend: "趋势关系" }[item.relation_kind] || "事件间研判"))}</span><p>${escapeHtml(item.relationship_statement || "这组事件存在可继续验证的变化关系。")}</p><small>涉及：${escapeHtml(eventNames.join("、"))}</small></article>`;
+  }).join("") : '<p class="muted">暂无足够证据形成前后、回应、对比或趋势关系。</p>';
+  panel.hidden = false;
+  content.innerHTML = `<div class="candidate-research-badges"><span>候选研判输入</span><span>T 榜前 ${escapeHtml(context.scope?.top_k ?? "—")}</span><span>事件价值 T ${escapeHtml(context.event_value ?? "—")}</span></div><p class="muted">下面的内容用于编辑会确认角度和命题，不是事实结论，也不能替代原文核验。</p><section class="editorial-research-topic-section"><div class="research-section-head"><h4>由研判形成的候选选题</h4><span>${topics.length} 条</span></div>${topicHtml}</section><section class="editorial-research-internal"><div class="research-section-head"><h4>事件内部的研判</h4><span>反常 / 利益冲突 / 可发散</span></div>${signalList("anomaly", "反常点", "暂无可确认的反常点")}${signalList("interest_conflict", "利益冲突", "暂无可确认的参与方利益冲突；来源分歧不直接等同于利益冲突")}${signalList("divergence", "可发散方向", "暂无可发散方向")}</section><section class="editorial-research-inter-event"><div class="research-section-head"><h4>事件之间的研判</h4><span>前后 / 回应 / 对比 / 趋势</span></div>${relationHtml}</section>`;
 }
 
 function renderEventCards(events) {
@@ -287,7 +315,7 @@ async function loadSimilarArticles(id) {
 
 function renderEditorialReadiness() {
   // 与 server/features/articles/domain/editorial-readiness.mjs 的 evaluateEditorialReadiness 保持一致：
-  // 4 个必填表单项填好，加上“禁止写入”无内容时的明确留空，即可成稿；2 个选填项只展示不阻塞。
+  // 6 个必填表单项填好，加上“禁止写入”无内容时的明确留空，即可成稿；2 个选填项只展示不阻塞。
   const PLACEHOLDER = /(?:待定|未定|待确认|待锁定|暂无|尚未|需作者|待作者|待主线|未明确|TBD)/i;
   // 与 server/features/articles/domain/editorial-readiness.mjs 保持一致：
   // 长文本里的“未明确/待核”等可能是具体事实边界，只有短占位回复才判为不合格。
@@ -295,6 +323,11 @@ function renderEditorialReadiness() {
     const text = String(value || "").trim();
     return Boolean(text) && !(text.length <= 30 && PLACEHOLDER.test(text));
   };
+  const researchBasisComplete = (value) => substantive(value)
+    && /(?:反常|异常|矛盾|冲突|利益|成本|责任|发散|前后|回应|对比|趋势|连续|变化|差异|突变|越界|失效|配置错误|奖励破解)/u.test(String(value || ""))
+    && /(?:事件|报道|来源|两起|多起|同一|[0-9]{1,4}\s*[年月日./-]|[0-9]+\s*[·.]\s*[0-9]+)/u.test(String(value || ""));
+  const confirmedFactsComplete = (value) => substantive(value)
+    && !/^(?:已确认(?:该事件)?的?(?:事实|事实链条)|事实链条|已确认事实|见上文|同上)[。；：:\s]*$/u.test(String(value || "").trim());
   const forbiddenClaimsComplete = (value) => !String(value || "").trim() || substantive(value);
   const gate = document.getElementById("editorial-production-gate");
   if (!gate) return;
@@ -302,7 +335,8 @@ function renderEditorialReadiness() {
   if (!form) return;
   const text = (name) => form.elements[name]?.value?.trim() || "";
   const checks = [
-    { label: "已确认事实", field: "confirmed_facts", ok: substantive(text("confirmed_facts")) },
+    { label: "已确认事实", field: "confirmed_facts", ok: confirmedFactsComplete(text("confirmed_facts")) },
+    { label: "采用的研判主线", field: "research_basis", ok: researchBasisComplete(text("research_basis")) },
     { label: "明确观点", field: "author_opinions", ok: substantive(text("author_opinions")) },
     { label: "写作角度", field: "angle", ok: substantive(text("angle")) },
     { label: "锁定命题", field: "thesis", ok: substantive(text("thesis")) },
@@ -384,17 +418,21 @@ async function prepareEditorialSources() {
 }
 
 async function sendEditorialAnswer() {
+  if (editorialRequestPending) return;
   const form = document.getElementById("editorial-form");
   if (!form) return;
   const candidateId = Number(form.elements.candidateId.value);
   if (!candidateId) return;
-  const answer = document.getElementById("editorial-answer")?.value?.trim() || "";
+  const answerEl = document.getElementById("editorial-answer");
+  const answer = answerEl?.value?.trim() || "";
   const button = document.getElementById("send-editorial-answer");
   const messages = document.getElementById("editorial-messages");
   if (!messages || !button) return;
   const empty = messages.querySelector(".editorial-chat-empty");
   if (empty) empty.remove();
   if (answer) messages.insertAdjacentHTML("beforeend", `<div class="editorial-message user"><b>你</b><p>${escapeHtml(answer).replaceAll("\n", "<br>")}</p></div>`);
+  // 先消费本轮输入，再等待流式回复，避免回复完成后的刷新/重渲染把旧答案再次带入下一轮。
+  if (answerEl) answerEl.value = "";
   editorialRequestPending = true;
   renderEditorialReadiness();
   try {
@@ -410,8 +448,6 @@ async function sendEditorialAnswer() {
       rethrow: true,
       confirmation: /[A-Za-z]:\\|(?:^|\s)\//.test(answer) ? "local-project-read" : "",
       onDone: async (data) => {
-        const answerEl = document.getElementById("editorial-answer");
-        if (answerEl) answerEl.value = "";
         await openEditorial(candidateId);
         toast(data?.ignoredBecauseLocked ? "简报已锁定，本次 AI 回复未覆盖成稿决策" : "编辑会决策已更新");
       },
@@ -432,7 +468,7 @@ async function persistEditorialForm(opts) {
     method: "PATCH",
     body: JSON.stringify({ angle: form.elements.angle.value, thesis: form.elements.thesis.value }),
   });
-  const fields = ["editor_question", "confirmed_facts", "author_opinions", "confirmed_experiences", "rejected_angles", "forbidden_claims"];
+  const fields = ["editor_question", "confirmed_facts", "research_basis", "author_opinions", "confirmed_experiences", "rejected_angles", "forbidden_claims"];
   const editorial = Object.fromEntries(fields.map((k) => [k, form.elements[k].value]));
   await request(`/api/candidates/${candidateId}/editorial`, { method: "PUT", body: JSON.stringify(editorial) });
   editorialDirty = false;

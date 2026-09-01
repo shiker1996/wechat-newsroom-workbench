@@ -192,9 +192,9 @@ function toggleGraphNode(nodeId) {
   if (hadFocus) document.querySelector(`[data-graph-node="${CSS.escape(nodeId)}"]`)?.focus();
 }
 
-const LENS_LABELS = dimensionLabels;
+const LENS_LABELS = { ...dimensionLabels, relation: "关系" };
 const DIMENSION_ROLES = dimensionRoles;
-const LENS_COLORS = { who: "#355f55", what: "#7a5c2e", where: "#6b4a7d" };
+const LENS_COLORS = { who: "#355f55", what: "#7a5c2e", where: "#6b4a7d", relation: "#9a4e42" };
 const CONTENT_CLASS_LABELS = {
   github_project: "项目图文",
   open_source_technology: "开源技术",
@@ -279,7 +279,7 @@ function dimensionGroups(events) {
   const graph = filteredGraph(events);
   if (!graph?.nodes) return [];
   return graph.nodes
-    .filter((node) => node.type !== "event")
+    .filter((node) => node.type !== "event" && node.type !== "relation")
     .map((node) => ({
       ...node,
       events: graph.edges
@@ -315,7 +315,7 @@ function renderGraph(events) {
   if (!container) return;
   const graph = filteredGraph(events);
   if (!graph?.nodes?.length) {
-    container.innerHTML = '<div class="empty-state">暂无关系图数据。完成打标与研判后，主体、动作与场合维度会在这里连成图。</div>';
+    container.innerHTML = '<div class="empty-state">暂无关系图数据。完成打标与研判后，主体、动作、场合与讨论关系会在这里连成图。</div>';
     return;
   }
   const lens = activeLens();
@@ -455,6 +455,29 @@ function renderEventHotlist() {
   }).join("");
 }
 
+function renderDiscussionRelations(events) {
+  const container = document.getElementById("discussion-relation-list");
+  const count = document.getElementById("discussion-relation-count");
+  if (!container) return;
+  const visibleIds = new Set((events || []).map((event) => String(event.event_id)));
+  const relations = (state.atlas?.discussionRelations || []).filter((relation) => (relation.event_ids || []).every((id) => visibleIds.has(String(id))));
+  const kindLabels = { sequence: "前后变化", response: "回应关系", comparison: "对比关系", trend: "趋势关系" };
+  const counts = relations.reduce((map, item) => { const key = item.relation_kind || "comparison"; map.set(key, (map.get(key) || 0) + 1); return map; }, new Map());
+  if (count) count.textContent = `${relations.length} 条可用于选题的研判 · ${[...counts].map(([key, value]) => `${kindLabels[key] || key} ${value}`).join(" · ")}`;
+  if (!relations.length) {
+    container.innerHTML = '<div class="empty-state">当前筛选下暂无前后、回应、对比或趋势研判。系统不会因为关键词相同强行生成选题。</div>';
+    return;
+  }
+  const eventById = new Map((state.atlas?.events || []).map((event) => [String(event.event_id), event]));
+  const labels = { sequence: "前后变化", response: "回应关系", comparison: "对比关系", trend: "趋势关系", same_subject_sequence: "前后变化", shared_object_comparison: "对比关系" };
+  const visible = relations.slice(0, 40);
+  container.innerHTML = `<div class="discussion-relation-guide">这些不是“关键词关系”，而是已经可以继续发展成选题的研判：事件内看反常、利益冲突和发散；事件间看前后、回应、对比和趋势。${relations.length > visible.length ? `当前先展示 ${visible.length} 条，另有 ${relations.length - visible.length} 条收进原始数据。` : ""}</div>` + visible.map((relation) => {
+    const titles = (relation.event_ids || []).map((id) => eventById.get(String(id))?.representative_title || id);
+    const evidenceCount = (relation.evidence || []).reduce((sum, item) => sum + (item.sources || []).length, 0);
+    return `<article class="discussion-relation-item"><div class="discussion-relation-score">${escapeHtml(relation.confidence || "待评估")}<br><small>${escapeHtml(relation.relation_kind === "trend" ? `${relation.event_ids.length} 个事件` : relation.days_apart == null ? "时间待核" : `${relation.days_apart} 天间隔`)}</small></div><div><h4><span class="research-relation-label">${escapeHtml(labels[relation.relation_kind] || labels[relation.relation_type] || "研判关系")}</span></h4><p class="discussion-relation-statement">${escapeHtml(relation.relationship_statement || "这组事件存在可继续验证的变化关系。")}</p><p class="discussion-relation-events">涉及事件：${escapeHtml(titles.join(" · "))}</p><small class="discussion-relation-basis">依据：${escapeHtml(relation.temporal_order === "ordered_by_event_time" ? "按事件时间顺序" : relation.temporal_order || "时间字段")} · ${evidenceCount} 个来源引用</small></div><span class="status-pill">可研判</span></article>`;
+  }).join("");
+}
+
 function eventSourceKey(article) {
   return String(article?.source || article?.channel || article?.url || "未标注来源").trim();
 }
@@ -543,6 +566,7 @@ function renderAtlas() {
 
   renderEventHotlist();
   renderGraph(events);
+  renderDiscussionRelations(events);
   renderDimensionCards(events);
 }
 

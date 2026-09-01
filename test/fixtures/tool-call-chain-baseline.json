@@ -232,6 +232,12 @@
       ]
     },
     {
+      "id": "discussion-researcher",
+      "name": "讨论研判编辑",
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
       "id": "editorial-room-chat",
       "name": "公众号编辑会",
       "requiredCapabilities": [],

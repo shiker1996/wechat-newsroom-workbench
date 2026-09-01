@@ -6,12 +6,13 @@ import test from 'node:test';
 import {Store} from '../server/platform/core/store.mjs';
 import {ToolRegistry} from '../server/platform/tools/registry.mjs';
 import {runEditorialAgentTurn} from '../server/features/articles/application/agent/editorial-adapter.mjs';
-import {reconcileEditorialAnswer} from '../server/features/articles/llm/editorial-room.mjs';
+import {applyEditorialResult,reconcileEditorialAnswer} from '../server/features/articles/llm/editorial-room.mjs';
+import {mergeAppendEditorialField,mergeSingleEditorialField} from '../server/features/articles/domain/editorial-patch.mjs';
 
 function registry(){const value=new ToolRegistry();value.register({manifest:{id:'mock-url',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',pathInputs:['root'],inputSchema:{type:'object',required:['targetUrl','root'],properties:{targetUrl:{type:'string'},title:{type:'string'},root:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,title:input.title,content:'原文证据：产品实测数据为 42。'},artifacts:[],warnings:[],provenance:{requestedUrl:input.targetUrl,finalUrl:input.targetUrl}};}}});value.register({manifest:{id:'mock-project',name:'本地项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',pathInputs:['path'],inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'},options:{type:'object'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{summary:'读取 1 个文件',files:[{path:'体验.md',size:20,excerpt:'本人安装运行后感觉交互一般',truncated:false}],totalFiles:1,totalChars:15,truncated:false,skipped:{}},artifacts:[],warnings:[],provenance:{root:input.path}};}}});return value;}
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'editorial-agent-'));fs.mkdirSync(path.join(root,'config'),{recursive:true});fs.copyFileSync(path.join(process.cwd(),'config','capability-consumers.json'),path.join(root,'config','capability-consumers.json'));const store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});const batch=store.createBatch({date:'2026-08-14',title:'Agent 试点'});store.addHotspots(batch.id,'manual',[{title:'测试事件',url:'https://example.com/source'}]);const hotspot=store.getBatch(batch.id).hotspots[0],candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];return {root,store,hotspot,candidate};}
-// 填满就绪判定要求的全部字段（角度/命题/分发池/读者利益/事实基座/作者观点/命题边界）
-function completeBrief(store,candidate){store.updateCandidate(candidate.id,{angle:'实测角度',thesis:'工具链需要产品验证',distribution_lane:'实验池',reader_stake:'开发者在选型时需要评估实测数据，否则会采信夸大宣传'});store.saveEditorial(candidate.id,{confirmed_facts:'来源显示实测数据为 42',author_opinions:'作者主张实测优先',forbidden_claims:'不扩大样本',experience_required:0,brief_status:'WRITE_NOW'});}
+// 填满就绪判定要求的全部字段（角度/命题/研判主线/事实基座/作者观点/命题边界）
+function completeBrief(store,candidate){store.updateCandidate(candidate.id,{angle:'实测角度',thesis:'工具链需要产品验证',distribution_lane:'实验池',reader_stake:'开发者在选型时需要评估实测数据，否则会采信夸大宣传'});store.saveEditorial(candidate.id,{confirmed_facts:'来源显示实测数据为 42',research_basis:'采用事件内部反常主线：工具已经发布，但实测数据与宣传效果存在落差，需要解释原因',author_opinions:'作者主张实测优先',forbidden_claims:'不扩大样本',experience_required:0,brief_status:'WRITE_NOW'});}
 
 test('编辑室使用统一 ToolRequest 读取原文，并在同轮基于结果提交决策',async(t)=>{const {root,store,hotspot,candidate}=fixture(t);let calls=0,sawToolResult=false;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){calls+=1;if(calls===1)return {callId:'m1',content:JSON.stringify({type:'tool_requests',assistant_note:'读取原文',requests:[{requestId:'tr_source',capability:'content.url.fetch',arguments:{resourceId:`source:${hotspot.id}`},reason:'核对实测数据'}]}),usage:{},model:'mock'};sawToolResult=messages.some((item)=>item.role==='tool'&&item.content.includes('产品实测数据为 42'));return {callId:'m2',content:JSON.stringify({type:'final',assistantReply:'证据已核对，你的判断是什么？',briefUpdates:{angle:'实测角度',thesis:'工具链需要产品验证',confirmed_facts:'来源显示实测数据为 42',forbidden_claims:'不扩大样本'}}),usage:{total_tokens:20},model:'mock'};}};const events=[{event_id:'E001',title:'测试事件',hotspots:[{...hotspot,sourceDoc:null}]}],stream=[];const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',events,workspaceRoot:root,onEvent:(event)=>stream.push(event)});assert.equal(calls,2);assert.equal(sawToolResult,true);assert.equal(result.toolCalls,1);assert.equal(result.editorial.confirmed_facts,'来源显示实测数据为 42');assert.ok(stream.some((event)=>event.type==='tool.completed'&&event.sources?.[0]?.url==='https://example.com/source'));assert.equal(store.getAgentRun(result.agentRunId).status,'completed');});
 
@@ -77,6 +78,7 @@ test('编辑室业务 Prompt 定义打平的 final 信封（业务字段平铺�
   const skillSource=fs.readFileSync(new URL('../skills/editorial-room-chat/SKILL.md',import.meta.url),'utf8');
   assert.match(skillSource,/平铺在 final 信封顶层/);assert.match(skillSource,/不要再套 output 层/);
   assert.doesNotMatch(skillSource,/读取当前决策和对话后返回严格JSON/);
+  assert.match(skillSource,/append.*追加并自动去重/);assert.match(skillSource,/remove.*明确列出/);assert.match(skillSource,/单值字段.*replace/);
   const codeSource=fs.readFileSync(new URL('../server/features/articles/llm/editorial-room.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(codeSource,/你是公众号编辑会主持人/,'编辑室 prompt 应只从技能加载，代码不再内联');
 });
@@ -137,6 +139,16 @@ test('briefUpdates 空串不覆盖已有实践记录',async(t)=>{
   assert.equal(result.editorial.author_opinions,'作者倾向批判定性');
 });
 
+test('模型以增量补丁更新编辑底稿时保留已有事实并去重',async(t)=>{
+  const {root,store,candidate}=fixture(t);
+  store.saveEditorial(candidate.id,{confirmed_facts:'事实 A\n事实 B',author_opinions:'已有观点'});
+  const output={type:'final',assistantReply:'已补充事实。',briefUpdates:{confirmed_facts:{append:['事实 B','事实 C']},author_opinions:{append:['已有观点','新增观点']}}};
+  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'patch-1',content:JSON.stringify(output),usage:{},model:'mock'};}};
+  const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,answer:'补充一条事实',events:[],workspaceRoot:root});
+  assert.equal(result.editorial.confirmed_facts,'事实 A\n事实 B\n事实 C');
+  assert.equal(result.editorial.author_opinions,'已有观点\n新增观点');
+});
+
 test('信封层 assistantReply 为空时回退（旧嵌套 output.assistantReply 为空），不产生无声轮次',async(t)=>{
   const {root,store,candidate}=fixture(t);
   const envelope={type:'final',assistantReply:'信封层回复：事实基座已确认',output:{assistantReply:'',briefUpdates:{confirmed_facts:'事实'}}};
@@ -173,6 +185,22 @@ test('已有对话时留空作答不再触发开场分支，而是继续推进',
   assert.equal(ongoing[2].role,'user');assert.equal(ongoing[2].content,'上轮回答');
 });
 
+test('编辑室把研判转成针对性提问输入，不把评分带入模型上下文',async()=>{
+  const {buildEditorialMessages}=await import('../server/features/articles/llm/editorial-room.mjs');
+  const messages=await buildEditorialMessages({editorial:{},messages:[]},'',[],null,'',{
+    event_value:92,event_rank:1,
+    topic_candidates:[{candidate_title:'AI 工具被强推后，开发者承担了什么成本？',core_question:'强推效率与实际负担是否冲突？',angle:'从开发者成本切入',thesis_seed:'不能只看效率宣传'}],
+    internal_research:[{event_id:'E1',internal_research:{anomalies:[{statement:'发布后操作成本反而上升'}],interest_conflicts:[{statement:'平台与开发者承担的成本不同'}],divergence_directions:[]}}],
+    relations:[{relation_id:'R1',relation_kind:'response',relationship_statement:'后续版本回应了上一版本暴露的操作问题',event_ids:['E1','E2']}],
+    evidence_boundary:{open_questions:['实际成本仍需来源正文核验']},scope:{events:[{event_id:'E1',title:'AI 工具发布'}]},
+  });
+  const context=messages.find((item)=>item.content.includes('editorial-context'))?.content || '';
+  const instruction=messages.at(-1).content;
+  assert.match(context,/focus_topic/);assert.match(context,/发布后操作成本反而上升/);assert.match(context,/response/);
+  assert.doesNotMatch(context,/event_value|event_rank/);
+  assert.match(instruction,/必须以模型研判为提问主线/);assert.match(instruction,/不要让作者从空白开始泛泛回答/);
+});
+
 test('作者收窄事件范围只落表单字段（excluded_events 机制已回滚）',async(t)=>{
   const {root,store,candidate}=fixture(t);
   const output={type:'final',assistantReply:'已记录：聚焦 AI 收编主线，放弃支付与游戏事件。',briefUpdates:{author_opinions:'聚焦巨头收编 AI 资产主线',rejected_angles:'放弃阿里灵犀与 PayPal 事件',confirmed_facts:'仅保留 SpaceX-Cursor 与 Anthropic-Decart 事实'}};
@@ -193,7 +221,7 @@ test('就绪判定：长文本中的事实状态描述（尚未完成）不被�
   assert.equal(substantiveDecision('【Anthropic拟收购Decart】据虎嗅报道：Anthropic 拟以 60 亿美元收购 Decart（尚未完成）。'),true,'长文本中的"尚未完成"是事实状态，不是占位符');
   const readiness=evaluateEditorialReadiness({
     candidate:{angle:'从开发者视角看工具演进',thesis:'大厂收编加速工具演进'},
-    editorial:{confirmed_facts:'据事件研判：SpaceX 于 8 月 14 日完成对 Cursor 的收购；据虎嗅报道：Anthropic 拟收购 Decart（尚未完成）。',author_opinions:'作者判断是机会',forbidden_claims:'未证实内容不得写入'},
+    editorial:{confirmed_facts:'据事件研判：SpaceX 于 8 月 14 日完成对 Cursor 的收购；据虎嗅报道：Anthropic 拟收购 Decart（尚未完成）。',research_basis:'采用事件间对比主线：一项收购已经完成，另一项仍处于拟议阶段，比较两种收编路径。',author_opinions:'作者判断是机会',forbidden_claims:'未证实内容不得写入'},
   });
   assert.equal(readiness.ready,true,'必填项齐备即可成稿');
 });
@@ -202,10 +230,44 @@ test('就绪判定：没有禁止写入内容时允许该字段留空',async()=>
   const {evaluateEditorialReadiness}=await import('../server/features/articles/index.mjs');
   const readiness=evaluateEditorialReadiness({
     candidate:{angle:'从开发者视角看工具演进',thesis:'大厂收编加速工具演进'},
-    editorial:{confirmed_facts:'已确认事实',author_opinions:'作者明确观点',forbidden_claims:''},
+    editorial:{confirmed_facts:'来源报道该功能已于本周上线，并记录了实际使用限制',research_basis:'采用事件内部反常：公开宣传与实际效果存在差异，文章解释造成差异的原因',author_opinions:'作者明确观点',forbidden_claims:''},
   });
   assert.equal(readiness.ready,true,'禁止写入为空表示没有额外禁写边界，不应阻塞成稿');
   assert.deepEqual(readiness.missing,[]);
+});
+
+test('就绪判定：没有采用的研判主线时不能锁定',async()=>{
+  const {evaluateEditorialReadiness,researchBasisDecision,confirmedFactsDecision}=await import('../server/features/articles/index.mjs');
+  assert.equal(researchBasisDecision('已融入「环境突变」维度，强调模型在开放环境中的行为突变与不可预测性'),false);
+  assert.equal(researchBasisDecision('采用事件内部反常主线：7·30 与 8·4 连续发生未授权联网行动，文章追问配置错误是否暴露了开放环境中的对齐脆弱性'),true);
+  assert.equal(confirmedFactsDecision('已确认该事件的事实链条'),false);
+  const readiness=evaluateEditorialReadiness({
+    candidate:{angle:'从开发者视角看工具演进',thesis:'大厂收编加速工具演进'},
+    editorial:{confirmed_facts:'来源报道该功能已于本周上线，并记录了实际使用限制',author_opinions:'作者明确观点',forbidden_claims:''},
+  });
+  assert.equal(readiness.ready,false);
+  assert.deepEqual(readiness.missing,['采用的研判主线']);
+});
+
+test('编辑室落表会清理命题末尾的流程状态文字',async(t)=>{
+  const {store,candidate}=fixture(t);
+  const current=store.getCandidate(candidate.id);
+  const result=applyEditorialResult({store,candidateId:candidate.id,current,parsed:{assistantReply:'已记录',briefUpdates:{thesis:'文章要证明真实环境会放大对齐风险。命题与角度已对齐，依赖链上事实、观点、命题均已合格。'}},result:{usage:{},model:'mock'}});
+  assert.equal(result.candidate.thesis,'文章要证明真实环境会放大对齐风险');
+});
+
+test('编辑室底稿多值字段默认追加去重，删除和清空必须显式操作',()=>{
+  const valid=()=>true;
+  assert.equal(mergeAppendEditorialField('事实 A\n事实 B',{append:['事实 B','事实 C']},valid),'事实 A\n事实 B\n事实 C');
+  assert.equal(mergeAppendEditorialField('事实 A\n事实 B\n事实 C',{remove:['事实 B']},valid),'事实 A\n事实 C');
+  assert.equal(mergeAppendEditorialField('事实 A',{replace:'暂无'},(value)=>value!=='暂无'),'事实 A');
+  assert.equal(mergeAppendEditorialField('事实 A',{clear:true},valid),'');
+});
+
+test('编辑室底稿单值字段不会被隐式追加，只接受明确替换',()=>{
+  assert.equal(mergeSingleEditorialField('原研判主线',{append:'补充说明'},()=>true),'原研判主线');
+  assert.equal(mergeSingleEditorialField('原研判主线',{replace:'新研判主线'},()=>true),'新研判主线');
+  assert.equal(mergeSingleEditorialField('原研判主线',{clear:true},()=>true),'');
 });
 
 test('编辑室前端门禁：长文本中的边界词不应被当作占位符',()=>{

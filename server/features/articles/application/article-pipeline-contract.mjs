@@ -68,7 +68,7 @@ export const ARTICLE_LENGTH_RANGE=Object.freeze({min:1300,max:2000});
 
 export function selectWriterSkill(candidate={}) {
   if(candidate.composite)return {skill:'wechat-mp-composite',reason:'候选由多个热点组成，需要按共同机制或趋势组织'};
-  const angleText=[candidate.angle,candidate.thesis,candidate.editorial?.confirmed_facts].filter(Boolean).join(' ');
+  const angleText=[candidate.angle,candidate.thesis,candidate.editorial?.research_basis,candidate.editorial?.confirmed_facts].filter(Boolean).join(' ');
   const allText=[candidate.hotspot_title,candidate.category,angleText].filter(Boolean).join(' ');
   const serious=/裁员|事故|伤亡|骚扰|违法|诉讼|疾病|医疗|劳动仲裁|隐私泄露/.test(allText);
   if(!serious&&/趣闻|离谱|八卦|段子|奇葩|荒诞|整活|吐槽/.test(angleText))return {skill:'wechat-mp-gossip-chill',reason:'角度明确采用轻量趣闻或职场反差表达，且不涉及严肃伤害事件'};

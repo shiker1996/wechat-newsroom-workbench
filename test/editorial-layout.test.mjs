@@ -23,18 +23,35 @@ test("未通过的成稿门禁可定位到决策底稿字段", () => {
   assert.match(source, /field\.scrollIntoView/);
 });
 
-test("编辑工作区固定高度且成稿门禁横跨双栏持续可见", () => {
+test("编辑室首屏保留编辑框，研判放在主编辑区之后", () => {
   assert.match(styles, /\.editorial-focus-grid\s*\{[^}]*grid-template-columns:minmax\(0,7fr\) minmax\(0,5fr\)[^}]*grid-template-rows:minmax\(0,1fr\) auto[^}]*height:clamp\(620px,calc\(100vh - 250px\),820px\)/);
-  assert.match(styles, /\.editorial-focus-grid \.editorial-production-gate\s*\{[^}]*grid-row:2[^}]*grid-column:1\/-1/);
   assert.match(styles, /\.editorial-focus-grid \.editorial-chat\s*\{[^}]*grid-row:1[^}]*min-height:0/);
   assert.match(styles, /\.editorial-focus-grid \.event-card-panel #event-cards-list\s*\{[^}]*overflow:auto/);
+  assert.doesNotMatch(html, /class="editorial-focus-grid"[\s\S]*class="editorial-research-panel"[\s\S]*class="editorial-production-gate"/);
+  assert.match(html, /class="editorial-focus-grid"[\s\S]*class="editorial-production-gate"[\s\S]*<\/div>\s*<section class="editorial-research-panel"/);
   assert.match(html, /id="editorial-production-hint" aria-live="polite"/);
+});
+
+test("编辑室研判展示候选命题和四类语义关系，不展示机器信号标题", () => {
+  assert.match(source, /由研判形成的候选选题/);
+  assert.match(source, /事件内部的研判/);
+  assert.match(source, /事件之间的研判/);
+  assert.match(source, /前后 \/ 回应 \/ 对比 \/ 趋势/);
+  assert.match(source, /已合并.*条证据/);
+  assert.doesNotMatch(source, /事件内信号（/);
+  assert.doesNotMatch(source, /事件间关系候选（/);
 });
 
 test("编辑会中的超长链接不会撑宽消息区", () => {
   assert.match(styles, /\.editorial-messages\s*\{\s*overflow-x:hidden/);
   assert.match(styles, /\.editorial-message p\s*\{[^}]*overflow-wrap:anywhere[^}]*word-break:break-word/);
   assert.match(styles, /\.editorial-reply textarea\s*\{[^}]*overflow-x:hidden[^}]*overflow-wrap:anywhere/);
+});
+
+test("编辑室发送回答前立即清空输入并阻止重复发送", () => {
+  assert.match(source, /async function sendEditorialAnswer\(\) \{\s*if \(editorialRequestPending\) return;/);
+  assert.match(source, /if \(answerEl\) answerEl\.value = "";\s*editorialRequestPending = true;/);
+  assert.doesNotMatch(source, /onDone: async \(data\) => \{\s*const answerEl/);
 });
 
 test("流式对话在布局完成后补滚外层与思考过程内层，避免底部内容被截住", () => {

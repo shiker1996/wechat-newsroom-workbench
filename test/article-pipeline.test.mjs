@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
+import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, buildReviewRepairPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
 import { inspectArticleQuality } from '../server/features/articles/domain/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 
@@ -42,6 +42,15 @@ test('成稿提示词展开真实标题、简报和大纲', () => {
   assert.match(prompt, /\"thesis\":\"真实命题\"/);
   assert.match(prompt, /大纲:\n# 真实大纲/);
   assert.doesNotMatch(prompt, /\$\{(?:selectedTitle|outline|JSON\.stringify\(brief\))\}/);
+});
+
+test('审稿返工提示词直接携带事实基座、大纲、去AI稿和首次审阅报告', () => {
+  const prompt = buildReviewRepairPrompt({ factBase: { claims: ['事实'] }, outline: '# 大纲', article: '# 去AI稿', review: 'result: needs-revision' });
+  assert.match(prompt, /事实基座：/);
+  assert.match(prompt, /文章大纲（对应 02-outline\.md）：[\s\S]*# 大纲/);
+  assert.match(prompt, /待修订文章（对应 05-humanized\.md）：[\s\S]*# 去AI稿/);
+  assert.match(prompt, /首次审阅报告与修订要求：[\s\S]*result: needs-revision/);
+  assert.match(prompt, /不要要求读取文件/);
 });
 
 test('综合候选汇总全部已抓取来源，写作简报移除来源原文', () => {
@@ -133,6 +142,10 @@ test('成稿执行器将分发池和读者利益写入规划、标题与锁定�
   assert.match(pipeline,/distribution_lane:brief\.distributionLane,reader_stake:brief\.readerStake/);
   assert.match(server,/distribution_lane: \$\{candidate\.distribution_lane/);
   assert.match(server,/reader_stake: \$\{candidate\.reader_stake/);
+  assert.match(pipeline,/researchBasis:editorial\.research_basis/);
+  assert.match(pipeline,/researchBasis:brief\.researchBasis/);
+  assert.match(pipeline,/research_basis:\$\{brief\.researchBasis/);
+  assert.match(server,/采用的研判主线/);
 });
 
 test('阶段子技能从项目 skills 目录加载，覆盖层只替换正文', () => {

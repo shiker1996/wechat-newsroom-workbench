@@ -22,7 +22,7 @@ export function buildScoreDualRun(scored = [], { draftFloor = 55 } = {}) {
   });
   const mean = (values) => values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : 0;
   const deltas = items.map((item) => item.delta);
-  return { schemaVersion: 1, generatedAt: new Date().toISOString(), formula: { legacy: 'F_legacy = A - S - D', current: 'F = A×(1-eventValueWeight) + T×eventValueWeight - S - D' }, draftFloor,
+  return { schemaVersion: 2, generatedAt: new Date().toISOString(), formula: { legacy: 'F_legacy = A - S - D', current: 'F = A×(1-eventValueWeight-researchValueWeight) + T×eventValueWeight + J×researchValueWeight - C' }, draftFloor,
     summary: { candidateCount: items.length, legacyDraftableCount: items.filter((item) => item.legacyDraftable).length,
       currentDraftableCount: items.filter((item) => item.currentDraftable).length, poolChangedCount: items.filter((item) => item.legacyDraftable !== item.currentDraftable).length,
       rankChangedCount: items.filter((item) => item.legacyRank !== item.currentRank).length, meanDelta: mean(deltas),

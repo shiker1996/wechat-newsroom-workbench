@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../server/features/research/application/research-pipeline.mjs';
+import { brainstorm, clusterItems, deterministicTimeliness, generateEventCards, isFreshForBatch, isSocialCardCandidate, preselection, resolveScoring, selectDimensionPool, selectArticlePool, selectBriefPool, topicValueForEvent, focusedCategories, scoreCards, researchValueForCandidate, selectSocialCandidates, dimensionSelections, DIMENSION_POOL_ROLES, ensureBatchEventCards, markdownRanked } from '../server/features/research/application/research-pipeline.mjs';
 import { classifyContentRoute, isPureProjectEvent } from '../server/features/research/domain/content-routing.mjs';
 import { buildScoreDualRun } from '../scripts/migration/replay-topic-score.mjs';
 
@@ -160,14 +160,15 @@ test('账号契合：命中内容支柱类目的维度组获得加分', () => {
   assert.equal(group.accountFit,6);
 });
 
-test('H/B/P/S/D/F由服务端公式计算', () => {
+test('T/J/A/C/F由服务端公式计算', () => {
   const source={candidateId:'C001',title:'事件',category:'🤖 AI/技术动态',poolRole:'核心8条',credibleScoop:0,riskLevel:'低'};
   const cards=[{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
   const result=scoreCards(cards,{items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]})[0];
   assert.equal(result.b,80); assert.equal(result.p,80); assert.equal(result.s,5); assert.equal(result.d,0);
   assert.equal(result.a,73.4);
-  assert.equal(result.f,46.4);
+  assert.equal(result.j,0); assert.equal(result.c,5);
+  assert.equal(result.f,35.4);
 });
 
 test('阶段5 T 接入 F：同等文章化质量下事件价值更高者优先', () => {
@@ -176,7 +177,20 @@ test('阶段5 T 接入 F：同等文章化质量下事件价值更高者优先',
   const scored=scoreCards([{...base,candidateId:'C-HIGH',source:{...base.source,eventValue:90}},{...base,candidateId:'C-LOW',source:{...base.source,eventValue:40}}],{items:[]});
   assert.equal(scored[0].candidateId,'C-HIGH');
   assert.equal(scored[0].a,scored[1].a);
-  assert.equal(Number((scored[0].f-scored[1].f).toFixed(1)),15);
+  assert.equal(Number((scored[0].f-scored[1].f).toFixed(1)),12.5);
+});
+
+test('研判价值 J 只统计候选实际绑定的模型信号和事件关系', () => {
+  const source={title:'事件',category:'🤖 AI/技术动态',accountFit:80,research_context:{
+    internal_signals:[{event_id:'E1',anomalies:[{signal_id:'E1:anomaly:1',kind:'anomaly',statement:'预期与结果不一致',confidence:'high',evidence_levels:['full_text']}],conflicts:[{signal_id:'E1:interest_conflict:1',kind:'interest_conflict',statement:'用户与开发者利益不同',confidence:'medium',evidence_levels:['full_text']}]}],
+    relations:[{relation_id:'R1',relation_kind:'response',confidence:'high',evidence_levels:['full_text'],event_ids:['E1','E2']}],
+  },topic_candidate:{internal_signal_refs:['E1:anomaly:1'],relation_ids:['R1']}};
+  const result=researchValueForCandidate({source});
+  assert.equal(result.signalCount,1);
+  assert.equal(result.relationCount,1);
+  assert.equal(result.internal,14);
+  assert.equal(result.interEvent,22);
+  assert.equal(result.score,36);
 });
 
 test('阶段6 离线回放脚本：记录高低 T/A、入池和排名差异但不改生产排序', () => {
@@ -346,6 +360,17 @@ test('探索脑暴输出截断时自动从双卡拆成单卡', async () => {
   const selected=[1,2].map((id)=>({hotspotId:id,title:`热点${id}`,category:'🤖 AI/技术动态',poolRole:'核心8条'}));
   const cards=await brainstorm(gateway,store,selected,[{label:'降级',content:'无'}],'b1','deepseek',()=>{});
   assert.equal(calls,3); assert.equal(cards.length,2); assert.equal(invalid[0].status,'invalid_output');
+});
+
+test('探索脑暴兼容模型研判候选的 candidate_id，并统一回写 C 编号', async () => {
+  const gateway = { config: { defaultProvider: 'mock', providers: { mock: { maxOutputTokens: 8000 } } }, async complete(input) {
+    const candidates = JSON.parse(input.messages[1].content.split('【候选】\n')[1]);
+    return { content: JSON.stringify({ items: [{ candidateId: candidates[0].candidate_id, status: 'PASS', angle: '模型给出的角度', thesis: '模型给出的命题', hypotheses: [], packaging: {}, bScores: {}, hProfile: {} }] }) };
+  } };
+  const cards = await brainstorm(gateway, { updateModelCall() {} }, [{ candidate_id: 'model:MR-T-001', title: '模型候选' }], [], 'b1', 'mock', () => {}, process.cwd());
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].candidateId, 'C001');
+  assert.equal(cards[0].source.candidate_id, 'model:MR-T-001');
 });
 
 test('事件卡生成：截断自动拆分，单事件失败不阻塞整批', async () => {
@@ -553,12 +578,12 @@ test('评分权重可通过 scoring 配置覆盖', () => {
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}];
   const synthesis={items:[{candidateId:'C001',saturationPenalty:5,duplicatePenalty:2,audienceRelevance:4,reason:'测试'}]};
   const defaults=scoreCards(cards,synthesis)[0];
-  assert.equal(defaults.f,46.4);
-  // H=69,B=80,P=80：A=73.4；无 T 的兼容候选按 T=0 计算 F=A×.7-S=46.4；自定义权重只改 A 聚合比例
+  assert.equal(defaults.f,35.4);
+  // H=69,B=80,P=80：A=73.4；无 T/J 的兼容候选按 T=0、J=0 计算 F=A×.55-S=35.4；自定义权重只改 A 聚合比例
   const custom=resolveScoring({contentPillars:['AI 行业热点：开发者影响'],scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
   const adjusted=scoreCards(cards,synthesis,custom)[0];
   assert.equal(adjusted.h,69); assert.equal(adjusted.b,80); assert.equal(adjusted.p,80); assert.equal(adjusted.s,5);
-  assert.equal(adjusted.f,Number(((69*0.5+80*0.3+80*0.2)*0.7-5).toFixed(1)));
+  assert.equal(adjusted.f,Number(((69*0.5+80*0.3+80*0.2)*0.55-5).toFixed(1)));
 });
 
 test('scoring 覆盖分类偏好与账号契合加分，非法值回退默认', () => {
@@ -581,6 +606,6 @@ test('选题报告公式文案跟随实际权重', () => {
   const scored=scoreCards([{candidateId:'C001',status:'PASS',source,bScores:{angleUniqueness:4,emotionSpread:4,titleHook:4,audienceRelevance:4,factSupport:4},
     hProfile:{historicalType:'bigtech',fiveSenseCount:4,fiveQuestionCount:3,recommendationFit:6,emotionTheme:4,searchFriendly:3}}],{items:[]});
   const custom=resolveScoring({scoring:{weights:{h:0.5,b:0.3,p:0.2}}});
-  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}},[],custom),/A = H×50% \+ B×30% \+ P×20%[；;].*F = A×70% \+ T×30% - S - D/);
-  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}}),/A = H×60% \+ B×25% \+ P×15%[；;].*F = A×70% \+ T×30% - S - D/);
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}},[],custom),/A = H×50% \+ B×30% \+ P×20%[；;].*F = A×55% \+ T×25% \+ J×20% - C/);
+  assert.match(markdownRanked(scored,{items:[],metaNarratives:[],combination:{}}),/A = H×60% \+ B×25% \+ P×15%[；;].*F = A×55% \+ T×25% \+ J×20% - C/);
 });

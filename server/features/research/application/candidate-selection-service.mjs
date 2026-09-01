@@ -63,7 +63,7 @@ export class CandidateSelectionService {
       const candidateUpdate = { pool_role: item.poolRole, risk_level: item.riskLevel,
         angle: item.angle, thesis: item.thesis, dimension: item.dimension || 'event', distribution_lane: item.distributionLane || '推荐池',
         reader_stake: item.readerStake || '', reader_stake_score: item.readerStakeScore, h_score: item.h, b_score: item.b, p_score: item.p,
-        s_score: item.s, d_score: item.d, f_score: item.f, topic_value: item.topicValue ?? item.eventValue, event_value: item.eventValue, article_value: item.a,
+        research_value: item.researchValue ?? item.j, s_score: item.s, d_score: item.d, competition_penalty: item.competitionPenalty ?? item.c, f_score: item.f, topic_value: item.topicValue ?? item.eventValue, event_value: item.eventValue, article_value: item.a,
         content_route: item.contentRoute || 'article', score_status: item.scoreStatus || 'ready', score_warning: item.scoreWarning || '',
         format: item.format || '', material_type: item.materialType || '', historical_type: item.historicalType || '',
         status: item.scoreStatus === 'needs_source_data' ? 'pooled' : 'analyzed' };

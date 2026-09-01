@@ -83,8 +83,10 @@
 - 双分发策略（可选）：`distributionStrategy.recommendation|notification|experiment`。每个池可配置 `purpose`、`preferredTopics` 和 `titleRule`，由选题、编辑会、标题和成稿技能读取；这些字段只描述内容规划，不授予自动群发或发布权限。
 - 通知资格（可选）：`notificationPolicy.minimumMatchedCriteria`、`minimumNotificationFit`（默认 4/5）、`minimumFactSupport`（默认 4/5）、`maxPerBatch`（默认 2，允许 0）、`blockedRiskLevels`、`readerStakes`、`criteria`。通知池必须有具体读者、明确动作或决策和具体后果；传闻、待核事实及禁入风险会确定性降到实验池，缺失配置时使用内置严格规则。
 - `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`server/features/research/application/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
-  - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`。
-  - `eventValueWeight`（0.30，限制在 0.25–0.40）：事件价值 T 在最终分中的权重；当前公式为 `F = A×(1-eventValueWeight) + T×eventValueWeight - S - D`。
+- `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`；H/B/P 只是 A 的内部拆分。
+- `eventValueWeight`（默认 0.25，限制在 0.25–0.40）：事件热度 T 在最终分中的权重。
+- `researchValueWeight`（默认 0.20，限制在 0.10–0.30）：事件内研判与事件间关系形成的研判价值 J 权重。
+- 常规文章最终分为 `F = A×(1-eventValueWeight-researchValueWeight) + T×eventValueWeight + J×researchValueWeight - C`，其中 `C = S + D`，S/D 仅作为内部扣分来源保留。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
   - `categoryPreference`：预排序分类偏好分（大厂 6 / AI 4 / 行业 3 / 综合 1 / 职场 0）。调低或调负可让泛热点沉底。
   - `pBase`：P 分类基分（大厂 50 / AI 40 / 行业 30 / 综合 20 / 职场 10）。

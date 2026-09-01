@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 32;
+export const WORKBENCH_SCHEMA_VERSION = 34;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -600,6 +600,21 @@ export function runDatabaseMigrations(db, migrateSchema) {
     }catch(error){db.exec('ROLLBACK');throw error;}}
     // v32：model_calls 增加原生工具调用留档，避免成功的工具轮次被误显示为无输出
     if(applied<32){db.exec('BEGIN IMMEDIATE');try{const columns=new Set(db.prepare('PRAGMA table_info(model_calls)').all().map((column)=>column.name));if(!columns.has('tool_calls_json'))db.exec('ALTER TABLE model_calls ADD COLUMN tool_calls_json TEXT');db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(32,?)').run(new Date().toISOString());db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}}
+    // v33：保存精简后的常规文章评分：研判价值 J 与竞争扣分 C。
+    if(applied<33){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(candidates)').all().map((column)=>column.name));
+      if(!columns.has('research_value'))db.exec('ALTER TABLE candidates ADD COLUMN research_value REAL');
+      if(!columns.has('competition_penalty'))db.exec('ALTER TABLE candidates ADD COLUMN competition_penalty REAL');
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(33,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v34：编辑会锁定时必须记录作者采用的研判主线，保证研判一路传入成稿。
+    if(applied<34){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(editorial_sessions)').all().map((column)=>column.name));
+      if(!columns.has('research_basis'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN research_basis TEXT NOT NULL DEFAULT ''");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(34,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
   }
   const violations = db.prepare('PRAGMA foreign_key_check').all();
   if (violations.length) throw new Error(`数据库迁移后存在 ${violations.length} 项外键完整性错误`);

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isPureProjectEvent, scoreCards } from '../../../features/research/index.mjs';
+import { isPureProjectEvent, readDiscussionResearchContext, scoreCards } from '../../../features/research/index.mjs';
 import { routeBreakingAnalysis } from '../../../features/articles/index.mjs';
 import { buildCustomFactSheet, customFactMarkdown, customSourceUrl, socialRouteForContentClass } from '../../../features/social-cards/index.mjs';
 import { createRepositoryCandidate } from '../../../features/social-cards/index.mjs';
@@ -110,6 +110,10 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
       }
       for (const candidate of candidates) candidate.member_hotspot_ids = candidate.composite ? store.candidateHotspots(candidate.id).map((item) => item.id) : [candidate.hotspot_id].filter(Boolean);
       if (track === 'article') attachEventConclusions(candidates, batchId);
+      for (const candidate of candidates) {
+        const researchContext = track === 'article' ? readDiscussionResearchContext({ workspaceRoot: root, batchId, candidate, events: candidateEventGroups(candidate) }) : null;
+        candidate.research_context = researchContext;
+      }
       return respond(json, response, 200, candidates);
     } catch (error) { return respond(json, response, 400, { error: error.message }); }
   }
@@ -202,7 +206,7 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
         if (parsed) {
           const card = { bScores: parsed.bScores || {}, hProfile: parsed.hProfile || { historicalType: 'bigtech', fiveSenseCount: 0, fiveQuestionCount: 0, recommendationFit: 0, emotionTheme: 0, searchFriendly: 0 }, angle: parsed.angle || '', thesis: parsed.thesis || '', source: { title: composite.hotspot_title, category: context.category, riskLevel: context.riskLevel, poolRole: '综合选题', hotspotId: null, composite: true, eventValue: context.eventValue, scoreStatus: context.scoreStatus, scoreWarning: context.scoreWarning } };
           const scored = scoreCards([card], { items: [] });
-          if (scored.length) store.updateCandidate(composite.id, { h_score: scored[0].h, b_score: scored[0].b, p_score: scored[0].p.toFixed(1), s_score: scored[0].s, d_score: scored[0].d, f_score: scored[0].f, event_value: scored[0].eventValue, article_value: scored[0].a, content_route: scored[0].contentRoute, score_status: scored[0].scoreStatus, score_warning: scored[0].scoreWarning, angle: parsed.angle || '', thesis: parsed.thesis || '', status: scored[0].scoreStatus === 'needs_source_data' ? 'pooled' : 'scored' });
+          if (scored.length) store.updateCandidate(composite.id, { h_score: scored[0].h, b_score: scored[0].b, p_score: scored[0].p.toFixed(1), research_value: scored[0].researchValue, s_score: scored[0].s, d_score: scored[0].d, competition_penalty: scored[0].competitionPenalty, f_score: scored[0].f, event_value: scored[0].eventValue, article_value: scored[0].a, content_route: scored[0].contentRoute, score_status: scored[0].scoreStatus, score_warning: scored[0].scoreWarning, angle: parsed.angle || '', thesis: parsed.thesis || '', status: scored[0].scoreStatus === 'needs_source_data' ? 'pooled' : 'scored' });
         }
       }
     } catch { /* auto-scoring is best-effort */ }
@@ -314,7 +318,7 @@ async function handleIndependentCreation({ request, response, pathname, root, co
     const candidate = store.getCandidate(Number(retryMatch[1])); if (!candidate) return respond(json, response, 404, { error: '自主写作项目不存在' }); const creation = store.getCustomArticleRequestByCandidate(candidate.id); const outputMode = candidate.tracks?.find((item) => item.track === 'article')?.output_mode || candidate.output_mode || ''; if (!creation && !['wechat-experience', 'wechat-tutorial'].includes(outputMode)) return respond(json, response, 409, { error: '该候选不是自主写作项目' }); const input = await body(request); const explicitSkillId = String(input.skillId || '').trim(); const requestedStages = input.stageSkills && typeof input.stageSkills === 'object' ? input.stageSkills : {}; const hasExplicitStages = Object.values(requestedStages).some((value) => String(value || '').trim()); const previousSnapshot = (input.useLatestSkill === true || explicitSkillId || hasExplicitStages) ? null : store.findLatestGenerationSnapshot({ batchId: candidate.batch_id, candidateId: candidate.id, purposes: ['tutorial', 'personal-writing'] }); const articleMode = outputMode === 'wechat-experience' ? 'experience' : 'tutorial'; const skillSelection = previousSnapshot ? null : await resolveEntryWriterSkill({ workspaceRoot: root, entryPoint: 'independent-writing', contentType: articleMode, requestedSkillId: explicitSkillId, recommendedSkillId: articleMode === 'experience' ? 'wechat-mp-personal-writing' : 'wechat-mp-tutorial' }); const stageSelections = previousSnapshot ? null : await resolveArticleStageSkills({ workspaceRoot: root, entryPoint: 'independent-writing', requested: requestedStages }); const job = aiJobs.start({ batchId: candidate.batch_id, candidateId: candidate.id, provider: previousSnapshot ? null : input.provider, type: 'tutorial', snapshotId: previousSnapshot?.id || null, skillSelection, stageSelections }); if (creation) store.updateCustomArticleRequest(creation.id, { latestJobId: job.id }); return respond(json, response, 202, { ...job, candidate });
   }
   const candidateMatch = pathname.match(/^\/api\/candidates\/(\d+)$/);
-  if (candidateMatch && request.method === 'GET') { const candidate = store.getCandidate(Number(candidateMatch[1])); if (candidate) { candidate.events = candidateEventGroups(candidate); const card = candidate.events.map((group) => group.card).find(Boolean); if (card) candidate.event_card = card; } return respond(json, response, candidate ? 200 : 404, candidate ?? { error: '候选不存在' }); }
+  if (candidateMatch && request.method === 'GET') { const candidate = store.getCandidate(Number(candidateMatch[1])); if (candidate) { candidate.events = candidateEventGroups(candidate); const card = candidate.events.map((group) => group.card).find(Boolean); if (card) candidate.event_card = card; candidate.research_context = readDiscussionResearchContext({ workspaceRoot: root, batchId: candidate.batch_id, candidate, events: candidate.events }); } return respond(json, response, candidate ? 200 : 404, candidate ?? { error: '候选不存在' }); }
   if (candidateMatch && request.method === 'PATCH') { const candidate = store.updateCandidate(Number(candidateMatch[1]), await body(request)); return respond(json, response, candidate ? 200 : 404, candidate ?? { error: '候选不存在' }); }
   if (candidateMatch && request.method === 'DELETE') { store.deleteCandidate(Number(candidateMatch[1])); return respond(json, response, 200, { ok: true }); }
   const candidateTracksMatch = pathname.match(/^\/api\/candidates\/(\d+)\/tracks$/);

@@ -57,6 +57,48 @@ test('阶段0影子归并：历史高置信事件复用稳定事件ID', () => {
   assert.equal(result.events[0].historical_match.event_id, 'S-HISTORY-1');
 });
 
+test('阶段0影子归并：同一主体同一职位的接任/卸任报道合并为一个事件', () => {
+  const result = resolveEventShadow({
+    batch: { id: 'batch-apple', batch_date: '2026-09-01' },
+    hotspots: [
+      hotspot(10, '苹果新任 CEO 特努斯上任', { who: '苹果', what: '新任CEO特努斯上任', actionType: '人事', object: 'ceo职位', keywords: ['苹果', '特努斯', '库克'] }),
+      hotspot(11, '库克卸任苹果 CEO，特努斯接任', { who: '苹果', what: '库克卸任CEO特努斯接任', actionType: '人事', object: 'ceo', keywords: ['苹果', '特努斯', '库克'] }),
+      hotspot(12, '苹果 CEO 交接完成', { who: '苹果', what: 'CEO交接', actionType: '人事', object: '苹果ceo', keywords: ['苹果', '特努斯', '库克'] }),
+    ],
+  });
+  assert.equal(result.shadow.event_count, 1);
+  assert.equal(result.events[0].hotspot_ids.length, 3);
+  assert.equal(result.differences.review_queue.length, 0);
+});
+
+test('阶段0影子归并：同主体提及其他对象时不因共享人名而误合并', () => {
+  const result = resolveEventShadow({
+    batch: { id: 'batch-apple-noise', batch_date: '2026-09-01' },
+    hotspots: [
+      hotspot(13, '苹果新任 CEO 特努斯上任', { who: '苹果', what: '新任CEO特努斯上任', actionType: '人事', object: 'ceo职位', keywords: ['苹果', '特努斯', '库克'] }),
+      hotspot(14, 'OpenAI购买苹果Mac用于AI训练', { who: '苹果', what: 'AI训练', actionType: '发布', object: '苹果Mac', keywords: ['苹果', '特努斯', '库克', 'OpenAI'] }),
+    ],
+  });
+  assert.equal(result.shadow.event_count, 2);
+});
+
+test('阶段0影子归并：历史事件 ID 冲突时只保留一个稳定事件并合并报道', () => {
+  const hotspots = [
+    hotspot(20, '同一事件的第一条报道', { who: '主体', what: '事件A', object: '对象A', keywords: ['事件A'] }),
+    hotspot(21, '同一事件的第二条报道', { who: '主体', what: '事件B', object: '对象B', keywords: ['事件B'] }),
+  ];
+  const materialized = materializeStableEvents({
+    hotspots,
+    shadowEvents: [
+      { event_id: 'S-SAME', title: '同一事件', hotspot_ids: [20], normalized: { whoKey: '主体', objectKey: '对象A', actionType: '发布' } },
+      { event_id: 'S-SAME', title: '同一事件后续', hotspot_ids: [21], normalized: { whoKey: '主体', objectKey: '对象B', actionType: '发布' } },
+    ],
+  });
+  assert.equal(materialized.length, 1);
+  assert.deepEqual(materialized[0].hotspot_ids, [20, 21]);
+  assert.equal(materialized[0].articles.length, 2);
+});
+
 test('结构化匹配输出自动合并、复核和新事件三个区间', () => {
   const base = { whoKey: 'a', objectKey: 'x', triggerKey: 'y', actionType: '发布', timeWindow: '2026-08', entityKeys: ['a', 'x', 'y'], eventKey: '' };
   assert.ok(structuredMatch(base, { ...base }).score >= 82);

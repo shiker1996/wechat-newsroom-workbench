@@ -202,7 +202,12 @@ export async function handleBatchRoutes({ request, response, pathname, searchPar
     });
     const heatByEvent = new Map((eventHeatRanking.items || []).map((item) => [item.eventId, item]));
     const atlasClusters = stableEvents.length ? materializeStableEvents({ shadowEvents: stableEvents, hotspots: eligible, heatByEvent }) : [];
-    const atlas = buildHotspotAtlas({ clusters: atlasClusters, totalArticles: eligible.length, taggedCount, excludedStale: batch.hotspots.length - eligible.length });
+    let discussionRelations = [];
+    try {
+      const relationFile = path.join(batchWorkdir(batch), 'sources', 'event-relations.json');
+      discussionRelations = JSON.parse(fs.readFileSync(relationFile, 'utf8'))?.items || [];
+    } catch { discussionRelations = []; }
+    const atlas = buildHotspotAtlas({ clusters: atlasClusters, totalArticles: eligible.length, taggedCount, excludedStale: batch.hotspots.length - eligible.length, discussionRelations });
     const eventByHotspot = new Map(memberships.map((membership) => [Number(membership.hotspot_id), membership.event_id]));
     for (const event of atlas.events || []) {
       const stableIds = [...new Set((event.hotspot_ids || []).map((hotspotId) => eventByHotspot.get(Number(hotspotId))).filter(Boolean))];

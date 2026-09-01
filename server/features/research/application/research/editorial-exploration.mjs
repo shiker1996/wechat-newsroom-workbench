@@ -9,7 +9,17 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
   const { prompt: brainstormSystem } = selectionPrompt({ workspaceRoot, skillName: 'hotspot-brainstorm' });
   const cards = [];
   const providerConfig = gateway.config.providers[provider || gateway.config.defaultProvider];
-  const candidates = selected.map((item, index) => ({ ...item, candidateId: `C${String(index + 1).padStart(3, '0')}` }));
+  // 候选选题现在可能来自模型研判（candidate_id=MR-T-xxx），也可能来自旧的程序候选。
+  // 对外仍给探索模型稳定的 Cxxx 编号，但匹配返回时同时接受服务端候选 ID，避免把有效结果误判为空。
+  const candidates = selected.map((item, index) => ({
+    ...item,
+    candidateId: `C${String(index + 1).padStart(3, '0')}`,
+    candidateAliases: [...new Set([item.candidateId, item.candidate_id, item.eventId].map((value) => String(value ?? '').trim()).filter(Boolean))],
+  }));
+  const candidateForOutput = (raw, group) => {
+    const outputId = String(raw?.candidateId || raw?.candidate_id || raw?.id || '').trim();
+    return group.find((item) => item.candidateId === outputId || item.candidateAliases.includes(outputId)) || null;
+  };
   async function processGroup(group, label, retry = false) {
     onProgress(`探索脑暴 ${label}（已完成 ${cards.length}/${selected.length}）`);
     const result = await gateway.complete({ provider, purpose: 'hotspot-brainstorm-explore', batchId, jsonMode: true,
@@ -38,7 +48,10 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
       return;
     }
     const outputItems = Array.isArray(parsed?.items) ? parsed.items : [];
-    const matchedItems = outputItems.filter((raw) => group.some((item) => item.candidateId === raw?.candidateId));
+    const matchedItems = outputItems.map((raw) => {
+      const source = candidateForOutput(raw, group);
+      return source ? { ...raw, candidateId: source.candidateId } : null;
+    }).filter(Boolean);
     if (!matchedItems.length) {
       const reason = '模型返回的 items 为空，或 candidateId 与输入候选不匹配';
       if (!retry) {

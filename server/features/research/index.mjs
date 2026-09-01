@@ -34,6 +34,18 @@ export { buildTopicScoreOperationsMetrics } from './application/topic-score-oper
 export { CandidateSelectionService } from './application/candidate-selection-service.mjs';
 export { classifyResearchFailure, recordResearchFailure } from './application/research-failure.mjs';
 export { buildEventHeatRanking, loadPreviousEventHeatItems, scoreClassifiedEvent, scoreEventHeat } from './domain/event-heat-ranking.mjs';
+export { DISCUSSION_RESEARCH_SCHEMA_VERSION, DISCUSSION_RESEARCH_TOP_K, DISCUSSION_RESEARCH_EXCLUDED_CONTENT_CLASSES, buildDiscussionResearch, discussionResearchMarkdown, readDiscussionResearchContext } from './domain/discussion-research.mjs';
+export {
+  buildDiscussionResearchModelInput,
+  buildDiscussionResearchModelMessages,
+  buildDiscussionRelationCandidatePairs,
+  buildInternalResearchModelInput,
+  buildRelationResearchModelInput,
+  buildTopicResearchModelInput,
+  generateDiscussionResearch,
+  normalizeDiscussionResearchModel,
+} from './application/research/discussion-research-stage.mjs';
+export { buildTopicCandidates, selectTopicCandidates, topicCandidatesMarkdown, discussionQuestionForContext } from './domain/topic-candidate-generation.mjs';
 export { projectStableEvents } from './domain/event-resolution-cluster-projection.mjs';
 export { duplicatePenaltyForHeat, EVENT_RESOLUTION_POLICY } from './domain/event-resolution-policy.mjs';
 export { loadShadowHistory, materializeStableEvents, resolveEventShadow, structuredMatch, buildEventTitle } from './domain/event-resolution-shadow.mjs';

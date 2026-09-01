@@ -243,6 +243,10 @@ final_readiness: WRITE_NOW
 
 # ${candidate.hotspot_title}
 
+## 采用的研判主线
+
+${editorial.research_basis.trim()}
+
 ## 锁定命题
 
 ${candidate.thesis.trim()}

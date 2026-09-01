@@ -15,7 +15,10 @@ function riskWeight(value) {
 
 // 事件关系图：事件节点与 who/what/where 维度节点连边，节点维度分即选题价值分。
 // 维度节点由 dimensionSelections 产出，天然只包含度数 ≥2 的组（孤立主体与单事件不建维度节点）。
-function buildEventGraph(clusters, events) {
+const RELATION_SCORE = { high: 3, medium: 2, low: 1 };
+const RELATION_LABELS = { same_subject_sequence: '同一主体连续事件', shared_object_comparison: '同一对象对比', action_comparison: '同类动作对比', context_comparison: '同一场合对比', shared_dimension: '共享维度关系' };
+
+function buildEventGraph(clusters, events, discussionRelations = []) {
   const groups = dimensionSelections(clusters, [], { whoLimit: 8, whatLimit: 8, whereLimit: 4 });
   const nodes = events.map((event,priorityRank) => ({
     id: `event:${event.event_id}`, type: 'event', title: event.representative_title,
@@ -27,10 +30,30 @@ function buildEventGraph(clusters, events) {
     nodes.push({ id: nodeId, type: group.dimension, label: group.title, eventCount: group.events.length, score: group.score });
     for (const event of group.events) edges.push({ from: `event:${event.event_id}`, to: nodeId });
   }
+  const eventIds = new Set(events.map((event) => String(event.event_id)));
+  for (const relation of discussionRelations || []) {
+    const ids = (relation.event_ids || []).map((id) => String(id)).filter((id) => eventIds.has(id));
+    if (ids.length !== 2) continue;
+    const relationId = `relation:${relation.relation_id}`;
+    nodes.push({
+      id: relationId,
+      type: 'relation',
+      label: RELATION_LABELS[relation.relation_type] || '事件关系候选',
+      eventCount: ids.length,
+      score: RELATION_SCORE[relation.confidence] || 1,
+      relationType: relation.relation_type,
+      confidence: relation.confidence,
+      sharedDimensions: relation.shared_dimensions || [],
+      temporalOrder: relation.temporal_order || 'same_or_unknown',
+      daysApart: relation.days_apart ?? null,
+      eventIds: ids,
+    });
+    for (const eventId of ids) edges.push({ from: `event:${eventId}`, to: relationId, relationId: relation.relation_id });
+  }
   return { nodes, edges };
 }
 
-export function buildHotspotAtlas({ clusters, totalArticles, taggedCount, excludedStale = 0 }) {
+export function buildHotspotAtlas({ clusters, totalArticles, taggedCount, excludedStale = 0, discussionRelations = [] }) {
   const events = clusters.map(({ tags, representativeHotspotId, ...event }) => {
     const articles = event.articles.map((article) => ({ ...article }));
     const hotspotIds = articles.map(a => a.hotspot_id).filter(Boolean);
@@ -46,11 +69,13 @@ export function buildHotspotAtlas({ clusters, totalArticles, taggedCount, exclud
   const sourceCounts = new Map();
   for (const event of events) for (const source of new Set(event.articles.map((article) => article.source).filter(Boolean))) sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
   const sources = [...sourceCounts].map(([name,eventCount]) => ({ name,eventCount,reportCount:events.reduce((sum,event) => sum+event.articles.filter((article)=>article.source===name).length,0) })).sort((a,b)=>b.eventCount-a.eventCount||b.reportCount-a.reportCount||a.name.localeCompare(b.name));
-  const graph = buildEventGraph(clusters, events);
+  const availableEventIds = new Set(events.map((event) => String(event.event_id)));
+  const relations = (discussionRelations || []).filter((relation) => (relation.event_ids || []).every((id) => availableEventIds.has(String(id))) && new Set(relation.event_ids || []).size >= 2);
+  const graph = buildEventGraph(clusters, events, relations.filter((relation) => new Set(relation.event_ids || []).size === 2));
   return {
     generatedAt:new Date().toISOString(), totalArticles, taggedCount, excludedStale, eventCount:events.length,
     sourceCount:sourceSet.size, multiSourceCount:events.filter((event)=>event.source_count>=2).length,
-    scopes,categories,sources,events,graph,
+    scopes,categories,sources,events,graph,discussionRelations: relations,
     gate:{ valid:reportSum===totalArticles&&articleIds.length===uniqueArticleIds.size, reportSum, uniqueArticleIds:uniqueArticleIds.size,
       complete:taggedCount===totalArticles, issues:[...(reportSum===totalArticles?[]:[`报道守恒失败：${reportSum}/${totalArticles}`]),...(articleIds.length===uniqueArticleIds.size?[]:['category_id 重复']),...(taggedCount===totalArticles?[]:[`仍有 ${totalArticles-taggedCount} 条未完整打标`])] },
   };

@@ -60,3 +60,22 @@ test('事件关系图连接事件与维度节点，孤立主体不建维度节�
     assert.ok(nodes.some((node)=>node.id===edge.to), `边终点缺失 ${edge.to}`);
   }
 });
+
+test('讨论关系候选接入事件图并保留时间、来源与置信度', () => {
+  const clusters = [1, 2].map((n) => ({
+    event_id: `E000${n}`, representative_title: `事件${n}`, market_scope: '国内', china_relevance_score: 8,
+    topic_category: '🤖 AI/技术动态', keywords: [], source_count: 1, report_count: 1,
+    latest_time: `2026-07-${String(18 + n).padStart(2, '0')}T10:00:00Z`,
+    articles: [{ category_id: `G${n}`, source: 'rsshub', title: `报道${n}`, risk_level: '低', hotspot_id: n }],
+    tags: { eventParts: { who: 'openai', object: '模型', actionType: n === 1 ? '发布' : '争议回应', labels: { who: 'OpenAI' } } },
+  }));
+  const atlas = buildHotspotAtlas({ clusters, totalArticles: 2, taggedCount: 2, discussionRelations: [{
+    relation_id: 'R-E0001-E0002', relation_type: 'same_subject_sequence', confidence: 'high',
+    shared_dimensions: ['who', 'object'], temporal_order: 'E0001_before_E0002', days_apart: 1,
+    event_ids: ['E0001', 'E0002'], evidence: [{ event_id: 'E0001', sources: [{ source: 'rsshub' }] }, { event_id: 'E0002', sources: [{ source: 'rsshub' }] }],
+  }] });
+  const relationNode = atlas.graph.nodes.find((node) => node.type === 'relation');
+  assert.equal(atlas.discussionRelations.length, 1);
+  assert.equal(relationNode.confidence, 'high');
+  assert.deepEqual(atlas.graph.edges.filter((edge) => edge.to === relationNode.id).map((edge) => edge.from).sort(), ['event:E0001', 'event:E0002']);
+});

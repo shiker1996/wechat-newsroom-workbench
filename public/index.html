@@ -163,20 +163,21 @@
       <section class="atlas-mode-panel" data-atlas-mode-panel="atlas" hidden>
         <div class="atlas-grid atlas-semantic-grid">
           <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
-          <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
+          <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button><button data-graph-lens="relation" role="tab" aria-selected="false">关系</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
         </div>
+        <section class="panel atlas-relation-panel"><div class="panel-head"><div><span class="kicker">TOPIC RESEARCH</span><h3>事件间研判</h3><p>只展示能继续形成选题的前后变化、回应关系、对比关系和趋势关系；关键词相同但没有讨论意义的事件不会进入这里。</p></div><span id="discussion-relation-count"></span></div><div id="discussion-relation-list" class="discussion-relation-list"></div></section>
         <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
       </section>
     </section>
 
     <section class="view" id="view-topics">
-      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>比较候选的历史表现、成稿潜力、账号契合与同题竞争，选择值得进入编辑会的文章方向。</p></div>
+      <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>综合事件热度、模型研判、文章化质量与竞争情况，选择值得进入编辑会的文章方向。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
           <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
           <div class="scope-tabs" id="article-type-tabs" aria-label="文章类型筛选"><button type="button" class="active" data-article-type="all">全部</button><button type="button" data-article-type="hotspot">热点事件</button><button type="button" data-article-type="independent">自主写作</button></div>
           <div class="topic-pool-hint">选题请在「<a href="#overview">热点全景</a>」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
-          <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>事件价值 T</b>事件热榜的价值分，反映热度、增量、来源扩散和时效</span><span><b>文章化质量 A</b>由 H、B、P 合成，反映是否值得写成文章</span><span><b>历史表现 H</b>相似题材的历史传播信号</span><span><b>成稿潜力 B</b>角度、情绪、标题、受众与事实支撑</span><span><b>账号契合 P</b>内容支柱、读者画像和账号定位的承接程度；不等同于事件热度或具体读者利益</span><span><b>同题饱和 S</b>市场中同类内容的竞争扣分</span><span><b>竞争修正 D</b>额外竞争因素校正</span><span><b>综合成稿分 F</b>最终排序依据，低于 55 默认隐藏</span></div><small>当前公式：A = H × 60% + B × 25% + P × 15%；F = A × 70% + T × 30% − S − D。</small></details>
+          <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>事件热度 T</b>事件热榜的热度、进展、来源扩散和时效</span><span><b>研判价值 J</b>事件内反常/利益冲突/发散，以及事件间前后/回应/对比/趋势关系</span><span><b>文章化质量 A</b>模型判断这个命题能否写成有传播力、有信息增量的文章</span><span><b>竞争扣分 C</b>同题饱和与事件重复造成的扣分</span><span><b>最终选题分 F</b>综合排序依据，低于 55 默认隐藏</span></div><small>当前公式：A = H × 60% + B × 25% + P × 15%；F = A × 55% + T × 25% + J × 20% − C。H/B/P 仅作为 A 的内部拆分。</small></details>
           <div id="candidate-list" class="candidate-list"></div>
         </section>
       </div>
@@ -557,7 +558,7 @@
               <div id="event-cards-list"></div>
             </section>
             <section class="editorial-production-gate" id="editorial-production-gate" aria-label="成稿条件">
-              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 5</span></div>
+              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 6</span></div>
               <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
               <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
               <div class="editorial-actions">
@@ -574,14 +575,19 @@
               </div>
             </section>
             </div>
+            <section class="editorial-research-panel" id="editorial-research-panel" hidden>
+              <div><span class="kicker">DISCUSSION RESEARCH</span><h4>研判输入</h4><p>先看由研判形成的候选选题，再确认采用哪条事件内或事件间的研判主线；事实仍需回到原文核验。</p></div>
+              <div id="editorial-research-content"></div>
+            </section>
             <details class="editorial-decision-details" id="editorial-decision-details">
               <summary><span><b>决策底稿</b><small>AI 编辑会自动整理 · 仅在复核或手工修订时展开</small></span><span class="decision-detail-state">查看全部字段</span></summary>
               <div class="editorial-decision-body">
             <div class="form-pair"><label>写作角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
             <label class="question-field">当前关键问题<input name="editor_question" placeholder="一次只问一个最能改变方向的问题"></label>
-            <div class="form-pair"><label>已确认事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>明确观点<textarea name="author_opinions" rows="5"></textarea></label></div>
-            <div class="form-pair"><label>已确认实践（选填）<textarea name="confirmed_experiences" rows="4"></textarea></label><label>否定角度 / 反证边界（选填）<textarea name="rejected_angles" rows="4"></textarea></label></div>
-            <div class="form-pair"><label>待完善项（由系统按必填项推导）<textarea name="open_questions" rows="3" readonly></textarea></label><label>禁止写入（无则留空）<textarea name="forbidden_claims" rows="3"></textarea></label></div>
+            <div class="form-pair"><label>已确认事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>采用的研判主线<textarea name="research_basis" rows="5" placeholder="必须明确采用哪条反常、利益冲突、发散方向或事件间关系"></textarea></label></div>
+            <div class="form-pair"><label>明确观点<textarea name="author_opinions" rows="5"></textarea></label><label>已确认实践（选填）<textarea name="confirmed_experiences" rows="4"></textarea></label></div>
+            <div class="form-pair"><label>否定角度 / 反证边界（选填）<textarea name="rejected_angles" rows="4"></textarea></label><label>待完善项（由系统按必填项推导）<textarea name="open_questions" rows="3" readonly></textarea></label></div>
+            <label>禁止写入（无则留空）<textarea name="forbidden_claims" rows="3"></textarea></label>
             <div class="gate-strip"><span id="brief-state">讨论中</span></div>
             <div class="decision-save-row"><button type="submit" class="ghost-button">保存修订</button></div>
               </div>
@@ -1223,6 +1229,7 @@
   <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><div class="preview-status" hidden>正在加载预览…</div><iframe title="产物预览" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe></dialog>
   <dialog id="confirm-dialog" class="modal"><div class="confirm-body"><h2>确认操作</h2><p class="confirm-message"></p><div class="modal-actions"><button type="button" class="ghost-button" data-confirm-cancel>取消</button><button type="button" class="ink-button" data-confirm-ok>确认执行</button></div></div></dialog>
   <dialog id="event-detail-dialog" class="drawer event-detail-dialog"><div class="drawer-inner"><div class="drawer-head"><div><span class="kicker">EVENT EVIDENCE</span><h2 id="event-detail-title">事件详情</h2></div><button type="button" class="close-button" data-close-event-detail aria-label="关闭事件详情">×</button></div><div id="event-detail-content"></div></div></dialog>
+  <dialog id="candidate-research-dialog" class="drawer candidate-research-dialog"><div class="drawer-inner"><div class="drawer-head"><div><span class="kicker">TOPIC RESEARCH</span><h2 id="candidate-research-title">选题研判</h2></div><button type="button" class="close-button" data-close-candidate-research aria-label="关闭选题研判">×</button></div><div id="candidate-research-content"></div></div></dialog>
   <dialog id="revision-dialog" class="modal revision-dialog"><div class="modal-head"><div><span class="kicker">DOCUMENT HISTORY</span><h2>版本历史</h2></div><button class="close-button" data-close-revisions aria-label="关闭">×</button></div><div class="revision-layout"><div id="revision-list" class="revision-list"></div><div class="revision-preview"><div id="revision-summary" class="muted">选择一个版本查看差异</div><pre id="revision-diff" class="revision-diff"></pre><button class="ink-button" id="restore-revision" disabled>恢复此版本</button></div></div></dialog>
   <dialog id="find-dialog" class="modal find-dialog"><div class="find-dialog-body"><div class="modal-head"><div><span class="kicker">FIND & REPLACE</span><h2>查找替换</h2></div><button class="close-button" data-close-find aria-label="关闭">×</button></div><label>查找<input id="find-text" autocomplete="off"></label><label>替换为<input id="replace-text" autocomplete="off"></label><div class="find-options"><label><input id="find-case-sensitive" type="checkbox"> 区分大小写</label><span id="find-result" role="status">输入要查找的内容</span></div><div class="modal-actions"><button class="ghost-button" id="find-next">查找下一个</button><button class="ghost-button" id="replace-one">替换</button><button class="ink-button" id="replace-all">全部替换</button></div></div></dialog>
   <dialog id="writing-goal-dialog" class="modal"><form id="writing-goal-form"><div class="modal-head"><div><span class="kicker">WRITING TARGET</span><h2>设置写作目标</h2></div><button type="button" class="close-button" data-close-writing-goal aria-label="关闭">×</button></div><label>目标可见字数<input id="writing-goal-input" type="number" min="200" max="10000" step="100" required></label><p class="fine-print">目标仅用于进度反馈；草稿和终稿可以分别设置，不改变保存与终稿门禁规则。</p><div class="modal-actions"><button type="button" class="ghost-button" data-close-writing-goal>取消</button><button type="submit" class="ink-button">保存目标</button></div></form></dialog>

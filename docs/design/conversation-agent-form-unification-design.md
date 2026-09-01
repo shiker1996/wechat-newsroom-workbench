@@ -41,7 +41,8 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 
 - **assistantReply**：给用户的回复，追问直接写在文本里（同 tutorial/custom-social 现状），问题不再持久化。
 - **briefUpdates**：本轮有变化的表单字段增量补丁。
-  - 编辑室：`{angle, thesis, distribution_lane, reader_stake, confirmed_facts, author_opinions, confirmed_experiences, rejected_angles, forbidden_claims, experience_required}`（合并现 candidateUpdates + editorial，去掉 nextQuestion/open_questions/next_action）
+  - 编辑室：`{angle, thesis, distribution_lane, reader_stake, confirmed_facts, research_basis, author_opinions, confirmed_experiences, rejected_angles, forbidden_claims, experience_required}`（合并现 candidateUpdates + editorial，去掉 nextQuestion/open_questions/next_action；`research_basis` 为作者确认采用的事件内或事件间研判主线）
+  - 多值字段（`confirmed_facts`、`author_opinions`、`confirmed_experiences`、`rejected_angles`、`forbidden_claims`）默认使用 `{append: [...]}` 追加并按条目去重；删除使用 `{remove: [...]}`，清空使用 `{clear: true}`。单值字段（`angle`、`thesis`、`research_basis`）使用 `{replace: "..."}` 或 `{set: "..."}` 明确替换，不能隐式覆盖。
   - 自主写作：现 `formUpdates` 改名为 `briefUpdates`，字段不变
   - 自定义图文：同
 - **删除模型的 `ready` 字段**（tutorial/custom-social）：就绪本就由代码复核，模型声明无意义。
@@ -53,6 +54,7 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 - `angle` / `thesis` 为实质内容（非占位符，复用 `substantiveDecision`）
 - `distribution_lane` 已确定且 `reader_stake` 具体（谁、什么场景、什么动作、什么后果）
 - `confirmed_facts` 非空（事实基座）
+- `research_basis` 非空且为实质内容（必须明确采用反常、利益冲突、发散方向，或前后/回应/对比/趋势关系）
 - `author_opinions` 非空（作者立场）
 - 体验门禁：`experience_required` 为真时 `confirmed_experiences` 必须有实质内容
 - `forbidden_claims` 非空（命题边界设界）
@@ -77,16 +79,17 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 | 位置 | 改动 |
 |---|---|
 | `server/domain/` 新增 | `evaluateEditorialReadiness` |
-| `server/features/articles/llm/editorial-room.mjs` | SYSTEM prompt 改 briefUpdates；reconcile 删 open_questions 管理；applyEditorialResult 删状态机；buildEditorialMessages 回喂 missing[] |
+| `server/features/articles/llm/editorial-room.mjs` | SYSTEM prompt 改 briefUpdates；reconcile 删 open_questions 管理；applyEditorialResult 删状态机并按字段类型执行追加、去重、明确删除/替换；buildEditorialMessages 回喂 missing[] |
+| `server/features/articles/domain/editorial-patch.mjs` | 提供编辑室底稿增量补丁的追加去重、明确删除/清空和单值替换逻辑 |
 | `server/platform/agent/editorial-adapter.mjs` | 信封指令、json-repair 模板、决策补写器 prompt 与合并逻辑 |
 | `server/features/articles/llm/tutorial-chat.mjs` / `server/features/social-cards/llm/custom-social-chat.mjs` | prompt 改 briefUpdates、删 ready |
 | `server/platform/agent/tutorial-adapter.mjs` / `custom-social-adapter.mjs` | 读 briefUpdates；删模型 ready 消费（代码复核保留） |
 | `server/platform/http/routes/article-routes.mjs` | 锁简报门禁换 readiness |
 | `server/features/articles/application/article-pipeline.mjs` | 成稿门禁换 readiness |
 | `server/application/candidate-selection-service.mjs` | 预置首问改开场注入 |
-| `public/src/views/editorial.js` | 成稿门五项检查换 missing[] 驱动；问题展示区改派生 |
-| `skills/editorial-room/SKILL.md` | prompt 同步 |
-| DB | 不动（列保留兼容） |
+| `public/src/views/editorial.js` | 成稿门六项检查换 missing[] 驱动；问题展示区改派生 |
+| `skills/editorial-room-chat/SKILL.md` | prompt 同步，要求先确认采用的研判主线 |
+| DB | `editorial_sessions.research_basis` 新增字段，schema v34；旧数据默认空值并需重新确认 |
 | 测试 | 编辑室约一半用例改写；tutorial/custom-social 相关断言更新 |
 
 ## 兼容策略

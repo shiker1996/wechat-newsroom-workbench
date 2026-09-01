@@ -8,7 +8,7 @@ import { selectionPrompt } from '../server/features/research/llm/selection-promp
 const workspaceRoot = process.cwd();
 
 test('选题阶段 5 个技能均可按名加载', () => {
-  for (const skillName of ['hotspot-tagging', 'hotspot-brainstorm', 'hotspot-synthesis', 'event-card-generator', 'editorial-room-chat', 'tutorial-chat', 'custom-social-chat']) {
+  for (const skillName of ['hotspot-tagging', 'hotspot-brainstorm', 'hotspot-synthesis', 'event-card-generator', 'discussion-researcher', 'editorial-room-chat', 'tutorial-chat', 'custom-social-chat']) {
     const bundle = loadSkillBundle({ workspaceRoot, skillName });
     assert.equal(bundle.fallback, false, `${skillName} 应从项目技能目录加载`);
     assert.ok(bundle.prompt.length > 100, `${skillName} prompt 不能为空`);
