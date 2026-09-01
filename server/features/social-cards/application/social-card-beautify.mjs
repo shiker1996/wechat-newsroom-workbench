@@ -610,7 +610,7 @@ function aiVisualDocumentWriteCatalogItem(registry) {
   };
 }
 
-export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, onProgress = () => {}, styleBrief = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
+export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, onProgress = () => {}, onEvent = () => {}, styleBrief = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
   const aiVisualScreenshotsEnabled = enableAiVisualScreenshots === true;
   const aiVisualDeliveryGateEnabled = enableAiVisualDeliveryGate === true;
   const batch = store.getBatch(batchId);
@@ -814,6 +814,7 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
       toolContext: { batchId, candidateId, skillId: AI_VISUAL_SKILL_NAME, provider: providerId, workspaceRoot, allowedRoots: [workdir], allowedCapabilities: [SOCIAL_CARD_PROJECT_READ_CAPABILITY, AI_VISUAL_DOCUMENT_WRITE] },
       maxOutputTokens: providerMaxOutputTokens,
       onProgress,
+      onEvent,
     });
     const generatedHtml = fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : '';
     const generatedPageCount = htmlPageCount(generatedHtml);

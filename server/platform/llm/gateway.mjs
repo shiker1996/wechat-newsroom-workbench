@@ -3,6 +3,8 @@ import { webSearch as tavilySearch, formatSearchResults } from './web-search.mjs
 import { outputBudgetFor, TRUNCATION_RETRY_SYSTEM_PROMPT } from './output-budget.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { applyModelProviderConfiguration } from '../extensions/model-provider-configuration.mjs';
+import { chatCompletionsEvents, normalizeChatToolCalls } from './stream-events.mjs';
+import { normalizeResponsesResponse, responsesEndpoint, responsesEvents, responsesPayload } from './responses-api.mjs';
 
 // 后台任务 thinking 实时进度：AiJobManager 在 run() 外层注册当前任务的接收器，
 // complete() 检测到接收器且本次 thinking 开启时，内部改用流式把 reasoning 实时转发给接收器。
@@ -21,9 +23,18 @@ function endpoint(baseUrl) {
   return /\/chat\/completions$/i.test(value)?value:`${value}/chat/completions`;
 }
 
-// 会话 Agent 的伪工具协议用 role:'tool' 消息携带 JSON 结果，但本网关不使用原生 tool_calls，
-// OpenAI 兼容端点（如 DeepSeek）会因缺少 tool_call_id 拒绝 tool 角色消息（HTTP 400），统一降级为 user。
-function wireMessages(messages){return messages.map(({role,content})=>({role:role==='tool'?'user':role,content:String(content??'')}));}
+// 旧的 Prompt JSON 工具协议没有 tool_call_id，继续降级为 user；原生工具协议保留
+// assistant.tool_calls 与 tool.tool_call_id，确保多轮工具结果能被模型正确关联。
+function wireMessages(messages, { nativeTools = false } = {}) {
+  return messages.map((message = {}) => {
+    const { protected: _protected, ...rest } = message;
+    if (!nativeTools) return { role: rest.role === 'tool' ? 'user' : rest.role, content: String(rest.content ?? '') };
+    if (rest.role === 'tool' && !rest.tool_call_id) return { role: 'user', content: String(rest.content ?? '') };
+    const wired = { ...rest, content: rest.content == null ? null : String(rest.content) };
+    if (wired.role !== 'assistant' || !Array.isArray(wired.tool_calls)) delete wired.tool_calls;
+    return wired;
+  });
+}
 
 function attachAbort(controller,signal){if(!signal)return()=>{};if(signal.aborted){controller.abort(signal.reason);return()=>{};}const abort=()=>controller.abort(signal.reason);signal.addEventListener('abort',abort,{once:true});return()=>signal.removeEventListener('abort',abort);}
 
@@ -78,6 +89,7 @@ function publicProvider(name, provider, configured) {
     name,
     label: provider.label || name,
     baseUrl: provider.baseUrl,
+    protocol: provider.protocol || 'chat_completions',
     model: provider.model,
     apiKeyEnv: provider.apiKeyEnv,
     configured,
@@ -87,6 +99,8 @@ function publicProvider(name, provider, configured) {
     taggingChunkSize: provider.taggingChunkSize,
     taggingConcurrency: provider.taggingConcurrency,
     supportsJsonMode: provider.supportsJsonMode === true,
+    supportsNativeTools: provider.supportsNativeTools === true,
+    supportsToolCallStreaming: provider.supportsToolCallStreaming === true,
     enabled: provider.enabled !== false,
     supportsWebSearch: !!provider.webSearchConfig,
   };
@@ -123,18 +137,80 @@ export class ModelGateway {
     return { providerName, provider, apiKey };
   }
 
-  async rawComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal }) {
+  async rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], nativeTools = false }) {
+    const controller = new AbortController();
+    const detachAbort = attachAbort(controller, signal);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.config.requestTimeoutMs);
+    try {
+      const modes = jsonMode && provider.supportsJsonMode === true && !tools.length ? [true, false] : [false];
+      for (const useJsonMode of modes) {
+        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, webSearch, thinking, tools, nativeTools });
+        const response = await fetchWithRetry(responsesEndpoint(provider.baseUrl), {
+          method: 'POST', signal: controller.signal,
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok && useJsonMode && [400, 422].includes(response.status)) continue;
+        if (!response.ok) throw new Error(`${provider.label || providerName} HTTP ${response.status}: ${data.error?.message || '调用失败'}`);
+        return normalizeResponsesResponse(data, provider.label || providerName);
+      }
+      throw new Error(`${provider.label || providerName} 不支持结构化输出模式`);
+    } catch (error) {
+      if (timedOut) throw new Error(`${provider.label || providerName} 请求超时（${this.config.requestTimeoutMs}ms），可在 config.local.json 调大 llm.requestTimeoutMs`);
+      if (signal?.aborted) throw Object.assign(new Error(`${provider.label || providerName} 请求已取消`), { code: 'MODEL_CALL_ABORTED' });
+      throw error;
+    } finally { detachAbort(); clearTimeout(timer); }
+  }
+
+  async *rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], nativeTools = false }) {
+    const controller = new AbortController();
+    const detachAbort = attachAbort(controller, signal);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.config.requestTimeoutMs);
+    try {
+      const modes = jsonMode && provider.supportsJsonMode === true && !tools.length ? [true, false] : [false];
+      for (const useJsonMode of modes) {
+        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, webSearch, thinking, tools, nativeTools, stream: true });
+        const response = await fetchWithRetry(responsesEndpoint(provider.baseUrl), {
+          method: 'POST', signal: controller.signal,
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          if (useJsonMode && [400, 422].includes(response.status)) continue;
+          throw new Error(`${provider.label || providerName} HTTP ${response.status}: ${data.error?.message || '调用失败'}`);
+        }
+        for await (const event of responsesEvents(response)) {
+          try { onEvent(event); } catch { /* 事件观测失败不应阻断模型调用 */ }
+          yield event;
+        }
+        return;
+      }
+      throw new Error(`${provider.label || providerName} 不支持结构化输出模式`);
+    } catch (error) {
+      if (timedOut) throw new Error(`${provider.label || providerName} 请求超时（${this.config.requestTimeoutMs}ms），可在 config.local.json 调大 llm.requestTimeoutMs`);
+      if (signal?.aborted) throw Object.assign(new Error(`${provider.label || providerName} 请求已取消`), { code: 'MODEL_CALL_ABORTED' });
+      throw error;
+    } finally { detachAbort(); clearTimeout(timer); }
+  }
+
+  async rawComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], nativeTools = false }) {
+    if ((provider.protocol || 'chat_completions') === 'responses') {
+      return this.rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, tools, nativeTools });
+    }
     const controller = new AbortController();
     const detachAbort=attachAbort(controller,signal);
     let timedOut=false;const timer = setTimeout(() => {timedOut=true;controller.abort();}, this.config.requestTimeoutMs);
     const maxTokens = Math.min(maxOutputTokens || provider.maxOutputTokens, provider.maxOutputTokens);
     try {
-      const modes=jsonMode&&provider.supportsJsonMode===true?[true,false]:[false];
+      const modes=jsonMode&&provider.supportsJsonMode===true&&!tools.length?[true,false]:[false];
       for(const useJsonMode of modes) {
-        const payload = { model: provider.model, messages: wireMessages(messages), temperature };
+        const payload = { model: provider.model, messages: wireMessages(messages, { nativeTools }), temperature };
         payload[provider.maxTokensField || 'max_tokens'] = maxTokens;
         Object.assign(payload, thinkingPayload(thinking, provider));
-        if(useJsonMode)payload.response_format={type:'json_object'};
+        if (tools.length) payload.tools = tools;
+        if(useJsonMode && !tools.length)payload.response_format={type:'json_object'};
         if(webSearch && provider.webSearchConfig) { payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue; }
         const response = await fetchWithRetry(endpoint(provider.baseUrl), {
           method: 'POST', signal: controller.signal,
@@ -146,15 +222,17 @@ export class ModelGateway {
         const finishReason = data.choices?.[0]?.finish_reason ?? null;
         if (finishReason === 'content_filter') throw new Error(`${provider.label || providerName} 输出触发内容过滤，未返回内容`);
         if (finishReason === 'insufficient_system_resource') throw new Error(`${provider.label || providerName} 服务端推理资源不足，生成被打断，请稍后重试`);
-        const content = data.choices?.[0]?.message?.content;
-        if (typeof content !== 'string') throw new Error(`${provider.label || providerName} 未返回文本内容`);
+        const message = data.choices?.[0]?.message || {};
+        const toolCalls = normalizeChatToolCalls(message.tool_calls || []);
+        const content = typeof message.content === 'string' ? message.content : '';
+        if (typeof message.content !== 'string' && !toolCalls.length) throw new Error(`${provider.label || providerName} 未返回文本内容`);
         // thinking 开启且 max_tokens 偏小时，预算可能全部耗在 reasoning 上：
         // content 为空串且 finish_reason=length，应当作截断处理，避免空内容传染下游阶段
-        if (finishReason === 'length' && !content.trim()) throw new Error(`${provider.label || providerName} 输出达到上限且未返回内容（推理可能占满输出预算）`);
-        if (!content.trim()) throw new Error(`${provider.label || providerName} 未返回文本内容（finish=${finishReason || 'unknown'}，输出为空白）`);
+        if (finishReason === 'length' && !content.trim() && !toolCalls.length) throw new Error(`${provider.label || providerName} 输出达到上限且未返回内容（推理可能占满输出预算）`);
+        if (!content.trim() && !toolCalls.length) throw new Error(`${provider.label || providerName} 未返回文本内容（finish=${finishReason || 'unknown'}，输出为空白）`);
         // thinking 过程（DeepSeek reasoning_content）：只读不回写 prompt，供编辑室/任务日志展示
         const reasoning = data.choices?.[0]?.message?.reasoning_content;
-        return { content, reasoning: typeof reasoning === 'string' && reasoning ? reasoning : '', usage: data.usage ?? {}, id: data.id ?? null, finishReason };
+        return { content, reasoning: typeof reasoning === 'string' && reasoning ? reasoning : '', usage: data.usage ?? {}, id: data.id ?? null, finishReason, toolCalls };
       }
       throw new Error(`${provider.label || providerName} 不支持结构化输出模式`);
     } catch (error) {
@@ -168,50 +246,94 @@ export class ModelGateway {
     }
   }
 
-  async rawStreamComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, onDelta = () => {}, thinking, signal }, onThinking = () => {}) {
-    const controller=new AbortController();const detachAbort=attachAbort(controller,signal);let timedOut=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},this.config.requestTimeoutMs);
-    const maxTokens=Math.min(maxOutputTokens||provider.maxOutputTokens,provider.maxOutputTokens);
+  async *rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], nativeTools = false }) {
+    if ((provider.protocol || 'chat_completions') === 'responses') {
+      yield* this.rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, nativeTools });
+      return;
+    }
+    const controller = new AbortController();
+    const detachAbort = attachAbort(controller, signal);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.config.requestTimeoutMs);
+    const maxTokens = Math.min(maxOutputTokens || provider.maxOutputTokens, provider.maxOutputTokens);
     try {
-      const modes=jsonMode&&provider.supportsJsonMode===true?[true,false]:[false];
-      for(const useJsonMode of modes) {
-        const payload={model:provider.model,messages:wireMessages(messages),temperature,stream:true};
-        payload[provider.maxTokensField||'max_tokens']=maxTokens;
+      const modes = jsonMode && provider.supportsJsonMode === true && !tools.length ? [true, false] : [false];
+      for (const useJsonMode of modes) {
+        const payload = { model: provider.model, messages: wireMessages(messages, { nativeTools }), temperature, stream: true };
+        payload[provider.maxTokensField || 'max_tokens'] = maxTokens;
         Object.assign(payload, thinkingPayload(thinking, provider));
-        payload.stream_options={include_usage:true};
-        if(useJsonMode)payload.response_format={type:'json_object'};
-        if(webSearch&&provider.webSearchConfig)payload[provider.webSearchConfig.payloadKey]=provider.webSearchConfig.payloadValue;
-        const response=await fetchWithRetry(endpoint(provider.baseUrl),{method:'POST',signal:controller.signal,
-          headers:{authorization:`Bearer ${apiKey}`,'content-type':'application/json'},body:JSON.stringify(payload)});
-        if(!response.ok) {
-          const data=await response.json().catch(()=>({}));
-          if(useJsonMode&&[400,422].includes(response.status))continue;
-          throw new Error(`${provider.label||providerName} HTTP ${response.status}: ${data.error?.message||'调用失败'}`);
+        payload.stream_options = { include_usage: true };
+        if (tools.length) payload.tools = tools;
+        if (useJsonMode && !tools.length) payload.response_format = { type: 'json_object' };
+        if (webSearch && provider.webSearchConfig) payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue;
+        const response = await fetchWithRetry(endpoint(provider.baseUrl), {
+          method: 'POST', signal: controller.signal,
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          if (useJsonMode && [400, 422].includes(response.status)) continue;
+          throw new Error(`${provider.label || providerName} HTTP ${response.status}: ${data.error?.message || '调用失败'}`);
         }
-        if(!response.body)throw new Error(`${provider.label||providerName} 未返回流式响应体`);
-        const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';let content='';let reasoning='';let usage={};let id=null;let finishReason=null;
-        const processLine=(line)=>{
-          const trimmed=line.trim();if(!trimmed.startsWith('data:'))return;const dataText=trimmed.slice(5).trim();if(!dataText||dataText==='[DONE]')return;
-          let data;try{data=JSON.parse(dataText);}catch{return;} id=data.id||id;usage=data.usage||usage;
-          const choice=data.choices?.[0];const delta=choice?.delta?.content??choice?.message?.content??'';
-          if(delta){content+=delta;onDelta(delta,content);}
-          // thinking 过程逐段透传（DeepSeek 流式在 delta.reasoning_content）
-          const reasoningDelta=choice?.delta?.reasoning_content??choice?.message?.reasoning_content??'';
-          if(reasoningDelta){reasoning+=reasoningDelta;onThinking(reasoningDelta,reasoning);}
-          if(choice?.finish_reason)finishReason=choice.finish_reason;
-        };
-        while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split(/\r?\n/);buffer=lines.pop()||'';for(const line of lines)processLine(line);}
-        buffer+=decoder.decode();if(buffer.trim())processLine(buffer);
-        if(finishReason==='content_filter')throw new Error(`${provider.label||providerName} 输出触发内容过滤，未返回内容`);
-        if(finishReason==='insufficient_system_resource')throw new Error(`${provider.label||providerName} 服务端推理资源不足，生成被打断，请稍后重试`);
-        if(!content.trim())throw new Error(`${provider.label||providerName} 未返回流式文本内容（finish=${finishReason||'unknown'}${reasoning?`，推理已产生 ${reasoning.length} 字符后内容为空`:''}）`);
-        return {content,reasoning,usage,id,finishReason};
+        const events = chatCompletionsEvents(response);
+        for await (const event of events) {
+          try { onEvent(event); } catch { /* 事件观测失败不应阻断模型调用 */ }
+          yield event;
+        }
+        return;
       }
-      throw new Error(`${provider.label||providerName} 不支持结构化输出模式`);
-    } catch(error) {
-      if (timedOut) throw new Error(`${provider.label||providerName} 请求超时（${this.config.requestTimeoutMs}ms），可在 config.local.json 调大 llm.requestTimeoutMs`);
-      if(signal?.aborted)throw Object.assign(new Error(`${provider.label||providerName} 请求已取消`),{code:'MODEL_CALL_ABORTED'});
+      throw new Error(`${provider.label || providerName} 不支持结构化输出模式`);
+    } catch (error) {
+      if (timedOut) throw new Error(`${provider.label || providerName} 请求超时（${this.config.requestTimeoutMs}ms），可在 config.local.json 调大 llm.requestTimeoutMs`);
+      if (signal?.aborted) throw Object.assign(new Error(`${provider.label || providerName} 请求已取消`), { code: 'MODEL_CALL_ABORTED' });
       throw error;
-    } finally {detachAbort();clearTimeout(timer);}
+    } finally {
+      detachAbort();
+      clearTimeout(timer);
+    }
+  }
+
+  async rawStreamComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, onDelta = () => {}, onEvent = () => {}, thinking, signal, tools = [], nativeTools = false }, onThinking = () => {}) {
+    let content = '';
+    let reasoning = '';
+    let usage = {};
+    let id = null;
+    let finishReason = null;
+    const toolCalls = [];
+    for await (const event of this.rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, nativeTools })) {
+      if (event.type === 'text-delta') {
+        content += event.text;
+        onDelta(event.text, content);
+      } else if (event.type === 'reasoning-delta') {
+        reasoning += event.text;
+        onThinking(event.text, reasoning);
+      } else if (event.type === 'tool-call') {
+        toolCalls.push({ id: event.callId, name: event.name, input: event.input, providerExecuted: event.providerExecuted === true });
+      } else if (event.type === 'usage') {
+        usage = event.usage || usage;
+      } else if (event.type === 'finish') {
+        finishReason = event.reason || finishReason;
+        id = event.responseId || id;
+      } else if (event.type === 'error' || event.type === 'tool-error') {
+        throw new Error(`${provider.label || providerName} ${event.message || '流式响应失败'}`);
+      }
+    }
+    if (finishReason === 'content_filter') throw new Error(`${provider.label || providerName} 输出触发内容过滤，未返回内容`);
+    if (finishReason === 'insufficient_system_resource') throw new Error(`${provider.label || providerName} 服务端推理资源不足，生成被打断，请稍后重试`);
+    if (!content.trim() && !toolCalls.length) {
+      throw new Error(`${provider.label || providerName} 未返回流式文本内容（finish=${finishReason || 'unknown'}${reasoning ? `，推理已产生 ${reasoning.length} 字符后内容为空` : ''}）`);
+    }
+    return { content, reasoning, usage, id, finishReason, toolCalls };
+  }
+
+  // 协议层事件流：直接暴露一轮模型请求的规范化事件；上下文压缩和 Agent 编排仍由上层负责。
+  async *streamEvents(input = {}) {
+    const { providerName, provider, apiKey } = this.resolve(input.provider);
+    const thinking = input.thinking ?? thinkingEnabledFor(input.purpose);
+    const outputBudget = outputBudgetFor({ purpose: input.purpose, providerMax: provider.maxOutputTokens, requested: input.maxOutputTokens, adaptive: false });
+    yield* this.rawStreamEvents({ providerName, provider, apiKey, messages: input.messages || [],
+      maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode === true,
+      webSearch: input.webSearch === true, thinking, signal: input.signal, tools: input.tools || [], nativeTools: input.nativeTools === true });
   }
 
   // complete() 的 thinking 实时化：有当前任务接收器且本次 thinking 开启时，
@@ -281,12 +403,14 @@ export class ModelGateway {
       let fallbackAttemptUsage = null;
       try {
         result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: context.messages,
-          maxOutputTokens: outputBudget.initial + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal }, { streamThinking });
+          maxOutputTokens: outputBudget.initial + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal,
+          tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking });
       } catch (error) {
         // thinking 开启时推理可能吃光 max_tokens 导致内容为空（finish=length）：回落无思考重试一次
         if (thinking && /未返回流式文本内容/.test(String(error.message || ''))) {
           result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: context.messages,
-            maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode, thinking: false, signal:input.signal }, { streamThinking: false });
+            maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode, thinking: false, signal:input.signal,
+            tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking: false });
         } else {
           throw error;
         }
@@ -294,7 +418,8 @@ export class ModelGateway {
       if (thinking && !String(result.content || '').trim() && result.finishReason === 'length') {
         fallbackAttemptUsage = result.usage;
         result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: context.messages,
-          maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode, thinking: false, signal:input.signal }, { streamThinking: false });
+          maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode, thinking: false, signal:input.signal,
+          tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking: false });
       }
       let attempts = 1;
       let firstAttemptUsage = null;
@@ -321,7 +446,8 @@ export class ModelGateway {
         });
         context = retryContext;
         result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: retryContext.messages,
-          maxOutputTokens: outputBudget.retry + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal }, { streamThinking });
+          maxOutputTokens: outputBudget.retry + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal,
+          tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking });
       }
       const promptTokens = Number(result.usage.prompt_tokens || 0) + Number(firstAttemptUsage?.prompt_tokens || 0) + Number(fallbackAttemptUsage?.prompt_tokens || 0);
       const completionTokens = Number(result.usage.completion_tokens || 0) + Number(firstAttemptUsage?.completion_tokens || 0) + Number(fallbackAttemptUsage?.completion_tokens || 0);
@@ -336,6 +462,7 @@ export class ModelGateway {
         compressed: context.compressed, latencyMs: Date.now() - started, status: 'completed',
         outputText: String(result.content ?? '').slice(0, 20000),
         reasoningText: typeof result.reasoning === 'string' && result.reasoning ? result.reasoning.slice(0, 20000) : null,
+        toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
         outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId });
       return { ...result, callId, usage: { ...result.usage, compression: compressionUsage },
         provider: providerName, model: provider.model, context,
@@ -350,7 +477,7 @@ export class ModelGateway {
     }
   }
 
-  async streamComplete(input,onDelta=()=>{},onThinking=()=>{}) {
+  async streamComplete(input,onDelta=()=>{},onThinking=()=>{},onEvent=()=>{}) {
     const {providerName,provider,apiKey}=this.resolve(input.provider);const started=Date.now();
     const thinking=input.thinking??thinkingEnabledFor(input.purpose);
     const thinkingReserve=thinking&&provider.supportsThinkingToggle===true?Math.max(0,Number(provider.thinkingReserveTokens??8000)||0):0;
@@ -377,26 +504,30 @@ export class ModelGateway {
           {role:'system',content:SUMMARY_SYSTEM_PROMPT},{role:'user',content:old.map((m,i)=>`[${i+1}] ${m.role}: ${typeof m.content==='string'?m.content:JSON.stringify(m.content)}`).join('\n\n')} ],signal:input.signal});
         compressionUsage.prompt_tokens+=Number(result.usage.prompt_tokens||0);compressionUsage.completion_tokens+=Number(result.usage.completion_tokens||0);compressionUsage.calls+=1;return result.content;
       }});
-      let result;let attempts=1;let firstAttemptUsage=null;const bufferedDeltas=[];const initialOnDelta=outputBudget.adaptive?(delta)=>bufferedDeltas.push(delta):onDelta;
+      let result;let attempts=1;let firstAttemptUsage=null;const bufferedDeltas=[];const bufferedEvents=[];
+      const initialOnDelta=outputBudget.adaptive?(delta)=>bufferedDeltas.push(delta):onDelta;
+      const initialOnEvent=outputBudget.adaptive?(event)=>bufferedEvents.push(event):onEvent;
       try {
         result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.initial+thinkingReserve,
-          temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,thinking,signal:input.signal},onThinking);
+          temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,onEvent:initialOnEvent,thinking,signal:input.signal,
+          tools:input.tools||[],nativeTools:input.nativeTools===true},onThinking);
       } catch (error) {
         // thinking 开启时推理可能吃光 max_tokens 导致内容为空（finish=length）：回落无思考重试一次
         if (thinking && /未返回流式文本内容/.test(String(error.message || ''))) {
           result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.initial,
-            temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,thinking:false,signal:input.signal},()=>{});
+            temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,onEvent:initialOnEvent,thinking:false,signal:input.signal,
+            tools:input.tools||[],nativeTools:input.nativeTools===true},()=>{});
         } else {
           throw error;
         }
       }
-      if(result.finishReason==='length'&&outputBudget.adaptive){firstAttemptUsage=result.usage;attempts=2;const retryBudget=contextBudget(provider,this.config,outputBudget.retry);context=await compactMessages([{role:'system',content:TRUNCATION_RETRY_SYSTEM_PROMPT,protected:true},...input.messages],{budget:retryBudget,recentMessageCount:this.config.recentMessageCount,summarize:async(old)=>{const summary=await this.rawComplete({providerName,provider,apiKey,thinking:false,maxOutputTokens:Math.min(1800,provider.maxOutputTokens),messages:[{role:'system',content:SUMMARY_SYSTEM_PROMPT},{role:'user',content:old.map((m,i)=>`[${i+1}] ${m.role}: ${typeof m.content==='string'?m.content:JSON.stringify(m.content)}`).join('\n\n')}],signal:input.signal});compressionUsage.prompt_tokens+=Number(summary.usage.prompt_tokens||0);compressionUsage.completion_tokens+=Number(summary.usage.completion_tokens||0);compressionUsage.calls+=1;return summary.content;}});result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.retry+thinkingReserve,temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta,thinking,signal:input.signal},onThinking);}else if(outputBudget.adaptive){let accumulated='';for(const delta of bufferedDeltas){accumulated+=delta;onDelta(delta,accumulated);}}
+      if(result.finishReason==='length'&&outputBudget.adaptive){firstAttemptUsage=result.usage;attempts=2;const retryBudget=contextBudget(provider,this.config,outputBudget.retry);context=await compactMessages([{role:'system',content:TRUNCATION_RETRY_SYSTEM_PROMPT,protected:true},...input.messages],{budget:retryBudget,recentMessageCount:this.config.recentMessageCount,summarize:async(old)=>{const summary=await this.rawComplete({providerName,provider,apiKey,thinking:false,maxOutputTokens:Math.min(1800,provider.maxOutputTokens),messages:[{role:'system',content:SUMMARY_SYSTEM_PROMPT},{role:'user',content:old.map((m,i)=>`[${i+1}] ${m.role}: ${typeof m.content==='string'?m.content:JSON.stringify(m.content)}`).join('\n\n')}],signal:input.signal});compressionUsage.prompt_tokens+=Number(summary.usage.prompt_tokens||0);compressionUsage.completion_tokens+=Number(summary.usage.completion_tokens||0);compressionUsage.calls+=1;return summary.content;}});result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.retry+thinkingReserve,temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta,onEvent,thinking,signal:input.signal,tools:input.tools||[],nativeTools:input.nativeTools===true},onThinking);}else if(outputBudget.adaptive){let accumulated='';for(const event of bufferedEvents)onEvent(event);for(const delta of bufferedDeltas){accumulated+=delta;onDelta(delta,accumulated);}}
       const reasoningTokens=Number(result.usage?.completion_tokens_details?.reasoning_tokens||0);
       const callId=this.store.recordModelCall({provider:providerName,model:provider.model,purpose:input.purpose,batchId:input.batchId,candidateId:input.candidateId,
         estimatedInputTokens:context.afterTokens,promptTokens:Number(result.usage.prompt_tokens||0)+Number(firstAttemptUsage?.prompt_tokens||0)+compressionUsage.prompt_tokens,
         completionTokens:Number(result.usage.completion_tokens||0)+Number(firstAttemptUsage?.completion_tokens||0)+compressionUsage.completion_tokens,reasoningTokens:reasoningTokens||null,compressed:context.compressed,
         latencyMs:Date.now()-started,status:'completed',outputText:String(result.content??'').slice(0,20000),
-        reasoningText:typeof result.reasoning==='string'&&result.reasoning?result.reasoning.slice(0,20000):null,
+        reasoningText:typeof result.reasoning==='string'&&result.reasoning?result.reasoning.slice(0,20000):null,toolCalls:Array.isArray(result.toolCalls)?result.toolCalls:[],
         outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId});
       return {...result,callId,provider:providerName,model:provider.model,context,usage:{...result.usage,compression:compressionUsage},
         outputBudget:{...outputBudget,used:attempts===2?outputBudget.retry:outputBudget.initial,attempts}};

@@ -25,8 +25,9 @@ function bindLogs() {
   });
 }
 
-// 模型调用日志：点击展开调用详情（元信息、输出文本、推理过程）
-function renderModelDetail(item) {
+// 模型调用日志：点击展开调用详情（元信息、文本输出、推理过程、原生工具调用）
+function renderModelDetail(item, logKey) {
+  const detailKey = escapeHtml(`${logKey}:detail`);
   let budget = null;
   if (item.output_budget_json) {
     try { budget = JSON.parse(item.output_budget_json); } catch { budget = null; }
@@ -41,15 +42,27 @@ function renderModelDetail(item) {
     `压缩：${item.compressed ? "是" : "否"}`,
   ].filter(Boolean).map((part) => `<span>${part}</span>`).join("");
   const budgetBlock = budget
-    ? `<details class="log-budget"><summary>输出预算</summary><pre class="log-output">${escapeHtml(JSON.stringify(budget, null, 2))}</pre></details>`
+    ? `<details class="log-budget" data-log-detail="${escapeHtml(`${logKey}:budget`)}"><summary>输出预算</summary><pre class="log-output">${escapeHtml(JSON.stringify(budget, null, 2))}</pre></details>`
+    : "";
+  let toolCalls = [];
+  if (item.tool_calls_json) {
+    try { toolCalls = JSON.parse(item.tool_calls_json); } catch { toolCalls = []; }
+  }
+  if (!Array.isArray(toolCalls)) toolCalls = [];
+  const toolBlock = toolCalls.length
+    ? `<details class="log-tool-calls" data-log-detail="${escapeHtml(`${logKey}:tools`)}"><summary>原生工具调用（${toolCalls.length}）</summary><pre class="log-output">${escapeHtml(JSON.stringify(toolCalls, null, 2))}</pre></details>`
     : "";
   const outputBlock = item.output_text
     ? `<pre class="log-output">${escapeHtml(item.output_text)}</pre>`
-    : '<p class="log-output-empty">（无输出留档）</p>';
+    : toolCalls.length
+      ? '<p class="log-output-empty">（本轮无文本输出，已留档原生工具调用）</p>'
+      : item.reasoning_text
+        ? '<p class="log-output-empty">（本轮无文本输出，已留档推理过程）</p>'
+        : '<p class="log-output-empty">（无输出留档）</p>';
   const reasoningBlock = item.reasoning_text
-    ? `<details class="log-reasoning"><summary>推理过程</summary><pre class="log-output">${escapeHtml(item.reasoning_text)}</pre></details>`
+    ? `<details class="log-reasoning" data-log-detail="${escapeHtml(`${logKey}:reasoning`)}"><summary>推理过程</summary><pre class="log-output">${escapeHtml(item.reasoning_text)}</pre></details>`
     : "";
-  return `<details class="log-model-detail"><summary>调用详情</summary><div class="log-meta log-model-meta">${meta}</div>${budgetBlock}${outputBlock}${reasoningBlock}</details>`;
+  return `<details class="log-model-detail" data-log-detail="${detailKey}"><summary>调用详情</summary><div class="log-meta log-model-meta">${meta}</div>${budgetBlock}${outputBlock}${toolBlock}${reasoningBlock}</details>`;
 }
 
 async function loadLogs(logType) {
@@ -57,6 +70,7 @@ async function loadLogs(logType) {
   const logs = await request("/api/logs" + qs);
   document.getElementById("log-count").textContent = logs.length + " 条";
   const list = document.getElementById("log-list");
+  const expandedDetails = new Set([...list.querySelectorAll("details[data-log-detail][open]")].map((detail) => detail.dataset.logDetail));
   list.innerHTML = logs.length
     ? logs.map((item) => {
         const ts = formatDate(item.ts, { year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false });
@@ -70,9 +84,13 @@ async function loadLogs(logType) {
         const body = message.length > 200
           ? `<details class="log-expand"><summary>${escapeHtml(message.slice(0, 200))}…</summary><span>${escapeHtml(message)}</span></details>`
           : `<span>${escapeHtml(message)}</span>`;
-        return `<article class="log-entry ${sc}"><div class="log-head"><span class="log-type-badge">${tl}</span><time>${escapeHtml(ts)}</time>${item.batch_id ? `<span class="log-batch">${escapeHtml(item.batch_id)}</span>` : ""}<span class="log-status status-pill ${sc}">${escapeHtml(item.status)}</span></div><div class="log-body"><code>${escapeHtml(item.subtype || "")}</code>${body}</div>${item.provider ? `<div class="log-meta"><span>服务商：${escapeHtml(item.provider)}</span></div>` : ""}${item.log_type === "model" ? renderModelDetail(item) : ""}</article>`;
+        const logKey = `${item.log_type}:${item.id}`;
+        return `<article class="log-entry ${sc}"><div class="log-head"><span class="log-type-badge">${tl}</span><time>${escapeHtml(ts)}</time>${item.batch_id ? `<span class="log-batch">${escapeHtml(item.batch_id)}</span>` : ""}<span class="log-status status-pill ${sc}">${escapeHtml(item.status)}</span></div><div class="log-body"><code>${escapeHtml(item.subtype || "")}</code>${body}</div>${item.provider ? `<div class="log-meta"><span>服务商：${escapeHtml(item.provider)}</span></div>` : ""}${item.log_type === "model" ? renderModelDetail(item, logKey) : ""}</article>`;
       }).join("")
     : '<div class="empty-state">暂无日志记录。</div>';
+  list.querySelectorAll("details[data-log-detail]").forEach((detail) => {
+    detail.open = expandedDetails.has(detail.dataset.logDetail);
+  });
 }
 
 // 自动刷新：复用 poll.js，离开日志视图时静默结束轮询

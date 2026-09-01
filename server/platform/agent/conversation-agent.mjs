@@ -3,11 +3,34 @@ import { compactAgentHistory, compactToolResult, toolCallFingerprint } from './c
 import { agentEvent } from './events.mjs';
 import { AgentContractError, normalizeAgentEnvelope, validateAgentEnvelope, toolError } from './tool-protocol.mjs';
 import { executeConversationTool } from './tool-executor.mjs';
+import { capabilityForToolName } from './tool-catalog.mjs';
 
 function budgets(input={}){const out={};for(const [key,value] of Object.entries(CONVERSATION_AGENT_BUDGET_DEFAULTS))out[key]=Math.min(CONVERSATION_AGENT_BUDGET_LIMITS[key],Math.max(1,Number(input[key])||value));return Object.freeze(out);}
 function runId(){return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;}
 function withTimeout(promise,timeoutMs){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new AgentContractError('AGENT_BUDGET_EXCEEDED',`Agent 已超过总耗时预算（${timeoutMs}ms）`)),timeoutMs);Promise.resolve(promise).then((value)=>{clearTimeout(timer);resolve(value);},(error)=>{clearTimeout(timer);reject(error);});});}
 function completedEvent(result){const data=result?.data||{},url=data.final_url||data.url||result?.provenance?.finalUrl||result?.provenance?.requestedUrl,title=data.title||'',chars=String(data.content||data.excerpt||data.text||'').length;return {summary:chars?`已读取 ${chars} 字`:title?'资料读取完成':'工具执行完成',sources:url?[{title,url}]:[]};}
+function nativeRequestId(call,index){const value=String(call?.id||`call_${index+1}`).replace(/[^A-Za-z0-9_-]/g,'_');return `tr_native_${value}_${index+1}`.slice(0,63);}
+function nativeToolEnvelope(modelTurn,catalog,maxRequests){
+  const calls=Array.isArray(modelTurn?.toolCalls)?modelTurn.toolCalls:[];
+  if(!calls.length)return null;
+  if(calls.length>maxRequests)throw new AgentContractError('INVALID_AGENT_ENVELOPE',`原生工具调用数量超过上限：${calls.length}`);
+  const callByRequestId=new Map();
+  const requests=calls.map((call,index)=>{
+    const requestId=nativeRequestId(call,index);
+    const capability=capabilityForToolName(call?.name,catalog)||'model.unknown-tool';
+    const request={requestId,capability,arguments:call?.input&&typeof call.input==='object'&&!Array.isArray(call.input)?call.input:{},reason:'模型原生工具调用'};
+    callByRequestId.set(requestId,call);
+    return request;
+  });
+  return {envelope:{type:'tool_requests',assistant_note:'执行模型原生工具调用',requests},callByRequestId};
+}
+function nativeHistory(modelTurn,results,callByRequestId){
+  const calls=Array.isArray(modelTurn?.toolCalls)?modelTurn.toolCalls:[];
+  return [
+    {role:'assistant',content:modelTurn.content?String(modelTurn.content):null,tool_calls:calls.map((call,index)=>({id:String(call.id||`call_${index+1}`),type:'function',function:{name:String(call.name||''),arguments:JSON.stringify(call.input||{})}})),protected:true},
+    ...results.map((result)=>{const call=callByRequestId.get(result.requestId);return {role:'tool',tool_call_id:String(call?.id||result.requestId),name:call?.name?String(call.name):undefined,content:JSON.stringify(result),protected:true};}),
+  ];
+}
 
 export async function runConversationAgent({entryPoint,modelStep,messages=[],registry,catalog,toolContext={},resolveArguments,sanitizeToolResult=(result)=>result,cacheLookup=null,onEvent=()=>{},store=null,budget={},signal=null}={}){
   if(typeof modelStep!=='function')throw new TypeError('modelStep 必须是函数');
@@ -21,7 +44,8 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       const remaining=Math.max(1,limits.timeoutMs-(Date.now()-started));
       const modelHistory=compactAgentHistory(history,limits.maxHistoryChars);
       const modelEnvelope=await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining);
-      const envelope=validateAgentEnvelope(normalizeAgentEnvelope(modelEnvelope),{maxRequests:limits.maxParallelToolCalls});
+      const native = nativeToolEnvelope(modelEnvelope,catalog,limits.maxParallelToolCalls);
+      const envelope=native?.envelope||validateAgentEnvelope(normalizeAgentEnvelope(modelEnvelope),{maxRequests:limits.maxParallelToolCalls});
       if(envelope.type==='final'){
         store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
         emit('done',{status:'completed'});return {agentRunId:id,...envelope,modelSteps:step+1,toolCalls};
@@ -42,7 +66,8 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
         }));
         results.push(...groupResults);
       }
-      history.push({role:'assistant',content:JSON.stringify(envelope),protected:true},{role:'tool',content:JSON.stringify(results),protected:true});
+      if(native) history.push(...nativeHistory(modelEnvelope,results,native.callByRequestId));
+      else history.push({role:'assistant',content:JSON.stringify(envelope),protected:true},{role:'tool',content:JSON.stringify(results),protected:true});
       if(totalResultChars>=limits.maxTotalToolResultChars){store?.finishAgentRun?.(id,{status:'limit',modelSteps:step+1,toolCalls,error:'达到工具结果字符预算'});emit('agent.limit',{reason:'达到工具结果字符预算'});return {agentRunId:id,type:'limit',modelSteps:step+1,toolCalls,messages:history};}
     }
     store?.finishAgentRun?.(id,{status:'limit',modelSteps:limits.maxModelSteps,toolCalls,error:'达到模型步骤预算'});emit('agent.limit',{reason:'达到模型步骤预算'});

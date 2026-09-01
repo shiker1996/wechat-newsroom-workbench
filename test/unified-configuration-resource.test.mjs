@@ -18,7 +18,7 @@ test('统一配置目录包含 system 与 model-provider 一等资源',async()=>
 test('模型供应商 Schema 覆盖运行时高级参数且旧环境变量可回退',()=>{
   const provider={label:'Demo',baseUrl:'https://example.com/v1',model:'demo-1',apiKeyEnv:'DEMO_KEY',contextWindow:8000,maxOutputTokens:1000,maxTokensField:'max_completion_tokens',taggingChunkSize:12,taggingConcurrency:3,supportsJsonMode:true,supportsThinkingToggle:true,thinkingReserveTokens:4000,reasoningEffort:'low',webSearchConfig:{payloadKey:'search',payloadValue:true}};
   const manifest=modelProviderManifest('demo',provider);
-  for(const field of ['maxTokensField','taggingChunkSize','taggingConcurrency','supportsJsonMode','supportsThinkingToggle','thinkingReserveTokens','reasoningEffort','webSearchPayloadKey','webSearchPayloadValue'])assert.ok(manifest.configuration.properties[field],field);
+  for(const field of ['maxTokensField','taggingChunkSize','taggingConcurrency','supportsJsonMode','supportsNativeTools','supportsToolCallStreaming','supportsThinkingToggle','thinkingReserveTokens','reasoningEffort','webSearchPayloadKey','webSearchPayloadValue'])assert.ok(manifest.configuration.properties[field],field);
   const fallback=legacyModelProviderConfiguration(provider,{DEMO_KEY:'legacy-secret'});
   assert.equal(fallback.apiKey,'legacy-secret');
   const runtime=applyModelProviderConfiguration(provider,{...fallback,model:'new-model'});

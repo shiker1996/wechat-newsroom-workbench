@@ -293,7 +293,7 @@ export class WorkbenchQueryService {
   listLogs({ limit = 100, logType } = {}) {
     const queries = [];
     // 统一日志各分支列数需保持一致：模型调用的详情字段在其他类型下以 NULL 占位
-    const modelDetailCols = 'model, output_text, reasoning_text, prompt_tokens, completion_tokens, reasoning_tokens, estimated_input_tokens, latency_ms, compressed, output_budget_json, generation_snapshot_id';
+    const modelDetailCols = 'model, output_text, reasoning_text, tool_calls_json, prompt_tokens, completion_tokens, reasoning_tokens, estimated_input_tokens, latency_ms, compressed, output_budget_json, generation_snapshot_id';
     const nullDetailCols = modelDetailCols.split(', ').map((col) => `NULL AS ${col}`).join(', ');
     if (!logType || logType === 'ai') queries.push(`SELECT 'ai' AS log_type, CAST(id AS TEXT) AS id, batch_id, type AS subtype, provider, status, COALESCE(error,progress) AS message, created_at AS ts, ${nullDetailCols} FROM ai_runs`);
     if (!logType || logType === 'source') queries.push(`SELECT 'source' AS log_type, CAST(id AS TEXT) AS id, batch_id, source AS subtype, source AS provider, status, COALESCE(error,'') AS message, ended_at AS ts, ${nullDetailCols} FROM source_runs`);

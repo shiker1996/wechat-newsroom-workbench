@@ -7,13 +7,15 @@ export class RuntimeAuditRepository {
       ORDER BY id DESC LIMIT 1`).get(input.batchId, input.candidateId ?? null, input.candidateId ?? null)?.id : null);
     const result = this.db.prepare(`INSERT INTO model_calls
       (provider,model,purpose,batch_id,candidate_row_id,estimated_input_tokens,prompt_tokens,
-       completion_tokens,reasoning_tokens,compressed,latency_ms,status,error,generation_snapshot_id,output_budget_json,output_text,reasoning_text,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+       completion_tokens,reasoning_tokens,compressed,latency_ms,status,error,generation_snapshot_id,output_budget_json,output_text,reasoning_text,tool_calls_json,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       input.provider, input.model, input.purpose || 'unknown', input.batchId ?? null, input.candidateId ?? null,
       input.estimatedInputTokens ?? 0, input.promptTokens ?? null, input.completionTokens ?? null,
       input.reasoningTokens ?? null, input.compressed ? 1 : 0, input.latencyMs ?? 0, input.status,
       input.error ?? null, snapshotId ?? null, input.outputBudget ? JSON.stringify(input.outputBudget) : null,
-      input.outputText ?? null, input.reasoningText ?? null, new Date().toISOString());
+      input.outputText ?? null, input.reasoningText ?? null,
+      Array.isArray(input.toolCalls) && input.toolCalls.length ? JSON.stringify(input.toolCalls) : null,
+      new Date().toISOString());
     const id = Number(result.lastInsertRowid);
     // 保留策略：model_calls 只保留最近 2000 条。每插入 100 条触发一次清理，
     // 避免每条插入都做删除扫描。

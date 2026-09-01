@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 31;
+export const WORKBENCH_SCHEMA_VERSION = 32;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -598,6 +598,8 @@ export function runDatabaseMigrations(db, migrateSchema) {
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(31,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v32：model_calls 增加原生工具调用留档，避免成功的工具轮次被误显示为无输出
+    if(applied<32){db.exec('BEGIN IMMEDIATE');try{const columns=new Set(db.prepare('PRAGMA table_info(model_calls)').all().map((column)=>column.name));if(!columns.has('tool_calls_json'))db.exec('ALTER TABLE model_calls ADD COLUMN tool_calls_json TEXT');db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(32,?)').run(new Date().toISOString());db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}}
   }
   const violations = db.prepare('PRAGMA foreign_key_check').all();
   if (violations.length) throw new Error(`数据库迁移后存在 ${violations.length} 项外键完整性错误`);

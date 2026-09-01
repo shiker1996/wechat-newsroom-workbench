@@ -1,6 +1,7 @@
 import { runConversationAgent } from './conversation-agent.mjs';
 import { AgentContractError, normalizeAgentEnvelope, normalizeToolRequest, validateAgentEnvelope } from './tool-protocol.mjs';
 import { parseModelJsonWithRepair } from '../llm/model-json.mjs';
+import { buildNativeToolDefinitions, capabilityForToolName, providerSupportsNativeTools, providerSupportsToolCallStreaming } from './tool-catalog.mjs';
 
 export const AI_VISUAL_PROJECT_READ = 'filesystem.project.read';
 export const AI_VISUAL_DOCUMENT_WRITE = 'filesystem.project.document_write';
@@ -31,7 +32,7 @@ function generationInstruction({ sourceRead, documentStarted, documentFinished, 
   return `当前检测到已达到 ${maxPages} 页。检查 ${outputPath} 是否已经包含完整主题 CSS、所有页面结构、闭合标签和可见主题装饰；如果还没写完，继续 append，每个 content 不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符。全部内容写完后，用 filesystem.project.document_write 的 finish 结束会话，随后才能返回 final。`;
 }
 
-function generationStageOverride({ requiredPageCount, canvas, outputPath, documentLabel }) {
+function generationStageOverride({ requiredPageCount, canvas, outputPath, documentLabel, nativeTools = false }) {
   const width = Number(canvas?.width) || 375;
   const height = Number(canvas?.height) || 667;
   return `
@@ -47,7 +48,7 @@ function generationStageOverride({ requiredPageCount, canvas, outputPath, docume
 - 不要假设程序会保留预置页面壳，最终文件必须由你的分块内容本身构成完整 HTML。
 - 生成阶段不调用浏览器审计，不调用修复能力，不调用旧的 filesystem.project.write，不返回程序化补丁。
 - 只有在 ${requiredPageCount} 页、主题 CSS、页面正文、闭合标签和主题装饰全部写完并成功 finish 后，才返回严格的 {"type":"final","assistantReply":"简短说明"}；assistantReply 必须是字符串。
-- 所有工具请求必须是完整合法 JSON；HTML/CSS 放在 JSON 字符串 content 中，正确转义引号、反斜杠和换行。
+${nativeTools ? '- 工具调用必须使用 API 提供的原生 function tool；不要在普通文本中伪造 tool_requests JSON。' : '- 所有工具请求必须是完整合法 JSON；HTML/CSS 放在 JSON 字符串 content 中，正确转义引号、反斜杠和换行。'}
 `;
 }
 
@@ -88,12 +89,16 @@ export async function runAiVisualDocumentAgent({
   maxOutputTokens = AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS,
   budget = {},
   onProgress = () => {},
+  onEvent = () => {},
 } = {}) {
   if (typeof getPageCount !== 'function') throw new TypeError('AI 视觉文档 Agent 缺少 getPageCount');
   if (!documentWriteSessionId) throw new TypeError('AI 视觉文档 Agent 缺少 documentWriteSessionId');
   const pageFiles = [...new Set(Array.isArray(workspaceFiles) ? workspaceFiles : [])];
   const maxPages = Math.max(1, Number(requiredPageCount) || 1);
   const generationCatalog = filterAiVisualGenerationCatalog(catalog, documentWriteCapability);
+  const nativeTools = providerSupportsNativeTools(gateway, provider);
+  const nativeToolDefinitions = nativeTools ? buildNativeToolDefinitions(generationCatalog) : [];
+  const nativeToolStreaming = nativeTools && providerSupportsToolCallStreaming(gateway, provider);
   const allowedCapabilities = [AI_VISUAL_PROJECT_READ, documentWriteCapability];
   const baseMessages = [{ role: 'user', protected: true, content: JSON.stringify({ render_request: renderRequest }) }];
   let sourceRead = false;
@@ -103,19 +108,27 @@ export async function runAiVisualDocumentAgent({
   let lastModelResult = null;
   let planningThinkingUsed = false;
 
-  const complete = async ({ history, step, signal, instruction, outputMaxTokens = AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS, thinking = false }) => gateway.complete({
-    provider,
-    purpose,
-    batchId,
-    candidateId,
-    thinking,
-    temperature: step ? 0.35 : 0.25,
-    maxOutputTokens: Math.min(outputMaxTokens, maxOutputTokens),
-    adaptiveOutput: false,
-    jsonMode: true,
-    signal,
-    messages: [...history, { role: 'user', protected: true, content: instruction }],
-  });
+  const complete = async ({ history, step, signal, instruction, outputMaxTokens = AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS, thinking = false, emit = () => {}, native = false }) => {
+    const input = {
+      provider,
+      purpose,
+      batchId,
+      candidateId,
+      thinking,
+      temperature: step ? 0.35 : 0.25,
+      maxOutputTokens: Math.min(outputMaxTokens, maxOutputTokens),
+      adaptiveOutput: false,
+      jsonMode: !native,
+      tools: native ? nativeToolDefinitions : [],
+      nativeTools: native,
+      signal,
+      messages: [...history, { role: 'user', protected: true, content: instruction }],
+    };
+    if (native && nativeToolStreaming && typeof gateway.streamComplete === 'function') {
+      return gateway.streamComplete(input, () => {}, (text) => emit('assistant.thinking', { text }));
+    }
+    return gateway.complete(input);
+  };
 
   const describeModelResponseError = (error) => {
     const issueText = Array.isArray(error?.issues) && error.issues.length
@@ -180,7 +193,7 @@ export async function runAiVisualDocumentAgent({
     entryPoint,
     registry,
     catalog: generationCatalog,
-    messages: [{ role: 'system', protected: true, content: `${agentSystem}${generationStageOverride({ requiredPageCount: maxPages, canvas, outputPath, documentLabel })}` }, ...baseMessages],
+    messages: [{ role: 'system', protected: true, content: `${agentSystem}${generationStageOverride({ requiredPageCount: maxPages, canvas, outputPath, documentLabel, nativeTools })}` }, ...baseMessages],
     store,
     budget: {
       maxModelSteps: Number(budget.maxModelSteps) || Math.max(18, maxPages + 12),
@@ -205,8 +218,9 @@ export async function runAiVisualDocumentAgent({
         onProgress(`AI 视觉 Agent 已原样追加 ${documentLabel} HTML/CSS 分块…`);
         pendingOperation = null;
       }
+      onEvent(event);
     },
-    modelStep: async ({ messages: history, step, signal }) => {
+    modelStep: async ({ messages: history, step, signal, emit }) => {
       if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_visual_read_${step + 1}`, pageFiles), { maxRequests: 1 });
       if (!documentStarted) {
         pendingOperation = 'begin';
@@ -224,8 +238,15 @@ export async function runAiVisualDocumentAgent({
 
       const usePlanningThinking = shouldUseAiVisualPlanningThinking({ sourceRead, documentStarted, planningThinkingUsed });
       planningThinkingUsed = true;
-      let result = await complete({ history, step, signal, thinking: usePlanningThinking, instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages, outputPath, documentLabel }) });
+      let result = await complete({ history, step, signal, emit, native: nativeTools, thinking: usePlanningThinking, instruction: generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount: Number(getPageCount()) || 0, maxPages, outputPath, documentLabel }) });
       lastModelResult = result;
+      if (nativeTools && result?.toolCalls?.length) {
+        const call = result.toolCalls[0];
+        const capability = capabilityForToolName(call.name, generationCatalog);
+        const operation = String(call.input?.operation || '');
+        if (capability === documentWriteCapability && ['begin', 'append', 'finish', 'abort'].includes(operation)) pendingOperation = operation;
+        return { nativeTools: true, content: result.content || '', toolCalls: result.toolCalls };
+      }
       let parsed = await parseAndValidateVisualEnvelope({ result, history, step, signal, label: 'AI 视觉 Agent' });
       let recoveryAttempts = 0;
       while (true) {

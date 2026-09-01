@@ -56,12 +56,15 @@ export function normalizeProviderInput(input={},existingId='') {
   const apiKeyEnv=LEGACY_ENV[id]||`MODEL_PROVIDER_${id.replace(/[^a-z0-9]/g,'_').toUpperCase()}_API_KEY`;
   return {id,provider:{
     label,baseUrl,model,apiKeyEnv,
+    protocol:input.protocol==='responses'?'responses':'chat_completions',
     contextWindow:integer(input.contextWindow,128000,4096,4000000),
     maxOutputTokens:integer(input.maxOutputTokens,16384,256,200000),
     maxTokensField:input.maxTokensField==='max_completion_tokens'?'max_completion_tokens':'max_tokens',
     taggingChunkSize:integer(input.taggingChunkSize,6,1,20),
     taggingConcurrency:integer(input.taggingConcurrency,4,1,20),
     supportsJsonMode:input.supportsJsonMode!==false,
+    supportsNativeTools:input.supportsNativeTools===true,
+    supportsToolCallStreaming:input.supportsToolCallStreaming===true,
     enabled:input.enabled!==false,
   }};
 }
@@ -83,7 +86,10 @@ export function saveModelProvider(root,config,input={}) {
   const {id,provider}=normalizeProviderInput(input,existingId);
   const previous=config.llm.providers[existingId||id];
   if(previous?.webSearchConfig)provider.webSearchConfig=previous.webSearchConfig;
+  if(input.protocol==null&&previous?.protocol)provider.protocol=previous.protocol;
   if(previous?.supportsThinkingToggle)provider.supportsThinkingToggle=true;
+  if(previous?.supportsNativeTools)provider.supportsNativeTools=true;
+  if(previous?.supportsToolCallStreaming)provider.supportsToolCallStreaming=true;
   if(previous?.thinkingReserveTokens!=null)provider.thinkingReserveTokens=previous.thinkingReserveTokens;
   if(previous?.reasoningEffort)provider.reasoningEffort=previous.reasoningEffort;
   if(existingId&&existingId!==id&&config.llm.providers[id])throw new Error(`模型配置 ${id} 已存在`);

@@ -69,7 +69,7 @@ const jobs = new CollectionJobManager(store, config, () => models);
 const models = new ModelGateway(config, store,(id,provider)=>extensionConfigurationService.resolve({extensionType:'model-provider',extensionId:id,manifest:modelProviderManifest(id,provider)}));
 const aiJobs = new AiJobManager(store, models, config, {
   batchLevelTypes: BATCH_LEVEL_AI_JOB_TYPES,
-  handlers: createAiJobHandlers({ store, gateway: models, config, log: (job, message) => aiJobs.log(job, message) }),
+  handlers: createAiJobHandlers({ store, gateway: models, config, log: (job, message) => aiJobs.log(job, message), onThinking: (job, delta) => aiJobs.recordThinking(job, delta) }),
   onFailure: ({ job, error }) => {
     if (job.type === 'research' || (job.type === 'auto' && job.phase === 'research')) recordResearchFailure({ store, job, error });
   },

@@ -117,7 +117,7 @@ async function renderCover({ workspaceRoot, htmlPath, imageDir, execute: provide
   }
 }
 
-export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, workdir, title, summary = '', brand = '', themeId = '', renderExecute = null, onProgress = () => {} } = {}) {
+export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, workdir, title, summary = '', brand = '', themeId = '', renderExecute = null, onProgress = () => {}, onEvent = () => {} } = {}) {
   if (!workdir) throw new TypeError('AI 封面生成缺少文章工作目录');
   const imageDir = path.join(workdir, 'images');
   fs.mkdirSync(imageDir, { recursive: true });
@@ -211,6 +211,7 @@ export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId
       toolContext: { batchId, candidateId, skillId: AI_VISUAL_COVER_SKILL, provider: providerId, workspaceRoot, allowedRoots: [imageDir], allowedCapabilities: [AI_VISUAL_PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE] },
       maxOutputTokens: providerMaxOutputTokens,
       onProgress,
+      onEvent,
     });
     const generatedPageCount = htmlPageCount(fs.readFileSync(htmlPath, 'utf8'));
     if (agent.type !== 'final' || agent.documentFinished !== true || generatedPageCount !== 1) throw new Error(`AI 封面生成未完成：页面数 ${generatedPageCount}，finish=${agent.documentFinished === true}`);

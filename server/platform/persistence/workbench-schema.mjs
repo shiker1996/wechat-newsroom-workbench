@@ -354,6 +354,7 @@ export function applyWorkbenchSchema(db) {
         generation_snapshot_id INTEGER,
         output_budget_json TEXT,
         output_text TEXT,
+        tool_calls_json TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE SET NULL,
         FOREIGN KEY(candidate_row_id) REFERENCES candidates(id) ON DELETE SET NULL

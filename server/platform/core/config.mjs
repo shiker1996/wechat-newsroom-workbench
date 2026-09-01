@@ -34,6 +34,8 @@ const defaults = {
       deepseek: {
         label: 'DeepSeek',
         baseUrl: 'https://api.deepseek.com',
+        // 保持现有链路；验证具体模型后可切换为 responses
+        protocol: 'chat_completions',
         model: 'deepseek-v4-flash',
         apiKeyEnv: 'DEEPSEEK_API_KEY',
         contextWindow: 900000,
@@ -42,8 +44,11 @@ const defaults = {
         taggingChunkSize: 8,
         taggingConcurrency: 6,
         supportsJsonMode: true,
+        supportsNativeTools: true,
+        supportsToolCallStreaming: true,
         // v4-flash 支持 thinking 开关；gateway 按调用用途决定是否关闭推理（结构化抽取关闭，对话/写作保持开启）
         supportsThinkingToggle: true,
+        responsesReasoningToggle: true,
         // thinking 开启时追加的推理 token 余量（推理与内容共享 max_tokens）
         thinkingReserveTokens: 8000,
         // 推理强度 low/high/max（v4-flash 三档均支持）；默认 low 收敛思维链长度，避免推理失控吃光输出预算
@@ -53,6 +58,7 @@ const defaults = {
       minimax: {
         label: 'MiniMax',
         baseUrl: 'https://api.minimaxi.com/v1',
+        protocol: 'chat_completions',
         model: 'MiniMax-M2.7',
         apiKeyEnv: 'MINIMAX_API_KEY',
         contextWindow: 204800,
@@ -67,6 +73,7 @@ const defaults = {
       kimi: {
         label: 'Kimi',
         baseUrl: 'https://api.moonshot.cn/v1',
+        protocol: 'chat_completions',
         model: 'kimi-k2.6',
         apiKeyEnv: 'MOONSHOT_API_KEY',
         contextWindow: 262144,

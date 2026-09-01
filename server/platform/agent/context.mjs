@@ -48,7 +48,13 @@ export function compactAgentHistory(messages,maxChars=120000){
   const projectRead=source.findIndex((message)=>messageCapability(message)==='filesystem.project.read');
   if(projectRead>=0)keep.add(projectRead);
   const latestTool=[...source.keys()].reverse().find((index)=>source[index]?.role==='tool');
-  if(latestTool!==undefined){keep.add(latestTool);const previous=latestTool-1;if(previous>=0&&source[previous]?.role==='assistant')keep.add(previous);}
+  if(latestTool!==undefined){
+    // 原生工具协议会为同一轮生成多个 role:'tool' 消息，必须整组保留，
+    // 否则模型只看到最后一个结果，下一轮容易重复调用或丢失依赖。
+    for(let index=latestTool;index>=0&&source[index]?.role==='tool';index-=1)keep.add(index);
+    const previous=latestTool-1;
+    if(previous>=0&&source[previous]?.role==='assistant')keep.add(previous);
+  }
   if(firstTool<0){for(let index=Math.max(0,source.length-2);index<source.length;index+=1)keep.add(index);}
   const selected=[...keep].sort((a,b)=>a-b).map((index)=>source[index]);
   const omitted=source.length-selected.length;

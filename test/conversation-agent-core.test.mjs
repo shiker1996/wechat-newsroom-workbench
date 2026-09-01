@@ -56,6 +56,18 @@ test('Agent 支持单工具结果回送模型后返回 final，并发送统一�
   for(const type of ['tool.requested','tool.running','tool.completed','done'])assert.ok(events.some((event)=>event.type===type));
 });
 
+test('Agent 将原生工具调用转换为可关联的 assistant/tool 历史并继续下一轮',async()=>{
+  const tools=registry(),catalog=buildConversationToolCatalog({registry:tools,entryCapabilities:['content.demo.read']});let nextHistory;
+  const result=await runConversationAgent({entryPoint:'editorial',registry:tools,catalog,modelStep:async({step,messages})=>{
+    if(step===0)return {nativeTools:true,content:'',toolCalls:[{id:'call_native_1',name:'cap_content_demo_read',input:{query:'native'}}]};
+    nextHistory=messages;return {type:'final',assistantReply:'完成',output:{}};
+  }});
+  assert.equal(result.type,'final');assert.equal(result.toolCalls,1);
+  const assistant=nextHistory.find((message)=>message.role==='assistant'&&Array.isArray(message.tool_calls));
+  const tool=nextHistory.find((message)=>message.role==='tool'&&message.tool_call_id==='call_native_1');
+  assert.equal(assistant.tool_calls[0].function.name,'cap_content_demo_read');assert.ok(tool.content.includes('result:native'));
+});
+
 test('Agent 历史上下文超限时保留事实读取和最近审计并压缩旧轮次',()=>{
   const history=[
     {role:'system',protected:true,content:'系统提示'},
