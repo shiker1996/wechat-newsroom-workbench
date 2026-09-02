@@ -91,7 +91,12 @@ function editorialResearchBrief(context) {
     relation_kind: item.relation_kind,
     relation_label: item.relation_label,
     event_ids: list(item.event_ids),
+    reference_event_ids: list(item.reference_event_ids),
     relationship_statement: item.relationship_statement,
+    differences: list(item.differences),
+    confidence: item.confidence,
+    evidence_source_ids: list(item.evidence_source_ids),
+    evidence_levels: list(item.evidence_levels),
     evidence_boundary: item.evidence_boundary,
   })).filter((item) => item.relationship_statement || item.relation_kind);
   const topics = list(context.topic_candidates || (context.topic_candidate ? [context.topic_candidate] : [])).map((item) => ({
@@ -103,12 +108,57 @@ function editorialResearchBrief(context) {
     thesis_seed: item.thesis_seed,
     internal_signal_refs: list(item.internal_signal_refs || item.signal_refs),
     relation_ids: list(item.relation_ids),
+    evidence_source_ids: list(item.evidence_source_ids),
+    evidence_levels: list(item.evidence_levels),
   })).filter((item) => item.candidate_title || item.core_question || item.angle || item.thesis_seed);
+  const materials = list(context.verified_research_materials || context.research_materials).map((item) => ({
+    material_id: item.material_id,
+    material_type: item.material_type,
+    status: item.status,
+    anchor_event_ids: list(item.anchor_event_ids || item.event_ids),
+    reference_event_ids: list(item.reference_event_ids),
+    statement: item.statement,
+    expected: item.expected,
+    observed: item.observed,
+    gap: item.gap,
+    parties: list(item.parties),
+    difference: item.difference,
+    comparison_basis: list(item.comparison_basis),
+    interpretation: item.interpretation,
+    writing_angles: list(item.writing_angles),
+    thesis_seeds: list(item.thesis_seeds),
+    question: item.question,
+    evidence_source_ids: list(item.evidence_source_ids),
+    evidence_levels: list(item.evidence_levels),
+    confidence: item.confidence,
+    report_markdown: item.report_markdown,
+  })).filter((item) => item.material_id && ['verified', 'needs_review', 'model_reported'].includes(item.status));
+  const reports = list(context.research_reports).map((item) => ({
+    report_id: item.report_id || item.material_id,
+    event_id: item.event_id,
+    title: item.title,
+    report_markdown: item.report_markdown,
+  })).filter((item) => item.report_markdown);
   return {
     focus_topic: topics[0] || null,
     topic_candidates: topics,
+    verified_research_materials: materials,
     internal_research: internal,
     inter_event_research: relations,
+    research_reports: reports,
+    reference_events: list(context.reference_events).map((item) => ({
+      reference_id: item.reference_id,
+      reference_only: item.reference_only === true,
+      anchor_event_ids: list(item.anchor_event_ids),
+      target_relation_ids: list(item.target_relation_ids),
+      target_signal: item.target_signal,
+      title: item.title,
+      url: item.url,
+      summary: item.summary,
+      content: item.content,
+      source_id: item.source_id,
+      evidence_level: item.evidence_level,
+    })),
     evidence_boundary: context.evidence_boundary || null,
     scope: { events: list(context.scope?.events).map((event) => ({ event_id: event.event_id, title: event.title })) },
   };
@@ -118,8 +168,10 @@ function researchDrivenInstruction(researchBrief) {
   if (!researchBrief) return '当前没有可用的模型研判内容；按事件卡和来源事实推进，但不要自行编造反常、利益冲突或事件关系。';
   const topic = researchBrief.focus_topic;
   const basisCount = researchBrief.internal_research.length + researchBrief.inter_event_research.length;
-  if (!topic && !basisCount) return '当前没有可用的模型研判内容；按事件卡和来源事实推进，但不要自行编造反常、利益冲突或事件关系。';
-  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组研判依据）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从下面的反常、利益冲突、发散或事件关系中选择一条最适合作者的主线。'} 每个问题都要明确引用对应的反常点、利益冲突、发散方向或前后/回应/对比/趋势关系：事实阶段问这条研判由哪些事实支撑，观点阶段问作者如何解释和站在哪一边，角度阶段问准备从哪一个矛盾或变化切入，命题阶段问文章要证明什么。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
+  const reportCount = researchBrief.research_reports?.length || 0;
+  if (!topic && !basisCount && !reportCount) return '当前没有可用的模型研判内容；按事件卡和来源事实推进，但不要自行编造反常、利益冲突或事件关系。';
+  const materialCount = researchBrief.verified_research_materials?.length || 0;
+  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组结构化研判、${reportCount} 份单事件模型研判报告、${materialCount} 条模型研判素材）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从单事件模型研判报告中的事件内或事件外素材中选择一条最适合作者的主线。'} 每个问题都要明确引用对应素材中的事实落差、利益差异、影响、前后变化、回应、对比、趋势或反例：事实阶段问这条素材由哪些事实和证据支撑，观点阶段问作者如何解释和站在哪一边，角度阶段问准备从哪一个矛盾、变化或反例切入，命题阶段问文章要证明什么。外部参考事件只能作为关系研判的参考材料，不能直接写成本文已确认事实。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
 }
 
 export async function buildEditorialMessages(current,answer,events=[],retrieve=null,workspaceRoot,researchContext=null) {

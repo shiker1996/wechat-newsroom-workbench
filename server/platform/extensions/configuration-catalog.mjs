@@ -10,7 +10,7 @@ const object=(properties,required=[])=>({type:'object',additionalProperties:fals
 const string=(title,extra={})=>({type:'string',title,...extra});
 const integer=(title,minimum,maximum,extra={})=>({type:'integer',title,minimum,maximum,...extra});
 
-function systemResources(){return [{id:'workbench',name:'工作台系统参数',type:'system',kind:'system',manifest:{id:'workbench',name:'工作台系统参数',configuration:object({port:integer('监听端口',1,65535,{default:4317}),python:string('Python 可执行文件'),maxConcurrent:integer('AI 后台任务并发',1,20,{default:2}),minVisibleChars:integer('文章最少可见字符',100,20000,{default:1300}),maxVisibleChars:integer('文章最多可见字符',100,30000,{default:2000})})}}];}
+function systemResources(){return [{id:'workbench',name:'工作台系统参数',type:'system',kind:'system',manifest:{id:'workbench',name:'工作台系统参数',configuration:object({port:integer('监听端口',1,65535,{default:4317}),python:string('Python 可执行文件'),maxConcurrent:integer('AI 后台任务并发',1,20,{default:2}),minVisibleChars:integer('文章最少可见字符',100,20000,{default:1300}),maxVisibleChars:integer('文章最多可见字符',100,30000,{default:2000}),discussionResearchTopK:integer('讨论研判 Top-K',5,10,{default:8,enum:[5,8,10],enumNames:['Top 5','Top 8','Top 10']})})}}];}
 
 function modelResources(config){return Object.entries(config.llm?.providers||{}).map(([id,provider])=>({id,name:provider.label||id,type:'model-provider',kind:'model-provider',manifest:modelProviderManifest(id,provider,config.llm.defaultProvider===id)}));}
 

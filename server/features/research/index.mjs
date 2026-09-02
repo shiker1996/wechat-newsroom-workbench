@@ -34,16 +34,38 @@ export { buildTopicScoreOperationsMetrics } from './application/topic-score-oper
 export { CandidateSelectionService } from './application/candidate-selection-service.mjs';
 export { classifyResearchFailure, recordResearchFailure } from './application/research-failure.mjs';
 export { buildEventHeatRanking, loadPreviousEventHeatItems, scoreClassifiedEvent, scoreEventHeat } from './domain/event-heat-ranking.mjs';
-export { DISCUSSION_RESEARCH_SCHEMA_VERSION, DISCUSSION_RESEARCH_TOP_K, DISCUSSION_RESEARCH_EXCLUDED_CONTENT_CLASSES, buildDiscussionResearch, discussionResearchMarkdown, readDiscussionResearchContext } from './domain/discussion-research.mjs';
+export { DISCUSSION_RESEARCH_SCHEMA_VERSION, DISCUSSION_RESEARCH_TOP_K, DISCUSSION_RESEARCH_TOP_K_OPTIONS, resolveDiscussionResearchTopK, DISCUSSION_RESEARCH_EXCLUDED_CONTENT_CLASSES, buildDiscussionResearch, discussionResearchMarkdown, readDiscussionResearchContext } from './domain/discussion-research.mjs';
+export {
+  RESEARCH_SEARCH_SCHEMA_VERSION,
+  RESEARCH_SEARCH_TASK_TYPES,
+  RESEARCH_SEARCH_TARGETS,
+  RESEARCH_SEARCH_RELATION_AXES,
+  RESEARCH_SEARCH_POLICY,
+  buildResearchSearchBaseline,
+  buildInternalResearchSearchTasks,
+  buildRelationResearchSearchTasks,
+  emptyResearchSearchLedger,
+  normalizeResearchSearchTask,
+  validateResearchSearchTask,
+} from './domain/research-search.mjs';
+export { executeInternalResearchSearch, researchSearchEvidenceForEvent } from './application/research-search-stage.mjs';
 export {
   buildDiscussionResearchModelInput,
   buildDiscussionResearchModelMessages,
+  buildSingleEventResearchModelInput,
+  buildDiscussionRelationCandidateGroups,
   buildDiscussionRelationCandidatePairs,
   buildInternalResearchModelInput,
   buildRelationResearchModelInput,
   buildTopicResearchModelInput,
+  cleanSingleEventResearchReport,
   generateDiscussionResearch,
+  generateDiscussionResearchSinglePass,
+  generateDiscussionResearchHypotheses,
+  generateDiscussionResearchTopics,
   normalizeDiscussionResearchModel,
+  verifyDiscussionResearch,
+  buildVerifiedResearchMaterials,
 } from './application/research/discussion-research-stage.mjs';
 export { buildTopicCandidates, selectTopicCandidates, topicCandidatesMarkdown, discussionQuestionForContext } from './domain/topic-candidate-generation.mjs';
 export { projectStableEvents } from './domain/event-resolution-cluster-projection.mjs';

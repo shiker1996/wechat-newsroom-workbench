@@ -8,7 +8,7 @@ import { isResearchEligibleHotspot } from '../domain/hotspot-pipeline-scope.mjs'
 import { selectionPrompt } from '../llm/selection-prompts.mjs';
 import { loadShadowHistory, resolveEventShadow } from '../domain/event-resolution-shadow.mjs';
 import { buildEventHeatRanking, loadPreviousEventHeatItems } from '../domain/event-heat-ranking.mjs';
-import { DISCUSSION_RESEARCH_TOP_K, buildDiscussionResearch, discussionResearchMarkdown } from '../domain/discussion-research.mjs';
+import { DISCUSSION_RESEARCH_TOP_K, buildDiscussionResearch, discussionResearchMarkdown, resolveDiscussionResearchTopK } from '../domain/discussion-research.mjs';
 import { buildTopicCandidates, selectTopicCandidates, topicCandidatesMarkdown } from '../domain/topic-candidate-generation.mjs';
 import { materializeStableEvents } from '../domain/event-resolution-shadow.mjs';
 import { duplicatePenaltyForHeat } from '../domain/event-resolution-policy.mjs';
@@ -18,7 +18,7 @@ import { ensureBatchEventCards, generateEventCards, overviewHtml, readEventCards
 import { brainstorm, breakingSynthesis, synthesize } from './research/editorial-exploration.mjs';
 import { classifyContentRoute, scoreStatusForCard } from '../domain/content-routing.mjs';
 import { G_SOCIAL_CLASS_CAPS, G_SOCIAL_THRESHOLDS, G_SOCIAL_WEIGHTS, scoreSocialCandidate, selectSocialCandidates, selectSocialPool } from '../domain/social-scoring.mjs';
-import { generateDiscussionResearch } from './research/discussion-research-stage.mjs';
+import { generateDiscussionResearchSinglePass, generateDiscussionResearchTopics } from './research/discussion-research-stage.mjs';
 
 // 研究子阶段仍统一通过 selectionPrompt 加载项目技能：hotspot-brainstorm、hotspot-synthesis、event-card-generator。
 // 实现分别位于 research/editorial-exploration.mjs 与 research/event-card-stage.mjs，保留这些契约标记便于结构扫描。
@@ -32,7 +32,7 @@ export { DIMENSION_POOL_ROLES, dimensionSelections };
 export { ensureBatchEventCards, generateEventCards, overviewHtml, readEventCardsFile };
 export { brainstorm, breakingSynthesis, synthesize };
 export { G_SOCIAL_CLASS_CAPS, G_SOCIAL_THRESHOLDS, G_SOCIAL_WEIGHTS, scoreSocialCandidate, selectSocialCandidates, selectSocialPool };
-export { DISCUSSION_RESEARCH_TOP_K, buildDiscussionResearch, discussionResearchMarkdown };
+export { DISCUSSION_RESEARCH_TOP_K, buildDiscussionResearch, discussionResearchMarkdown, resolveDiscussionResearchTopK };
 export { buildTopicCandidates, selectTopicCandidates, topicCandidatesMarkdown };
 
 const CATEGORIES = ['🤖 AI/技术动态','📰 综合资讯','🏢 大厂战略','📈 行业趋势','💼 职场生态'];
@@ -466,7 +466,7 @@ export function selectBriefPool(clusters, ranking, { limit = 12 } = {}) {
 }
 
 const RESEARCH_SIGNAL_POINTS = Object.freeze({ anomaly: 14, interest_conflict: 22, divergence: 8 });
-const RESEARCH_RELATION_POINTS = Object.freeze({ sequence: 16, response: 22, comparison: 18, trend: 24 });
+const RESEARCH_RELATION_POINTS = Object.freeze({ sequence: 16, response: 22, comparison: 18, trend: 24, counterexample: 24 });
 const CONFIDENCE_FACTOR = Object.freeze({ high: 1, medium: 0.75, low: 0.4 });
 const EVIDENCE_FACTOR = Object.freeze({ full_text: 1, summary_only: 0.7, repository_meta: 0.45, title_only: 0.25 });
 
@@ -598,7 +598,7 @@ export function markdownRanked(scored, synthesis, dimensionGroups = [], scoring 
 const GENERIC_WORDS_HOTWORD = new Set(['ai','公司','发布','消息','最新','回应','宣布','科技','行业','全球','技术','产品','平台','企业','市场','今日','新闻']);
 
 
-export async function runResearchPipeline({ gateway, store, batchId, provider, workspaceRoot, maxAgeHours = 168, onProgress = () => {} }) {
+export async function runResearchPipeline({ gateway, store, batchId, provider, workspaceRoot, maxAgeHours = 168, onProgress = () => {}, resumeFrom = '' }) {
   const batch = store.getBatch(batchId); if (!batch) throw new Error('批次不存在');
   if(batch.batch_type==='breaking')throw new Error('突发专题必须执行事实基座与双评分分析，不能进入常规 8+2 研判');
   if (!batch.hotspots.length) throw new Error('当前批次没有热点，请先完成采集');
@@ -699,40 +699,182 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   writeFile(path.join(sourcesDir,'event-clusters.json'),JSON.stringify({ generated_at:new Date().toISOString(), total_articles:researchHotspots.length,excluded_stale_count:staleCount,excluded_skipped_event_count:skippedEvents.length,total_events:clusters.length,events:clusters },null,2));
   writeFile(path.join(workdir,'hotspot-overview.html'),overviewHtml(clusters));
   // 阶段 0 只冻结 T 榜前 K 事件；语义研判交给模型，程序只做输入裁剪和输出门禁。
-  const discussionResearchBase = buildDiscussionResearch({ events: clusters, eventHeatRanking, batchId: batch.id, topK: DISCUSSION_RESEARCH_TOP_K });
+  const configuredDiscussionResearchTopK = store.getExtensionSetting?.('system', 'workbench')?.value?.discussionResearchTopK;
+  const discussionResearchTopK = resolveDiscussionResearchTopK(configuredDiscussionResearchTopK);
+  const stage3CheckpointPath = path.join(sourcesDir, 'discussion-research-stage3-input.json');
+  let resumeSnapshot = null;
+  if (resumeFrom === 'topic_generation') {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(stage3CheckpointPath, 'utf8'));
+      if (parsed?.batch_id === batch.id && parsed?.single_pass?.reports && parsed?.base_report) resumeSnapshot = parsed;
+    } catch { /* 旧批次没有阶段 3 快照时走完整研判兼容路径。 */ }
+    if (resumeSnapshot?.clusters?.length) clusters = resumeSnapshot.clusters;
+    if (resumeSnapshot?.event_heat_ranking?.items?.length) eventHeatRanking = resumeSnapshot.event_heat_ranking;
+    onProgress(resumeSnapshot ? '重试阶段 3：复用已完成的阶段 1/2 研判产物' : '未找到阶段 3 快照，兼容执行完整研判');
+  }
+  const currentDiscussionResearchBase = buildDiscussionResearch({ events: clusters, eventHeatRanking, batchId: batch.id, topK: discussionResearchTopK });
+  const discussionResearchBase = resumeSnapshot?.base_report || currentDiscussionResearchBase;
+  const topkResearchScopePath = path.join(sourcesDir, 'topk-research-scope.json');
+  writeFile(topkResearchScopePath, JSON.stringify({
+    schema_version: discussionResearchBase.schema_version,
+    generated_at: discussionResearchBase.generated_at,
+    batch_id: batch.id,
+    mode: discussionResearchBase.mode,
+    ...discussionResearchBase.policy,
+    ...discussionResearchBase.scope,
+  }, null, 2));
+  onProgress(`阶段 0 完成：冻结 T 榜前 ${discussionResearchBase.scope.selected_count} 个非项目事件，保留 ${discussionResearchBase.scope.items.reduce((sum, item) => sum + (item.source_refs?.length || 0), 0)} 个来源指针`);
   const discussionResearchInputPath = path.join(sourcesDir, 'discussion-research-input.json');
-  const discussionResearchModelRequests = [];
-  const discussionResearch = await generateDiscussionResearch({
-    gateway, store, events: clusters, baseReport: discussionResearchBase, batchId: batch.id, provider, workspaceRoot, onProgress,
-    onModelRequest: (request) => discussionResearchModelRequests.push({
-      phase: request.phase,
-      attempt: request.attempt,
-      input: request.input,
-      skill: request.messages.skill,
-      prompt_source: request.messages.prompt_source,
-      messages: request.messages.messages,
-    }),
-  });
-  writeFile(discussionResearchInputPath, JSON.stringify({
-    schema_version: 2,
+  const discussionResearchReportsPath = path.join(sourcesDir, 'discussion-research-reports.md');
+  const previousResearchInput = resumeSnapshot ? (() => {
+    try { return JSON.parse(fs.readFileSync(discussionResearchInputPath, 'utf8')); } catch { return null; }
+  })() : null;
+  const discussionResearchModelRequests = Array.isArray(previousResearchInput?.phases) ? previousResearchInput.phases : [];
+  const persistDiscussionResearchInput = () => writeFile(discussionResearchInputPath, JSON.stringify({
+    schema_version: 4,
     generated_at: new Date().toISOString(),
     batch_id: batch.id,
     purpose: 'discussion-research',
     provider,
     phases: discussionResearchModelRequests,
-    note: '按事件内、事件间、候选选题三个阶段记录实际模型输入；attempt=0 是首次请求，attempt=1 是格式重试。',
+    note: '每个 Top-K 事件执行一次完整模型研判交互；模型在同一次交互中完成事件内和事件外研判并返回 Markdown。程序只记录模型输入、原生联网调用和响应审计；正文抓取延迟到编辑室。第 3 阶段关闭联网，只读取研判报告。',
   }, null, 2));
+  const recordDiscussionResearchModelRequest = (pass, request) => {
+    discussionResearchModelRequests.push({
+      phase: request.phase,
+      attempt: request.attempt,
+      pass,
+      output_format: request.outputFormat || 'markdown',
+      tool_choice: request.toolChoice || null,
+      web_search_mode: request.webSearchMode || 'disabled',
+      input: request.input,
+      skill: request.messages.skill,
+      prompt_source: request.messages.prompt_source,
+      messages: request.messages.messages,
+    });
+    persistDiscussionResearchInput();
+  };
+  const recordDiscussionResearchModelResponse = (response) => {
+    const request = [...discussionResearchModelRequests].reverse().find((item) => (
+      item.phase === response.phase
+      && item.attempt === response.attempt
+      && !item.response
+    ));
+    if (!request) return;
+    request.response = {
+      tool_choice: response.toolChoice || null,
+      call_id: response.result?.callId || null,
+      finish_reason: response.result?.finishReason || null,
+      tool_calls: Array.isArray(response.result?.toolCalls) ? response.result.toolCalls : [],
+      usage: response.result?.usage || null,
+      ...(response.error ? { error: response.error } : {}),
+    };
+    persistDiscussionResearchInput();
+  };
+  const singlePass = resumeSnapshot?.single_pass || await generateDiscussionResearchSinglePass({
+    gateway,
+    store,
+    events: clusters,
+    baseReport: discussionResearchBase,
+    batchId: batch.id,
+    provider,
+    workspaceRoot,
+    onProgress,
+    onModelRequest: (request) => recordDiscussionResearchModelRequest('single_event_research', request),
+    onModelResponse: recordDiscussionResearchModelResponse,
+  });
+  const researchReports = singlePass.reports || [];
+  writeFile(stage3CheckpointPath, JSON.stringify({
+    schema_version: 1,
+    batch_id: batch.id,
+    generated_at: new Date().toISOString(),
+    base_report: discussionResearchBase,
+    clusters,
+    event_heat_ranking: eventHeatRanking,
+    single_pass: {
+      reports: singlePass.reports || [],
+      internalResearch: singlePass.internalResearch || [],
+      relations: singlePass.relations || [],
+      referenceEvents: singlePass.referenceEvents || [],
+      verifiedResearchMaterials: singlePass.verifiedResearchMaterials || [],
+    },
+  }, null, 2));
+  const reportMarkdown = researchReports.map((report, index) => [
+    `## ${index + 1}. ${report.title || report.event_id || '事件研判'}`,
+    '',
+    `事件 ID：${report.event_id || '—'}`,
+    '',
+    report.report_markdown || '（模型未返回报告）',
+    '',
+  ].join('\n')).join('\n');
+  writeFile(discussionResearchReportsPath, `# 单事件模型研判报告\n\n${reportMarkdown}`);
+  const topicResult = await generateDiscussionResearchTopics({
+    gateway,
+    store,
+    events: clusters,
+    baseReport: discussionResearchBase,
+    internalResearch: singlePass.internalResearch,
+    relations: singlePass.relations,
+    verifiedResearchMaterials: singlePass.verifiedResearchMaterials,
+    researchReports,
+    relationSearchTasks: [],
+    referenceEvents: singlePass.referenceEvents,
+    batchId: batch.id,
+    provider,
+    workspaceRoot,
+    onProgress,
+    onModelRequest: (request) => recordDiscussionResearchModelRequest('topic_generation', request),
+    onModelResponse: recordDiscussionResearchModelResponse,
+  });
+  const discussionResearch = {
+    ...discussionResearchBase,
+    mode: 'model_analysis',
+    research_source: 'model',
+    internal_signals: singlePass.internalResearch,
+    internal_research: singlePass.internalResearch,
+    relations: singlePass.relations,
+    inter_event_research: singlePass.relations,
+    verified_research_materials: singlePass.verifiedResearchMaterials,
+    research_reports: researchReports,
+    reference_events: singlePass.referenceEvents,
+    topic_candidates: topicResult.topics,
+    topic_candidate: topicResult.topics[0] || null,
+    topic_generation_audit: topicResult.audit,
+    model_research: {
+      status: 'completed',
+      phase_count: 2,
+      research_stage: 'single_event_model_research',
+      model_interaction_count: researchReports.length,
+      failed_event_count: researchReports.filter((item) => item.error).length,
+      model_report_count: researchReports.filter((item) => item.report_markdown && !item.error).length,
+      verified_material_count: singlePass.verifiedResearchMaterials.filter((item) => item.status === 'verified').length,
+      needs_review_material_count: singlePass.verifiedResearchMaterials.filter((item) => item.status === 'needs_review' || item.status === 'model_reported').length,
+      research_material_count: singlePass.verifiedResearchMaterials.length,
+      relation_pair_count: singlePass.relations.length,
+      relation_group_count: 0,
+      external_anchor_count: singlePass.referenceEvents.length,
+      relation_search_task_count: 0,
+      reference_event_count: singlePass.referenceEvents.length,
+      selected_event_count: clusters.filter((event) => discussionResearchBase.scope.items.some((item) => item.event_id === event.event_id)).length,
+      relation_count: singlePass.relations.length,
+      topic_count: topicResult.topics.length,
+      relation_topic_required: topicResult.audit?.required || 0,
+      relation_topic_count: topicResult.audit?.actual || 0,
+      relation_topic_repair_attempted: Boolean(topicResult.audit?.repair_attempted),
+    },
+  };
+  persistDiscussionResearchInput();
   const discussionResearchPath = path.join(sourcesDir, 'discussion-research.json');
-  const topkResearchScopePath = path.join(sourcesDir, 'topk-research-scope.json');
   const internalSignalsPath = path.join(sourcesDir, 'internal-signals.json');
   const eventRelationsPath = path.join(sourcesDir, 'event-relations.json');
+  const verifiedResearchMaterialsPath = path.join(sourcesDir, 'verified-research-materials.json');
   const discussionResearchReportPath = path.join(workdir, 'discussion-research-report.md');
   writeFile(discussionResearchPath, JSON.stringify(discussionResearch, null, 2));
-  writeFile(topkResearchScopePath, JSON.stringify({ generated_at: discussionResearch.generated_at, batch_id: batch.id, ...discussionResearch.policy, ...discussionResearch.scope }, null, 2));
   writeFile(internalSignalsPath, JSON.stringify({ generated_at: discussionResearch.generated_at, batch_id: batch.id, mode: discussionResearch.mode, items: discussionResearch.internal_signals }, null, 2));
-  writeFile(eventRelationsPath, JSON.stringify({ generated_at: discussionResearch.generated_at, batch_id: batch.id, mode: discussionResearch.mode, items: discussionResearch.relations }, null, 2));
+  writeFile(eventRelationsPath, JSON.stringify({ generated_at: discussionResearch.generated_at, batch_id: batch.id, mode: discussionResearch.mode, items: discussionResearch.relations, reference_events: discussionResearch.reference_events || [], verified_research_materials: discussionResearch.verified_research_materials || [] }, null, 2));
+  writeFile(verifiedResearchMaterialsPath, JSON.stringify({ generated_at: discussionResearch.generated_at, batch_id: batch.id, mode: discussionResearch.mode, items: discussionResearch.verified_research_materials || [] }, null, 2));
   writeFile(discussionResearchReportPath, discussionResearchMarkdown(discussionResearch));
-  onProgress(`阶段 0 模型讨论研判完成：T 榜前 ${discussionResearch.scope.selected_count} 个事件，形成 ${discussionResearch.relations.length} 条有证据关系`);
+  onProgress(`阶段 1-3 模型讨论研判完成：T 榜前 ${discussionResearch.scope.selected_count} 个事件，形成 ${discussionResearch.verified_research_materials.length} 条研判素材和 ${discussionResearch.relations.length} 条有证据关系`);
   onProgress('执行事件级兼容预评估，并从 Top-K 研判候选中按讨论价值选择核心8条 + 黑马2条');
   const breaking=batch.batch_type==='breaking';
   if(breaking)onProgress('执行突发事件单题研判，不参与常规 8+2 竞争');
@@ -749,7 +891,7 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   writeFile(topicCandidatePath, JSON.stringify({ generated_at: new Date().toISOString(), batch_id: batch.id, policy: { source_scope: 'event-heat-ranking-top-k', t_unchanged: true, final_f_unchanged: true }, items: topicCandidatesWithRoles }, null, 2));
   writeFile(topicPreselectionPath, JSON.stringify({ generated_at: new Date().toISOString(), batch_id: batch.id, core: topicSelection.core, black: topicSelection.black, backup: topicSelection.backup, items: topicCandidatesWithRoles }, null, 2));
   writeFile(topicCandidateReportPath, topicCandidatesMarkdown({ candidates: topicCandidatesWithRoles, selection: topicSelection }));
-  onProgress(`阶段 2 候选生成完成：${topicSelection.all.length} 条（核心 ${topicSelection.core.length}、黑马 ${topicSelection.black.length}、候补 ${topicSelection.backup.length}）`);
+  onProgress(`阶段 3 候选生成完成：${topicSelection.all.length} 条（核心 ${topicSelection.core.length}、黑马 ${topicSelection.black.length}、候补 ${topicSelection.backup.length}）`);
   // 维度优先统一选题：who（含单事件主体）/ what / where 混排，账号契合加分来自 account-context.json
   const pool = breaking
     ? {selected:ranking.map((item)=>({...item,poolRole:'突发专题',eliminationReason:'',dimension:'event',events:null})),backup:[],groups:[]}
@@ -790,7 +932,21 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   writeFile(path.join(sourcesDir,'social-card-preselection.json'),JSON.stringify({generated_at:new Date().toISOString(),items:socialPool},null,2));
   writeFile(path.join(sourcesDir,'social-card-ranking.json'),JSON.stringify({generated_at:new Date().toISOString(),items:socialRanking},null,2));
   store.saveEliminationReasons(batchId,ranking);
-  const brainstormInputs = breaking ? pool.selected : (topicSelection.selected.length ? topicSelection.selected : dimensionEntries);
+  const hasResearchBasis = (candidate) => {
+    const topic = candidate?.topic_candidate || candidate?.research_context?.topic_candidate || {};
+    const context = candidate?.research_context || {};
+    return [
+      ...researchList(topic.material_ids),
+      ...researchList(topic.internal_signal_refs || topic.signal_refs),
+      ...researchList(topic.relation_ids),
+      ...researchList(context.verified_research_materials),
+    ].length > 0;
+  };
+  // 常规脑暴只能消费研判阶段产生的候选；不再用普通事件池作为无依据的降级输入。
+  const brainstormInputs = breaking ? pool.selected : topicSelection.selected.filter(hasResearchBasis);
+  if (!breaking && topicSelection.selected.length && !brainstormInputs.length) {
+    onProgress('候选均缺少事件内/事件间研判依据，已阻止普通事件摘要进入脑暴');
+  }
   const hasBrainstormInputs = brainstormInputs.length > 0;
   const cards = hasBrainstormInputs
     ? await brainstorm(gateway,store,brainstormInputs,account,batchId,provider,onProgress,workspaceRoot)
@@ -802,8 +958,9 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     : { items: [], metaNarratives: [], combination: {} };
   const scored = cards.length ? scoreCards(cards,synthesis,scoring) : [];
   if (!scored.length && hasBrainstormInputs) throw new Error('全部候选均为 NO_ANGLE，请检查标注或更换批次');
-  // 成稿门槛前置：F 低于 55 的候选不进选题池（进池也过不了成稿门禁）；全灭时保留第 1 名兜底
-  const DRAFT_FLOOR = 55;
+  // 当前先开放完整研判结果供人工检查；成稿门禁仍由后续编辑会/成稿流程负责。
+  // 复盘结束后再恢复正式成稿线，避免阶段 3 的候选被展示层提前截断。
+  const DRAFT_FLOOR = 0;
   const draftable = breaking
     ? scored.filter((item) => item.scoreStatus === 'ready')
     : scored.filter((item) => item.scoreStatus === 'ready' && item.f >= DRAFT_FLOOR);
@@ -850,7 +1007,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     ['全量事件聚类','event-clusters.json',path.join(sourcesDir,'event-clusters.json')],['事件归并影子结果','event-resolution-shadow.json',shadowPath],
     ['事件归并影子差异','event-resolution-shadow-diff.json',shadowDiffPath],['事件热榜','event-heat-ranking.json',eventHeatPath],['事件事实卡','event-cards.json',eventCardsPath],
     ['讨论研判总览','discussion-research.json',discussionResearchPath],['讨论研判模型输入','discussion-research-input.json',discussionResearchInputPath],['Top-K 研判范围','topk-research-scope.json',topkResearchScopePath],
-    ['事件内研判信号','internal-signals.json',internalSignalsPath],['事件间关系候选','event-relations.json',eventRelationsPath],
+    ['单事件模型研判报告','discussion-research-reports.md',discussionResearchReportsPath],['阶段 3 重试快照','discussion-research-stage3-input.json',stage3CheckpointPath],
+    ['事件内研判信号','internal-signals.json',internalSignalsPath],['事件间关系','event-relations.json',eventRelationsPath],['研判素材','verified-research-materials.json',verifiedResearchMaterialsPath],
     ['讨论研判报告','discussion-research-report.md',discussionResearchReportPath],
     ['候选选题生成','topic-candidate-generation.json',topicCandidatePath],['候选选题预选','topic-preselection-ranking.json',topicPreselectionPath],
     ['候选选题研判报告','topic-candidate-report.md',topicCandidateReportPath],

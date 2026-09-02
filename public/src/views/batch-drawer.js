@@ -93,7 +93,7 @@ export async function openBatch(id, mode) {
   const failureGroups = Object.entries(Object.groupBy(pipelineFailures, (item) => item.stage));
   const pipelineFailureSection = pipelineFailures.length || decidedFailures.length ? `<section class="drawer-section pipeline-failure-section">
     <div class="pipeline-heading"><div><span class="kicker">PENDING FAILURES</span><h3>待处理失败 · ${pipelineFailures.length}</h3></div><span class="failure-readonly-badge">可单条重试</span></div>
-    <p>重试只执行当前失败对象；成功后自动归档为已解决，不会清除原始执行日志。</p>
+    <p>采集、打标和事件卡失败只重试当前对象；事件研判失败优先从阶段 3 快照恢复，只重新生成候选并继续后续流程。旧失败记录没有快照时，会兼容重跑完整研判。成功后自动归档为已解决，不会清除原始执行日志。</p>
     <div class="pipeline-failure-groups">${failureGroups.map(([stageName, failures]) => `<details open><summary>${escapeHtml(failureStageLabel[stageName] || stageName)} <b>${failures.length}</b></summary>
       <div>${failures.map((item) => {
         const detail = item.detail || {};
@@ -373,10 +373,10 @@ async function retryPipelineFailure(button) {
   const original=button.textContent;button.disabled=true;button.textContent="重试中…";
   try {
     const provider=document.getElementById("batch-ai-provider")?.value;
-    await request(`/api/batches/${encodeURIComponent(batch.id)}/pipeline-failures/${failureId}/retry`,{
+    const job=await request(`/api/batches/${encodeURIComponent(batch.id)}/pipeline-failures/${failureId}/retry`,{
       method:"POST",body:JSON.stringify({provider}),
     });
-    toast("单条重试成功，失败记录已标记为已解决");
+    toast(job?.status === "queued" ? "重试任务已加入队列" : "重试任务已启动");
     await openBatch(batch.id);
   } catch(error) {
     toast(`重试失败：${error.message}`,"error");

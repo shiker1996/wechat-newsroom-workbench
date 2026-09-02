@@ -7,7 +7,7 @@ import { isFreshForBatch } from '../../../features/research/index.mjs';
 import { dailyFocusOptions } from '../../../features/articles/index.mjs';
 import { isResearchEligibleHotspot } from '../../../features/research/index.mjs';
 import { respond, boundedLimit } from '../route-helpers.mjs';
-import { retryPipelineFailure, skipPipelineFailure, reopenPipelineFailure } from '../../../features/batches/index.mjs';
+import { skipPipelineFailure, reopenPipelineFailure } from '../../../features/batches/index.mjs';
 
 export async function handleTaskRoutes({ request, response, pathname, searchParams, store, body, json, aiJobs, jobs, models, root, config,
   batchWorkdir, batchMaxAgeHours }) {
@@ -15,9 +15,13 @@ export async function handleTaskRoutes({ request, response, pathname, searchPara
     ?{error:`上游环节仍有 ${failures.length} 条待处理失败，请先重试或跳过后再${action}`,code:'PIPELINE_FAILURES_PENDING',failureCount:failures.length,stages}:null;};
   const failureRetryMatch=pathname.match(/^\/api\/batches\/([^/]+)\/pipeline-failures\/(\d+)\/retry$/);
   if(failureRetryMatch&&request.method==='POST'){
-    const batchId=decodeURIComponent(failureRetryMatch[1]);const input=await body(request);
-    try{return respond(json,response,200,await retryPipelineFailure({failureId:Number(failureRetryMatch[2]),batchId,
-      provider:input.provider||config.llm.defaultProvider,store,gateway:models,config}));}
+    const batchId=decodeURIComponent(failureRetryMatch[1]);const failureId=Number(failureRetryMatch[2]);const input=await body(request);
+    try {
+      const failure=store.getPipelineFailure(failureId);
+      if(!failure||failure.batch_id!==batchId)return respond(json,response,404,{error:'失败记录不存在'});
+      if(!['open','retrying'].includes(failure.status))return respond(json,response,409,{error:`失败记录当前状态不可重试：${failure.status}`});
+      return respond(json,response,202,aiJobs.start({batchId,provider:input.provider||config.llm.defaultProvider,type:'pipeline-failure-retry',failureId}));
+    }
     catch(error){return respond(json,response,422,{error:error.message});}
   }
   const failureDecisionMatch=pathname.match(/^\/api\/batches\/([^/]+)\/pipeline-failures\/(\d+)\/(skip|reopen)$/);

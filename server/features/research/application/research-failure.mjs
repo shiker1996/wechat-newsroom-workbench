@@ -11,5 +11,10 @@ export function classifyResearchFailure(error) {
 }
 export function recordResearchFailure({ store, job, error }) {
   const classified = classifyResearchFailure(error);
-  return store.recordPipelineFailure({ batchId: job.batchId, runId: job.id, stage: 'research', objectType: 'stage', objectKey: 'stage:research', title: '事件研判', errorCode: classified.code, errorMessage: String(error?.message || error), detail: { category: classified.category, phase: job.phase || 'research', provider: job.provider, skippable: false } });
+  const message = String(error?.message || error || '');
+  const errorStage = String(error?.stage || '');
+  const phase = errorStage.startsWith('discussion-research-')
+    ? errorStage.slice('discussion-research-'.length)
+    : /阶段\s*3/.test(message) ? 'topic_generation' : (job.phase || 'research');
+  return store.recordPipelineFailure({ batchId: job.batchId, runId: job.id, stage: 'research', objectType: 'stage', objectKey: 'stage:research', title: '事件研判', errorCode: classified.code, errorMessage: message, detail: { category: classified.category, phase, provider: job.provider, skippable: false } });
 }

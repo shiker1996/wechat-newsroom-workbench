@@ -21,6 +21,7 @@ const SEMANTIC_RELATION_QUESTIONS = Object.freeze({
   response: '后一个事件回应了什么？这次连续动作中的回应，改变了哪些利益、判断或行动？',
   comparison: '这些事件都围绕同一对象，但参与方的动作、收益和代价有什么差异？',
   trend: '多个事件连续出现，背后是在形成什么趋势，谁会先受到影响？',
+  counterexample: '这个事件反驳了什么趋势或判断？它说明原来的判断在哪些条件下不成立？',
 });
 const text = (value, max = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const list = (value) => Array.isArray(value) ? value : [];
@@ -62,6 +63,7 @@ function titleFor(events, relation) {
   if (kind === 'sequence') return `从${first}到${second}：这次变化意味着什么？`;
   if (kind === 'trend') return `从${titles.slice(0, 3).join('、')}看，变化正在指向哪里？`;
   if (kind === 'comparison') return `${first}与${second}都在行动，真正差异在哪？`;
+  if (kind === 'counterexample') return `${first}与${second}之间，谁反驳了什么判断？`;
   const label = RELATION_LABELS[relation?.relation_type] || '事件关系';
   return `${label}：${first} × ${second}`;
 }
@@ -74,11 +76,11 @@ function topicSeed(events, relation, focus) {
     const kind = relation.relation_kind || 'comparison';
     const question = SEMANTIC_RELATION_QUESTIONS[kind] || RELATION_QUESTIONS[relation.relation_type] || SEMANTIC_RELATION_QUESTIONS.comparison;
     return {
-      topic_type: kind === 'sequence' ? 'event_sequence' : kind === 'response' ? 'event_response' : kind === 'trend' ? 'event_trend' : 'event_comparison',
+      topic_type: kind === 'sequence' ? 'event_sequence' : kind === 'response' ? 'event_response' : kind === 'trend' ? 'event_trend' : kind === 'counterexample' ? 'event_counterexample' : 'event_comparison',
       candidate_title: titleFor(events, relation),
       angle: relation.relationship_statement || question,
       core_question: question,
-      thesis_seed: kind === 'trend' ? '把连续出现的事件放进同一条变化线上，判断它是否已经从新闻变成趋势。' : kind === 'response' ? '围绕回应前后的变化，解释回应改变了什么，而不是只复述双方表态。' : '围绕事件之间的变化或差异，解释背后的利益、策略与代价。',
+      thesis_seed: kind === 'trend' ? '把连续出现的事件放进同一条变化线上，判断它是否已经从新闻变成趋势。' : kind === 'response' ? '围绕回应前后的变化，解释回应改变了什么，而不是只复述双方表态。' : kind === 'counterexample' ? '围绕反例与原有判断的冲突，说明趋势或判断成立的边界。' : '围绕事件之间的变化或差异，解释背后的利益、策略与代价。',
       basis: relation.event_ids || [],
     };
   }
@@ -105,19 +107,26 @@ function openQuestions(events, relation, signals) {
   if (signals.some((item) => item.kind === 'unverified_boundary')) questions.push('未核实内容在成稿前是否需要补充来源？');
   return [...new Set(questions)];
 }
-function candidateContext({ events, scope, signals, relations, type, relationIds, focus = null }) {
+function candidateContext({ events, scope, signals, relations, materials = [], type, relationIds, focus = null }) {
   const eventIds = events.map(idOf);
   const eventValues = events.map((event) => finite(scope.get(idOf(event))?.event_value ?? event.eventValue ?? event.t)).filter((value) => value != null);
   const ranks = events.map((event) => finite(scope.get(idOf(event))?.rank ?? event.eventHeatRank)).filter((value) => value != null);
   const allSignals = events.flatMap((event) => eventSignals(idOf(event), signals));
   const relation = relationIds.length ? relations.get(relationIds[0]) : null;
   const seed = topicSeed(events, relation, focus);
+  const eventIdSet = new Set(eventIds);
+  const selectedMaterials = list(materials).filter((material) => {
+    const anchors = list(material?.anchor_event_ids).map(String);
+    const materialRelationId = String(material?.relation_id || '').trim();
+    return anchors.some((id) => eventIdSet.has(id)) || (materialRelationId && relationIds.includes(materialRelationId));
+  });
   return {
     scope: 'topk',
     event_value: eventValues.length ? Math.max(...eventValues) : null,
     event_rank: ranks.length ? Math.min(...ranks) : null,
     internal_signals: events.map((event) => signals.get(idOf(event))).filter(Boolean),
     relations: relationIds.map((id) => relations.get(id)).filter(Boolean),
+    verified_research_materials: selectedMaterials,
     topic_candidate: {
       status: 'provisional', type, event_ids: eventIds, relation_ids: relationIds,
       discussion_question: discussionQuestion(events, relation, allSignals),
@@ -133,16 +142,16 @@ function candidateContext({ events, scope, signals, relations, type, relationIds
     open_questions: openQuestions(events, relation, allSignals),
   };
 }
-function candidateFromEvents({ events, type, relation = null, ranking, scope, signals, relations, relationIds = [], order, focus = null }) {
+function candidateFromEvents({ events, type, relation = null, ranking, scope, signals, relations, materials = [], relationIds = [], order, focus = null }) {
   const rankItems = events.map((event) => ranking.get(idOf(event))).filter(Boolean);
   const lead = [...rankItems].sort((a, b) => finite(a.eventHeatRank, 999999) - finite(b.eventHeatRank, 999999))[0] || {};
   const sourceSignals = events.flatMap((event) => eventSignals(idOf(event), signals));
   const signalBonus = Math.min(10, sourceSignals.length * 2 + (sourceSignals.some((item) => item.kind === 'interest_conflict') ? 4 : 0));
-  const relationBonus = relation ? Math.min(15, 6 + (relation.relation_kind === 'response' ? 5 : relation.relation_kind === 'trend' ? 4 : 2) + (relation.confidence === 'high' ? 3 : 0)) : 0;
+  const relationBonus = relation ? Math.min(15, 6 + (relation.relation_kind === 'response' ? 5 : relation.relation_kind === 'trend' || relation.relation_kind === 'counterexample' ? 4 : 2) + (relation.confidence === 'high' ? 3 : 0)) : 0;
   const eventValue = Math.max(...rankItems.map((item) => finite(item.eventValue ?? item.t ?? item.eventHeatScore, 0)), 0);
   // 候选级预选以事件 T 为热度底座；旧事件级 finalPreScore 只保留作审计，不能替代 T。
   const topicPreselectionScore = Number((eventValue + relationBonus + signalBonus).toFixed(1));
-  const context = candidateContext({ events, scope, signals, relations, type, relationIds, focus });
+  const context = candidateContext({ events, scope, signals, relations, materials, type, relationIds, focus });
   const seed = context.topic_candidate;
   const articleList = allArticles(events);
   const primary = events[0] || {};
@@ -183,14 +192,14 @@ function candidateFromEvents({ events, type, relation = null, ranking, scope, si
     angle: seed.angle || '', thesis: seed.thesis_seed || '', dimension_labels: labels, order,
   };
 }
-function candidateFromModelTopic({ topic, events, ranking, scope, signals, relations, order }) {
+function candidateFromModelTopic({ topic, events, ranking, scope, signals, relations, materials = [], order }) {
   const eventIds = list(topic.event_ids).map(String);
   const topicEvents = eventIds.map((id) => events.find((event) => idOf(event) === id)).filter(Boolean);
   if (!topicEvents.length) return null;
   const relationIds = list(topic.relation_ids).map(String).filter((id) => relations.has(id));
   const relation = relationIds.length ? relations.get(relationIds[0]) : null;
   const type = topic.topic_type === 'event_trend' ? 'multi_event_trend' : topicEvents.length > 1 ? 'dual_event_relation' : 'single_event';
-  const candidate = candidateFromEvents({ events: topicEvents, type, relation, ranking, scope, signals, relations, relationIds, order });
+  const candidate = candidateFromEvents({ events: topicEvents, type, relation, ranking, scope, signals, relations, materials, relationIds, order });
   const modelTopic = {
     ...topic,
     event_ids: topicEvents.map(idOf),
@@ -198,6 +207,10 @@ function candidateFromModelTopic({ topic, events, ranking, scope, signals, relat
     is_author_stance: false,
     analysis_source: 'model',
   };
+  const referencedMaterialIds = new Set(list(topic.material_ids).map(String));
+  const topicMaterials = referencedMaterialIds.size
+    ? list(materials).filter((material) => referencedMaterialIds.has(String(material?.material_id)))
+    : candidate.research_context.verified_research_materials;
   return {
     ...candidate,
     candidate_id: `model:${topic.candidate_id || order + 1}`,
@@ -209,6 +222,7 @@ function candidateFromModelTopic({ topic, events, ranking, scope, signals, relat
       ...candidate.research_context,
       topic_candidate: modelTopic,
       topic_candidates: [modelTopic],
+      verified_research_materials: topicMaterials,
       research_source: 'model',
       evidence_boundary: { ...candidate.research_context.evidence_boundary, note: '候选选题由模型根据事件卡、来源证据和事件关系形成；仍需编辑会确认。' },
     },
@@ -244,34 +258,38 @@ function sortCandidates(left, right) {
     || left.candidate_id.localeCompare(right.candidate_id);
 }
 export function buildTopicCandidates({ events = [], discussionResearch = {}, ranking = [] } = {}) {
+  // 阶段 0 只有范围快照，不能因为事件存在就自动降级生成“新闻复述”候选。
+  // 候选必须等待模型完成事件内/事件间研判；模型候选是否回填结构化 ID 不影响保留。
+  if (discussionResearch.mode === 'phase0_scope') return [];
   const scopedIds = new Set(list(discussionResearch.scope?.items).map((item) => String(item.event_id)));
   const byEvent = mapBy(events, idOf);
   const byRanking = mapBy(ranking, (item) => item.eventId || item.event_id);
   const byScope = mapBy(discussionResearch.scope?.items, (item) => item.event_id);
   const bySignals = mapBy(discussionResearch.internal_signals, (item) => item.event_id);
   const byRelation = mapBy(discussionResearch.relations, (item) => item.relation_id);
+  const materials = list(discussionResearch.verified_research_materials);
   const scopedEvents = [...scopedIds].map((id) => byEvent.get(id)).filter(Boolean)
     .sort((a, b) => finite(byScope.get(idOf(a))?.rank, 999999) - finite(byScope.get(idOf(b))?.rank, 999999) || idOf(a).localeCompare(idOf(b)));
   const modelTopics = discussionResearch.research_source === 'model' ? list(discussionResearch.topic_candidates) : [];
   if (discussionResearch.research_source === 'model') {
-    return modelTopics.map((topic, index) => candidateFromModelTopic({ topic, events: scopedEvents, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, order: index }))
+    return modelTopics.map((topic, index) => candidateFromModelTopic({ topic, events: scopedEvents, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, materials, order: index }))
       .filter(Boolean).sort(sortCandidates).map((candidate, index) => ({ ...candidate, generated_rank: index + 1 }));
   }
   const candidates = [];
   scopedEvents.forEach((event, index) => {
     const focus = bestInternalSeed(eventSignals(idOf(event), bySignals));
-    candidates.push(candidateFromEvents({ events: [event], type: 'single_event', focus, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, order: index }));
+    candidates.push(candidateFromEvents({ events: [event], type: 'single_event', focus, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, materials, order: index }));
   });
   for (const relation of list(discussionResearch.relations)) {
     const relationEvents = list(relation.event_ids).map((id) => byEvent.get(String(id))).filter(Boolean);
     if (relationEvents.length < 2) continue;
     const type = relation.relation_kind === 'trend' ? 'multi_event_trend' : 'dual_event_relation';
-    candidates.push(candidateFromEvents({ events: relationEvents, type, relation, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, relationIds: [String(relation.relation_id)], order: candidates.length }));
+    candidates.push(candidateFromEvents({ events: relationEvents, type, relation, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, materials, relationIds: [String(relation.relation_id)], order: candidates.length }));
   }
   for (const ids of connectedComponents(scopedEvents.map(idOf), list(discussionResearch.relations))) {
     const groupRelations = list(discussionResearch.relations).filter((relation) => list(relation.event_ids).every((id) => ids.includes(String(id))));
     const groupEvents = ids.map((id) => byEvent.get(id)).filter(Boolean);
-    candidates.push(candidateFromEvents({ events: groupEvents, type: 'multi_event_chain', relation: groupRelations.find((item) => item.relation_kind === 'trend') || groupRelations[0] || null, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, relationIds: groupRelations.map((item) => String(item.relation_id)), order: candidates.length }));
+    candidates.push(candidateFromEvents({ events: groupEvents, type: 'multi_event_chain', relation: groupRelations.find((item) => item.relation_kind === 'trend') || groupRelations[0] || null, ranking: byRanking, scope: byScope, signals: bySignals, relations: byRelation, materials, relationIds: groupRelations.map((item) => String(item.relation_id)), order: candidates.length }));
   }
   return candidates.sort(sortCandidates).map((candidate, index) => ({ ...candidate, generated_rank: index + 1 }));
 }
@@ -303,7 +321,7 @@ export function selectTopicCandidates(candidates = [], { coreLimit = 8, blackLim
 }
 export function topicCandidatesMarkdown({ candidates = [], selection = {} } = {}) {
   const role = (candidate) => candidate.poolRole || '未入选';
-  return ['# 阶段 2 · 讨论导向候选选题', '', '> 候选命题由事件内反常、利益冲突、可发散方向，以及事件间前后、回应、对比、趋势关系生成；不代表作者最终立场。', '', '核心 ' + (selection.core?.length || 0) + ' 条；黑马 ' + (selection.black?.length || 0) + ' 条；候补 ' + (selection.backup?.length || 0) + ' 条。', '', ...candidates.map((candidate) => {
+  return ['# 阶段 3 · 讨论导向候选选题', '', '> 候选命题必须来自已确认的事件内研判信号，或模型确认的事件间前后、回应、对比、趋势、反例关系；不代表作者最终立场。', '', '核心 ' + (selection.core?.length || 0) + ' 条；黑马 ' + (selection.black?.length || 0) + ' 条；候补 ' + (selection.backup?.length || 0) + ' 条。', '', ...candidates.map((candidate) => {
     const signals = candidate.research_context?.internal_signals || [];
     const signalCount = signals.reduce((sum, item) => sum + [item.anomalies, item.conflicts, item.divergences, item.internal_research?.anomalies, item.internal_research?.interest_conflicts, item.internal_research?.divergence_directions].reduce((n, values) => n + (Array.isArray(values) ? values.length : 0), 0), 0);
     const relationCount = candidate.research_context?.relations?.length || 0;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { ModelGateway } from '../server/platform/llm/gateway.mjs';
-import { wireResponsesInput, responsesToolDefinitions } from '../server/platform/llm/responses-api.mjs';
+import { wireResponsesInput, responsesPayload, responsesToolDefinitions } from '../server/platform/llm/responses-api.mjs';
 import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
 function gateway(port) {
@@ -94,4 +94,32 @@ test('Responses 工具定义与 Chat Completions 工具定义保持协议隔离'
     { type: 'function', name: 'x', description: '', parameters: { type: 'object' } },
   ]);
   assert.deepEqual(wireResponsesInput([{ role: 'tool', tool_call_id: 'c', content: 'ok' }], { nativeTools: false }), [{ role: 'user', content: 'ok' }]);
+});
+
+test('Responses 联网搜索请求加入 DeepSeek web_search 工具并强制选择', () => {
+  const body = responsesPayload({
+    provider: { protocol: 'responses', model: 'deepseek-v4-flash', maxOutputTokens: 1000 },
+    messages: [{ role: 'user', content: '核实这条研判' }],
+    maxOutputTokens: 1000,
+    tools: [{ type: 'web_search' }],
+    toolChoice: { type: 'web_search' },
+    jsonMode: true,
+    thinking: false,
+  });
+  assert.deepEqual(body.tools, [{ type: 'web_search' }]);
+  assert.deepEqual(body.tool_choice, { type: 'web_search' });
+  assert.equal(body.text, undefined);
+});
+
+test('Responses 响应保留服务端执行的 web_search_call', async () => {
+  const { normalizeResponsesResponse } = await import('../server/platform/llm/responses-api.mjs');
+  const result = normalizeResponsesResponse({
+    id: 'resp-search',
+    status: 'completed',
+    output_text: '{"ok":true}',
+    output: [{ type: 'web_search_call', id: 'ws_1', status: 'completed', action: { type: 'search', query: '测试查询' } }],
+  }, 'DeepSeek');
+  assert.deepEqual(result.toolCalls, [{
+    id: 'ws_1', name: 'web_search', input: { type: 'search', query: '测试查询' }, providerExecuted: true, status: 'completed',
+  }]);
 });

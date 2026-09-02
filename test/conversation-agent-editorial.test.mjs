@@ -6,13 +6,32 @@ import test from 'node:test';
 import {Store} from '../server/platform/core/store.mjs';
 import {ToolRegistry} from '../server/platform/tools/registry.mjs';
 import {runEditorialAgentTurn} from '../server/features/articles/application/agent/editorial-adapter.mjs';
-import {applyEditorialResult,reconcileEditorialAnswer} from '../server/features/articles/llm/editorial-room.mjs';
+import {applyEditorialResult,buildEditorialMessages,reconcileEditorialAnswer} from '../server/features/articles/llm/editorial-room.mjs';
 import {mergeAppendEditorialField,mergeSingleEditorialField} from '../server/features/articles/domain/editorial-patch.mjs';
 
 function registry(){const value=new ToolRegistry();value.register({manifest:{id:'mock-url',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',pathInputs:['root'],inputSchema:{type:'object',required:['targetUrl','root'],properties:{targetUrl:{type:'string'},title:{type:'string'},root:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,title:input.title,content:'原文证据：产品实测数据为 42。'},artifacts:[],warnings:[],provenance:{requestedUrl:input.targetUrl,finalUrl:input.targetUrl}};}}});value.register({manifest:{id:'mock-project',name:'本地项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',pathInputs:['path'],inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'},options:{type:'object'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{summary:'读取 1 个文件',files:[{path:'体验.md',size:20,excerpt:'本人安装运行后感觉交互一般',truncated:false}],totalFiles:1,totalChars:15,truncated:false,skipped:{}},artifacts:[],warnings:[],provenance:{root:input.path}};}}});return value;}
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'editorial-agent-'));fs.mkdirSync(path.join(root,'config'),{recursive:true});fs.copyFileSync(path.join(process.cwd(),'config','capability-consumers.json'),path.join(root,'config','capability-consumers.json'));const store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});const batch=store.createBatch({date:'2026-08-14',title:'Agent 试点'});store.addHotspots(batch.id,'manual',[{title:'测试事件',url:'https://example.com/source'}]);const hotspot=store.getBatch(batch.id).hotspots[0],candidate=store.addCandidates(batch.id,[hotspot.id],{tracks:['article']})[0];return {root,store,hotspot,candidate};}
 // 填满就绪判定要求的全部字段（角度/命题/研判主线/事实基座/作者观点/命题边界）
 function completeBrief(store,candidate){store.updateCandidate(candidate.id,{angle:'实测角度',thesis:'工具链需要产品验证',distribution_lane:'实验池',reader_stake:'开发者在选型时需要评估实测数据，否则会采信夸大宣传'});store.saveEditorial(candidate.id,{confirmed_facts:'来源显示实测数据为 42',research_basis:'采用事件内部反常主线：工具已经发布，但实测数据与宣传效果存在落差，需要解释原因',author_opinions:'作者主张实测优先',forbidden_claims:'不扩大样本',experience_required:0,brief_status:'WRITE_NOW'});}
+
+test('编辑室消息把研判信号、关系证据和外部参考材料作为写作输入',async()=>{
+  const messages=await buildEditorialMessages({
+    hotspot_title:'候选命题',url:'https://example.com/source',category:'新闻事件',risk_level:'低',messages:[],editorial:{},
+  },'',[],null,process.cwd(),{
+    scope:{top_k:30,events:[{event_id:'E1',title:'事件一'},{event_id:'E2',title:'事件二'}]},event_value:88,
+    topic_candidates:[{candidate_id:'T1',topic_type:'event_counterexample',candidate_title:'谁反驳了这个趋势？',core_question:'原有判断在哪些条件下不成立？',angle:'从反例切入',thesis_seed:'趋势存在边界',internal_signal_refs:['E1:anomaly:1'],relation_ids:['MR-001'],evidence_source_ids:['search:1'],evidence_levels:['full_text']}],
+    internal_research:[{event_id:'E1',title:'事件一',internal_research:{anomalies:[{signal_id:'E1:anomaly:1',statement:'宣传与结果出现落差',evidence_source_ids:['search:1'],evidence_levels:['full_text']}],interest_conflicts:[],divergence_directions:[]}}],
+    inter_event_research:[{relation_id:'MR-001',relation_kind:'counterexample',relation_label:'反例关系',event_ids:['E1','E2'],reference_event_ids:['REF-1'],relationship_statement:'事件二反驳了继续扩大的判断',differences:['动作方向相反'],evidence_source_ids:['search:1'],evidence_levels:['full_text']}],
+    reference_events:[{reference_id:'REF-1',reference_only:true,title:'外部反例样本',evidence_level:'summary_only'}],
+    evidence_boundary:{open_questions:['反例是否适用于当前主体'],note:'待编辑确认'},
+  });
+  const content=messages.map((item)=>String(item.content||'')).join('\n');
+  assert.match(content,/谁反驳了这个趋势/);
+  assert.match(content,/事件二反驳了继续扩大的判断/);
+  assert.match(content,/外部反例样本/);
+  assert.match(content,/反例关系/);
+  assert.match(content,/外部参考事件只能作为关系研判的参考材料/);
+});
 
 test('编辑室使用统一 ToolRequest 读取原文，并在同轮基于结果提交决策',async(t)=>{const {root,store,hotspot,candidate}=fixture(t);let calls=0,sawToolResult=false;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){calls+=1;if(calls===1)return {callId:'m1',content:JSON.stringify({type:'tool_requests',assistant_note:'读取原文',requests:[{requestId:'tr_source',capability:'content.url.fetch',arguments:{resourceId:`source:${hotspot.id}`},reason:'核对实测数据'}]}),usage:{},model:'mock'};sawToolResult=messages.some((item)=>item.role==='tool'&&item.content.includes('产品实测数据为 42'));return {callId:'m2',content:JSON.stringify({type:'final',assistantReply:'证据已核对，你的判断是什么？',briefUpdates:{angle:'实测角度',thesis:'工具链需要产品验证',confirmed_facts:'来源显示实测数据为 42',forbidden_claims:'不扩大样本'}}),usage:{total_tokens:20},model:'mock'};}};const events=[{event_id:'E001',title:'测试事件',hotspots:[{...hotspot,sourceDoc:null}]}],stream=[];const result=await runEditorialAgentTurn({gateway,store,registry:registry(),candidateId:candidate.id,provider:'mock',events,workspaceRoot:root,onEvent:(event)=>stream.push(event)});assert.equal(calls,2);assert.equal(sawToolResult,true);assert.equal(result.toolCalls,1);assert.equal(result.editorial.confirmed_facts,'来源显示实测数据为 42');assert.ok(stream.some((event)=>event.type==='tool.completed'&&event.sources?.[0]?.url==='https://example.com/source'));assert.equal(store.getAgentRun(result.agentRunId).status,'completed');});
 

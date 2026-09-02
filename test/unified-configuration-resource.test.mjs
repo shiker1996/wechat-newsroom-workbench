@@ -11,7 +11,7 @@ function repository(){const rows=new Map();return {get:(type,id)=>rows.get(`${ty
 
 test('统一配置目录包含 system 与 model-provider 一等资源',async()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'configuration-catalog-'));
-  try{const items=await buildConfigurationCatalog({root,config:{llm:{providers:{demo:{label:'Demo',baseUrl:'https://example.com/v1',model:'demo-1',contextWindow:8000,maxOutputTokens:1000}}}}});assert.ok(findConfigurationResource(items,'system','workbench'));assert.ok(findConfigurationResource(items,'model-provider','demo'));}
+  try{const items=await buildConfigurationCatalog({root,config:{llm:{providers:{demo:{label:'Demo',baseUrl:'https://example.com/v1',model:'demo-1',contextWindow:8000,maxOutputTokens:1000}}}}});const workbench=findConfigurationResource(items,'system','workbench');assert.ok(workbench);assert.deepEqual(workbench.manifest.configuration.properties.discussionResearchTopK.enum,[5,8,10]);assert.equal(workbench.manifest.configuration.properties.discussionResearchTopK.default,8);assert.ok(findConfigurationResource(items,'model-provider','demo'));}
   finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

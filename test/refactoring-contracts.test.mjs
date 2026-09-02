@@ -219,7 +219,7 @@ test('refactoring baseline: supported AI job types are accepted and persisted', 
 test('refactoring stage 2: every supported AI job type has an explicit handler', () => {
   const handlers = createAiJobHandlers({ store: {}, gateway: {}, config: {}, log() {} });
   assert.deepEqual([...handlers.keys()], AI_JOB_TYPES);
-  assert.equal(handlers.size, 13);
+  assert.equal(handlers.size, AI_JOB_TYPES.length);
   assert.equal(handlers.has('unsupported-job'), false);
 });
 

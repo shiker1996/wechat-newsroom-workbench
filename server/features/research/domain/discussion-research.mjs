@@ -2,8 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dimensionPartsOf } from './hotspot-dimensions.mjs';
 
-export const DISCUSSION_RESEARCH_SCHEMA_VERSION = 2;
-export const DISCUSSION_RESEARCH_TOP_K = 30;
+export const DISCUSSION_RESEARCH_SCHEMA_VERSION = 3;
+// 讨论研判只处理 T 榜前若干个非项目事件；其余事件保留在热榜和普通流程中。
+export const DISCUSSION_RESEARCH_TOP_K_OPTIONS = Object.freeze([5, 8, 10]);
+export const DISCUSSION_RESEARCH_TOP_K = 8;
+
+export function resolveDiscussionResearchTopK(value) {
+  const normalized = Number(value);
+  return DISCUSSION_RESEARCH_TOP_K_OPTIONS.includes(normalized) ? normalized : DISCUSSION_RESEARCH_TOP_K;
+}
 export const DISCUSSION_RESEARCH_EXCLUDED_CONTENT_CLASSES = Object.freeze(['github_project']);
 
 const text = (value, max = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -57,16 +64,25 @@ function dedupeSemanticSignals(items, limit = 8) {
   })).slice(0, limit);
 }
 
+function sourceEvidenceLevel(article = {}) {
+  if (text(article?.content) || text(article?.full_text) || text(article?.fullText)) return 'full_text';
+  if (text(article?.summary) || text(article?.description)) return 'summary_only';
+  if (article?.repositoryMeta || article?.repository_meta) return 'repository_meta';
+  return 'title_only';
+}
+
 function sourceRefs(event) {
   return list(event?.articles).slice(0, 8).map((article, index) => ({
     source_id: text(article?.source_id || (article?.hotspot_id != null ? `hotspot:${article.hotspot_id}` : article?.category_id || `source:${index + 1}`), 80),
     title: text(article?.title, 140),
     source: text(article?.source, 60),
     url: text(article?.url, 300) || null,
+    evidence_level: sourceEvidenceLevel(article),
   }));
 }
 
 function eventScope(event, heat, rank, reason) {
+  const sources = sourceRefs(event);
   return {
     event_id: idOf(event),
     rank,
@@ -78,6 +94,9 @@ function eventScope(event, heat, rank, reason) {
     latest_time: text(event?.latest_time, 50) || null,
     source_count: finite(event?.source_count, 0),
     report_count: finite(event?.report_count, 0),
+    source_ids: sources.map((source) => source.source_id),
+    source_evidence_levels: Object.fromEntries(sources.map((source) => [source.source_id, source.evidence_level])),
+    source_refs: sources,
     included_reason: reason,
   };
 }
@@ -313,26 +332,20 @@ export function buildDiscussionResearch({ events = [], eventHeatRanking = {}, to
       || idOf(a.event).localeCompare(idOf(b.event)));
   const selected = ranked.slice(0, Math.max(0, Number(topK) || DISCUSSION_RESEARCH_TOP_K));
   const scope = selected.map(({ event, heat }, index) => eventScope(event, heat, finite(heat?.rank, index + 1), 'T 榜前 K 事件，进入阶段 0 研判范围'));
-  const internalSignals = selected.map(({ event }) => internalSignalsFor(event));
-  const relations = [];
-  for (let i = 0; i < selected.length; i += 1) {
-    for (let j = i + 1; j < selected.length; j += 1) {
-      const relation = relationFor(selected[i].event, selected[j].event);
-      if (relation) relations.push(relation);
-    }
-  }
-  relations.push(...trendRelations(selected));
-  relations.sort((a, b) => (({ high: 0, medium: 1, low: 2 }[a.confidence] || 9) - ({ high: 0, medium: 1, low: 2 }[b.confidence] || 9)
-    || a.relation_id.localeCompare(b.relation_id)));
+  // 阶段 0 只负责冻结研判范围。不要在这里根据关键词、维度或时间
+  // 直接生成反常、利益冲突、发散方向或事件关系；这些都由阶段 1 的
+  // 单事件模型联网交互完成。
   return {
     schema_version: DISCUSSION_RESEARCH_SCHEMA_VERSION,
     generated_at: generatedAt,
     batch_id: String(batchId || ''),
-    mode: 'phase0_observation',
+    mode: 'phase0_scope',
     policy: {
       top_k: Number(topK) || DISCUSSION_RESEARCH_TOP_K,
       excluded_content_classes: [...DISCUSSION_RESEARCH_EXCLUDED_CONTENT_CLASSES],
       t_unchanged: true, f_unchanged: true, pool_unchanged: true,
+      semantic_judgement: 'model_only',
+      phase0_outputs: ['scope', 'source_refs'],
     },
     scope: {
       eligible_count: ranked.length,
@@ -340,8 +353,8 @@ export function buildDiscussionResearch({ events = [], eventHeatRanking = {}, to
       selected_count: selected.length,
       items: scope,
     },
-    internal_signals: internalSignals,
-    relations,
+    internal_signals: [],
+    relations: [],
     topic_candidates: [],
   };
 }
@@ -350,14 +363,18 @@ export function discussionResearchMarkdown(report) {
   const scope = report?.scope?.items || [];
   const signals = report?.internal_signals || [];
   const relations = report?.relations || [];
+  const materials = report?.verified_research_materials || [];
+  const rawReports = report?.research_reports || [];
   const lines = [
-    '# 阶段 0 · 高热事件讨论研判观察',
+    '# 高热事件讨论研判报告',
     '',
     `模式：${report?.mode || 'phase0_observation'}；范围：T 榜前 ${report?.policy?.top_k || DISCUSSION_RESEARCH_TOP_K}；本次纳入 ${scope.length} 个事件。`,
     '',
     report?.research_source === 'model'
-      ? '本报告由模型基于 Top-K 事件卡、来源资料和时间信息进行语义研判；程序只负责范围裁剪、证据绑定、结构校验和去重，研判价值 J 在候选评分阶段计算。'
-      : '本报告只整理已有事件卡、事件维度和时间关系，不改变 T、F、候选池，也不把观察信号直接当作选题命题。',
+      ? '本报告由模型按事件逐个联网研判并直接返回 Markdown；程序只负责范围裁剪、调用审计、来源整理、结构索引和去重，研判价值 J 在候选评分阶段计算。'
+      : report?.mode === 'phase0_scope'
+        ? '阶段 0 只冻结 T 榜前 K 的非项目事件和来源指针；尚未进行事件内或事件间语义研判，页面不会在此阶段展示程序猜出的关系。'
+        : '本报告只整理已有事件卡、事件维度和时间关系，不改变 T、F、候选池，也不把观察信号直接当作选题命题。',
     '',
     '## Top-K 研判范围',
     '',
@@ -376,6 +393,13 @@ export function discussionResearchMarkdown(report) {
     '',
     ...(relations.length ? relations.map((item) => `- ${item.relation_label || item.relation_kind}：${item.relationship_statement || item.event_ids.join(' ↔ ')}`) : ['- 暂无模型能够用来源证据支持的前后、回应、对比或趋势关系']),
     '',
+    '## 模型研判原始报告',
+    '',
+    ...(rawReports.length ? rawReports.flatMap((item) => [`### ${item.title || item.event_id || '事件研判'}`, '', item.report_markdown || '（模型未返回报告）', '']) : ['- 暂无模型研判报告']),
+    '## 写作研判素材',
+    '',
+    ...(materials.length ? materials.map((item) => `- ${item.material_type}（${item.status}）：${item.statement || item.interpretation || '暂无说明'}${item.writing_angles?.length ? `；可写角度：${item.writing_angles.join('、')}` : ''}${item.thesis_seeds?.length ? `；观点种子：${item.thesis_seeds.join('、')}` : ''}`) : ['- 暂无模型研判素材']),
+    '',
     '## 下一阶段',
     '',
     '- 由编辑确认哪些模型研判可以发展成讨论命题。',
@@ -391,7 +415,7 @@ function readJson(filePath) {
 function derivedDiscussionQuestion(internalSignals, relations, matchedIds) {
   const relation = relations.find((item) => (item.event_ids || []).some((id) => matchedIds.has(String(id))));
   if (relation) {
-    const labels = { same_subject_sequence: '同一主体的连续动作之间发生了什么变化？', shared_object_comparison: '不同主体围绕同一对象的动作有何差异？', action_comparison: '这些同类动作背后是否存在共同变化？', context_comparison: '同一场合下的不同事件为何出现不同反应？', shared_dimension: '这些事件之间的共同维度，是否足以构成一个讨论问题？' };
+    const labels = { same_subject_sequence: '同一主体的连续动作之间发生了什么变化？', shared_object_comparison: '不同主体围绕同一对象的动作有何差异？', action_comparison: '这些同类动作背后是否存在共同变化？', context_comparison: '同一场合下的不同事件为何出现不同反应？', shared_dimension: '这些事件之间的共同维度，是否足以构成一个讨论问题？', model_sequence: '前后事件之间发生了什么变化？', model_response: '后一个事件回应了什么，改变了哪些判断或利益？', model_comparison: '这些事件的具体动作、收益和代价有何差异？', model_trend: '这些事件连续出现，是否已经形成值得讨论的趋势？', model_counterexample: '这个事件反驳了什么趋势或判断？' };
     return labels[relation.relation_type] || labels.shared_dimension;
   }
   const signals = internalSignals.flatMap((item) => [...(item.anomalies || []), ...(item.conflicts || []), ...(item.divergences || [])]);
@@ -417,7 +441,12 @@ export function readDiscussionResearchContext({ workspaceRoot, batchId, candidat
   const matched = (report.scope?.items || []).filter((item) => eventIds.has(String(item.event_id)));
   const matchedIds = new Set(matched.map((item) => String(item.event_id)));
   const internalSignals = (report.internal_signals || []).filter((item) => matchedIds.has(String(item.event_id)));
-  const relations = (report.relations || []).filter((item) => item.event_ids?.length >= 2 && item.event_ids.every((id) => matchedIds.has(String(id))));
+  const referenceEvents = (report.reference_events || []).filter((item) => list(item.anchor_event_ids).some((id) => matchedIds.has(String(id))));
+  const relations = (report.relations || []).filter((item) => {
+    const anchors = list(item.event_ids).map(String);
+    return anchors.length >= 1 && anchors.every((id) => matchedIds.has(id))
+      && (!item.reference_event_ids?.length || item.reference_event_ids.some((referenceId) => referenceEvents.some((reference) => String(reference.reference_id) === String(referenceId))));
+  });
   const internalResearch = internalSignals.map((item) => ({
     ...item,
     internal_research: item.internal_research || {
@@ -427,6 +456,8 @@ export function readDiscussionResearchContext({ workspaceRoot, batchId, candidat
     },
   }));
   const openQuestions = internalResearch.flatMap((item) => item.internal_research?.divergence_directions || []).map((item) => item.question || item.statement).filter(Boolean);
+  const materials = (report.verified_research_materials || []).filter((item) => list(item.anchor_event_ids || item.event_ids).some((id) => matchedIds.has(String(id))));
+  const researchReports = (report.research_reports || []).filter((item) => matchedIds.has(String(item.event_id)));
   const generated = readJson(path.join(sourceDir, 'topic-candidate-generation.json'))?.items || [];
   const exact = generated.find((item) => {
     const ids = new Set((item.event_ids || []).map(String));
@@ -446,6 +477,9 @@ export function readDiscussionResearchContext({ workspaceRoot, batchId, candidat
     internal_research: internalResearch,
     inter_event_research: relations,
     relations,
+    reference_events: referenceEvents,
+    verified_research_materials: materials,
+    research_reports: researchReports,
     topic_candidates: generatedTopics,
     topic_candidate: generatedTopic ? { ...generatedTopic, angle: generatedTopic.angle || null, thesis: generatedTopic.thesis || null } : { status: 'provisional', type: matched.length > 1 ? 'dual_event_relation' : 'single_event', angle: null, thesis: null, discussion_question: question, is_author_stance: false, note: '候选命题只用于编辑确认，不代表作者最终立场。' },
     evidence_boundary: { open_questions: openQuestions, note: generatedTopic || generatedTopics.length ? '研判已形成候选选题；角度与作者命题仍需编辑会确认。' : '当前只提供事件内和事件间研判，尚未形成可直接发布的候选选题。' },

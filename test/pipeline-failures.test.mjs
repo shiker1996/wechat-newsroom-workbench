@@ -190,12 +190,12 @@ test('研判错误分类并持久化为不可跳过的阶段失败',t=>{
   assert.equal(failure.error_code,'empty_brainstorm');assert.equal(failure.detail.skippable,false);
 });
 
-test('研判阶段失败可整体重试并在成功后解决',async t=>{
+test('阶段3研判失败优先以阶段3模式重试并在成功后解决',async t=>{
   const {root,store}=workspace(t);const batch=store.createBatch({date:'2026-08-11',title:'研判重试'});
   const failure=store.recordPipelineFailure({batchId:batch.id,stage:'research',objectType:'stage',objectKey:'stage:research',
-    title:'事件研判',errorCode:'invalid_model_output',errorMessage:'JSON 无效',detail:{skippable:false}});
+    title:'事件研判',errorCode:'invalid_model_output',errorMessage:'阶段 3 模型输出 JSON 无效',detail:{phase:'topic_generation',skippable:false}});
   let calls=0;const response=await retryPipelineFailure({failureId:failure.id,batchId:batch.id,provider:'deepseek',store,gateway:{},
-    config:{workspaceRoot:root},researchRunner:async(input)=>{calls+=1;assert.equal(input.batchId,batch.id);return {candidates:3};}});
+    config:{workspaceRoot:root},researchRunner:async(input)=>{calls+=1;assert.equal(input.batchId,batch.id);assert.equal(input.resumeFrom,'topic_generation');return {candidates:3};}});
   assert.equal(calls,1);assert.deepEqual(response.result,{candidates:3});
   assert.equal(store.getPipelineFailure(failure.id).status,'resolved');
 });

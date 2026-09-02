@@ -70,9 +70,9 @@ test('维度统一选题：核心8混排 + 黑马2 + 候补3，事件回填入�
   assert.ok(eliminated.eliminationReason.length>0);
 });
 
-test('成稿线前置：F 低于 55 的候选不进入选题池', () => {
+test('研判复盘期间：完整候选进入选题池，暂不按 F 截断', () => {
   const source = fs.readFileSync(new URL('../server/features/research/application/research-pipeline.mjs', import.meta.url), 'utf8');
-  assert.match(source, /const DRAFT_FLOOR = 55/);
+  assert.match(source, /const DRAFT_FLOOR = 0/);
   assert.match(source, /draftable = breaking[\s\S]*item\.scoreStatus === 'ready'[\s\S]*item\.f >= DRAFT_FLOOR/);
   assert.match(source, /saveAnalyzedCandidates\(batchId,draftable\.map/);
 });

@@ -4,6 +4,7 @@
     "content.url.fetch": {"name":"网页正文读取","description":"读取指定网页并提取可引用的正文内容。","category":"信息获取"},
     "content.web.search": {"name":"网络搜索","description":"按查询词检索公开网页和参考资料。","category":"信息获取"},
     "content.news.search": {"name":"新闻搜索","description":"检索带来源和发布时间的新闻结果。","category":"信息获取"},
+    "content.research.search": {"name":"研判关系搜索","description":"为事件内信号和事件间关系发现补充公开网页与新闻样本。","category":"信息获取"},
     "content.document.search": {"name":"文档检索","description":"从已授权的知识库或文档目录检索材料。","category":"信息获取"},
     "content.repository.inspect": {"name":"代码仓库分析","description":"核验代码仓库的元数据、README、版本与安装入口。","category":"信息获取"},
     "content.passage.retrieve": {"name":"文章段落检索","description":"从文章内容池中检索可复用或可引用的相关段落。","category":"内容检索"},

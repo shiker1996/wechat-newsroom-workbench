@@ -9,7 +9,8 @@
         "server/platform/integrations/information-search.mjs",
         "server/platform/integrations/local-project-reader.mjs",
         "server/platform/integrations/repository-inspector.mjs",
-        "server/platform/integrations/source-fetcher.mjs"
+        "server/platform/integrations/source-fetcher.mjs",
+        "server/features/research/application/research-search-stage.mjs"
       ],
       "dependencies": [
         {
@@ -35,6 +36,14 @@
           "adapterStatus": "ready",
           "triggerPolicy": "code-path",
           "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "content.research.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "research-material"
         },
         {
           "capability": "content.document.search",

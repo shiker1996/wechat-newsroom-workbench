@@ -25,6 +25,15 @@ function bindLogs() {
   });
 }
 
+function discussionOutputForDisplay(item) {
+  const raw = String(item.output_text || '').trim();
+  if (item.subtype !== 'discussion-research' || !raw) return { text: raw, raw: '' };
+  const heading = raw.match(/^[ \t]*#[ \t]+事件研判报告[ \t]*$/mu);
+  if (!heading) return { text: raw, raw: '' };
+  const text = raw.slice(heading.index).trim();
+  return { text, raw: text === raw ? '' : raw };
+}
+
 // 模型调用日志：点击展开调用详情（元信息、文本输出、推理过程、原生工具调用）
 function renderModelDetail(item, logKey) {
   const detailKey = escapeHtml(`${logKey}:detail`);
@@ -52,8 +61,12 @@ function renderModelDetail(item, logKey) {
   const toolBlock = toolCalls.length
     ? `<details class="log-tool-calls" data-log-detail="${escapeHtml(`${logKey}:tools`)}"><summary>原生工具调用（${toolCalls.length}）</summary><pre class="log-output">${escapeHtml(JSON.stringify(toolCalls, null, 2))}</pre></details>`
     : "";
-  const outputBlock = item.output_text
-    ? `<pre class="log-output">${escapeHtml(item.output_text)}</pre>`
+  const displayOutput = discussionOutputForDisplay(item);
+  const rawOutputBlock = displayOutput.raw
+    ? `<details class="log-raw-output"><summary>原始输出（已隐藏前置进度文本）</summary><pre class="log-output">${escapeHtml(displayOutput.raw)}</pre></details>`
+    : "";
+  const outputBlock = displayOutput.text
+    ? `<pre class="log-output">${escapeHtml(displayOutput.text)}</pre>${rawOutputBlock}`
     : toolCalls.length
       ? '<p class="log-output-empty">（本轮无文本输出，已留档原生工具调用）</p>'
       : item.reasoning_text

@@ -33,6 +33,16 @@
       "riskLevel": "local-write"
     },
     {
+      "id": "firecrawl-search",
+      "name": "Firecrawl 搜索",
+      "version": "1.0.0",
+      "kind": "tool",
+      "capabilities": [
+        "content.research.search"
+      ],
+      "riskLevel": "network-read"
+    },
+    {
       "id": "local-passage-retrieval",
       "name": "本地段落检索",
       "version": "1.0.0",
@@ -235,7 +245,9 @@
       "id": "discussion-researcher",
       "name": "讨论研判编辑",
       "requiredCapabilities": [],
-      "optionalCapabilities": []
+      "optionalCapabilities": [
+        "content.web.search"
+      ]
     },
     {
       "id": "editorial-room-chat",
@@ -515,7 +527,8 @@
         "server/platform/integrations/information-search.mjs",
         "server/platform/integrations/local-project-reader.mjs",
         "server/platform/integrations/repository-inspector.mjs",
-        "server/platform/integrations/source-fetcher.mjs"
+        "server/platform/integrations/source-fetcher.mjs",
+        "server/features/research/application/research-search-stage.mjs"
       ],
       "dependencies": [
         {
@@ -541,6 +554,14 @@
           "adapterStatus": "ready",
           "triggerPolicy": "code-path",
           "resultPolicy": "fact-material"
+        },
+        {
+          "capability": "content.research.search",
+          "requirement": "conditional",
+          "failurePolicy": "continue-with-warning",
+          "adapterStatus": "ready",
+          "triggerPolicy": "code-path",
+          "resultPolicy": "research-material"
         },
         {
           "capability": "content.document.search",
@@ -664,6 +685,12 @@
       "capabilities": [
         "diagram.echarts.render",
         "diagram.mermaid.render"
+      ]
+    },
+    {
+      "sourceFile": "server/features/research/application/research-search-stage.mjs",
+      "capabilities": [
+        "content.research.search"
       ]
     },
     {

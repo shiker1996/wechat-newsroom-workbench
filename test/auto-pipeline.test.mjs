@@ -7,7 +7,7 @@ test('自动任务类型串联打标、事件卡与事件研判', () => {
   const manager = fs.readFileSync(new URL('../server/platform/jobs/ai-job-manager.mjs', import.meta.url), 'utf8');
   const handlers = fs.readFileSync(new URL('../server/features/batches/application/ai-job-handlers.mjs', import.meta.url), 'utf8');
   const autoBranch = fs.readFileSync(new URL('../server/features/batches/application/auto-pipeline.mjs', import.meta.url), 'utf8');
-  assert.deepEqual(AI_JOB_TYPES, ['tag','retag','event-cards','research','breaking-analysis','article','daily','tutorial','typeset','social-card','social-card-beautify','cover-image','auto']);
+  assert.deepEqual(AI_JOB_TYPES, ['tag','retag','event-cards','research','pipeline-failure-retry','breaking-analysis','article','daily','tutorial','typeset','social-card','social-card-beautify','cover-image','auto']);
   assert.doesNotMatch(manager, /createAiJobHandlers/);
   assert.match(handlers, /\['auto'/);
   assert.match(autoBranch, /runBreakingAnalysisPipeline/);

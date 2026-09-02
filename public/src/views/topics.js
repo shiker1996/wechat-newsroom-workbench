@@ -52,6 +52,7 @@ const researchRelationLabels = {
   sequence: "前后变化",
   response: "回应关系",
   comparison: "对比关系",
+  counterexample: "反例关系",
 };
 
 function uniqueBy(items, keyOf) {
@@ -84,12 +85,13 @@ function researchSignalList(items = []) {
   return `<div class="candidate-research-signal-grid">${items.map((item) => `<article class="candidate-research-signal"><span class="research-signal-label">${escapeHtml(researchSignalLabels[item.kind] || "观察点")}</span><p>${escapeHtml(item.statement || "暂无说明")}</p>${item.eventTitles?.length ? `<small>涉及：${escapeHtml(item.eventTitles.join("、"))}</small>` : ""}</article>`).join("")}</div>`;
 }
 
-function relationView(item, titleById) {
+function relationView(item, titleById, referenceTitleById = new Map()) {
   const names = (item.event_ids || []).map((id) => titleById.get(String(id)) || `事件 ${String(id).slice(0, 8)}`).filter(Boolean);
+  const referenceNames = (item.reference_event_ids || []).map((id) => referenceTitleById.get(String(id)) || `外部参考 ${String(id).slice(0, 8)}`).filter(Boolean);
   const temporal = String(item.temporal_order || "");
   const temporalText = item.relation_label || researchRelationLabels[item.relation_kind] || (temporal.includes("_before_") ? "时间上前后相接" : "时间先后仍待确认");
   const dimensions = (item.shared_dimensions || []).filter(Boolean).join("、");
-  return { ...item, names, label: researchRelationLabels[item.relation_kind] || researchRelationLabels[item.relation_type] || "事件关系", temporalText, dimensions };
+  return { ...item, names: [...names, ...referenceNames], label: researchRelationLabels[item.relation_kind] || researchRelationLabels[item.relation_type] || "事件关系", temporalText, dimensions };
 }
 
 function researchContextHtml(context) {
@@ -97,29 +99,43 @@ function researchContextHtml(context) {
   const scope = context.scope?.events || [];
   const signals = context.internal_research || context.internal_signals || [];
   const relations = context.inter_event_research || context.relations || [];
+  const materials = context.verified_research_materials || context.research_materials || [];
+  const reports = context.research_reports || [];
   const topicCandidates = context.topic_candidates || (context.topic_candidate?.candidate_title ? [context.topic_candidate] : []);
   const titleById = new Map(scope.map((item) => [String(item.event_id), item.title || `事件 ${String(item.event_id).slice(0, 8)}`]));
+  const referenceTitleById = new Map((context.reference_events || []).map((item) => [String(item.reference_id), item.title || `外部参考 ${String(item.reference_id).slice(0, 8)}`]));
   const signalGroups = researchSignalGroups(signals);
-  const relationGroups = uniqueBy(relations, (item) => `${item.relation_kind || item.relation_type || "relation"}|${[...(item.event_ids || [])].map(String).sort().join(",")}`).map((item) => relationView(item, titleById));
-  const relationItemHtml = (item) => `<article class="candidate-research-relation"><div><span class="research-relation-label">${escapeHtml(item.label)}</span><span class="research-confidence">${escapeHtml(item.confidence === "high" ? "较强依据" : item.confidence === "medium" ? "有一定依据" : "待进一步确认")}</span></div><p>${escapeHtml(item.relationship_statement || item.names.join(" 与 "))}</p><small>涉及：${escapeHtml(item.names.join("、"))}${item.dimensions ? ` · 研判依据：${escapeHtml(item.dimensions)}` : ""}</small></article>`;
+  const relationGroups = uniqueBy(relations, (item) => `${item.relation_kind || item.relation_type || "relation"}|${[...(item.event_ids || []), ...(item.reference_event_ids || [])].map(String).sort().join(",")}`).map((item) => relationView(item, titleById, referenceTitleById));
+  const relationById = new Map(relationGroups.map((item) => [String(item.relation_id || ""), item]));
+  const topicRelationHtml = (topic) => {
+    const linked = [...new Set((topic.relation_ids || []).map(String))].map((id) => relationById.get(id)).filter(Boolean);
+    if (!linked.length) return "";
+    return `<p><b>关系来源：</b>${linked.map((item) => `${escapeHtml(item.relation_id || "关系")} · ${escapeHtml(item.label)}：${escapeHtml(item.relationship_statement || item.names.join(" 与 "))}`).join("；")}</p>`;
+  };
+  const relationItemHtml = (item) => `<article class="candidate-research-relation"><div><span class="research-relation-label">${escapeHtml(item.label)}</span><span class="research-confidence">${escapeHtml(item.confidence === "high" ? "较强依据" : item.confidence === "medium" ? "有一定依据" : "待进一步确认")}</span></div><p>${escapeHtml(item.relationship_statement || item.names.join(" 与 "))}</p>${item.differences?.length ? `<small>具体差异：${escapeHtml(item.differences.join("；"))}</small>` : ""}<small>涉及：${escapeHtml(item.names.join("、"))}${item.dimensions ? ` · 研判依据：${escapeHtml(item.dimensions)}` : ""}${item.reference_event_ids?.length ? ` · 外部参考：${escapeHtml(item.reference_event_ids.join("、"))}` : ""}</small></article>`;
   const relationHtml = relationGroups.length ? relationGroups.map(relationItemHtml).join("") : '<p class="muted">目前没有足够证据形成前后、回应、对比或趋势关系；不会因为关键词相同强行拼题。</p>';
   const openQuestions = uniqueBy([
     ...(context.evidence_boundary?.open_questions || []),
     ...signals.flatMap((item) => (item.internal_research?.divergence_directions || item.divergence_directions || []).map((signal) => signal.question || signal.statement)),
   ], (item) => item).filter(Boolean);
   const eventNames = uniqueBy(scope.map((item) => item.title).filter(Boolean), (item) => item);
+  const referenceEvents = context.reference_events || [];
+  const referenceHtml = referenceEvents.length ? `<section class="candidate-research-involved"><h3>外部参考材料</h3><p class="muted">这些材料只用于支持对比、趋势或反例关系，不属于本批次 Top-K 事件，也不能直接当作本文事实。</p><ul>${referenceEvents.map((item) => `<li>${escapeHtml(item.title || item.reference_id || "未命名参考")}${item.evidence_level ? `（${escapeHtml(item.evidence_level)}）` : ""}</li>`).join("")}</ul></section>` : "";
   const stageLabel = topicCandidates.length ? "已形成候选选题" : "研判中";
   const signalCard = (item) => `<article class="candidate-research-signal"><span class="research-signal-label">${escapeHtml(researchSignalLabels[item.kind] || item.label || "研判点")}</span><p>${escapeHtml(item.statement || item.question || "暂无说明")}</p>${item.expected ? `<small>预期：${escapeHtml(item.expected)}</small>` : ""}${item.question && item.statement !== item.question ? `<small>可继续追问：${escapeHtml(item.question)}</small>` : ""}${item.eventTitles?.length ? `<small>涉及：${escapeHtml(item.eventTitles.join("、"))}</small>` : ""}</article>`;
   const signalSection = (title, kind, empty) => { const values = signalGroups.filter((item) => item.kind === kind); return `<section class="research-subsection"><div class="research-section-head"><h4>${title}</h4><span>${values.length} 条</span></div>${values.length ? `<div class="candidate-research-signal-grid">${values.map(signalCard).join("")}</div>` : `<p class="muted">${empty}</p>`}</section>`; };
-  const topicHtml = topicCandidates.length ? topicCandidates.map((topic) => `<article class="research-topic-seed"><span class="research-signal-label">候选选题 · ${escapeHtml(topic.topic_type || "讨论命题")}</span><h4>${escapeHtml(topic.candidate_title || topic.title || "未命名候选")}</h4><p><b>核心问题：</b>${escapeHtml(topic.core_question || topic.discussion_question || "待编辑确认")}</p><p><b>切入角度：</b>${escapeHtml(topic.angle || "待编辑确认")}</p><p><b>命题种子：</b>${escapeHtml(topic.thesis_seed || "待编辑确认")}</p><small>仅供编辑会确认，不代表作者最终立场。</small></article>`).join("") : '<p class="muted">当前研判还没有形成候选选题，不展示泛化的新闻复述。</p>';
+  const topicHtml = topicCandidates.length ? topicCandidates.map((topic) => `<article class="research-topic-seed"><span class="research-signal-label">候选选题 · ${escapeHtml(topic.topic_type || "讨论命题")}</span><h4>${escapeHtml(topic.candidate_title || topic.title || "未命名候选")}</h4><p><b>核心问题：</b>${escapeHtml(topic.core_question || topic.discussion_question || "待编辑确认")}</p><p><b>切入角度：</b>${escapeHtml(topic.angle || "待编辑确认")}</p><p><b>命题种子：</b>${escapeHtml(topic.thesis_seed || "待编辑确认")}</p>${topicRelationHtml(topic)}<small>仅供编辑会确认，不代表作者最终立场。</small></article>`).join("") : '<p class="muted">当前研判还没有形成候选选题，不展示泛化的新闻复述。</p>';
+  const materialHtml = materials.length ? `<section class="candidate-research-materials"><div class="research-section-head"><h3>已验证写作素材</h3><span>${materials.length} 条</span></div><div class="candidate-research-signal-grid">${materials.map((item) => `<article class="candidate-research-signal"><span class="research-signal-label">${escapeHtml(item.material_type || "研判素材")}</span><p>${escapeHtml(item.statement || item.interpretation || "暂无说明")}</p>${item.expected ? `<small>预期：${escapeHtml(item.expected)}</small>` : ""}${item.observed ? `<small>观察：${escapeHtml(item.observed)}</small>` : ""}${item.gap ? `<small>落差：${escapeHtml(item.gap)}</small>` : ""}${item.interpretation ? `<small>写作解释：${escapeHtml(item.interpretation)}</small>` : ""}${item.writing_angles?.length ? `<small>可写角度：${escapeHtml(item.writing_angles.join("；"))}</small>` : ""}${item.thesis_seeds?.length ? `<small>观点种子：${escapeHtml(item.thesis_seeds.join("；"))}</small>` : ""}</article>`).join("")}</div></section>` : '<section class="candidate-research-materials"><p class="muted">当前没有经过证据验证的写作素材。</p></section>';
+  const reportHtml = reports.length ? `<section class="candidate-research-reports"><div class="research-section-head"><h3>模型原始研判报告</h3><span>${reports.length} 个事件</span></div>${reports.map((item) => `<details open><summary>${escapeHtml(item.title || item.event_id || "事件研判")}</summary><pre>${escapeHtml(item.report_markdown || "模型未返回报告")}</pre></details>`).join("")}</section>` : "";
   return `<div class="candidate-research-summary"><div class="candidate-research-badges"><span>${stageLabel}</span><span>T 榜前 ${escapeHtml(context.scope?.top_k ?? "—")}</span><span>涉及 ${scope.length} 个事件</span>${context.event_value == null ? "" : `<span>事件价值 T ${escapeHtml(context.event_value)}</span>`}</div>
     <p class="muted">先看研判如何形成选题，再回看事件事实。这里不是新闻摘要，也不是作者最终观点。</p>
     <section class="candidate-research-topic-section"><div class="research-section-head"><h3>由研判形成的候选选题</h3><span>${topicCandidates.length} 条</span></div>${topicHtml}</section>
     ${eventNames.length ? `<section class="candidate-research-involved"><h3>涉及哪些事件</h3><div class="research-event-chips">${eventNames.map((name) => `<span>${escapeHtml(name)}</span>`).join("")}</div></section>` : ""}
-    <section class="candidate-research-internal"><div class="research-section-head"><h3>事件内部的研判</h3><span>反常 / 利益冲突 / 可发散</span></div>${signalSection("反常点", "anomaly", "暂无可确认的反常点")}${signalSection("利益冲突", "interest_conflict", "事件卡没有提供可确认的参与方利益冲突；来源分歧不直接等同于利益冲突")}${signalSection("可发散方向", "divergence", "暂无可发散方向")}</section>
+    ${reportHtml}${materialHtml}<section class="candidate-research-internal"><div class="research-section-head"><h3>事件内部的研判</h3><span>反常 / 利益冲突 / 可发散</span></div>${signalSection("反常点", "anomaly", "暂无可确认的反常点")}${signalSection("利益冲突", "interest_conflict", "事件卡没有提供可确认的参与方利益冲突；来源分歧不直接等同于利益冲突")}${signalSection("可发散方向", "divergence", "暂无可发散方向")}</section>
     <section class="candidate-research-inter-event"><div class="research-section-head"><h3>事件之间的研判</h3><span>前后 / 回应 / 对比 / 趋势</span></div>${relationHtml}</section>
+    ${referenceHtml}
     <section class="candidate-research-boundary"><div class="research-section-head"><h3>写作前还要确认</h3><span>不是已确认事实</span></div>${openQuestions.length ? `<ul>${openQuestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : '<p class="muted">当前没有额外的待确认问题。</p>'}</section>
-    <details class="candidate-research-raw"><summary>查看原始证据字段（高级）</summary><pre>${escapeHtml(JSON.stringify({ scope: context.scope, internal_research: signals, inter_event_research: relations }, null, 2))}</pre></details>
+    <details class="candidate-research-raw"><summary>查看原始证据字段（高级）</summary><pre>${escapeHtml(JSON.stringify({ scope: context.scope, internal_research: signals, inter_event_research: relations, reference_events: referenceEvents }, null, 2))}</pre></details>
   </div>`;
 }
 

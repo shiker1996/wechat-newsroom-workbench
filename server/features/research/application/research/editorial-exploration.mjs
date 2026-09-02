@@ -5,6 +5,103 @@ function parseModelJson(result, store) {
   return parseSharedModelJson(result, { store, label: '研判模型' });
 }
 
+const list = (value) => Array.isArray(value) ? value : [];
+const text = (value, max = 500) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+function compactResearchItem(item = {}) {
+  return {
+    event_id: item.event_id,
+    signal_id: item.signal_id,
+    kind: item.kind,
+    status: item.status || item.research_status,
+    statement: text(item.statement, 500),
+    question: text(item.question, 400),
+    expected: text(item.expected, 300),
+    observed: text(item.observed, 300),
+    gap: text(item.gap, 300),
+    parties: list(item.parties).map((value) => text(value, 100)).filter(Boolean).slice(0, 6),
+    issue: text(item.issue, 300),
+    difference: text(item.difference, 300),
+    baseline: text(item.baseline, 300),
+    impact: text(item.impact, 400),
+    writing_angles: list(item.writing_angles).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+    thesis_seeds: list(item.thesis_seeds).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+    evidence_source_ids: list(item.evidence_source_ids).map((value) => text(value, 120)).filter(Boolean).slice(0, 8),
+    evidence_levels: list(item.evidence_levels).map((value) => text(value, 40)).filter(Boolean),
+  };
+}
+
+function researchBasisForCandidate(item = {}) {
+  const topic = item.topic_candidate || item.research_context?.topic_candidate || {};
+  const context = item.research_context || {};
+  const signalRefs = new Set(list(topic.internal_signal_refs || topic.signal_refs).map((value) => String(typeof value === 'object' ? value.signal_id || value.id : value)));
+  const relationIds = new Set(list(topic.relation_ids).map(String));
+  const internalResearch = list(context.internal_signals).flatMap((eventResearch) => {
+    const eventId = String(eventResearch?.event_id || '');
+    return [
+      ...list(eventResearch?.anomalies || eventResearch?.anomaly_points),
+      ...list(eventResearch?.conflicts || eventResearch?.interest_conflicts),
+      ...list(eventResearch?.divergences || eventResearch?.divergence_directions),
+    ].map((signal) => ({ ...signal, event_id: eventId }));
+  });
+  const selectedSignals = internalResearch
+    .filter((signal) => !signalRefs.size || signalRefs.has(String(signal.signal_id)))
+    .map(compactResearchItem);
+  const allRelations = list(context.relations || context.inter_event_research);
+  const selectedRelations = allRelations
+    .filter((relation) => !relationIds.size || relationIds.has(String(relation.relation_id)))
+    .map((relation) => ({
+      relation_id: relation.relation_id,
+      relation_kind: relation.relation_kind,
+      status: relation.status,
+      event_ids: list(relation.event_ids).map(String),
+      reference_event_ids: list(relation.reference_event_ids).map(String),
+      relationship_statement: text(relation.relationship_statement, 600),
+      relationship_question: text(relation.relationship_question, 400),
+      differences: list(relation.differences).map((value) => text(value, 240)).filter(Boolean).slice(0, 6),
+      comparison_basis: list(relation.comparison_basis).slice(0, 6),
+      insight: text(relation.insight, 500),
+      writing_angles: list(relation.writing_angles).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+      thesis_seeds: list(relation.thesis_seeds).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+      refutes: text(relation.refutes, 300),
+      evidence_source_ids: list(relation.evidence_source_ids).map((value) => text(value, 120)).filter(Boolean).slice(0, 8),
+      evidence_levels: list(relation.evidence_levels).map((value) => text(value, 40)).filter(Boolean),
+    }));
+  const materials = list(context.verified_research_materials)
+    .filter((material) => !list(topic.material_ids).length || list(topic.material_ids).map(String).includes(String(material?.material_id)))
+    .map((material) => ({
+      material_id: material.material_id,
+      material_type: material.material_type,
+      status: material.status,
+      anchor_event_ids: list(material.anchor_event_ids).map(String),
+      relation_kind: material.relation_kind,
+      statement: text(material.statement, 600),
+      interpretation: text(material.interpretation, 500),
+      question: text(material.question, 400),
+      writing_angles: list(material.writing_angles).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+      thesis_seeds: list(material.thesis_seeds).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
+      evidence_source_ids: list(material.evidence_source_ids).map((value) => text(value, 120)).filter(Boolean).slice(0, 8),
+      evidence_levels: list(material.evidence_levels).map((value) => text(value, 40)).filter(Boolean),
+    }));
+  const evidenceSourceIds = [...new Set([
+    ...list(topic.evidence_source_ids),
+    ...selectedSignals.flatMap((signal) => signal.evidence_source_ids),
+    ...selectedRelations.flatMap((relation) => relation.evidence_source_ids),
+    ...materials.flatMap((material) => material.evidence_source_ids),
+  ].map((value) => text(value, 120)).filter(Boolean))];
+  return {
+    rule: '选题只能从以下已验证/待复核研判素材发展；事件卡只作背景，不能替代研判依据。',
+    material_ids: list(topic.material_ids).map(String),
+    internal_signal_refs: list(topic.internal_signal_refs || topic.signal_refs).map((value) => String(typeof value === 'object' ? value.signal_id || value.id : value)),
+    relation_ids: list(topic.relation_ids).map(String),
+    evidence_source_ids: evidenceSourceIds,
+    internal_research: selectedSignals,
+    inter_event_research: selectedRelations,
+    verified_research_materials: materials,
+    evidence_boundary: context.evidence_boundary || null,
+  };
+}
+
 export async function brainstorm(gateway, store, selected, account, batchId, provider, onProgress, workspaceRoot) {
   const { prompt: brainstormSystem } = selectionPrompt({ workspaceRoot, skillName: 'hotspot-brainstorm' });
   const cards = [];
@@ -14,6 +111,7 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
   const candidates = selected.map((item, index) => ({
     ...item,
     candidateId: `C${String(index + 1).padStart(3, '0')}`,
+    research_basis: researchBasisForCandidate(item),
     candidateAliases: [...new Set([item.candidateId, item.candidate_id, item.eventId].map((value) => String(value ?? '').trim()).filter(Boolean))],
   }));
   const candidateForOutput = (raw, group) => {
@@ -22,9 +120,13 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
   };
   async function processGroup(group, label, retry = false) {
     onProgress(`探索脑暴 ${label}（已完成 ${cards.length}/${selected.length}）`);
+    const promptCandidates = group.map((candidate) => ({
+      ...candidate,
+      research_basis: candidate.research_basis || researchBasisForCandidate(candidate),
+    }));
     const result = await gateway.complete({ provider, purpose: 'hotspot-brainstorm-explore', batchId, jsonMode: true,
-      messages: [{ role: 'system', content: brainstormSystem, protected: true },
-        { role: 'user', content: `${retry ? '【极简重试】每个字符串不超过40个汉字，严格闭合JSON。\n' : ''}【账号与作者资产】\n${account.map((x) => `${x.label}:\n${x.content}`).join('\n\n')}\n\n【候选】\n${JSON.stringify(group)}`, protected: true }],
+       messages: [{ role: 'system', content: brainstormSystem, protected: true },
+        { role: 'user', content: `${retry ? '【极简重试】每个字符串不超过40个汉字，严格闭合JSON。\n' : ''}【账号与作者资产】\n${account.map((x) => `${x.label}:\n${x.content}`).join('\n\n')}\n\n【脑暴输入规则】\n只允许基于每条候选中的 research_basis 生成角度、命题和包装。research_basis 为空，或其中没有任何研判报告/研判素材时，不得把事件卡摘要自行改造成选题；应返回 NO_ANGLE，并说明缺少研判依据。候选本身未回填 material_ids、internal_signal_refs 或 relation_ids，不等于没有研判依据；只要 research_basis 中存在对应报告或素材即可继续脑暴。候选标题只是研判阶段的临时种子，不是新的事实来源。\n\n【候选】\n${JSON.stringify(promptCandidates)}`, protected: true }],
       maxOutputTokens: Math.min(6500, providerConfig.maxOutputTokens) });
     let parsed;
     try { parsed = parseModelJson(result, store); }

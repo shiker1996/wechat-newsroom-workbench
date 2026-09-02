@@ -102,7 +102,7 @@ function publicProvider(name, provider, configured) {
     supportsNativeTools: provider.supportsNativeTools === true,
     supportsToolCallStreaming: provider.supportsToolCallStreaming === true,
     enabled: provider.enabled !== false,
-    supportsWebSearch: !!provider.webSearchConfig,
+    supportsWebSearch: provider.protocol === 'responses' || !!provider.webSearchConfig,
   };
 }
 
@@ -137,7 +137,7 @@ export class ModelGateway {
     return { providerName, provider, apiKey };
   }
 
-  async rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], nativeTools = false }) {
+  async rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], toolChoice = null, nativeTools = false }) {
     const controller = new AbortController();
     const detachAbort = attachAbort(controller, signal);
     let timedOut = false;
@@ -145,7 +145,7 @@ export class ModelGateway {
     try {
       const modes = jsonMode && provider.supportsJsonMode === true && !tools.length ? [true, false] : [false];
       for (const useJsonMode of modes) {
-        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, webSearch, thinking, tools, nativeTools });
+        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, thinking, tools, toolChoice, nativeTools });
         const response = await fetchWithRetry(responsesEndpoint(provider.baseUrl), {
           method: 'POST', signal: controller.signal,
           headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(payload),
@@ -163,7 +163,7 @@ export class ModelGateway {
     } finally { detachAbort(); clearTimeout(timer); }
   }
 
-  async *rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], nativeTools = false }) {
+  async *rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], toolChoice = null, nativeTools = false }) {
     const controller = new AbortController();
     const detachAbort = attachAbort(controller, signal);
     let timedOut = false;
@@ -171,7 +171,7 @@ export class ModelGateway {
     try {
       const modes = jsonMode && provider.supportsJsonMode === true && !tools.length ? [true, false] : [false];
       for (const useJsonMode of modes) {
-        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, webSearch, thinking, tools, nativeTools, stream: true });
+        const payload = responsesPayload({ provider, messages, maxOutputTokens, temperature, jsonMode: useJsonMode, thinking, tools, toolChoice, nativeTools, stream: true });
         const response = await fetchWithRetry(responsesEndpoint(provider.baseUrl), {
           method: 'POST', signal: controller.signal,
           headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(payload),
@@ -195,9 +195,9 @@ export class ModelGateway {
     } finally { detachAbort(); clearTimeout(timer); }
   }
 
-  async rawComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], nativeTools = false }) {
+  async rawComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], toolChoice = null, nativeTools = false }) {
     if ((provider.protocol || 'chat_completions') === 'responses') {
-      return this.rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, tools, nativeTools });
+      return this.rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, tools, toolChoice, nativeTools });
     }
     const controller = new AbortController();
     const detachAbort=attachAbort(controller,signal);
@@ -210,6 +210,7 @@ export class ModelGateway {
         payload[provider.maxTokensField || 'max_tokens'] = maxTokens;
         Object.assign(payload, thinkingPayload(thinking, provider));
         if (tools.length) payload.tools = tools;
+        if (toolChoice) payload.tool_choice = toolChoice;
         if(useJsonMode && !tools.length)payload.response_format={type:'json_object'};
         if(webSearch && provider.webSearchConfig) { payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue; }
         const response = await fetchWithRetry(endpoint(provider.baseUrl), {
@@ -246,9 +247,9 @@ export class ModelGateway {
     }
   }
 
-  async *rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], nativeTools = false }) {
+  async *rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, onEvent = () => {}, tools = [], toolChoice = null, nativeTools = false }) {
     if ((provider.protocol || 'chat_completions') === 'responses') {
-      yield* this.rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, nativeTools });
+      yield* this.rawResponsesStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, toolChoice, nativeTools });
       return;
     }
     const controller = new AbortController();
@@ -264,6 +265,7 @@ export class ModelGateway {
         Object.assign(payload, thinkingPayload(thinking, provider));
         payload.stream_options = { include_usage: true };
         if (tools.length) payload.tools = tools;
+        if (toolChoice) payload.tool_choice = toolChoice;
         if (useJsonMode && !tools.length) payload.response_format = { type: 'json_object' };
         if (webSearch && provider.webSearchConfig) payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue;
         const response = await fetchWithRetry(endpoint(provider.baseUrl), {
@@ -293,14 +295,14 @@ export class ModelGateway {
     }
   }
 
-  async rawStreamComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, onDelta = () => {}, onEvent = () => {}, thinking, signal, tools = [], nativeTools = false }, onThinking = () => {}) {
+  async rawStreamComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, onDelta = () => {}, onEvent = () => {}, thinking, signal, tools = [], toolChoice = null, nativeTools = false }, onThinking = () => {}) {
     let content = '';
     let reasoning = '';
     let usage = {};
     let id = null;
     let finishReason = null;
     const toolCalls = [];
-    for await (const event of this.rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, nativeTools })) {
+    for await (const event of this.rawStreamEvents({ providerName, provider, apiKey, messages, maxOutputTokens, temperature, jsonMode, webSearch, thinking, signal, onEvent, tools, toolChoice, nativeTools })) {
       if (event.type === 'text-delta') {
         content += event.text;
         onDelta(event.text, content);
@@ -333,7 +335,7 @@ export class ModelGateway {
     const outputBudget = outputBudgetFor({ purpose: input.purpose, providerMax: provider.maxOutputTokens, requested: input.maxOutputTokens, adaptive: false });
     yield* this.rawStreamEvents({ providerName, provider, apiKey, messages: input.messages || [],
       maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode === true,
-      webSearch: input.webSearch === true, thinking, signal: input.signal, tools: input.tools || [], nativeTools: input.nativeTools === true });
+      webSearch: input.webSearch === true, thinking, signal: input.signal, tools: input.tools || [], toolChoice: input.toolChoice || null, nativeTools: input.nativeTools === true });
   }
 
   // complete() 的 thinking 实时化：有当前任务接收器且本次 thinking 开启时，
@@ -362,8 +364,9 @@ export class ModelGateway {
     let context;
     const compressionUsage = { prompt_tokens: 0, completion_tokens: 0, calls: 0 };
     const webSearch = input.webSearch === true;
+    const toolChoice = input.toolChoice || null;
     // Tavily web search fallback for providers without native search
-    if (webSearch && !provider.webSearchConfig && this.config.tavily?.enabled) {
+    if (webSearch && input.webSearchFallback !== false && !provider.webSearchConfig && this.config.tavily?.enabled) {
       const tavilyApiKey = process.env[this.config.tavily.apiKeyEnv];
       if (tavilyApiKey) {
         const lastUserMsg = [...input.messages].reverse().find(m => m.role === 'user');
@@ -404,13 +407,13 @@ export class ModelGateway {
       try {
         result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: context.messages,
           maxOutputTokens: outputBudget.initial + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal,
-          tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking });
+          tools: input.tools || [], toolChoice, nativeTools: input.nativeTools === true }, { streamThinking });
       } catch (error) {
         // thinking 开启时推理可能吃光 max_tokens 导致内容为空（finish=length）：回落无思考重试一次
         if (thinking && /未返回流式文本内容/.test(String(error.message || ''))) {
           result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: context.messages,
             maxOutputTokens: outputBudget.initial, temperature: input.temperature, jsonMode: input.jsonMode, thinking: false, signal:input.signal,
-            tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking: false });
+            tools: input.tools || [], toolChoice, nativeTools: input.nativeTools === true }, { streamThinking: false });
         } else {
           throw error;
         }
@@ -447,7 +450,7 @@ export class ModelGateway {
         context = retryContext;
         result = await this.rawCompleteMaybeStream({ providerName, provider, apiKey, messages: retryContext.messages,
           maxOutputTokens: outputBudget.retry + thinkingReserve, temperature: input.temperature, jsonMode: input.jsonMode, thinking, signal:input.signal,
-          tools: input.tools || [], nativeTools: input.nativeTools === true }, { streamThinking });
+          tools: input.tools || [], toolChoice, nativeTools: input.nativeTools === true }, { streamThinking });
       }
       const promptTokens = Number(result.usage.prompt_tokens || 0) + Number(firstAttemptUsage?.prompt_tokens || 0) + Number(fallbackAttemptUsage?.prompt_tokens || 0);
       const completionTokens = Number(result.usage.completion_tokens || 0) + Number(firstAttemptUsage?.completion_tokens || 0) + Number(fallbackAttemptUsage?.completion_tokens || 0);
@@ -486,7 +489,7 @@ export class ModelGateway {
     const compressionUsage={prompt_tokens:0,completion_tokens:0,calls:0};
     try {
       const webSearch=input.webSearch===true;
-      if(webSearch&&!provider.webSearchConfig&&this.config.tavily?.enabled){
+      if(webSearch&&input.webSearchFallback!==false&&!provider.webSearchConfig&&this.config.tavily?.enabled){
         const apiKey=process.env[this.config.tavily.apiKeyEnv];
         if(apiKey){
           const lastUserMsg=[...input.messages].reverse().find(m=>m.role==='user');
@@ -510,13 +513,13 @@ export class ModelGateway {
       try {
         result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.initial+thinkingReserve,
           temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,onEvent:initialOnEvent,thinking,signal:input.signal,
-          tools:input.tools||[],nativeTools:input.nativeTools===true},onThinking);
+          tools:input.tools||[],toolChoice:input.toolChoice||null,nativeTools:input.nativeTools===true},onThinking);
       } catch (error) {
         // thinking 开启时推理可能吃光 max_tokens 导致内容为空（finish=length）：回落无思考重试一次
         if (thinking && /未返回流式文本内容/.test(String(error.message || ''))) {
           result=await this.rawStreamComplete({providerName,provider,apiKey,messages:context.messages,maxOutputTokens:outputBudget.initial,
             temperature:input.temperature,jsonMode:input.jsonMode,webSearch,onDelta:initialOnDelta,onEvent:initialOnEvent,thinking:false,signal:input.signal,
-            tools:input.tools||[],nativeTools:input.nativeTools===true},()=>{});
+            tools:input.tools||[],toolChoice:input.toolChoice||null,nativeTools:input.nativeTools===true},()=>{});
         } else {
           throw error;
         }

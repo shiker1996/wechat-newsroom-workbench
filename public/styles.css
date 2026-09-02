@@ -362,6 +362,7 @@ nav { flex:1;min-height:0;padding-top: 18px; display: grid; align-content:start;
 .candidate-research-raw { border-top: 1px dashed var(--line); padding-top: 12px; }
 .candidate-research-raw summary { cursor: pointer; color: var(--muted); font-size: 11px; }
 .candidate-research-raw pre { max-height: 300px; overflow: auto; padding: 12px; background: var(--ink); color: #c7e6dc; font: 10px/1.6 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-research-reports pre, .editorial-research-reports pre { max-height: 520px; overflow: auto; margin: 10px 0 0; padding: 14px; background: rgba(255,255,255,.65); color: var(--ink); font: 13px/1.75 var(--body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .candidate-quality-panel { margin-top: 16px; padding: 15px; border: 1px solid var(--accent); background: rgba(227,239,232,.32); }
 .candidate-quality-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .candidate-quality-panel h3 { margin: 0; font: 600 20px var(--display); }

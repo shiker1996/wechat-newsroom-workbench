@@ -49,6 +49,10 @@ export function wireResponsesInput(messages = [], { nativeTools = false } = {}) 
 
 export function responsesToolDefinitions(tools = []) {
   return tools.map((tool) => {
+    const builtinType = String(tool?.type || '').trim();
+    if (builtinType === 'web_search' || builtinType === 'web_search_2025_08_26') {
+      return { type: builtinType };
+    }
     const fn = tool?.function || tool || {};
     return {
       type: 'function',
@@ -70,7 +74,10 @@ export function responsesReasoningPayload(thinking, provider) {
   return { reasoning: { effort: provider.reasoningEffort || 'medium' } };
 }
 
-export function responsesPayload({ provider, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, tools = [], nativeTools = false, stream = false }) {
+export function responsesPayload({ provider, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, thinking, tools = [], toolChoice = null, nativeTools = false, stream = false }) {
+  // Responses API 的工具必须通过 tools 传入；联网搜索使用 DeepSeek 的内置
+  // web_search tool，不使用 Chat Completions 风格的 webSearch 顶层开关。
+  const responseTools = Array.isArray(tools) ? tools : [];
   const payload = {
     model: provider.model,
     input: wireResponsesInput(messages, { nativeTools }),
@@ -79,9 +86,9 @@ export function responsesPayload({ provider, messages, maxOutputTokens, temperat
   };
   if (stream) payload.stream = true;
   Object.assign(payload, responsesReasoningPayload(thinking, provider));
-  if (tools.length) payload.tools = responsesToolDefinitions(tools);
-  if (jsonMode && !tools.length) payload.text = { format: { type: 'json_object' } };
-  if (webSearch && provider.webSearchConfig) payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue;
+  if (responseTools.length) payload.tools = responsesToolDefinitions(responseTools);
+  if (toolChoice) payload.tool_choice = toolChoice;
+  if (jsonMode && !responseTools.length) payload.text = { format: { type: 'json_object' } };
   return payload;
 }
 
@@ -119,15 +126,25 @@ function normalizeResponsesUsage(usage = {}) {
 }
 
 export function normalizeResponsesToolCalls(data) {
-  return outputItems(data).filter((item) => item?.type === 'function_call').map((item, index) => {
+  return outputItems(data).flatMap((item, index) => {
+    if (item?.type === 'web_search_call') {
+      return [{
+        id: String(item.id || `web_search_${index + 1}`),
+        name: 'web_search',
+        input: item.action || item.input || {},
+        providerExecuted: true,
+        status: item.status || null,
+      }];
+    }
+    if (item?.type !== 'function_call') return [];
     const name = String(item.name || '').trim();
     if (!name) throw new Error(`工具调用 #${index + 1} 缺少名称`);
-    return {
+    return [{
       id: String(item.call_id || item.id || `call_${index + 1}`),
       name,
       input: parseToolArguments(item.arguments ?? item.input),
       providerExecuted: false,
-    };
+    }];
   });
 }
 

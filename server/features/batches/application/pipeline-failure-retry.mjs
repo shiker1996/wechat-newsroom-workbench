@@ -36,7 +36,11 @@ export async function retryPipelineFailure({ failureId, batchId, provider, store
     else if (failure.stage === 'collect' && failure.object_type === 'source') result = await retryTopSource({ failure, store, config, onProgress });
     else if (failure.stage === 'tag' && failure.hotspot_id) { result = await tagBatch({ gateway, store, batchId, provider, hotspotIds: [failure.hotspot_id], force: true, maxAgeHours: store.getBatch(batchId)?.max_age_hours || 168, workspaceRoot: config.workspaceRoot, onProgress }); if (result.failed || result.updated !== 1) throw new Error(result.failed ? '该热点重试后仍未返回有效标注' : '目标热点不在当前可打标范围内'); }
     else if (failure.stage === 'event-card') { const eventId = failure.detail?.eventId || failure.object_key.replace(/^event:/, ''); result = await ensureBatchEventCards({ gateway, store, batchId, provider, eventIds: [eventId], maxAgeHours: store.getBatch(batchId)?.max_age_hours || 168, workspaceRoot: config.workspaceRoot, onProgress }); if (result.failed.some((item) => item.event_id === eventId) || !result.clusters.some((item) => item.event_id === eventId && item.card)) throw new Error('该事件重试后仍未生成有效事件卡'); }
-    else if (failure.stage === 'research' && failure.object_type === 'stage') result = await researchRunner({ gateway, store, batchId, provider, maxAgeHours: store.getBatch(batchId)?.max_age_hours || 168, workspaceRoot: config.workspaceRoot, onProgress });
+    else if (failure.stage === 'research' && failure.object_type === 'stage') {
+      const phase = String(failure.detail?.phase || '');
+      const stage3Failure = phase === 'topic_generation' || /阶段\s*3/.test(String(failure.error_message || ''));
+      result = await researchRunner({ gateway, store, batchId, provider, maxAgeHours: store.getBatch(batchId)?.max_age_hours || 168, workspaceRoot: config.workspaceRoot, onProgress, ...(stage3Failure ? { resumeFrom: 'topic_generation' } : {}) });
+    }
     else throw new Error('该失败类型暂不支持单条重试');
     store.resolvePipelineFailure(failure.id); return { failure: store.getPipelineFailure(failure.id), result };
   } catch (error) { store.failPipelineFailureRetry(failure.id, error.message, { ...failure.detail, lastRetryError: error.message }); throw error; }
