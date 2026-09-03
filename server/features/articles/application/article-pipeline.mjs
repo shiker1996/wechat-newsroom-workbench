@@ -36,6 +36,24 @@ export {
 function writeFile(filePath,content) { fs.mkdirSync(path.dirname(filePath),{recursive:true}); const temp=`${filePath}.tmp`; fs.writeFileSync(temp,String(content).trimEnd()+'\n','utf8'); fs.renameSync(temp,filePath); return fs.statSync(filePath); }
 function cleanMarkdown(value) { return String(value||'').trim().replace(/^```(?:markdown)?\s*/i,'').replace(/\s*```$/,''); }
 function outputExcerpt(value,max=180) { return String(value||'').replace(/\s+/g,' ').trim().slice(0,max); }
+function complianceRepairNeedsRetry(original, repaired, issues = []) {
+  const source = String(original || '').trim();
+  const result = String(repaired || '').trim();
+  if (!result || result === source) return true;
+  const flaggedPhrases = issues.flatMap((issue) => {
+    const message = typeof issue === 'string' ? issue : String(issue?.message || '');
+    return [...message.matchAll(/'([^']{2,80})'|“([^”]{2,80})”|‘([^’]{2,80})’/g)]
+      .map((match) => match[1] || match[2] || match[3])
+      .filter((value) => value && !/^(?:来源|公告|媒体|作者|观点|事实|标题)$/.test(value));
+  });
+  if (flaggedPhrases.some((phrase) => source.includes(phrase) && result.includes(phrase))) return true;
+  const titleIssue = issues.some((issue) => {
+    const type = typeof issue === 'string' ? '' : String(issue?.type || '');
+    const message = typeof issue === 'string' ? issue : String(issue?.message || '');
+    return ['title', 'publication_compliance', 'financial'].includes(type) && /标题|高影响|绝对化|财经数字/.test(message);
+  });
+  return titleIssue && extractArticleTitle(source) === extractArticleTitle(result);
+}
 function visibleChars(markdown) { return articleLengthStatus(markdown,{min:0,max:Number.MAX_SAFE_INTEGER}).count; }
 function asArray(value,{emptyWords=false}={}) {
   if(Array.isArray(value))return value.filter((item)=>item!=null&&String(item).trim()!=='');
@@ -108,10 +126,14 @@ export function buildPublicationComplianceRepairPrompt({ factBase = {}, claimReg
 - 标题单独审核。高影响财经数字、负面主张和绝对化判断若没有在已核验事实中得到直接支持，必须从标题删除或改为克制的定性表达；优先把标题改成不含具体财经数字、不使用“失效”“失败”等绝对化结论的表述。
 - 标题或正文中的未核实判断必须改成明确的分析表达，例如“从……看”“本文关注的是……”或“这可能意味着……”，不能伪装成事实。
 - 争议、负面和动机判断必须明确归因到公告、公司、员工、媒体或作者分析；不得把作者解读写成公司已经承认的事实。
-- 事实中的数字、折价率、营收、分红和时间信息，必须就近使用事实基座登记的具体来源。保留数字时，在对应句末使用登记中的具体来源标题和 URL，例如“（来源：[公司公告](https://example.com)）”；不得只写“据媒体”“据市场观察”或其他无法追溯的笼统来源。登记中没有 sourceUrl 的数字或高影响事实必须删除、改成不含数字的概括，不能自行补 URL、来源名称或外部事实。
+- 事实中的数字、折价率、营收、分红和时间信息，必须就近使用事实基座登记的具体来源。保留数字时，在对应句末使用登记中的具体来源标题和 URL，例如“（来源：[登记中的来源标题](登记中的 sourceUrl)）”；不得只写“据媒体”“据市场观察”或其他无法追溯的笼统来源。登记中没有 sourceUrl 的数字或高影响事实必须删除、改成不含数字的概括，不能自行补 URL、来源名称或外部事实。
 - 严格遵守作者明确不采用的方向和禁写边界，不得为了增强冲突补写退市、挤压投入、价格高估/低估、管理层动机或未披露时间表等结论。
 - 保留并兑现作者采用的研判拓展点，但不得把研判假设改写成已核验事实。
 ${preserveVisuals ? '- 保留现有全部 Markdown 图片、图片占位 HTML 注释、Mermaid/ECharts 产物和相关链接，只修改必要的文字与标题，不得删除或重排这些视觉产物。' : ''}
+
+这是强制修订，不是提出建议。门禁问题中指出的每一个标题或正文风险都必须在输出中实际改写，不能原样保留被指出的词句。若标题使用了事实基座中的 opinion 主张，标题也不能把该观点包装成结论；应改为“已核验事件事实 + 开放问题/中性分析对象”，不要在标题中使用“结构性解法”“结构性困境”“通道失效”“清算”“终结”“边缘化”“低效”等未经直接核验的定性词。高影响数字即使有 verified 主张，标题也必须保留“拟”“上限”“不超过”等事实限定；如果数字和分析判断放在一起会制造确定性暗示，直接从标题删除数字。
+
+正文中的 opinion 只能以“笔者认为”“从机制上看”“这可能意味着”等明确的分析表达出现；不能把“主动收缩”“暴露了……困境”“EPS/净资产得以增厚”等模型推导或作者判断写成已经发生的客观事实。事实基座没有对应 claim 的计算结果、经济后果、历史动作或动机必须删除，不能以“常识”补足。
 
 逐项修订顺序：先通读门禁问题和文章，列出文章中所有需要保留的数字/高影响事实；逐一在“发布主张登记”中寻找直接匹配的 verified 主张和 sourceUrl。找不到的就删除或降格，不能用相邻主张、模型常识或计算结果替代。再逐项处理标题、开头和正文中的绝对化、贬损化及动机推断，最后检查每个保留的关键数字是否紧邻具体来源链接。
 
@@ -136,7 +158,7 @@ ${JSON.stringify(rejectedAngles)}
 待修订文章：
 ${String(article || '').trim()}
 
-只输出修订后的完整 Markdown 文章，必须保留唯一一级标题。`;
+只输出修订后的完整 Markdown 文章，必须保留唯一一级标题。输出前必须确认标题已按上述规则重新审核，且不得与原文风险标题相同。`;
 }
 
 async function textCall(gateway,input,system,user,maxOutputTokens=5000) {
@@ -156,11 +178,19 @@ async function aiQualityGate({gateway,store,provider,batchId,candidateId,article
 
 async function repairArticleForPublicationCompliance({ gateway, orchestratorSkill, reviewerSkill, provider, batchId, candidateId, article, factBase, publicationClaimRegister, publicationScan, issues, researchPoints, rejectedAngles, preserveVisuals = false, maxOutputTokens = 6500 }) {
   const systemPrompt = buildArticleStageSystem(orchestratorSkill, 'publication-compliance-repair', reviewerSkill);
-  const result = await textCall(gateway, { provider, purpose: 'article-publication-compliance-repair', batchId, candidateId }, systemPrompt,
-    buildPublicationComplianceRepairPrompt({ factBase, claimRegister: publicationClaimRegister, article, issues, publicationScan, researchPoints, rejectedAngles, preserveVisuals }), maxOutputTokens);
-  const repaired = cleanMarkdown(result.content).replace(/<!--\s*REVIEW[\s\S]*?-->/gi, '').trim();
+  const repairPrompt = buildPublicationComplianceRepairPrompt({ factBase, claimRegister: publicationClaimRegister, article, issues, publicationScan, researchPoints, rejectedAngles, preserveVisuals });
+  let result = await textCall(gateway, { provider, purpose: 'article-publication-compliance-repair', batchId, candidateId }, systemPrompt, repairPrompt, maxOutputTokens);
+  let repaired = cleanMarkdown(result.content).replace(/<!--\s*REVIEW[\s\S]*?-->/gi, '').trim();
   const outputIssue = articleStageOutputIssue(repaired, { requireArticle: true });
   if (outputIssue) throw new Error(`合规修订输出无效：${outputIssue}；返回摘要：${outputExcerpt(repaired)}`);
+  if (complianceRepairNeedsRetry(article, repaired, issues)) {
+    const retrySystem = `${systemPrompt}\n\n这是合规修订重试。上一次输出没有实际改写门禁指出的风险，不能再次复制原文章。必须先改写标题和被点名的风险句，再输出完整文章；如果无法在事实基座中证明某个数字或判断，就删除它或改为明确的限定性分析。`;
+    const retryPrompt = `${repairPrompt}\n\n上一次修订未生效。请强制改写被门禁点名的标题/句子，不得原样返回原文；尤其不能继续使用原标题中的观点性结论。`;
+    result = await textCall(gateway, { provider, purpose: 'article-publication-compliance-repair-retry', batchId, candidateId }, retrySystem, retryPrompt, maxOutputTokens);
+    repaired = cleanMarkdown(result.content).replace(/<!--\s*REVIEW[\s\S]*?-->/gi, '').trim();
+    const retryIssue = articleStageOutputIssue(repaired, { requireArticle: true });
+    if (retryIssue) throw new Error(`合规修订重试输出无效：${retryIssue}；返回摘要：${outputExcerpt(repaired)}`);
+  }
   return { article: repaired, result };
 }
 

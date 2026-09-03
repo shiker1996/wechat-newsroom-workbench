@@ -114,7 +114,7 @@ export function scanPublicationRisk({ article = '', title = '', factBase = {} } 
 export function publicationCompliancePrompt({ factBase = {}, claimRegister = [], scan = {} } = {}) {
   return `发布合规专项要求：
 - 不能把传闻、匿名爆料、单方说法、模型推断或搜索摘要写成确定事实。
-- IPO、上市、估值、融资、破产、违法、诈骗、造假、压榨、性骚扰等高影响主张，必须检查直接证据、来源质量、日期和归因；证据不足时必须删除、降格或停止发布。
+- IPO、上市、估值、融资、破产、违法、诈骗、造假、压榨、性骚扰等高影响主张，必须检查直接证据、日期和归因；证据不足时必须删除、降格或停止发布。来源质量要区分硬阻塞和改进建议：已核验主张有可追溯 sourceUrl、文章明确归因时，聚合平台或二手媒体不是单独的失败理由；应要求正文说明“据某平台汇总”或其所引用的公告/财报，而不是要求模型自行补找原始链接。
 - 标题、摘要和前 200 字单独审核；正文中的限定语不能自动修复一个已经把传闻写成事实的标题。
 - 不能用“最后一次”“梦碎”“彻底失败”“必然”等绝对化或贬损化表达制造冲突，除非它是明确归因的原话且不会误导读者。
 - 争议内容应分别呈现各方说法，明确“谁说的”和“是否得到独立确认”；不要推断公司或个人动机。
@@ -125,7 +125,7 @@ ${JSON.stringify(scan)}
 可用的事实主张登记：
 ${JSON.stringify(claimRegister)}
 
-请把风险问题写入门禁 issues，并区分：publication_compliance、fact、title、citation、reputation、financial、privacy、copyright。高影响事实无法核验时不得返回 pass。`;
+请把必须修正的风险写入门禁 issues，并区分：publication_compliance、fact、title、citation、reputation、financial、privacy、copyright。只有以下情况才阻止 pass：事实基座没有直接支持、来源不可追溯、争议/观点被写成确定事实、标题制造未经支持的高影响结论，或存在明确的法律/隐私/侵权风险。仅“建议追溯原始信源”或“聚合来源不是最佳来源”属于 citation 改进建议；如果当前事实已登记且文章准确归因，不要仅因此返回 pass=false。高影响事实无法核验时不得返回 pass；已核验但来源层级较低的事实，应要求明确归因，而不是单独阻断。`;
 }
 
 export function publicationComplianceIssue({ scan = {}, gate = {} } = {}) {
