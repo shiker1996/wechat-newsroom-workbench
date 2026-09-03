@@ -51,6 +51,15 @@ function displayCompositeTitle(candidate, hotspots) {
   return `综合 · ${candidate.candidate_id}`;
 }
 
+function parseObject(value) {
+  try {
+    const parsed = JSON.parse(value || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export class CandidateQueryService {
   constructor(db, repositories) {
     this.db = db;
@@ -79,6 +88,53 @@ export class CandidateQueryService {
         Object.assign(candidate, socialCandidatePresentation(candidate.hotspot_raw_json,
           this.repositories.socialCandidates.getFactSheet(candidate.id), candidate.social_score));
       }
+      return candidate;
+    });
+  }
+
+  // 选题池和编辑室侧栏只需要卡片字段。不要复用 list()：它会读取每个候选的全部
+  // 列表轨道信息，并为图文候选逐条读取事实表；详情页再通过 get() 按需加载这些内容。
+  listSummary(batchId, track = 'article') {
+    const normalizedTrack = this.repositories.candidates.normalizeTrack(track);
+    const socialColumns = normalizedTrack === 'social_cards' ? `,
+      h.raw_json AS hotspot_raw_json,
+      rs.data_json AS fact_sheet_json,
+      ss.score_json AS social_score_json` : '';
+    const socialJoins = normalizedTrack === 'social_cards' ? `
+      LEFT JOIN repository_fact_sheets rs ON rs.candidate_row_id=c.id
+      LEFT JOIN candidate_social_scores ss ON ss.candidate_row_id=c.id` : '';
+    const all = this.db.prepare(`SELECT c.id, c.hotspot_id, c.candidate_id, c.pool_role, c.risk_level,
+      c.dimension, c.distribution_lane, c.reader_stake, c.reader_stake_score,
+      c.research_value, c.competition_penalty, c.f_score, c.event_value, c.article_value,
+      c.content_route, c.score_status, c.score_warning, c.content_class, c.status,
+      c.composite, c.hotspot_titles,
+      h.title AS hotspot_title, h.source, h.source_group, h.source_name,
+      e.brief_status,
+      ct.status AS track_status, ct.score AS track_score,
+      ct.pool_role AS track_pool_role, ct.output_mode,
+      (SELECT COUNT(*) FROM candidate_hotspots ch WHERE ch.candidate_row_id=c.id) AS hotspot_count,
+      (SELECT h2.title FROM candidate_hotspots ch2 JOIN hotspots h2 ON h2.id=ch2.hotspot_id
+        WHERE ch2.candidate_row_id=c.id ORDER BY ch2.hotspot_id LIMIT 1) AS first_hotspot_title
+      ${socialColumns}
+      FROM candidates c LEFT JOIN hotspots h ON h.id=c.hotspot_id
+      LEFT JOIN editorial_sessions e ON e.candidate_row_id=c.id
+      JOIN candidate_tracks ct ON ct.candidate_row_id=c.id AND ct.track=?
+      ${socialJoins}
+      WHERE c.batch_id=? ORDER BY COALESCE(ct.score,c.f_score,-1) DESC, c.id ASC`).all(normalizedTrack, batchId);
+    return all.map((candidate) => {
+      if (candidate.composite) {
+        candidate.hotspot_title = displayCompositeTitle(candidate,
+          candidate.first_hotspot_title ? [{ title: candidate.first_hotspot_title }] : []);
+      }
+      if (normalizedTrack === 'social_cards') {
+        candidate.social_score = candidate.social_score_json == null ? null : { score: parseObject(candidate.social_score_json) };
+        Object.assign(candidate, socialCandidatePresentation(candidate.hotspot_raw_json,
+          candidate.fact_sheet_json == null ? null : { data_json: candidate.fact_sheet_json }, candidate.social_score));
+      }
+      delete candidate.hotspot_raw_json;
+      delete candidate.fact_sheet_json;
+      delete candidate.social_score_json;
+      delete candidate.first_hotspot_title;
       return candidate;
     });
   }

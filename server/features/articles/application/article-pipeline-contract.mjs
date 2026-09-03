@@ -85,5 +85,23 @@ export function articleLengthStatus(article, range = ARTICLE_LENGTH_RANGE) {
 }
 
 export function buildDraftUserPrompt(selectedTitle, brief, outline) {
-  return `标题:${selectedTitle}\n\n锁定简报与事实基座:${JSON.stringify(brief)}\n\n大纲:\n${outline}`;
+  return `标题:${selectedTitle}\n\n锁定简报、事实基座与发布主张登记:${JSON.stringify(brief)}\n\n写作时必须优先覆盖 adoptedResearchPoints 中作者明确采用的研判拓展点，不得只复述事件摘要；将其转化为事实解释、利益/成本分析、事件间关系或可验证的观点边界。只把事实基座中 status=verified 的主张写成确定事实；disputed、unverified 和 restricted_claims 必须按明确归因、限定或删除处理。涉及 IPO、上市、估值、融资、公司/个人负面指控时，不得在标题、摘要或前 200 字中加入没有直接证据的数字、动作和结论。\n\n大纲:\n${outline}`;
+}
+
+export function buildResearchCoveragePrompt({ article = '', researchPoints = [], rejectedAngles = [] } = {}) {
+  return `请检查下面的文章是否真正采纳了作者在编辑室明确选择的研判拓展点。只检查这些已选择的点，不要求文章覆盖未选择的研判材料。
+
+判断标准：full=文章使用事实解释了该点，并展开了它对文章命题的意义；partial=仅提及或换词复述，没有形成论证；omitted=没有出现；contradicted=文章与该点相反且没有说明依据。只要核心采用点为 omitted、contradicted 或 partial_core，status 必须为 needs_revision；全部至少达到 full 或非核心 partial 时才 pass。
+
+只返回 JSON，不要 Markdown、解释或前置文本，格式必须是：
+{"status":"pass|needs_revision","summary":"一句话","items":[{"point_id":"对应 point_id","status":"full|partial|partial_core|omitted|contradicted","coverage":"一句话说明覆盖情况","explanation":"依据文章中的具体段落或缺口","article_excerpt":"不超过80字的原文摘录"}],"omitted_points":[],"contradicted_points":[],"rejected_point_leakage":[],"repair_suggestions":[]}
+
+采用的研判拓展点：
+${JSON.stringify(researchPoints)}
+
+作者明确不采用的方向（不得重新写成文章事实或核心观点）：
+${JSON.stringify(rejectedAngles)}
+
+文章：
+${String(article).trim()}`;
 }

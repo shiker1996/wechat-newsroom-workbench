@@ -20,6 +20,7 @@ articles/<topic-slug>/
   07-seo-keywords.md       # SEO 关闭时不存在
   08-seo-optimized.md      # SEO 关闭时不存在
   08-quality-gate.json
+  research-coverage-review.json
   09-FINAL.md
 ```
 
@@ -53,6 +54,10 @@ articles/<topic-slug>/
 - `remaining_gaps`
 
 `experience_required: true` 时 `confirmed_experiences` 不得为空，并须记录材料或证据来源。`remaining_gaps` 中只要仍有会影响核心命题成立的项目，就不得标为 `LOCKED`。
+
+### `editorial-research-selection.json`
+
+记录作者在编辑室明确采用的研判点与明确舍弃的方向。`selected` 保存自然语言研判点及可选回溯引用，`rejected` 保存方向和原因；内部 ID 只用于追溯，不要求正文出现，也不作为文章事实或成稿门禁的字符串匹配条件。
 
 ### 01-personal-materials.md
 
@@ -94,7 +99,11 @@ articles/<topic-slug>/
 
 ### 02-fact-base.json
 
-保存根据锁定事实、作者观点和来源正文建立的结构化事实基座。每条 claim 包含 `claim`、`status`、`evidence`、`sourceUrl` 和 `boundary`；`status` 只能是 `verified`、`disputed`、`unverified` 或 `opinion`。
+保存根据锁定事实、作者观点和来源正文建立的结构化事实基座。每条 claim 包含 `claim`、`status`、`evidence`、`sourceUrl` 和 `boundary`；高影响主张还应记录来源类型、来源日期和归因对象；`status` 只能是 `verified`、`disputed`、`unverified` 或 `opinion`。
+
+### 02-publication-claim-register.json
+
+保存供写作、标题、SEO 和发布合规门禁共同使用的主张登记。每条记录包含 `id`、`claim`、`status`、`evidence`、`sourceUrl`、`sourceTitle`、`sourceType`、`publishedAt`、`boundary` 和 `publicationRule`。`verified` 只表示来源直接支持主张；`disputed`、`unverified` 和没有直接来源的主张不得作为确定性高影响事实进入标题。
 
 ### 03-titles.md
 
@@ -120,6 +129,10 @@ articles/<topic-slug>/
 result: pass|needs-revision
 verified_facts: 0
 citation_coverage: 100%
+publication_compliance: pass|needs-revision|blocked
+risk_categories: none|financial,reputation,privacy,sensitive_event,copyright
+blocked_claims: none|具体主张
+title_status: pass|rewrite|blocked
 content_role: 拉新|沉淀|搜索
 expected_action: 评论|分享|收藏|关注|搜索
 practical_increment: pass|needs-revision
@@ -140,6 +153,10 @@ remaining_risks: none
 只包含优化后的文章和可移除的 HTML 元数据注释，不添加 SEO 报告头。
 
 `08-quality-gate.json` 保存终稿语义门禁结果，不进入最终正文。
+
+### 10-publication-compliance.json
+
+保存 SEO、图表和配图占位完成后的最终发布合规门禁。包括程序风险扫描、模型门禁结果、风险类别、阻断主张和修订建议。该门禁未通过时不得进入排版或发布。
 
 ### 09-FINAL.md
 

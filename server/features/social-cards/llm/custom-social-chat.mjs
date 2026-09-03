@@ -1,6 +1,5 @@
 import { formatAccountContext } from '../../../shared/domain/account-context.mjs';
 import { delimitUntrusted, trimConversation } from '../../../platform/llm/context-safety.mjs';
-import { parseModelJson } from '../../../platform/llm/model-json.mjs';
 
 // 自定义图文创建前的对话式策划（仿 editorial-room.mjs 的流式 JSON 模式，但无状态：
 // 创建前还没有候选记录，草稿与对话历史由前端每轮全量传入，本模块只返回结构化表单更新）。
@@ -8,9 +7,6 @@ import { parseModelJson } from '../../../platform/llm/model-json.mjs';
 const CONTENT_TYPES = new Set(['tutorial', 'list', 'opinion']);
 const CHANNELS = new Set(['wechat', 'xiaohongshu']);
 
-export function parseResult(result, store) {
-  return parseModelJson(result,{store,label:'图文策划'});
-}
 import { selectionPrompt } from '../../research/llm/selection-prompts.mjs';
 
 // 图文策划 prompt 的唯一事实源是技能 skills/custom-social-chat；账号上下文仍是代码注入的数据，

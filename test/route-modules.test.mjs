@@ -47,6 +47,35 @@ test('候选详情路由使用注入的 candidateEventGroups 返回事件组', a
   assert.equal(payload.data.event_card.conclusion,'事实卡');
 });
 
+test('批次候选列表使用轻量摘要，不读取候选详情研判', async () => {
+  const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
+  let payload = null;
+  let summaryCalled = false;
+  const handled = await handleCandidateRoutes({
+    request: { method: 'GET' }, response: {}, pathname: '/api/batches/b1/candidates',
+    searchParams: new URLSearchParams('track=article'), root: '', config: {},
+    store: {
+      listCandidates() { throw new Error('列表接口不应回退到完整候选查询'); },
+      listCandidateSummaries() {
+        summaryCalled = true;
+        return [{ id: 1201, candidate_id: 'S001', hotspot_id: 7, hotspot_title: '列表标题',
+          f_score: 61, pool_role: '核心8条', status: 'analyzed' }];
+      },
+      candidateHotspots() { return []; },
+    }, body: async () => ({}), json(_response, status, data) { payload = { status, data }; },
+    models: null, aiJobs: null, localSecurity: null, batchWorkdir() {}, articleWorkdir() {}, socialCardWorkdir() {},
+    writeUtf8() {}, candidateRepositoryUrl() {}, candidateEventGroups() { throw new Error('列表接口不应读取事件详情'); },
+    attachEventConclusions(items) { return items.map((item) => ({ ...item, event_conclusion: '事件结论' })); }, evaluateCustomCardGate() { return {}; },
+  });
+  assert.equal(handled, true);
+  assert.equal(payload.status, 200);
+  assert.equal(summaryCalled, true);
+  assert.equal(payload.data[0].id, 1201);
+  assert.equal(payload.data[0].f_score, 61);
+  assert.equal(payload.data[0].event_conclusion, '事件结论');
+  assert.equal('research_context' in payload.data[0], false);
+});
+
 test('事件热榜加入事件图文时写入事件图文输出模式', async () => {
   const { handleCandidateRoutes } = await import('../server/platform/http/routes/candidate-routes.mjs');
   const calls = [];

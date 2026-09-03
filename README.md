@@ -83,6 +83,16 @@ articles/ topics/ social-cards/  内容产物（运行时生成）
 
 架构细节见[架构总览](./docs/architecture.md)。
 
+## 架构图
+
+| 图表 | 说明 |
+|---|---|
+| ![功能架构图](docs/diagrams/architecture.png) | **功能架构图** — 整体系统分层：前端 SPA、HTTP 服务层、平台核心层、业务特性层、共享领域层、存储与插件系统 |
+| ![主流程](docs/diagrams/mainWorkflow.png) | **主流程时序图** — 用户操作 → 路由分发 → API 调用 → AI/DB 操作 → 响应渲染的完整数据流 |
+| ![批次管线](docs/diagrams/batchPipeline.png) | **批次自动化管线** — 从数据采集到稿件生成的完整流水线，含 AI 辅助的标注/研究/撰稿与社交卡片生成 |
+
+> 架构图由 [LikeC4](https://likec4.dev/) 从 `likec4/model.c4` 生成，更多视图（平台核心层、业务特性层详解）见[架构总览](./docs/architecture.md)。
+
 ## 配置与数据
 
 - 默认配置内置于代码，工作区覆盖写入 `config.local.json`。

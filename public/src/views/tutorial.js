@@ -5,6 +5,7 @@ import { state } from "../core/state.js";
 import { escapeHtml, providerOptions, toast, withLoading } from "../core/ui.js";
 import { loadSkillSelect, loadStageSkillControls, selectedStageSkills } from "../core/skill-selection.js";
 import { consumeAgentEvent } from "../core/agent-events.js";
+import { setMarkdown } from "../core/markdown.js";
 // Unified stream contract consumed here: tool.requested, assistant.delta.
 
 let bound = false;
@@ -259,7 +260,7 @@ async function sendChat() {
   }
   assistant.classList.remove("pending");
   if (!result) throw new Error("教程策划未返回完整结果");
-  replyText.textContent = result.reply || replyText.textContent;
+  if (result.reply) setMarkdown(replyText, result.reply);
   applyUpdates(result.formUpdates);
   if (result.project) {
     field("localProjectPath").value = result.project.root;

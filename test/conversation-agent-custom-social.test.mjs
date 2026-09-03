@@ -5,92 +5,96 @@ import path from 'node:path';
 import test from 'node:test';
 import { Store } from '../server/platform/core/store.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
+import { toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
 import { runCustomSocialAgentTurn } from '../server/features/social-cards/application/agent/custom-social-adapter.mjs';
 
-function registry(){const value=new ToolRegistry();value.register({manifest:{id:'search',name:'搜索',version:'1.0.0',capabilities:['content.web.search'],riskLevel:'network-read',inputSchema:{type:'object',required:['query'],properties:{query:{type:'string'},maxResults:{type:'integer'}}},outputSchema:{type:'object'}},adapter:{async execute(){return {status:'ok',data:{answer:'公开资料',results:[{title:'官方说明',url:'https://docs.example.com/guide'}]},artifacts:[],warnings:[],provenance:{}};}}});value.register({manifest:{id:'repo',name:'仓库',version:'1.0.0',capabilities:['content.repository.inspect'],riskLevel:'network-read',inputSchema:{type:'object',required:['sourceUrl'],properties:{sourceUrl:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{sourceUrl:input.sourceUrl,description:'仓库事实',readmeMarkdown:'安装说明'},artifacts:[],warnings:[],provenance:{}};}}});return value;}
-function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'custom-social-agent-'));fs.mkdirSync(path.join(root,'config'),{recursive:true});fs.copyFileSync(path.join(process.cwd(),'config','capability-consumers.json'),path.join(root,'config','capability-consumers.json'));const store=new Store(path.join(root,'test.db')),batch=store.createBatch({date:'2026-08-14',title:'自定义图文 Agent'});t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});return {root,store,batch};}
+function call(capability, input, id = capability) { return { id, name: toolNameForCapability(capability), input }; }
+function native(callId, toolCalls) { return { callId, content: '', toolCalls, model: 'mock', usage: { total_tokens: 10 } }; }
+function gateway(sequence) {
+  let index = 0;
+  return {
+    config: { defaultProvider: 'mock', providers: { mock: { maxOutputTokens: 4096, supportsNativeTools: true, supportsToolCallStreaming: false } } },
+    async complete({ messages }) { const next = sequence[index++]; return typeof next === 'function' ? next({ messages }) : next; },
+  };
+}
+function registry() {
+  const value = new ToolRegistry();
+  value.register({
+    manifest: { id: 'search', name: '搜索', version: '1.0.0', capabilities: ['content.web.search'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, maxResults: { type: 'integer' } } }, outputSchema: { type: 'object' } },
+    adapter: { async execute() { return { status: 'ok', data: { answer: '公开资料', results: [{ title: '官方说明', url: 'https://docs.example.com/guide' }] }, artifacts: [], warnings: [], provenance: {} }; } },
+  });
+  value.register({
+    manifest: { id: 'repo', name: '仓库', version: '1.0.0', capabilities: ['content.repository.inspect'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['sourceUrl'], properties: { sourceUrl: { type: 'string' } } }, outputSchema: { type: 'object' } },
+    adapter: { async execute(input) { return { status: 'ok', data: { sourceUrl: input.sourceUrl, description: '仓库事实', readmeMarkdown: '安装说明' }, artifacts: [], warnings: [], provenance: {} }; } },
+  });
+  return value;
+}
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'custom-social-agent-'));
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.copyFileSync(path.join(process.cwd(), 'config', 'capability-consumers.json'), path.join(root, 'config', 'capability-consumers.json'));
+  const store = new Store(path.join(root, 'test.db'));
+  const batch = store.createBatch({ date: '2026-08-14', title: '自定义图文 Agent' });
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  return { root, store, batch };
+}
 
-test('自定义图文显式搜索并把外部结果强制标为带 URL 的【素材】',async(t)=>{const {root,store,batch}=fixture(t);let calls=0;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){calls+=1;if(calls===1)return {callId:'s1',content:JSON.stringify({type:'tool_requests',assistant_note:'搜索资料',requests:[{requestId:'tr_search',capability:'content.web.search',arguments:{query:'Agent 教程'},reason:'补充公开资料'}]}),model:'mock',usage:{}};assert.ok(messages.some((item)=>item.role==='tool'&&item.content.includes('docs.example.com')));return {callId:'s2',content:JSON.stringify({type:'final',assistantReply:'方案已整理',briefUpdates:{content_type:'tutorial',channel:'wechat',topic:'Agent 教程',audience:'开发者',points:['【体验】官方文档给出安装方式','【建议】先测试','【建议】保留边界'],steps:['安装','运行'],expected_pages:6}}),model:'mock',usage:{}};}};const result=await runCustomSocialAgentTurn({gateway,store,registry:registry(),batchId:batch.id,draft:{},workspaceRoot:root});assert.equal(result.toolCalls,1);assert.match(result.formUpdates.points[0],/^【素材】/);assert.match(result.formUpdates.points[0],/https:\/\/docs\.example\.com\/guide/);assert.deepEqual(result.formUpdates.materialUrls,['https://docs.example.com/guide']);const attachments=store.listConversationFactAttachments({batchId:batch.id,entryPoint:'custom-social'});assert.equal(attachments.length,1);assert.equal(attachments[0].capability,'content.web.search');});
-
-test('仓库分析只接受用户提供的 GitHub 资源',async(t)=>{const {root,store,batch}=fixture(t);let repoExecutions=0,step=0;const tools=registry(),original=tools.execute.bind(tools);tools.execute=async(...args)=>{if(args[0]==='content.repository.inspect')repoExecutions+=1;return original(...args);};const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;if(step===1)return {callId:'r1',content:JSON.stringify({type:'tool_requests',assistant_note:'读仓库',requests:[{requestId:'tr_repo',capability:'content.repository.inspect',arguments:{resourceId:'material:999'},reason:'分析仓库'}]}),model:'mock',usage:{}};return {callId:'r2',content:JSON.stringify({type:'final',assistantReply:'请提供仓库',briefUpdates:{}}),model:'mock',usage:{}};}};const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{materialUrls:['https://example.com/not-github']},workspaceRoot:root});assert.equal(repoExecutions,0);assert.equal(result.ready,false);const call=store.listAgentToolCalls(result.agentRunId)[0];assert.equal(call.error_code,'RESOURCE_NOT_ALLOWED');});
-
-test('自定义图文生产链关闭 provider 隐式搜索并复用事实附件',()=>{const adapter=fs.readFileSync(new URL('../server/features/social-cards/application/agent/custom-social-adapter.mjs',import.meta.url),'utf8'),route=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8');assert.match(adapter,/webSearch:false/);assert.match(route,/runCustomSocialAgentTurn/);assert.doesNotMatch(route,/runCustomSocialChatStream/);assert.match(route,/entryPoint:'custom-social'/);assert.match(route,/materialCache/);});
-
-// 扩展方案阶段 A：custom-social 接入 filesystem.project.read（explicit-resource）
-function registryWithProject(captured){const value=registry();value.register({manifest:{id:'project-reader',name:'项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input,context){captured.push({input,context});return {status:'ok',data:{summary:'项目摘要',files:[{path:'README.md',size:10,excerpt:'内容',truncated:false}],totalFiles:1,totalChars:10,truncated:false,skipped:[],absoluteRoot:'/不应泄漏/absolute',extraSecret:'不应进入模型'},artifacts:[],warnings:[],provenance:{}};}}});return value;}
-const finalWith=(points)=>({callId:'f',content:JSON.stringify({type:'final',assistantReply:'好',briefUpdates:{points}}),model:'mock',usage:{}});
-
-test('提供项目路径：目录 resourceId 化、授权边界逐项对照、项目读取结果走【体验】降级链路',async(t)=>{
-  const {root,store,batch}=fixture(t);const captured=[];const tools=registryWithProject(captured);
-  const projectPath=path.join(root,'demo-proj'),documentRoot=path.join(root,'docs');let step=0,seenCatalog='';
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){step+=1;
-    if(step===1){seenCatalog=messages.filter((item)=>item.role==='system').map((item)=>item.content).join('\n');
-      assert.ok(seenCatalog.includes('"filesystem.project.read"'),'目录缺少项目读取能力');
-      assert.ok(seenCatalog.includes('project:current'),'资源目录缺少 project:current');
-      assert.ok(!seenCatalog.includes('demo-proj'),'模型目录泄漏本地绝对路径');
-      return {callId:'p1',content:JSON.stringify({type:'tool_requests',assistant_note:'读取项目',requests:[{requestId:'tr_p',capability:'filesystem.project.read',arguments:{resourceId:'project:current'},reason:'核对实际项目'}]}),model:'mock',usage:{}};}
-    return finalWith(['【体验】项目实际运行表现稳定']);}};
-  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{},workspaceRoot:root,projectPath,documentRoots:[documentRoot]});
-  // allowedRoots 组成：workspaceRoot + documentRoots + projectPath
-  assert.equal(captured.length,1);assert.equal(captured[0].input.path,projectPath);
-  assert.deepEqual(captured[0].context.allowedRoots,[root,documentRoot,projectPath]);
-  // 结果裁剪：摘要字段保留，绝对路径与多余字段不进入模型/附件
-  const attachments=store.listConversationFactAttachments({batchId:batch.id,entryPoint:'custom-social'});
-  assert.equal(attachments.length,1);assert.equal(attachments[0].capability,'filesystem.project.read');
-  assert.equal(attachments[0].data.summary,'项目摘要');
-  assert.ok(!('absoluteRoot' in attachments[0].data)&&!('extraSecret' in attachments[0].data),'裁剪失效');
-  // §3.4 风险覆盖：项目读取派生的新【体验】被降级改写为【素材】
-  assert.match(result.formUpdates.points[0],/^【素材】项目实际运行表现稳定/);
+test('自定义图文先搜索素材，再用表单工具更新，最后用结束工具提交', async (t) => {
+  const { root, store, batch } = fixture(t);
+  const result = await runCustomSocialAgentTurn({
+    gateway: gateway([
+      native('search', [call('content.web.search', { query: 'Agent 教程' }, 'search')]),
+      ({ messages }) => {
+        assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('docs.example.com')));
+        return native('form', [call('agent.form.update', { operations: [
+          { field: 'content_type', op: 'replace', value: 'tutorial' },
+          { field: 'channel', op: 'replace', value: 'wechat' },
+          { field: 'topic', op: 'replace', value: 'Agent 教程' },
+          { field: 'audience', op: 'replace', value: '开发者' },
+          { field: 'points', op: 'append', values: ['【体验】官方文档给出安装方式', '【建议】先测试', '【建议】保留边界'] },
+          { field: 'steps', op: 'append', values: ['安装', '运行'] },
+          { field: 'expected_pages', op: 'set', value: 6 },
+        ] }, 'form')]);
+      },
+      native('finish', [call('agent.conversation.finish', { assistantReply: '素材已加入图文策划，方案已整理。' }, 'finish')]),
+    ]),
+    store, registry: registry(), batchId: batch.id, draft: {}, workspaceRoot: root,
+  });
+  assert.equal(result.toolCalls, 3);
+  assert.equal(result.reply, '素材已加入图文策划，方案已整理。');
+  assert.equal(result.ready, true);
+  assert.match(result.formUpdates.points[0], /^【素材】/);
+  assert.match(result.formUpdates.points[0], /https:\/\/docs\.example\.com\/guide/);
+  assert.deepEqual(result.formUpdates.materialUrls, ['https://docs.example.com/guide']);
+  const attachments = store.listConversationFactAttachments({ batchId: batch.id, entryPoint: 'custom-social' });
+  assert.ok(attachments.some((item) => item.capability === 'content.web.search'));
 });
 
-test('未提供项目路径：不注册资源、不出现项目读取确定性调用、越界 resourceId 被拒绝',async(t)=>{
-  const {root,store,batch}=fixture(t);const captured=[];const tools=registryWithProject(captured);let step=0,seenCatalog='';
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){step+=1;
-    if(step===1){seenCatalog=messages.filter((item)=>item.role==='system').map((item)=>item.content).join('\n');
-      assert.ok(seenCatalog.includes('"project":null'),'未提供路径时资源目录不得出现 project:current');
-      return {callId:'x1',content:JSON.stringify({type:'tool_requests',assistant_note:'尝试读取',requests:[{requestId:'tr_x',capability:'filesystem.project.read',arguments:{resourceId:'project:current'},reason:'试探'}]}),model:'mock',usage:{}};}
-    return finalWith([]);}};
-  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{},workspaceRoot:root});
-  assert.equal(captured.length,0,'未授权资源不得执行');
-  const call=store.listAgentToolCalls(result.agentRunId)[0];
-  assert.equal(call.error_code,'RESOURCE_NOT_ALLOWED');assert.match(JSON.parse(call.result_summary_json).message,/项目资源不属于当前请求/);
+test('仓库分析只接受用户提供的 GitHub 资源', async (t) => {
+  const { root, store, batch } = fixture(t);
+  const result = await runCustomSocialAgentTurn({
+    gateway: gateway([
+      native('repo', [call('content.repository.inspect', { resourceId: 'material:1' }, 'repo')]),
+      native('finish', [call('agent.conversation.finish', { assistantReply: '请提供 GitHub 仓库地址。' }, 'finish')]),
+    ]),
+    store, registry: registry(), batchId: batch.id, draft: { materialUrls: ['https://example.com/not-github'] }, workspaceRoot: root,
+  });
+  assert.equal(result.ready, false);
+  assert.equal(store.listAgentToolCalls(result.agentRunId)[0].error_code, 'RESOURCE_NOT_ALLOWED');
 });
 
-test('提供项目路径但能力未启用时报错引导去技能配置开启',async(t)=>{
-  const {root,store,batch}=fixture(t);
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){throw new Error('不应到达模型');}};
-  await assert.rejects(
-    runCustomSocialAgentTurn({gateway,store,registry:registryWithProject([]),batchId:batch.id,draft:{},workspaceRoot:root,projectPath:path.join(root,'demo-proj'),allowedCapabilities:['content.web.search']}),
-    (error)=>error.message.includes('自定义图文当前未启用本地项目读取能力')&&error.message.includes('filesystem.project.read'));
+test('自定义图文允许普通文本回复；不解析旧 JSON', async (t) => {
+  const { root, store, batch } = fixture(t);
+  const oldJson = JSON.stringify({ type: 'final', assistantReply: '不应接受', briefUpdates: { topic: '不应写入' } });
+  const result = await runCustomSocialAgentTurn({ gateway: gateway([{ callId: 'legacy', content: oldJson, model: 'mock', usage: {} }]), store, registry: registry(), batchId: batch.id, draft: {}, workspaceRoot: root });
+  assert.equal(result.reply, oldJson);
 });
 
-// passage content 回填（设计文档 §13）：url.fetch 成功后正文写回素材资源，passage.retrieve 走严格分支
-function registryWithFetchAndPassage(passageInputs){const value=registry();
-  value.register({manifest:{id:'url-fetch',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',inputSchema:{type:'object',required:['targetUrl'],properties:{targetUrl:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,final_url:input.targetUrl,title:'素材页',content:'抓取到的正文内容'},artifacts:[],warnings:[],provenance:{}};}}});
-  value.register({manifest:{id:'passage',name:'段落检索',version:'1.0.0',capabilities:['content.passage.retrieve'],riskLevel:'read-only',inputSchema:{type:'object',properties:{documents:{type:'array'},query:{type:'string'},k:{type:'integer'}}},outputSchema:{type:'object'}},adapter:{async execute(input){passageInputs.push(input);return {status:'ok',data:{passages:[]},artifacts:[],warnings:[],provenance:{}};}}});
-  return value;}
-
-test('url.fetch 后 passage.retrieve 命中回填正文走严格分支（不透传）',async(t)=>{
-  const {root,store,batch}=fixture(t);const passageInputs=[];const tools=registryWithFetchAndPassage(passageInputs);let step=0;
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
-    if(step===1)return {callId:'f1',content:JSON.stringify({type:'tool_requests',assistant_note:'抓取素材',requests:[{requestId:'tr_fetch',capability:'content.url.fetch',arguments:{resourceId:'material:1'},reason:'读取素材正文'}]}),model:'mock',usage:{}};
-    if(step===2)return {callId:'f2',content:JSON.stringify({type:'tool_requests',assistant_note:'检索段落',requests:[{requestId:'tr_passage',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文要点',k:4},reason:'定位可引用段落'}]}),model:'mock',usage:{}};
-    return finalWith(['【素材】素材页给出关键事实 https://example.com/material']);}};
-  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{materialUrls:['https://example.com/material']},workspaceRoot:root});
-  assert.equal(result.toolCalls,2);
-  assert.equal(passageInputs.length,1,'passage.retrieve 应以 documents 形式执行');
-  assert.deepEqual(passageInputs[0].documents,[{id:'material:1',content:'抓取到的正文内容'}]);
-  assert.equal(passageInputs[0].query,'正文要点');assert.equal(passageInputs[0].k,4);
-});
-
-test('passage.retrieve 的 resourceIds 未抓取或未知时拒绝 RESOURCE_NOT_ALLOWED',async(t)=>{
-  const {root,store,batch}=fixture(t);const passageInputs=[];const tools=registryWithFetchAndPassage(passageInputs);let step=0;
-  const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
-    if(step===1)return {callId:'d1',content:JSON.stringify({type:'tool_requests',assistant_note:'未抓取直接检索',requests:[{requestId:'tr_unfetched',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
-    if(step===2)return {callId:'d2',content:JSON.stringify({type:'tool_requests',assistant_note:'未知资源检索',requests:[{requestId:'tr_unknown',capability:'content.passage.retrieve',arguments:{resourceIds:['material:9'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
-    return finalWith([]);}};
-  const result=await runCustomSocialAgentTurn({gateway,store,registry:tools,batchId:batch.id,draft:{materialUrls:['https://example.com/material']},workspaceRoot:root});
-  assert.equal(passageInputs.length,0,'未授权检索不得执行插件');
-  const calls=store.listAgentToolCalls(result.agentRunId);
-  assert.equal(calls.length,2);assert.ok(calls.every((call)=>call.error_code==='RESOURCE_NOT_ALLOWED'));
+test('自定义图文生产路由使用 Agent、事实附件和原生工具设置', () => {
+  const adapter = fs.readFileSync(new URL('../server/features/social-cards/application/agent/custom-social-adapter.mjs', import.meta.url), 'utf8');
+  const route = fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs', import.meta.url), 'utf8');
+  assert.match(adapter, /agent\.conversation\.finish/);
+  assert.match(adapter, /nativeTools: true/);
+  assert.match(route, /runCustomSocialAgentTurn/);
+  assert.match(route, /listConversationFactAttachments/);
 });

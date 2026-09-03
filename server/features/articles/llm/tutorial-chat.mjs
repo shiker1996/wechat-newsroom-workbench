@@ -44,15 +44,6 @@ export function tutorialChatMessages({ draft = {}, history = [], answer = '', pr
   ];
 }
 
-export function parseTutorialResult(result, store) {
-  try { return JSON.parse(String(result.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
-  catch (error) {
-    const reason = `教程策划返回无效 JSON：${error.message}`;
-    if (store) store.updateModelCall(result.callId, { status: 'invalid_output', error: reason });
-    throw new Error(reason);
-  }
-}
-
 export function evaluateTutorialChatReadiness({ draft = {}, updates = {}, projectContext = null } = {}) {
   const merged={...draft,...updates};
   const mode=merged.articleMode;

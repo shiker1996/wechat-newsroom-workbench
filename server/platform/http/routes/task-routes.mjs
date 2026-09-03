@@ -50,7 +50,15 @@ export async function handleTaskRoutes({ request, response, pathname, searchPara
     const input = await body(request); const batchId = decodeURIComponent(researchMatch[1]); const batch = store.getBatch(batchId);
     if (!batch) return respond(json, response, 404, { error: '批次不存在' });
     const blocked=pipelineFailureGate(batchId,['collect','tag','event-card'],'研判');if(blocked)return respond(json,response,409,blocked);
-    return respond(json, response, 202, aiJobs.start({ batchId, provider: input.provider, type: batch.batch_type === 'breaking' ? 'breaking-analysis' : 'research' }));
+    let resumeFrom = '';
+    if (batch.batch_type !== 'breaking') {
+      try {
+        const checkpoint = JSON.parse(fs.readFileSync(path.join(batchWorkdir(batch), 'sources', 'discussion-research-stage3-input.json'), 'utf8'));
+        if (checkpoint?.batch_id === batchId && Array.isArray(checkpoint.single_pass?.reports) && checkpoint.single_pass.reports.length
+          && checkpoint.base_report?.scope?.items?.length) resumeFrom = 'topic_generation';
+      } catch { /* 没有阶段 1/2 快照时执行完整研判。 */ }
+    }
+    return respond(json, response, 202, aiJobs.start({ batchId, provider: input.provider, type: batch.batch_type === 'breaking' ? 'breaking-analysis' : 'research', resumeFrom }));
   }
   const autoMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/auto$/);
   if (autoMatch && request.method === 'POST') {

@@ -1,3 +1,5 @@
+import { appendMarkdown, setMarkdown } from "./markdown.js";
+
 export function scrollToLatest(element) {
   if (!element) return;
   const apply = () => {
@@ -27,8 +29,8 @@ export function consumeAgentEvent(event,{toolCards,replyText,thinkingBox,thinkin
   const type=String(event.type||'');
   if(type.startsWith('tool.')&&toolCards)ensureAgentToolCard(toolCards,event);
   if((type==='thinking'||type==='assistant.thinking')&&thinkingText){if(thinkingBox){thinkingBox.hidden=false;thinkingBox.open=true;}thinkingText.textContent+=event.text||'';scrollToLatest(thinkingText);}
-  if((type==='delta'||type==='assistant.delta')&&replyText)replyText.textContent+=event.text||'';
-  if(type==='agent.limit'&&replyText&&!replyText.textContent)replyText.textContent=event.reason||'本轮工具调用已达到上限，请继续对话。';
+  if((type==='delta'||type==='assistant.delta')&&replyText)appendMarkdown(replyText,event.text||'');
+  if(type==='agent.limit'&&replyText&&!replyText.dataset.markdownSource?.trim())setMarkdown(replyText,event.reason||'本轮工具调用已达到上限，请继续对话。');
   if(type==='error')throw new Error(event.message||event.error||`${errorLabel}调用失败`);
   if(type==='done'){if(thinkingBox)thinkingBox.open=false;return event.data||true;}
   return null;

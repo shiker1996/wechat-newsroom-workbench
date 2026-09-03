@@ -1,0 +1,5 @@
+{
+  "$schema": "https://likec4.dev/schemas/config.json",
+  "name": "write-assistant",
+  "title": "见字 — WeChat Newsroom Workbench"
+}

@@ -8,22 +8,9 @@
 
 ## 总览图
 
-```text
-浏览器（public/src 视图）
-   │  /api/*（JSON 与 NDJSON 流）
-   ▼
-server.mjs ──► server/platform/http/routes/*（按批次、候选创作、任务及既有领域模块拆分）
-   │        └─► server.mjs（只保留装配、静态资源和少量顶层入口）
-   ▼
-┌────────────────┬─────────────────┬──────────────────┐
-│ Store（数据层） │ AiJobManager /   │ ModelGateway      │
-│ server/platform/core/store │ JobManager       │ server/platform/llm/gateway   │
-│                │ （后台任务）      │ （LLM 网关）       │
-└────────────────┴─────────────────┴──────────────────┘
-   ▼                                   ▼
-SQLite（data/workbench.db）      技能运行时 server/skills + skills/
-                                        工具注册中心 server/platform/tools + plugins/
-```
+![功能架构图](./diagrams/architecture.png)
+
+> 上图由 [LikeC4](https://likec4.dev/) 从 `likec4/model.c4` 实时生成，随架构变更同步更新。
 
 ## 启动流程（server.mjs，约 960 行）
 
@@ -53,7 +40,17 @@ SQLite（data/workbench.db）      技能运行时 server/skills + skills/
 - **NDJSON 流**（`application/x-ndjson`，每行一个 `{type}` 事件）：`POST /api/candidates/:id/ai/editorial/stream`、`POST /api/batches/:id/custom-social-chat/stream`、`POST /api/batches/:id/tutorial-chat/stream`。
 - **确认头**：技能包与插件的变更类路由要求 `x-admin-confirm: TRUSTED-LOCAL-PLUGIN`（`system-routes.mjs` 单点校验），备份恢复要求 `x-restore-confirm: RESTORE`。两者是防误触门禁，不是鉴权。
 
-## 数据层（server/platform/core/）
+### 请求处理时序
+
+![主流程时序图](./diagrams/mainWorkflow.png)
+
+> 上图展示了用户点击导航 → 路由分发 → API 调用 → AI/DB 操作 → 响应渲染的完整时序。
+
+## 平台核心层
+
+![平台核心层详解](./diagrams/platformDetail.png)
+
+### Store（server/platform/core/）
 
 - `store.mjs` 的 `Store` 类是兼容 facade：负责打开数据库、执行启动迁移、组装 Repository/Query Service/Application Service，并暴露旧公共 API；Store 本身不再直接执行 SQL。
 - 迁移是**幂等的 `CREATE TABLE IF NOT EXISTS` + `PRAGMA table_info` 探测补列**（无 `user_version`），只增不破；跨版本验收见 `test/version-compat.test.mjs`。
@@ -107,7 +104,17 @@ SQLite（data/workbench.db）      技能运行时 server/skills + skills/
 - `server/features/collection/application/` 负责采集源配置、统一采集 Runner、Store 事件落库和静态页面采集助手；这些属于采集业务用例。
 - `server/features/collection/domain/` 负责采集结果质量规则。业务入口统一从 `server/features/collection/index.mjs` 导出。
 
+## 业务特性层
+
+![业务特性层详解](./diagrams/featureDetail.png)
+
 ## 两条流水线
+
+### 批次自动化管线
+
+![批次自动化管线](./diagrams/batchPipeline.png)
+
+整个管线从采集到发布经历：采集 → 打标 → 聚类/事件解析 → 研判评分 → 编辑会 → 成稿 → 排版/封面/社交卡片。
 
 ### 文章链
 

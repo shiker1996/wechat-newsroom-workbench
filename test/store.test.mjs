@@ -38,6 +38,28 @@ test('Store delegates cross-domain reads to the workbench query service', () => 
   }
 });
 
+test('候选列表摘要不加载完整候选详情字段', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-candidate-summary-'));
+  let store;
+  try {
+    store = new Store(path.join(tempRoot, 'test.db'));
+    const batch = store.createBatch({ date: '2026-09-03', title: '候选列表摘要' });
+    store.addHotspots(batch.id, 'rsshub', [{ title: '事件标题', source: 'rsshub' }]);
+    const hotspot = store.getBatch(batch.id).hotspots[0];
+    const candidate = store.addCandidates(batch.id, [hotspot.id])[0];
+    const summary = store.listCandidateSummaries(batch.id, 'article')[0];
+    assert.equal(summary.id, candidate.id);
+    assert.equal(summary.hotspot_title, '事件标题');
+    assert.equal('angle' in summary, false);
+    assert.equal('thesis' in summary, false);
+    assert.equal('tracks' in summary, false);
+    assert.equal('hotspot_raw_json' in summary, false);
+  } finally {
+    store?.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('Store exposes editorial and social candidate repositories through compatible methods', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'newsroom-domain-repositories-'));
   let store;

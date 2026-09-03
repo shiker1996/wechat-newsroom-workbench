@@ -103,17 +103,15 @@ export async function handleCandidateRoutes({ request, response, pathname, searc
   if (candidatesMatch && request.method === 'GET') {
     try {
       const batchId = decodeURIComponent(candidatesMatch[1]); const track = searchParams.get('track') || 'article'; const kind = searchParams.get('kind') || 'all';
-      let candidates = store.listCandidates(batchId, track);
+      let candidates = typeof store.listCandidateSummaries === 'function'
+        ? store.listCandidateSummaries(batchId, track)
+        : store.listCandidates(batchId, track);
       if (track === 'article' && kind !== 'all') {
         const independent = (item) => ['wechat-experience', 'wechat-tutorial'].includes(String(item.output_mode || ''));
         candidates = candidates.filter((item) => kind === 'independent' ? independent(item) : kind === 'hotspot' ? !independent(item) : true);
       }
       for (const candidate of candidates) candidate.member_hotspot_ids = candidate.composite ? store.candidateHotspots(candidate.id).map((item) => item.id) : [candidate.hotspot_id].filter(Boolean);
-      if (track === 'article') attachEventConclusions(candidates, batchId);
-      for (const candidate of candidates) {
-        const researchContext = track === 'article' ? readDiscussionResearchContext({ workspaceRoot: root, batchId, candidate, events: candidateEventGroups(candidate) }) : null;
-        candidate.research_context = researchContext;
-      }
+      if (track === 'article') candidates = attachEventConclusions(candidates, batchId);
       return respond(json, response, 200, candidates);
     } catch (error) { return respond(json, response, 400, { error: error.message }); }
   }

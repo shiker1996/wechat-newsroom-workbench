@@ -1,4 +1,6 @@
-// 编辑室就绪判定：代码确定性校验 8 个表单项，替代模型自觉的状态声明。
+import { normalizeResearchPoints, researchPointsComplete } from './research-selection.mjs';
+
+// 编辑室就绪判定：代码确定性校验 9 个表单项，替代模型自觉的状态声明。
 // 编辑室只是辅助作者填表：必填项填好即可成稿，选填项不参与门禁。
 // 设计见 docs/design/conversation-agent-form-unification-design.md。
 
@@ -28,13 +30,15 @@ export function confirmedFactsDecision(value){
 }
 
 // 编辑室表单项的唯一权威清单：scope 决定值从候选还是底稿会话读取。
-// 顺序即依赖链（事实→研判主线→观点→角度→命题→边界），模型按此顺序推进提问。
+// 顺序即依赖链：先明确事实、观点、角度和命题，再决定采用哪些研判拓展点，
+// 最后用 research_basis 解释这些拓展点如何服务于文章。
 export const EDITORIAL_FIELDS=Object.freeze([
   {key:'confirmed_facts',label:'已确认事实',required:true,scope:'editorial'},
-  {key:'research_basis',label:'采用的研判主线',required:true,scope:'editorial'},
   {key:'author_opinions',label:'明确观点',required:true,scope:'editorial'},
   {key:'angle',label:'写作角度',required:true,scope:'candidate'},
   {key:'thesis',label:'锁定命题',required:true,scope:'candidate'},
+  {key:'adopted_research_points',label:'采用的研判拓展点',required:true,scope:'editorial'},
+  {key:'research_basis',label:'采用的研判主线',required:true,scope:'editorial'},
   // 没有额外禁写项时，空值本身就是明确边界；若填写内容仍需通过实质性校验。
   {key:'forbidden_claims',label:'禁止写入',required:true,allowEmpty:true,scope:'editorial'},
   {key:'confirmed_experiences',label:'已确认实践',required:false,scope:'editorial'},
@@ -44,14 +48,20 @@ export const EDITORIAL_FIELDS=Object.freeze([
 export function editorialFieldComplete(field,value){
   if(field.key==='research_basis')return researchBasisDecision(value);
   if(field.key==='confirmed_facts')return confirmedFactsDecision(value);
+  if(field.key==='adopted_research_points')return researchPointsComplete(value);
   return field.allowEmpty&&!String(value??'').trim()||substantiveDecision(value);
 }
 
 export function evaluateEditorialReadiness({candidate={},editorial={}}={}){
   const fields=EDITORIAL_FIELDS.map((field)=>{
     const source=field.scope==='candidate'?candidate:editorial;
-    const value=String(source[field.key]??'').trim();
-    return {...field,value,ok:editorialFieldComplete(field,value)};
+    const rawValue=field.key==='adopted_research_points'
+      ? normalizeResearchPoints(source[field.key])
+      : String(source[field.key]??'').trim();
+    const value=field.key==='adopted_research_points'
+      ? rawValue.map((item)=>item.statement).join('；')
+      : rawValue;
+    return {...field,value,rawValue,ok:editorialFieldComplete(field,rawValue)};
   });
   const missing=fields.filter((field)=>field.required&&!field.ok).map((field)=>field.label);
   return {ready:missing.length===0,missing,fields};

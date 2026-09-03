@@ -792,8 +792,8 @@ function bindCustomSocialForm(){
   });
   const applyFormUpdates=(updates)=>{
     if(!updates||typeof updates!=='object')return;
-    const set=(id,value)=>{if(value==null||value==='')return;const el=document.getElementById(id);if(el)el.value=value;};
-    const setLines=(id,value)=>{const text=Array.isArray(value)?value.join('\n'):String(value||'');if(text.trim())set(id,text);};
+    const set=(id,value)=>{if(value==null)return;const el=document.getElementById(id);if(el)el.value=value;};
+    const setLines=(id,value)=>{if(value==null)return;const text=Array.isArray(value)?value.join('\n'):String(value||'');set(id,text);};
     if(updates.content_type){set('custom-content-type',updates.content_type);syncTypeFields();}
     set('custom-channel',updates.channel);
     set('custom-topic',updates.topic);set('custom-audience',updates.audience);set('custom-scenario',updates.scenario);

@@ -1,6 +1,6 @@
 # 对话 Agent 表单化统一设计
 
-> 状态：待实施（2026-08-15 定稿）
+> 状态：已实施（2026-09-03；三个对话 Agent 的表单更新与结束动作均已工具化）
 > 涉及：编辑室（agent.editorial）、自主写作（agent.tutorial）、自定义图文（agent.custom-social）
 
 ## 背景与问题
@@ -27,24 +27,21 @@
 
 ## 目标结构
 
-### 协议层（已完成，不变）
+### 协议层：所有业务动作通过原生工具完成
 
-final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强制 `type` + `assistantReply`。
+三个 Agent 均要求模型使用 API 原生 function tools，不再要求模型在普通输出中返回 JSON 信封，也不再从模型最终文本解析业务字段。
 
-### 业务 payload 统一为两字段
-
-三个 Agent 的 final 统一为：
-
-```json
-{"type": "final", "assistantReply": "回复（含追问，不落库）", "briefUpdates": { "…本领域表单增量补丁…" }}
-```
-
-- **assistantReply**：给用户的回复，追问直接写在文本里（同 tutorial/custom-social 现状），问题不再持久化。
-- **briefUpdates**：本轮有变化的表单字段增量补丁。
-  - 编辑室：`{angle, thesis, distribution_lane, reader_stake, confirmed_facts, research_basis, author_opinions, confirmed_experiences, rejected_angles, forbidden_claims, experience_required}`（合并现 candidateUpdates + editorial，去掉 nextQuestion/open_questions/next_action；`research_basis` 为作者确认采用的事件内或事件间研判主线）
-  - 多值字段（`confirmed_facts`、`author_opinions`、`confirmed_experiences`、`rejected_angles`、`forbidden_claims`）默认使用 `{append: [...]}` 追加并按条目去重；删除使用 `{remove: [...]}`，清空使用 `{clear: true}`。单值字段（`angle`、`thesis`、`research_basis`）使用 `{replace: "..."}` 或 `{set: "..."}` 明确替换，不能隐式覆盖。
-  - 自主写作：现 `formUpdates` 改名为 `briefUpdates`，字段不变
-  - 自定义图文：同
+- **表单写入**：本轮有变化的字段调用共享业务工具 `agent.form.update`，参数为 `operations:[{field,op,value/values}]`。工具按字段白名单执行，并返回当前 `formState`。
+  - 多值字段使用 `append` 追加并去重，使用 `remove` 删除指定条目，使用 `clear` 清空；不能用一份较短数组隐式覆盖或删除旧内容。
+  - 单值字段使用 `replace` / `set` 明确替换，使用 `clear` 明确清空；非法字段、非法操作和不符合字段规则的值拒绝执行。
+  - 编辑室的 `adopted_research_points` 仍由专用 `editorial.research.select` 工具写入，不允许通用表单工具绕过研判点 ID 校验。
+- **结束本轮**：调用统一的 `agent.conversation.finish`，只提交 `assistantReply`。工具执行成功后，Agent runtime 直接结束本轮并把回复交给路由；模型不再返回 `final` JSON。
+- **模型能力前置条件**：三个对话 Agent 要求当前模型启用原生 function tools。未启用时立即报错，不退回模型 JSON 协议，避免出现两套行为。
+- **`formUpdates`**：仍作为 HTTP/SSE 返回给前端的当前表单快照，不是模型输出格式；它用于刷新页面，不参与模型协议解析。
+- **`ready`**：由代码根据当前表单计算，模型不再提交或影响该字段。
+  - 编辑室：工具可更新 `angle`、`thesis`、`confirmed_facts`、`research_basis`、`author_opinions`、`confirmed_experiences`、`rejected_angles`、`forbidden_claims`；`adopted_research_points` 仍走专用研判点工具。
+  - 自主写作：工具字段对应 `articleMode`、`topic`、`audience`、`environment`、`thesis`、`points`、`steps`、`prerequisites`、`expected_results`、`common_errors`、`limitations`、`materialUrls`。
+  - 自定义图文：工具字段对应内容类型、渠道、主题、受众、场景、命题、要点、步骤/清单、素材 URL、限制和页数。
 - **删除模型的 `ready` 字段**（tutorial/custom-social）：就绪本就由代码复核，模型声明无意义。
 
 ### 就绪判定：代码确定性计算
@@ -74,16 +71,17 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 - 模型 payload 不再有 `next_action`；`applyEditorialResult` 不再消费它
 - 可删除的兜底代码：WRITE_NOW 前置校验/粘滞、DISCUSS 死锁提领、open_questions 外科清除中的提领逻辑（门禁本身的体验问题拦截保留）
 
-## 迁移点清单
+## 已实施改动
 
 | 位置 | 改动 |
 |---|---|
-| `server/domain/` 新增 | `evaluateEditorialReadiness` |
-| `server/features/articles/llm/editorial-room.mjs` | SYSTEM prompt 改 briefUpdates；reconcile 删 open_questions 管理；applyEditorialResult 删状态机并按字段类型执行追加、去重、明确删除/替换；buildEditorialMessages 回喂 missing[] |
+| `server/features/articles/domain/editorial-readiness.mjs` | `evaluateEditorialReadiness` |
+| `server/features/articles/llm/editorial-room.mjs` | 编辑室上下文和问题生成；最终回复由结束工具提交，不再解析模型 JSON |
 | `server/features/articles/domain/editorial-patch.mjs` | 提供编辑室底稿增量补丁的追加去重、明确删除/清空和单值替换逻辑 |
-| `server/platform/agent/editorial-adapter.mjs` | 信封指令、json-repair 模板、决策补写器 prompt 与合并逻辑 |
-| `server/features/articles/llm/tutorial-chat.mjs` / `server/features/social-cards/llm/custom-social-chat.mjs` | prompt 改 briefUpdates、删 ready |
-| `server/platform/agent/tutorial-adapter.mjs` / `custom-social-adapter.mjs` | 读 briefUpdates；删模型 ready 消费（代码复核保留） |
+| `server/features/articles/application/agent/editorial-adapter.mjs` | 暴露研判选择、表单更新和结束工具；要求原生 function tools |
+| `server/features/articles/llm/tutorial-chat.mjs` / `server/features/social-cards/llm/custom-social-chat.mjs` | 仅提供对话上下文，结构化写入和结束动作由原生工具完成 |
+| `server/features/articles/application/agent/tutorial-adapter.mjs` / `server/features/social-cards/application/agent/custom-social-adapter.mjs` | 暴露 `agent.form.update` 和 `agent.conversation.finish`，维护本轮表单状态；不解析模型最终 JSON |
+| `server/platform/agent/form-update-tool.mjs` | 提供共享字段白名单、追加去重、明确删除/清空、单值替换、工具 Schema 与执行结果 |
 | `server/platform/http/routes/article-routes.mjs` | 锁简报门禁换 readiness |
 | `server/features/articles/application/article-pipeline.mjs` | 成稿门禁换 readiness |
 | `server/application/candidate-selection-service.mjs` | 预置首问改开场注入 |
@@ -92,14 +90,17 @@ final 信封已打平（2026-08-15）：业务字段平铺顶层，协议只强�
 | DB | `editorial_sessions.research_basis` 新增字段，schema v34；旧数据默认空值并需重新确认 |
 | 测试 | 编辑室约一半用例改写；tutorial/custom-social 相关断言更新 |
 
-## 兼容策略
+## 兼容边界
 
 - 历史 `editorial_sessions` 行保留旧列数据；新逻辑不读 `next_action`/`editor_question`/`open_questions` 作为判定依据（仅展示回退）
-- final 信封的旧嵌套格式继续兼容（tool-protocol 已支持）
-- `briefUpdates` 同时接受旧名 `formUpdates`（tutorial/custom-social 过渡期内双读，prompt 只教新名）
+- `runConversationAgent` 的通用运行器仍保留旧信封能力，供其他尚未迁移的 Agent 使用；三个对话 Agent 在入口处强制 `nativeTools: true`，因此不会走旧信封解析分支。
+- `agent.form.update` 是三个对话 Agent 的唯一结构化表单写入口；工具写入后的当前状态会回传给模型，并作为 HTTP/SSE 的 `formUpdates` 快照返回前端。
+- `agent.conversation.finish` 是三个对话 Agent 的唯一正常结束入口。模型只提交 `assistantReply`，运行器收到成功工具结果后结束本轮。
+- `briefUpdates` 不再是这三个 Agent 的可用协议字段；模型普通文本中的同名内容不会被程序读取。
+- 不支持原生 function tools 的模型直接失败并提示更换模型，不退回 JSON 协议。
 
 ## 验收标准
 
-1. 全量测试绿（含改写的编辑室用例：表单补丁落库、就绪代码推导、缺项驱动提问、体验门禁、字段冻结补写）
+1. 相关功能测试绿（含三个 Agent 的工具调用、结束工具、表单补丁落库/回传、就绪代码推导、缺项驱动提问、体验门禁、字段冻结补写）
 2. S001 场景回归：多轮作答后不再重复提问；字段齐备即自动可成稿，无需模型声明
 3. 锁简报与成稿流水线门禁行为与旧版一致（有缺项 409）

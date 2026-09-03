@@ -1,4 +1,4 @@
-// Phase 0 contract baseline only. Production conversations do not consume this module yet.
+// Shared contract constants for production conversation agents and their phase-0 baseline tests.
 export const CONVERSATION_AGENT_SCHEMA_VERSION = 1;
 
 export const CONVERSATION_AGENT_ENTRY_POINTS = Object.freeze([

@@ -1,0 +1,16 @@
+specification {
+  element person    { style { shape person } }
+  element system   { style { shape rectangle } }
+  element container { style { shape rectangle } }
+  element component { style { shape component } }
+  element storage   { style { shape storage } }
+  element queue     { style { shape queue } }
+
+  tag critical
+  tag core
+  tag feature
+
+  relationship async { color amber; line dotted }
+  relationship sync  { color primary; line solid }
+  relationship data  { color green; line solid }
+}

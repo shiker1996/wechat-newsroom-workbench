@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, buildReviewRepairPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
+import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, buildReviewRepairPrompt, buildPublicationComplianceRepairPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
 import { inspectArticleQuality } from '../server/features/articles/domain/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 
@@ -53,6 +53,23 @@ test('审稿返工提示词直接携带事实基座、大纲、去AI稿和首次
   assert.match(prompt, /不要要求读取文件/);
 });
 
+test('合规修订提示词要求 AI 直接修订标题、归因和来源展示', () => {
+  const prompt = buildPublicationComplianceRepairPrompt({
+    factBase: { claims: [{ id: 'claim-1', claim: '回购上限为30%', status: 'verified', sourceUrl: 'https://example.com/a' }] },
+    claimRegister: [{ id: 'claim-1', claim: '回购上限为30%', status: 'verified', sourceUrl: 'https://example.com/a' }],
+    issues: [{ type: 'title', message: '标题包含高影响财经数字' }],
+    publicationScan: { title: '标题30%', titleBlockers: ['标题数字“30%”未明确归因'] },
+    researchPoints: [{ point_id: 'I1', statement: '反常点' }],
+    rejectedAngles: ['不得断言主动退市'],
+    article: '# 标题30%\n\n正文。',
+  });
+  assert.match(prompt, /标题单独审核/);
+  assert.match(prompt, /明确归因/);
+  assert.match(prompt, /具体来源/);
+  assert.match(prompt, /只输出修订后的完整 Markdown 文章/);
+  assert.match(prompt, /不得新增事实、数字、日期/);
+});
+
 test('综合候选汇总全部已抓取来源，写作简报移除来源原文', () => {
   const candidate={composite:true,source_documents:[
     {title:'来源甲',url:'https://example.com/a',source:{status:'ok',content:'甲正文'}},
@@ -73,8 +90,19 @@ test('质量门禁只授权 verified 事实并区分观点与亲测', () => {
   const source=fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs',import.meta.url),'utf8');
   assert.match(source,/正文事实只能来自事实基座中的 verified 项/);
   assert.match(source,/第一人称作者判断或阅读动作/);
-  assert.match(source,/不得用新的数字、案例、榜单、硬件配置或模型常识替换/);
+  assert.match(source,/不能用相邻主张、模型常识或计算结果替代/);
   assert.doesNotMatch(source,/事实基座可能未穷尽其中数据/);
+});
+
+test('终稿与发布安全门禁失败后都会进入定向合规修订并复检', () => {
+  const source=fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs',import.meta.url),'utf8');
+  assert.match(source,/purpose: 'article-publication-compliance-repair'/);
+  assert.match(source,/Step 4\.2 AI 质量门禁未通过，执行定向事实与合规修订/);
+  assert.match(source,/stage:'final-recheck'/);
+  assert.match(source,/stage:'publication-safety-recheck'/);
+  assert.match(source,/preserveVisuals:true/);
+  assert.match(source,/JSON\.stringify\(\{generatedAt:new Date\(\)\.toISOString\(\),scan:publicationScan,gate:publicationQuality\}/);
+  assert.match(source,/Step 7\.3 发布合规门禁未通过，执行定向合规修订/);
 });
 
 test('爆款结构门禁要求钩子、3-5个章节和来源链接', () => {

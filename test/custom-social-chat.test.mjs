@@ -1,25 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
-  parseResult,
   sanitizeFormUpdates,
   requestMessages,
 } from '../server/features/social-cards/llm/custom-social-chat.mjs';
 
-test('parseResult 解析合法 JSON 与围栏 JSON', () => {
-  const plain = parseResult({ content: '{"assistantReply":"好","ready":false}', finishReason: 'stop' });
-  assert.equal(plain.assistantReply, '好');
-  const fenced = parseResult({ content: '```json\n{"assistantReply":"行"}\n```', finishReason: 'stop' });
-  assert.equal(fenced.assistantReply, '行');
-});
-
-test('parseResult 对截断/无效 JSON 报错并标记模型调用', () => {
-  const calls = [];
-  const store = { updateModelCall(id, patch) { calls.push({ id, patch }); } };
-  assert.throws(() => parseResult({ content: '{"assistantReply":"没完', finishReason: 'length', callId: 9 }, store), /截断/);
-  assert.equal(calls[0].id, 9);
-  assert.equal(calls[0].patch.status, 'invalid_output');
-  assert.throws(() => parseResult({ content: '不是 JSON', finishReason: 'stop', callId: 10 }, store), /无效 JSON/);
+test('自定义图文策划不再暴露普通文本 JSON 解析协议', () => {
+  const source = fs.readFileSync(new URL('../server/features/social-cards/application/agent/custom-social-adapter.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /parseResult|parseModelJson/);
+  assert.match(source, /agent\.conversation\.finish/);
 });
 
 test('sanitizeFormUpdates 只放行合法字段并清洗取值', () => {

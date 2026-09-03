@@ -553,38 +553,47 @@
               <div class="editorial-reply"><textarea id="editorial-answer" rows="3" placeholder="回答当前问题；首次进入时可以留空，让 AI 先提问"></textarea><button type="button" class="ink-button" id="send-editorial-answer">发送回答 / 让 AI 提问</button></div>
               <small>AI 只整理明确回答并继续追问；不会把沉默、临时建议或模型推断写成作者决定。</small>
             </section>
-            <section class="event-card-panel" id="event-card-panel" hidden>
-              <div><span class="kicker">EVENT CARDS</span><h4 id="event-cards-heading">关联事件</h4><p>选题与事件为一对多 · 事实采纳与原文抓取由 AI 编辑按需自动完成</p></div>
-              <div id="event-cards-list"></div>
-            </section>
-            <section class="editorial-production-gate" id="editorial-production-gate" aria-label="成稿条件">
-              <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 6</span></div>
-              <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
-              <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
-              <div class="editorial-actions">
-                <details class="creation-skill-settings">
-                  <summary><span><b>本次创作配置</b><small id="editorial-skill-summary" aria-live="polite">系统推荐主写 · 4 个加工阶段使用默认配置</small></span><em>调整</em></summary>
-                  <div class="creation-skill-popover">
-                    <div class="stage-skill-settings-head"><span>CREATION ROUTE</span><b>选择主写与加工方式</b><small>默认配置适合大多数文章。只有明确需要替换某个技能时才调整。</small></div>
-                    <label class="writer-skill-picker"><span>主写技能</span><select id="editorial-writer-skill" aria-label="热点文章主写技能"><option value="">系统自动选择</option></select><small data-skill-note>系统会根据内容类型选择合适技能</small></label>
-                    <details class="stage-skill-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="editorial-stage-skills" class="stage-skill-list" aria-busy="true"></div></details>
-                    <div class="creation-skill-actions"><button type="button" class="text-button" id="reset-editorial-skills">恢复默认</button><button type="button" class="outline-button" id="close-editorial-skills">完成</button></div>
-                  </div>
-                </details>
-                <button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button>
-              </div>
-            </section>
+            <aside class="editorial-focus-rail">
+              <section class="editorial-focus-brief" aria-label="本篇写作主线">
+                <div class="editorial-focus-brief-head"><div><span class="kicker">EDITORIAL FOCUS</span><h4>本篇怎么写</h4></div><span>最多 3 条研判点</span></div>
+                <p>系统已按当前候选命题预选研判主线。你只需确认是否采用，详细依据按需查看。</p>
+                <div id="editorial-focus-research-summary" class="editorial-focus-research-summary"><span class="muted">尚未选择研判拓展点</span></div>
+                <div class="editorial-focus-brief-actions"><button type="button" class="outline-button" data-editorial-open="research">查看 / 调整研判</button><button type="button" class="text-button" data-editorial-open="decision">填写决策底稿</button></div>
+              </section>
+              <section class="editorial-production-gate" id="editorial-production-gate" aria-label="成稿条件">
+                <div class="production-gate-heading"><div><span class="kicker">DRAFTING GATE</span><h4 id="editorial-production-title">尚未达到成稿条件</h4></div><span class="production-gate-count" id="editorial-gate-count">0 / 7</span></div>
+                <div class="editorial-gate-checks" id="editorial-gate-checks"></div>
+                <p id="editorial-production-hint" aria-live="polite">继续回答编辑问题，或展开决策底稿补齐缺失项。</p>
+                <div class="editorial-actions">
+                  <details class="creation-skill-settings">
+                    <summary><span><b>本次创作配置</b><small id="editorial-skill-summary" aria-live="polite">系统推荐主写 · 4 个加工阶段使用默认配置</small></span><em>调整</em></summary>
+                    <div class="creation-skill-popover">
+                      <div class="stage-skill-settings-head"><span>CREATION ROUTE</span><b>选择主写与加工方式</b><small>默认配置适合大多数文章。只有明确需要替换某个技能时才调整。</small></div>
+                      <label class="writer-skill-picker"><span>主写技能</span><select id="editorial-writer-skill" aria-label="热点文章主写技能"><option value="">系统自动选择</option></select><small data-skill-note>系统会根据内容类型选择合适技能</small></label>
+                      <details class="stage-skill-settings"><summary><span>标题、审阅、自然化与 SEO</span><b>加工阶段</b></summary><div id="editorial-stage-skills" class="stage-skill-list" aria-busy="true"></div></details>
+                      <div class="creation-skill-actions"><button type="button" class="text-button" id="reset-editorial-skills">恢复默认</button><button type="button" class="outline-button" id="close-editorial-skills">完成</button></div>
+                    </div>
+                  </details>
+                  <button type="button" class="primary-button" id="start-editorial-production" hidden>确认简报并开始成稿</button>
+                </div>
+              </section>
+            </aside>
             </div>
-            <section class="editorial-research-panel" id="editorial-research-panel" hidden>
-              <div><span class="kicker">DISCUSSION RESEARCH</span><h4>研判输入</h4><p>先看由研判形成的候选选题，再确认采用哪条事件内或事件间的研判主线；事实仍需回到原文核验。</p></div>
-              <div id="editorial-research-content"></div>
-            </section>
+            <details class="editorial-reference-details event-card-panel" id="event-card-panel" hidden>
+              <summary><span><span class="kicker">FACTS & SOURCES</span><h4 id="event-cards-heading">关联事件</h4><small>事件卡、来源状态与原文摘录；需要核验时再展开。</small></span><span class="detail-state">按需查看</span></summary>
+              <div id="event-cards-list"></div>
+            </details>
+            <details class="editorial-reference-details editorial-research-panel" id="editorial-research-panel" hidden>
+              <summary><span><span class="kicker">DISCUSSION RESEARCH</span><h4>研判依据</h4><small>候选研判点、事件间关系与验证材料；用于确认文章主线。</small></span><span class="detail-state">按需查看</span></summary>
+              <div class="editorial-research-panel-body"><div id="editorial-research-content"></div></div>
+            </details>
             <details class="editorial-decision-details" id="editorial-decision-details">
               <summary><span><b>决策底稿</b><small>AI 编辑会自动整理 · 仅在复核或手工修订时展开</small></span><span class="decision-detail-state">查看全部字段</span></summary>
               <div class="editorial-decision-body">
             <div class="form-pair"><label>写作角度<textarea name="angle" rows="3"></textarea></label><label>锁定命题<textarea name="thesis" rows="3" placeholder="文章最终要证明什么？"></textarea></label></div>
             <label class="question-field">当前关键问题<input name="editor_question" placeholder="一次只问一个最能改变方向的问题"></label>
-            <div class="form-pair"><label>已确认事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>采用的研判主线<textarea name="research_basis" rows="5" placeholder="必须明确采用哪条反常、利益冲突、发散方向或事件间关系"></textarea></label></div>
+            <label class="editorial-research-selection-field"><span>采用的研判拓展点</span><input type="hidden" name="adopted_research_points" value="[]"><div id="editorial-research-selection-summary" class="editorial-research-selection-summary"><span class="muted">等待编辑室 Agent 根据本篇角度和命题自动选择。</span></div><small>由 Agent 工具写入采用清单，页面只读展示；不需要作者逐条勾选。</small></label>
+            <div class="form-pair"><label>已确认事实<textarea name="confirmed_facts" rows="5"></textarea></label><label>采用的研判主线<textarea name="research_basis" rows="5" placeholder="根据上方采用清单，说明这条研判如何成为文章主线"></textarea></label></div>
             <div class="form-pair"><label>明确观点<textarea name="author_opinions" rows="5"></textarea></label><label>已确认实践（选填）<textarea name="confirmed_experiences" rows="4"></textarea></label></div>
             <div class="form-pair"><label>否定角度 / 反证边界（选填）<textarea name="rejected_angles" rows="4"></textarea></label><label>待完善项（由系统按必填项推导）<textarea name="open_questions" rows="3" readonly></textarea></label></div>
             <label>禁止写入（无则留空）<textarea name="forbidden_claims" rows="3"></textarea></label>

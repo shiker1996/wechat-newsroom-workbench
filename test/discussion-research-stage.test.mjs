@@ -71,6 +71,9 @@ test('模型研判输出被转换为事件内信号、事件间关系和候选�
 
   assert.equal(report.mode, 'model_analysis');
   assert.equal(report.research_source, 'model');
+  assert.equal('internal_research' in report, false);
+  assert.equal('inter_event_research' in report, false);
+  assert.equal('topic_candidate' in report, false);
   assert.equal(report.internal_signals[0].anomalies[0].statement, '发布后短时间内出现方向调整');
   assert.equal(report.internal_signals[0].interest_conflicts[0].parties[0], '用户');
   assert.equal(report.relations[0].relation_kind, 'comparison');
@@ -289,7 +292,10 @@ test('阶段3输入同时携带事件内搜索证据、事件间搜索证据和�
   });
   assert.equal(input.policy.requires_report_input, true);
   assert.equal(input.policy.requires_research_basis, false);
-  assert.equal(input.policy.requires_evidence_source_ids, true);
+  assert.equal(input.policy.requires_evidence_source_ids, false);
+  assert.deepEqual(input.events.find((item) => item.event_id === 'E1').event_source_ids, ['hotspot:1']);
+  assert.deepEqual(input.events.find((item) => item.event_id === 'E1').research_source_ids, ['search:internal', 'search:relation']);
+  assert.deepEqual(input.events.find((item) => item.event_id === 'E2').research_source_ids, ['search:relation']);
   assert.equal(input.events.find((item) => item.event_id === 'E1').sources.some((item) => item.source_id === 'search:internal'), true);
   assert.equal(input.events.find((item) => item.event_id === 'E2').sources.some((item) => item.source_id === 'search:relation'), true);
   assert.equal(input.external_reference_events[0].reference_only, true);

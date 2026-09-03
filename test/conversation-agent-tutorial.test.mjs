@@ -5,35 +5,126 @@ import path from 'node:path';
 import test from 'node:test';
 import { Store } from '../server/platform/core/store.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
+import { toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
 import { runTutorialAgentTurn, tutorialProjectAttachmentArguments } from '../server/features/articles/application/agent/tutorial-adapter.mjs';
 import { getFactAttachment } from '../server/platform/agent/fact-attachments.mjs';
 import { buildCustomFactSheet } from '../server/features/social-cards/index.mjs';
 
-function projectRegistry(){const registry=new ToolRegistry();registry.register({manifest:{id:'mock-project',name:'项目读取',version:'1.0.0',capabilities:['filesystem.project.read'],riskLevel:'read-only',pathInputs:['path'],inputSchema:{type:'object',required:['path'],properties:{path:{type:'string'},options:{type:'object'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{root:input.path,summary:'读取 1/1 个文本文件，共 18 字符',files:[{path:'README.md',size:18,excerpt:'npm run dev\n实际说明',truncated:false}],totalFiles:1,totalChars:18,truncated:false,skipped:{}},artifacts:[],warnings:[],provenance:{}};}}});return registry;}
+function call(capability, input, id = capability) { return { id, name: toolNameForCapability(capability), input }; }
+function native(callId, toolCalls) { return { callId, content: '', toolCalls, model: 'mock', usage: { total_tokens: 10 } }; }
+function gateway(sequence) {
+  let index = 0;
+  return {
+    config: { defaultProvider: 'mock', providers: { mock: { maxOutputTokens: 4096, supportsNativeTools: true, supportsToolCallStreaming: false } } },
+    async complete({ messages }) { const next = sequence[index++]; return typeof next === 'function' ? next({ messages }) : next; },
+  };
+}
+function projectRegistry() {
+  const registry = new ToolRegistry();
+  registry.register({
+    manifest: { id: 'mock-project', name: '项目读取', version: '1.0.0', capabilities: ['filesystem.project.read'], riskLevel: 'read-only', pathInputs: ['path'], inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, options: { type: 'object' } } }, outputSchema: { type: 'object' } },
+    adapter: { async execute(input) { return { status: 'ok', data: { root: input.path, summary: '读取 1/1 个文本文件，共 18 字符', files: [{ path: 'README.md', size: 18, excerpt: 'npm run dev\n实际说明', truncated: false }], totalFiles: 1, totalChars: 18, truncated: false, skipped: {} }, artifacts: [], warnings: [], provenance: {} }; } },
+  });
+  return registry;
+}
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-agent-'));
+  const project = path.join(root, 'demo-project');
+  fs.mkdirSync(project);
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.copyFileSync(path.join(process.cwd(), 'config', 'capability-consumers.json'), path.join(root, 'config', 'capability-consumers.json'));
+  const store = new Store(path.join(root, 'test.db'));
+  const batch = store.createBatch({ date: '2026-08-14', title: '自主写作 Agent' });
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  return { root, project, store, batch };
+}
 
-function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'tutorial-agent-')),project=path.join(root,'demo-project');fs.mkdirSync(project);fs.mkdirSync(path.join(root,'config'),{recursive:true});fs.copyFileSync(path.join(process.cwd(),'config','capability-consumers.json'),path.join(root,'config','capability-consumers.json'));const store=new Store(path.join(root,'test.db')),batch=store.createBatch({date:'2026-08-14',title:'自主写作 Agent'});t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});return {root,project,store,batch};}
+test('自主写作先读取项目，再用表单工具写入，最后用结束工具提交', async (t) => {
+  const { root, project, store, batch } = fixture(t);
+  const result = await runTutorialAgentTurn({
+    gateway: gateway([
+      ({ messages }) => {
+        assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('README.md')));
+        assert.doesNotMatch(messages.find((item) => item.role === 'tool').content, /demo-project/);
+        return native('form', [call('agent.form.update', { operations: [
+          { field: 'articleMode', op: 'replace', value: 'tutorial' },
+          { field: 'topic', op: 'replace', value: '运行演示项目' },
+          { field: 'audience', op: 'replace', value: '开发者' },
+          { field: 'environment', op: 'replace', value: 'Node.js 22' },
+          { field: 'points', op: 'append', values: ['【素材】README 提供启动命令', '【素材】项目包含运行说明', '【建议】执行前检查版本'] },
+          { field: 'steps', op: 'append', values: ['安装依赖', '运行 npm run dev'] },
+        ] }, 'form')]);
+      },
+      ({ messages }) => {
+        assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('运行演示项目')));
+        return native('finish', [call('agent.conversation.finish', { assistantReply: '项目材料已读取，事实表已整理。' }, 'finish')]);
+      },
+    ]),
+    store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'tutorial' }, answer: `读取 ${project}`, projectPath: project, workspaceRoot: root,
+  });
+  assert.equal(result.toolCalls, 3); // 程序确定性项目读取 + 表单更新 + 结束
+  assert.equal(result.reply, '项目材料已读取，事实表已整理。');
+  assert.equal(result.ready, true);
+  assert.equal(result.projectContext.files[0].path, 'README.md');
+  assert.equal('root' in result.projectContext, false);
+  const cached = getFactAttachment(store, { batchId: batch.id, capability: 'filesystem.project.read', arguments: tutorialProjectAttachmentArguments(project) });
+  assert.equal(cached.data.summary, result.projectContext.summary);
+});
 
-test('自主写作把检测到的路径包装为项目资源 ToolCall，模型只看到相对路径',async(t)=>{const {root,project,store,batch}=fixture(t),events=[];let modelCalls=0;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete({messages}){modelCalls+=1;const tool=messages.find((item)=>item.role==='tool');assert.ok(tool);assert.match(tool.content,/README\.md/);assert.doesNotMatch(tool.content,new RegExp(project.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));return {callId:'tutorial-final',content:JSON.stringify({assistantReply:'项目已作为素材读取，请确认实际体验。',briefUpdates:{articleMode:'tutorial',topic:'运行演示项目',audience:'开发者',environment:'Node.js 22',points:['【素材】README 提供启动命令','【素材】项目包含运行说明','【建议】执行前检查版本'],steps:['安装依赖','运行 npm run dev']}}),model:'mock',usage:{total_tokens:12}};}};const result=await runTutorialAgentTurn({gateway,store,registry:projectRegistry(),provider:'mock',batchId:batch.id,draft:{articleMode:'tutorial'},answer:`读取 ${project}`,projectPath:project,workspaceRoot:root,onEvent:(event)=>events.push(event)});assert.equal(modelCalls,1);assert.equal(result.toolCalls,1);assert.equal(result.ready,true);assert.equal(result.projectContext.files[0].path,'README.md');assert.equal('root' in result.projectContext,false);assert.ok(events.some((event)=>event.type==='tool.completed'));const cached=getFactAttachment(store,{batchId:batch.id,capability:'filesystem.project.read',arguments:tutorialProjectAttachmentArguments(project)});assert.equal(cached.data.summary,result.projectContext.summary);});
+test('自主写作 Agent 的表单工具追加去重，不覆盖已有要点', async (t) => {
+  const { root, store, batch } = fixture(t);
+  const result = await runTutorialAgentTurn({
+    gateway: gateway([
+      ({ messages }) => {
+        assert.ok(messages.some((item) => item.role === 'system' && item.content.includes('agent.form.update')));
+        return native('form', [call('agent.form.update', { operations: [
+          { field: 'topic', op: 'replace', value: '工具运行复盘' },
+          { field: 'points', op: 'append', values: ['旧要点', '新增要点'] },
+        ] }, 'form')]);
+      },
+      ({ messages }) => {
+        assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('新增要点')));
+        return native('finish', [call('agent.conversation.finish', { assistantReply: '已记录本轮表单变化。' }, 'finish')]);
+      },
+    ]),
+    store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'tutorial', points: ['旧要点'] }, workspaceRoot: root,
+  });
+  assert.equal(result.toolCalls, 2);
+  assert.equal(result.formUpdates.topic, '工具运行复盘');
+  assert.deepEqual(result.formUpdates.points, ['旧要点', '新增要点']);
+});
 
-test('项目材料不会让心得模式绕过【体验】门禁，缓存项目下一轮不重复执行',async(t)=>{const {root,project,store,batch}=fixture(t),registry=projectRegistry();let executions=0;const original=registry.execute.bind(registry);registry.execute=async(...args)=>{executions+=1;return original(...args);};const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){return {callId:'experience-final',content:JSON.stringify({assistantReply:'事实表已齐备，可以创建初稿',briefUpdates:{articleMode:'experience',topic:'项目心得',audience:'开发者',thesis:'工具仍需打磨',points:['【素材】项目包含 README','【素材】有启动命令','【建议】检查版本']}}),model:'mock',usage:{}};}};const first=await runTutorialAgentTurn({gateway,store,registry,batchId:batch.id,draft:{articleMode:'experience'},projectPath:project,workspaceRoot:root});assert.equal(first.ready,false);assert.deepEqual(first.missing,['至少一条【体验】']);await runTutorialAgentTurn({gateway,store,registry,batchId:batch.id,draft:{articleMode:'experience'},projectPath:project,workspaceRoot:root});assert.equal(executions,1);});
+test('项目材料不能让心得模式绕过【体验】门禁', async (t) => {
+  const { root, project, store, batch } = fixture(t);
+  const result = await runTutorialAgentTurn({
+    gateway: gateway([
+      native('form', [call('agent.form.update', { operations: [
+        { field: 'articleMode', op: 'replace', value: 'experience' },
+        { field: 'topic', op: 'replace', value: '项目心得' },
+        { field: 'audience', op: 'replace', value: '开发者' },
+        { field: 'thesis', op: 'replace', value: '工具仍需打磨' },
+        { field: 'points', op: 'append', values: ['【素材】项目包含 README', '【素材】有启动命令', '【建议】检查版本'] },
+      ] }, 'form')]),
+      native('finish', [call('agent.conversation.finish', { assistantReply: '还需要作者亲自体验后的判断。' }, 'finish')]),
+    ]),
+    store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'experience' }, projectPath: project, workspaceRoot: root,
+  });
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.missing, ['至少一条【体验】']);
+});
 
-test('自主写作生产路由只使用 Agent、复用事实附件与统一事件消费器',()=>{const route=fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs',import.meta.url),'utf8'),client=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8'),search=fs.readFileSync(new URL('../server/platform/integrations/information-search.mjs',import.meta.url),'utf8');assert.match(route,/runTutorialAgentTurn/);assert.doesNotMatch(route,/runTutorialChatStream/);assert.match(route,/listConversationFactAttachments/);assert.match(search,/if \(fact\[field\]\)/);assert.match(client,/consumeAgentEvent/);});
+test('自主写作允许普通文本回复；不解析旧 JSON', async (t) => {
+  const { root, store, batch } = fixture(t);
+  const oldJson = JSON.stringify({ assistantReply: '不应接受', briefUpdates: { topic: '不应写入' } });
+  const result = await runTutorialAgentTurn({ gateway: gateway([{ callId: 'legacy', content: oldJson, model: 'mock', usage: {} }]), store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: {}, workspaceRoot: root });
+  assert.equal(result.reply, oldJson);
+});
 
-test('创建事实表可直接复用对话阶段 URL 附件而不重复抓取',async()=>{let fetched=0;const url='https://example.com/material',fact=await buildCustomFactSheet({input:{content_type:'tutorial',topic:'示例',points:['【素材】A','【素材】B','【建议】C'],materialUrls:[url]},root:process.cwd(),materialCache:new Map([[url,{title:'缓存材料',content:'已读取正文'}]]),fetchImpl:async()=>{fetched+=1;throw new Error('不应调用');}});assert.equal(fetched,0);assert.equal(fact.materials[0].title,'缓存材料');assert.equal(fact.materials[0].status,'ok');});
-
-// passage content 回填（设计文档 §13）：url.fetch 成功后正文写回素材资源，passage.retrieve 走严格分支
-test('url.fetch 后 passage.retrieve 命中回填正文；未抓取/未知 resourceId 拒绝',async(t)=>{
-  const {root,store,batch}=fixture(t),passageInputs=[],registry=projectRegistry();
-  registry.register({manifest:{id:'url-fetch',name:'网页读取',version:'1.0.0',capabilities:['content.url.fetch'],riskLevel:'network-read',inputSchema:{type:'object',required:['targetUrl'],properties:{targetUrl:{type:'string'}}},outputSchema:{type:'object'}},adapter:{async execute(input){return {status:'ok',data:{url:input.targetUrl,final_url:input.targetUrl,title:'素材页',content:'抓取到的教程正文'},artifacts:[],warnings:[],provenance:{}};}}});
-  registry.register({manifest:{id:'passage',name:'段落检索',version:'1.0.0',capabilities:['content.passage.retrieve'],riskLevel:'read-only',inputSchema:{type:'object',properties:{documents:{type:'array'},query:{type:'string'},k:{type:'integer'}}},outputSchema:{type:'object'}},adapter:{async execute(input){passageInputs.push(input);return {status:'ok',data:{passages:[]},artifacts:[],warnings:[],provenance:{}};}}});
-  let step=0;const gateway={config:{defaultProvider:'mock',providers:{mock:{maxOutputTokens:4096}}},async complete(){step+=1;
-    if(step===1)return {callId:'t1',content:JSON.stringify({type:'tool_requests',assistant_note:'未抓取先试探',requests:[{requestId:'tr_early',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1','material:9'],query:'正文'},reason:'试探'}]}),model:'mock',usage:{}};
-    if(step===2)return {callId:'t2',content:JSON.stringify({type:'tool_requests',assistant_note:'抓取素材',requests:[{requestId:'tr_fetch',capability:'content.url.fetch',arguments:{resourceId:'material:1'},reason:'读取素材正文'}]}),model:'mock',usage:{}};
-    if(step===3)return {callId:'t3',content:JSON.stringify({type:'tool_requests',assistant_note:'检索段落',requests:[{requestId:'tr_passage',capability:'content.passage.retrieve',arguments:{resourceIds:['material:1'],query:'正文要点'},reason:'定位可引用段落'}]}),model:'mock',usage:{}};
-    return {callId:'t4',content:JSON.stringify({type:'final',assistantReply:'已读取素材',briefUpdates:{articleMode:'tutorial',topic:'示例',audience:'开发者'}}),model:'mock',usage:{}};}};
-  const result=await runTutorialAgentTurn({gateway,store,registry,provider:'mock',batchId:batch.id,draft:{articleMode:'tutorial',materialUrls:['https://example.com/material']},workspaceRoot:root});
-  assert.equal(passageInputs.length,1,'仅回填后的检索可执行');
-  assert.deepEqual(passageInputs[0].documents,[{id:'material:1',content:'抓取到的教程正文'}]);
-  const denied=store.listAgentToolCalls(result.agentRunId).find((call)=>call.request_id==='tr_early');
-  assert.equal(denied.error_code,'RESOURCE_NOT_ALLOWED');
+test('创建事实表可直接复用对话阶段 URL 附件而不重复抓取', async () => {
+  let fetched = 0;
+  const url = 'https://example.com/material';
+  const fact = await buildCustomFactSheet({ input: { content_type: 'tutorial', topic: '示例', points: ['【素材】A', '【素材】B', '【建议】C'], materialUrls: [url] }, root: process.cwd(), materialCache: new Map([[url, { title: '缓存材料', content: '已读取正文' }]]), fetchImpl: async () => { fetched += 1; throw new Error('不应调用'); } });
+  assert.equal(fetched, 0);
+  assert.equal(fact.materials[0].title, '缓存材料');
+  assert.equal(fact.materials[0].status, 'ok');
 });

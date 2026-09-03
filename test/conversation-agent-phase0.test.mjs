@@ -55,13 +55,13 @@ test('Phase 0 基线冻结三入口当前触发方式、能力矩阵、门禁和
   const editorial=baseline.entries.find((entry)=>entry.id==='editorial');
   assert.ok(editorial.capabilities.includes('content.url.fetch'));
   assert.ok(editorial.capabilities.includes('content.passage.retrieve'));
-  assert.equal(editorial.modelDeclaredToolIntent,'ToolRequest[]');
+  assert.equal(editorial.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   const tutorial=baseline.entries.find((entry)=>entry.id==='independent-writing');
   assert.ok(tutorial.capabilities.includes('filesystem.project.read'));
-  assert.equal(tutorial.modelDeclaredToolIntent,'ToolRequest[]');
+  assert.equal(tutorial.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   const custom=baseline.entries.find((entry)=>entry.id==='custom-social');
   assert.ok(custom.capabilities.includes('content.repository.inspect'));
-  assert.equal(custom.modelDeclaredToolIntent,'ToolRequest[]');
+  assert.equal(custom.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   assert.equal(baseline.auditMetadata.knownGaps.length,1);
 });
 

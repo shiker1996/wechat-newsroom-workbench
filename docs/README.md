@@ -21,7 +21,7 @@
 
 | 文档 | 内容 |
 |---|---|
-| [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线 |
+| [architecture.md](./architecture.md) | 架构总览：HTTP 路由、Store、后台任务、LLM 网关、技能运行时、工具注册中心、两条流水线；[功能架构图](./diagrams/architecture.png)、[主流程时序图](./diagrams/mainWorkflow.png)、[平台核心层](./diagrams/platformDetail.png)、[业务特性层](./diagrams/featureDetail.png)、[批次管线](./diagrams/batchPipeline.png) |
 | [plugin-development.md](./plugin-development.md) | 插件开发指南：新增能力（目录定义与消费者接入）与新增插件（Manifest、Adapter、安全与发布）两个环节 |
 | [extending.md](./extending.md) | 扩展开发：技能包 / 本地插件 / 远程插件的示例、权限说明、失败语义与版本兼容规则 |
 | [safety-defaults.md](./safety-defaults.md) | 模型与信息工具的超时、重试、并发与预算安全默认值 |

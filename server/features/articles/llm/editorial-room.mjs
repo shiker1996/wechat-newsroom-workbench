@@ -1,54 +1,9 @@
 import { formatAccountContext } from '../../../shared/domain/account-context.mjs';
-import { evaluateEditorialReadiness, substantiveDecision, confirmedFactsDecision, researchBasisDecision, EDITORIAL_FIELDS } from '../domain/editorial-readiness.mjs';
+import { evaluateEditorialReadiness, substantiveDecision, EDITORIAL_FIELDS } from '../domain/editorial-readiness.mjs';
 import { selectionPrompt } from '../../research/llm/selection-prompts.mjs';
 import { delimitUntrusted, trimConversation, truncateAtBoundary } from '../../../platform/llm/context-safety.mjs';
-import { parseModelJson } from '../../../platform/llm/model-json.mjs';
-import { hasEditorialPatch, mergeAppendEditorialField, mergeSingleEditorialField } from '../domain/editorial-patch.mjs';
 
 export { substantiveDecision };
-
-const FIRSTHAND_EXPERIENCE=/(?:我|本人|自己)?(?:已经|已|实际|亲自)?[^。！？\n]{0,20}(?:安装|部署|运行|使用|试用|跑通|跑过|实测|亲测)[^。！？\n]{0,24}(?:过|了|体验|感受|结果)/;
-
-// briefUpdates 中归属候选选题的字段（其余归属编辑底稿会话）
-const CANDIDATE_FIELDS=['angle','thesis'];
-// 文本类底稿字段：占位符值（"待定/暂无"等）不视为实质更新
-const BRIEF_TEXT_FIELDS=['research_basis','author_opinions','rejected_angles'];
-const BRIEF_KEEP_ON_EMPTY_FIELDS=['confirmed_facts','confirmed_experiences','forbidden_claims'];
-
-// 编辑室不做"决策补写"兜底：逐字段状态回显由代码给出，
-// 沉淀职责完全归模型，代码侧只保留占位符/空串过滤与体验确定性沉淀。
-
-function redactLocalPaths(value){return String(value||'').replace(/[A-Za-z]:\\[^\s，。；、)）\]]+/g,'【本地项目材料】').replace(/(?:^|\s)\/(?:[^/\s]+\/)*[^/\s，。；、)）\]]+/g,' 【本地项目材料】');}
-
-const DECISION_META_SUFFIX=/(?:。|；|;|\s)*(?:命题与角度|依赖链上|依赖链|编辑底稿).{0,160}?(?:合格|已对齐|可成稿)[^。！？]*[。！？]?\s*$/u;
-
-// 模型有时会把“已合格/可成稿”等流程播报粘进 angle/thesis，落表前剥离，
-// 保证文章字段只保存作者决策，不保存编辑室运行状态。
-function cleanDecisionText(field,value){
-  const text=String(value??'').trim();
-  return (field==='angle'||field==='thesis')?text.replace(DECISION_META_SUFFIX,'').trim():text;
-}
-
-// 用户明确陈述亲身实践时，确定性沉淀进 confirmed_experiences（不依赖模型自觉）
-export function reconcileEditorialAnswer({parsed,current,answer=''}){
-  const result=structuredClone(parsed||{}),updates=result.briefUpdates&&typeof result.briefUpdates==='object'?result.briefUpdates:(result.briefUpdates={});
-  const explicit=FIRSTHAND_EXPERIENCE.test(String(answer||''));
-  if(explicit){
-    const claim=redactLocalPaths(String(answer).trim()).slice(0,800);
-    const existingUpdate=updates.confirmed_experiences;
-    if(existingUpdate&&typeof existingUpdate==='object'&&!Array.isArray(existingUpdate)){
-      const append=Array.isArray(existingUpdate.append)?existingUpdate.append:[existingUpdate.append].filter(Boolean);
-      updates.confirmed_experiences={...existingUpdate,append:[...append,claim]};
-    }else{
-      updates.confirmed_experiences=[existingUpdate,claim].filter(Boolean).join('\n');
-    }
-  }
-  return result;
-}
-
-export function parseEditorialResult(result,store) {
-  return parseModelJson(result,{store,label:'编辑会'});
-}
 
 // 编辑会 prompt 的唯一事实源是技能 skills/editorial-room-chat；账号上下文仍是代码注入的数据，
 // 技能文本用 {{ACCOUNT_CONTEXT}} 占位符标出注入位置。技能缺失或被禁用时 selectionPrompt 直接抛错（fail-fast）。
@@ -61,6 +16,45 @@ function editorialSystem(workspaceRoot) {
 // 检索不可用或失败时回退为头部截断。
 const EXCERPT_BUDGET=8000;
 const EXCERPT_OPTIONS={k:6,headChars:1500,chunkChars:500,maxCharsPerDoc:EXCERPT_BUDGET};
+const RESEARCH_SELECTION_CATALOG_BUDGET=40000;
+
+function researchPointText(point){
+  return String(point?.statement||point?.question||point?.relationship_statement||point?.label||'').trim();
+}
+
+// 编辑室业务工具使用的唯一研判点目录。point_id 优先复用研判产物中的 ID，
+// 缺失时按事件、类型和顺序生成稳定回退 ID，禁止 Agent 自行构造跨选题引用。
+export function buildEditorialResearchPointOptions(context){
+  if(!context||typeof context!=='object')return [];
+  const options=[],signals=Array.isArray(context.internal_research||context.internal_signals)?(context.internal_research||context.internal_signals):[],relations=Array.isArray(context.inter_event_research||context.relations)?(context.inter_event_research||context.relations):[];
+  const names=new Map((context.scope?.events||[]).map((event)=>[String(event.event_id),event.title||'相关事件']));
+  const add=(point)=>{if(!point.statement||options.some((item)=>item.point_id===point.point_id))return;options.push(point);};
+  signals.forEach((event)=>{
+    const research=event.internal_research||{},eventId=String(event.event_id||'');
+    const groups=[
+      ['anomaly','反常点',research.anomalies||event.anomaly_points||[]],
+      ['interest_conflict','利益冲突',research.interest_conflicts||event.interest_conflicts||[]],
+      ['divergence','可发散方向',research.divergence_directions||event.divergence_directions||[]],
+    ];
+    groups.forEach(([kind,label,items])=>(Array.isArray(items)?items:[]).forEach((item,index)=>{
+      const statement=researchPointText(item);if(!statement)return;
+      add({
+        point_id:String(item.signal_id||item.internal_signal_id||`internal:${kind}:${eventId}:${index}`),scope:'internal',kind,label,statement,
+        expected:item.expected||item.baseline||'',observed:item.observed||'',gap:item.gap||'',baseline:item.baseline||'',impact:item.impact||'',why_it_matters:item.why_it_matters||'',issue:item.issue||'',difference:item.difference||'',parties:item.parties||[],supporting_facts:item.supporting_facts||item.confirmed_facts||[],evidence_boundary:item.evidence_boundary||'',confidence:item.confidence||'',question:item.question||'',
+        event_id:eventId,event_ids:eventId?[eventId]:[],event_title:event.title||names.get(eventId)||'相关事件',signal_id:item.signal_id||item.internal_signal_id||'',signal_refs:item.signal_refs||[],material_ids:item.material_ids||[],material_refs:item.material_refs||[],evidence_source_ids:item.evidence_source_ids||[],evidence_source_refs:item.evidence_source_refs||[],evidence_levels:item.evidence_levels||[],writing_role:kind==='anomaly'?'opening_conflict':kind==='interest_conflict'?'mechanism':'reader_impact',
+      });
+    }));
+  });
+  relations.forEach((item,index)=>{
+    const statement=researchPointText(item);if(!statement)return;
+    const kind=item.relation_kind||'comparison';
+    add({
+      point_id:String(item.relation_id||`inter_event:${kind}:${index}`),scope:'inter_event',kind,label:item.relation_label||({sequence:'前后关系',response:'回应关系',comparison:'对比关系',trend:'趋势关系',counterexample:'反例关系'}[kind]||'事件间关系'),statement,
+      expected:Array.isArray(item.differences)?item.differences.join('；'):'',difference:Array.isArray(item.differences)?item.differences.join('；'):'',impact:item.insight||'',why_it_matters:item.insight||'',comparison_basis:item.comparison_basis||[],evidence_boundary:item.evidence_boundary||'',confidence:item.confidence||'',event_ids:item.event_ids||[],reference_event_ids:item.reference_event_ids||[],event_title:(item.event_ids||[]).map((id)=>names.get(String(id))).filter(Boolean).join('、'),relation_id:item.relation_id||'',relation_refs:item.relation_refs||[],evidence_source_ids:item.evidence_source_ids||[],evidence_source_refs:item.evidence_source_refs||[],evidence_levels:item.evidence_levels||[],writing_role:kind==='counterexample'?'counterexample':kind==='comparison'?'mechanism':'reader_impact',
+    });
+  });
+  return options;
+}
 
 async function sourceExcerpt(hotspot,retrieve,query) {
   const content=String(hotspot.sourceDoc?.content||'');
@@ -145,6 +139,7 @@ function editorialResearchBrief(context) {
     verified_research_materials: materials,
     internal_research: internal,
     inter_event_research: relations,
+    selectable_research_points: buildEditorialResearchPointOptions(context),
     research_reports: reports,
     reference_events: list(context.reference_events).map((item) => ({
       reference_id: item.reference_id,
@@ -171,7 +166,41 @@ function researchDrivenInstruction(researchBrief) {
   const reportCount = researchBrief.research_reports?.length || 0;
   if (!topic && !basisCount && !reportCount) return '当前没有可用的模型研判内容；按事件卡和来源事实推进，但不要自行编造反常、利益冲突或事件关系。';
   const materialCount = researchBrief.verified_research_materials?.length || 0;
-  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组结构化研判、${reportCount} 份单事件模型研判报告、${materialCount} 条模型研判素材）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从单事件模型研判报告中的事件内或事件外素材中选择一条最适合作者的主线。'} 每个问题都要明确引用对应素材中的事实落差、利益差异、影响、前后变化、回应、对比、趋势或反例：事实阶段问这条素材由哪些事实和证据支撑，观点阶段问作者如何解释和站在哪一边，角度阶段问准备从哪一个矛盾、变化或反例切入，命题阶段问文章要证明什么。外部参考事件只能作为关系研判的参考材料，不能直接写成本文已确认事实。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
+  const pointCount = researchBrief.selectable_research_points?.length || 0;
+  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组结构化研判、${reportCount} 份单事件模型研判报告、${materialCount} 条模型研判素材）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从单事件模型研判报告中的事件内或事件外素材中帮助作者形成写作判断。'} 研判点现在只作为事实、观点、角度和命题的讨论依据，页面默认不选，也不要在作者尚未明确角度和命题前选择研判点。先具体追问作者想解释哪一个反常、利益/成本/责任冲突、发散方向或事件间关系，并据此协助作者明确观点、角度和命题。角度和命题明确后，直接从 researchBrief 的 selectable_research_points 中挑选 1～3 条最能支撑当前命题的研判拓展点，调用 editorial.research.select 工具写入当前选题；完整可选目录单独位于 research-selection-catalog（共 ${pointCount} 条），只能使用目录中的原样 point_id。工具会校验 point_id 是否属于当前研判，不需要再询问作者确认。工具返回后，说明每条点承担的写作作用，再用 research_basis 总结已选择的素材及其如何服务于文章。不能把所有素材自动选入，也不能自行构造研判点 ID；如果目录标记为截断或找不到合适点，不要猜 ID，也不要调用选择工具。每个问题都要明确引用对应素材中的事实落差、利益差异、影响、前后变化、回应、对比、趋势或反例。外部参考事件只能作为关系研判的参考材料，不能直接写成本文已确认事实。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
+}
+
+function researchSelectionCatalog(points = []) {
+  const compact = (statementLimit) => points.map((point) => ({
+    point_id: point.point_id,
+    scope: point.scope,
+    kind: point.kind,
+    label: point.label,
+    event_id: point.event_id,
+    event_ids: point.event_ids,
+    event_title: point.event_title,
+    relation_id: point.relation_id,
+    statement: truncateAtBoundary(point.statement, statementLimit).text,
+  }));
+  let pointsForPrompt = compact(360);
+  let serialized = JSON.stringify({ point_count: points.length, points: pointsForPrompt });
+  if (serialized.length > RESEARCH_SELECTION_CATALOG_BUDGET) {
+    pointsForPrompt = compact(180);
+    serialized = JSON.stringify({ point_count: points.length, points: pointsForPrompt });
+  }
+  if (serialized.length > RESEARCH_SELECTION_CATALOG_BUDGET) {
+    pointsForPrompt = points.map((point) => ({
+      point_id: point.point_id,
+      scope: point.scope,
+      kind: point.kind,
+      label: point.label,
+      event_id: point.event_id,
+      event_ids: point.event_ids,
+      relation_id: point.relation_id,
+    }));
+    serialized = JSON.stringify({ point_count: points.length, points: pointsForPrompt });
+  }
+  return serialized;
 }
 
 export async function buildEditorialMessages(current,answer,events=[],retrieve=null,workspaceRoot,researchContext=null) {
@@ -196,11 +225,13 @@ export async function buildEditorialMessages(current,answer,events=[],retrieve=n
     });
   }
   const researchBrief = editorialResearchBrief(researchContext);
+  const selectableResearchPoints = researchBrief?.selectable_research_points || [];
+  const researchBriefContext = researchBrief ? { ...researchBrief, selectable_research_points: undefined } : null;
   // 逐字段状态由代码从底稿推导并完整回显（所见即所判），模型只围绕不合格项提问
   const {ready,fields}=evaluateEditorialReadiness({candidate:current,editorial:current.editorial||{}});
   const fieldStatus=fields.map((field)=>`- ${field.label}（${field.required?'必填':'选填'}）：${field.value?`当前值「${field.value.slice(0,200)}」${field.ok?'，合格':'，不合格（占位符不算实质表态）'}`:'未填写'}`).join('\n');
   const researchInstruction = researchDrivenInstruction(researchBrief);
-  const instruction=answer.trim()?`处理用户刚才的回答并更新 briefUpdates；${researchInstruction} 若仍有不合格的必填项，围绕依赖链（事实→研判主线→观点→角度→命题→边界）上最靠前的一个不合格必填项提出下一个问题。`: (current.messages?.length?`用户本轮未输入新内容，不是重新开始。基于当前底稿继续推进：${researchInstruction} 有不合格必填项则按依赖链顺序提问最靠前的一个；全部合格则说明底稿已可成稿，直接告知作者。`:`编辑会刚开始。先用一两句话概括事件卡与来源已给出的事实基座，再用具体研判依据建立写作主线。${researchInstruction} 按依赖链顺序（先确认事实，再确认研判主线，再观点、角度、命题、边界）提出第一个关键问题。${current.editorial?.editor_question?`选题编排阶段预置的首问供参考：${current.editorial.editor_question}`:''}`);
+  const instruction=answer.trim()?`处理用户刚才的回答；需要更新底稿字段时调用 agent.form.update，使用 operations:[{field,op,value/values}]；${researchInstruction} 若仍有不合格的必填项，围绕依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）上最靠前的一个不合格必填项提出下一个问题。`: (current.messages?.length?`用户本轮未输入新内容，不是重新开始。基于当前底稿继续推进：${researchInstruction} 需要更新底稿字段时调用 agent.form.update，使用 operations:[{field,op,value/values}]；有不合格必填项则按依赖链顺序提问最靠前的一个；全部合格则说明底稿已可成稿，直接告知作者。`:`编辑会刚开始。先用一两句话概括事件卡与来源已给出的事实基座，再用具体研判依据帮助作者形成观点、角度和命题。${researchInstruction} 按依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）提出第一个关键问题。${current.editorial?.editor_question?`选题编排阶段预置的首问供参考：${current.editorial.editor_question}`:''}`);
   // 装配结构：不可信块只放纯数据（候选/事件/底稿/字段状态）；对话历史展开为真实 user/assistant 回合，
   // 作者回答（已在 current.messages 末尾）保有 user 回合权重，指令作为最后一条 user 消息收尾。
   return [
@@ -211,50 +242,29 @@ export async function buildEditorialMessages(current,answer,events=[],retrieve=n
         angle:current.angle,thesis:current.thesis,composite:Boolean(current.composite)
       },
       events:eventInputs,
-      researchBrief,
+      researchBrief: researchBriefContext,
       currentEditorial:current.editorial,fieldStatus,ready})},
+    {role:'user',protected:true,content:delimitUntrusted('research-selection-catalog',researchSelectionCatalog(selectableResearchPoints),RESEARCH_SELECTION_CATALOG_BUDGET)},
     ...trimConversation(current.messages),
     {role:'user',protected:true,content:instruction},
   ];
 }
 
-export function applyEditorialResult({store,candidateId,current,parsed,result}) {
-  const reply=String(parsed.assistantReply||'').trim();
+export function finalizeEditorialResult({store,candidateId,current,reply='',result={}}) {
+  const assistantReply=String(reply||'').trim();
   const latest=store.getCandidate(candidateId);
   if(latest?.status==='locked'||latest?.editorial?.brief_status==='LOCKED'){
-    if(reply)store.addEditorialMessage(candidateId,'assistant',reply);
-    return {candidate:store.getCandidate(candidateId),editorial:latest.editorial,usage:result.usage,model:result.model,reply,ignoredBecauseLocked:true};
+    if(assistantReply)store.addEditorialMessage(candidateId,'assistant',assistantReply);
+    return {candidate:store.getCandidate(candidateId),editorial:latest.editorial,usage:result.usage,model:result.model,reply:assistantReply,ignoredBecauseLocked:true};
   }
-  const updates=parsed.briefUpdates||{};
-  // 候选字段是单值决策：只有模型明确返回 set/replace（或兼容旧字符串）才替换。
-  const candidatePatch={};
-  for(const field of CANDIDATE_FIELDS){
-    if(!hasEditorialPatch(updates[field]))continue;
-    const value=cleanDecisionText(field,mergeSingleEditorialField(current[field],updates[field],substantiveDecision));
-    if(value!==String(current[field]||'').trim()||((updates[field]?.clear===true)&&!value))candidatePatch[field]=value;
-  }
-  const mergedCandidate={...current,...candidatePatch};
-  if(Object.keys(candidatePatch).length)store.updateCandidate(candidateId,{angle:mergedCandidate.angle,thesis:mergedCandidate.thesis});
-  // 多值底稿字段默认追加并去重；删除/清空/整段替换都必须通过显式操作表达。
-  const mergeText=(field,validator=substantiveDecision)=>{
-    const next=updates[field];
-    if(!hasEditorialPatch(next))return current.editorial[field]||'';
-    return mergeAppendEditorialField(current.editorial[field]||'',next,validator);
-  };
-  const mergeSingle=(field,validator)=>{
-    const next=updates[field];
-    if(!hasEditorialPatch(next))return current.editorial[field]||'';
-    return mergeSingleEditorialField(current.editorial[field]||'',next,validator);
-  };
-  const mergedEditorial={...current.editorial,
-    confirmed_facts:mergeText('confirmed_facts',confirmedFactsDecision),research_basis:mergeSingle('research_basis',researchBasisDecision),author_opinions:mergeText('author_opinions',substantiveDecision),
-    confirmed_experiences:mergeText('confirmed_experiences',substantiveDecision),rejected_angles:mergeText('rejected_angles',substantiveDecision),
-    forbidden_claims:mergeText('forbidden_claims')};
-  // 就绪由代码推导：必填表单项填好即可成稿，不再由模型声明
-  const readiness=evaluateEditorialReadiness({candidate:mergedCandidate,editorial:mergedEditorial});
-  const editorial=store.saveEditorial(candidateId,{...mergedEditorial,
+  // 表单和研判采用点已经由业务工具直接写入；这里只刷新状态和保存最终回复。
+  const base=latest||current;
+  const mergedCandidate=store.getCandidate(candidateId)||base;
+  // 就绪由代码推导：必填表单项填好即可成稿，不由模型声明。
+  const readiness=evaluateEditorialReadiness({candidate:mergedCandidate,editorial:mergedCandidate.editorial||{}});
+  const editorial=store.saveEditorial(candidateId,{...(mergedCandidate.editorial||{}),
     editor_question:'',open_questions:readiness.missing.join('；'),
     next_action:readiness.ready?'WRITE_NOW':'DISCUSS',brief_status:readiness.ready?'WRITE_NOW':'DISCUSS'});
-  if(reply)store.addEditorialMessage(candidateId,'assistant',reply);
-  return {candidate:store.getCandidate(candidateId),editorial,readiness,usage:result.usage,model:result.model,reply};
+  if(assistantReply)store.addEditorialMessage(candidateId,'assistant',assistantReply);
+  return {candidate:store.getCandidate(candidateId),editorial,readiness,usage:result.usage,model:result.model,reply:assistantReply};
 }

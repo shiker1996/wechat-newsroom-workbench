@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
 const source = fs.readFileSync(path.join(root, "public/src/views/editorial.js"), "utf8");
+const topicsSource = fs.readFileSync(path.join(root, "public/src/views/topics.js"), "utf8");
 const streamSource = fs.readFileSync(path.join(root, "public/src/core/stream-chat.js"), "utf8");
 const agentEventsSource = fs.readFileSync(path.join(root, "public/src/core/agent-events.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "public/styles.css"), "utf8");
@@ -23,13 +24,21 @@ test("未通过的成稿门禁可定位到决策底稿字段", () => {
   assert.match(source, /field\.scrollIntoView/);
 });
 
-test("编辑室首屏保留编辑框，研判放在主编辑区之后", () => {
-  assert.match(styles, /\.editorial-focus-grid\s*\{[^}]*grid-template-columns:minmax\(0,7fr\) minmax\(0,5fr\)[^}]*grid-template-rows:minmax\(0,1fr\) auto[^}]*height:clamp\(620px,calc\(100vh - 250px\),820px\)/);
-  assert.match(styles, /\.editorial-focus-grid \.editorial-chat\s*\{[^}]*grid-row:1[^}]*min-height:0/);
-  assert.match(styles, /\.editorial-focus-grid \.event-card-panel #event-cards-list\s*\{[^}]*overflow:auto/);
-  assert.doesNotMatch(html, /class="editorial-focus-grid"[\s\S]*class="editorial-research-panel"[\s\S]*class="editorial-production-gate"/);
-  assert.match(html, /class="editorial-focus-grid"[\s\S]*class="editorial-production-gate"[\s\S]*<\/div>\s*<section class="editorial-research-panel"/);
+test("编辑室首屏聚焦对话与写作主线，资料区默认按需展开", () => {
+  assert.match(html, /class="editorial-focus-grid"[\s\S]*class="editorial-focus-rail"[\s\S]*id="editorial-production-gate"/);
+  assert.match(html, /<details class="editorial-reference-details event-card-panel" id="event-card-panel" hidden>/);
+  assert.match(html, /<details class="editorial-reference-details editorial-research-panel" id="editorial-research-panel" hidden>/);
+  assert.match(styles, /\.editorial-focus-grid\s*\{[^}]*grid-template-columns:minmax\(0,1\.35fr\) minmax\(300px,.65fr\)[^}]*height:clamp\(560px,calc\(100vh - 300px\),740px\)/);
+  assert.match(styles, /\.editorial-focus-rail\s*\{[^}]*display:flex[^}]*flex-direction:column/);
+  assert.match(styles, /\.editorial-reference-details>summary\s*\{[^}]*cursor:pointer/);
   assert.match(html, /id="editorial-production-hint" aria-live="polite"/);
+});
+
+test("编辑室右侧成稿门禁不会因窄栏 flex 收缩而溢出容器", () => {
+  assert.match(styles, /editorial-focus-grid \.editorial-focus-rail\{overflow-x:hidden;overflow-y:auto/);
+  assert.match(styles, /editorial-focus-rail>\.editorial-focus-brief,\.editorial-focus-grid \.editorial-focus-rail>\.editorial-production-gate\{flex:0 0 auto\}/);
+  assert.match(styles, /editorial-focus-rail \.editorial-production-gate\{box-sizing:border-box;width:100%;max-width:100%;min-width:0;flex-shrink:0\}/);
+  assert.match(styles, /editorial-focus-rail \.editorial-gate-check\{[^}]*white-space:normal/);
 });
 
 test("编辑室研判展示候选命题和四类语义关系，不展示机器信号标题", () => {
@@ -40,6 +49,16 @@ test("编辑室研判展示候选命题和四类语义关系，不展示机器�
   assert.match(source, /已合并.*条证据/);
   assert.doesNotMatch(source, /事件内信号（/);
   assert.doesNotMatch(source, /事件间关系候选（/);
+});
+
+test("研判拓展点由编辑会 Agent 对话决定，页面只读展示采用状态", () => {
+  assert.match(source, /由编辑室 Agent 根据已经确认的角度和命题自动选择/);
+  assert.match(source, /本页只读展示，不需要手动勾选/);
+  assert.doesNotMatch(source, /data-research-point/);
+  assert.doesNotMatch(source, /data-research-reject/);
+  assert.doesNotMatch(source, /function recommendResearchPoints/);
+  assert.doesNotMatch(source, /preselectedResearchPoints/);
+  assert.doesNotMatch(html, /type="checkbox"[^>]*data-research-point/);
 });
 
 test("编辑会中的超长链接不会撑宽消息区", () => {
@@ -76,10 +95,12 @@ test("候选题 Tab 使用两端箭头平滑滚动并隐藏原生滚动条", () 
   assert.match(source, /next\.disabled = sidebar\.scrollLeft >= maxScroll - 1/);
 });
 
-test("编辑室区分加载、空池和低于成稿线三种状态", () => {
+test("编辑室区分加载和空池状态，并展示全部文章候选", () => {
   assert.match(html, /id="editorial-loading"[^>]*role="status"/);
   assert.match(html, /id="editorial-empty" class="empty-state" hidden/);
   assert.match(source, /当前批次还没有文章候选/);
-  assert.match(source, /均低于成稿线/);
+  assert.match(source, /const visibleCandidates = state\.candidates/);
+  assert.doesNotMatch(source, /低于成稿线|DRAFT_SCORE_THRESHOLD|editorial-hidden-note/);
+  assert.doesNotMatch(topicsSource, /低于成稿线|DRAFT_SCORE_THRESHOLD|data-toggle-hidden-candidates|hiddenItems/);
   assert.match(source, /const requested = visibleCandidates\.find/);
 });

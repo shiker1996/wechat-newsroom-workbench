@@ -1,4 +1,4 @@
-import { evaluateEditorialReadiness, selectWriterSkill } from '../../../features/articles/index.mjs';
+import { evaluateEditorialReadiness, normalizeRejectedAngles, selectWriterSkill } from '../../../features/articles/index.mjs';
 import { resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
 import { listArticleStageSkillSlots, listEntryWriterSkills, resolveArticleStageSkills, resolveEntryWriterSkill } from '../../skills/entry-routing.mjs';
 import { executeCapabilityWithPreference } from '../../tools/capability-slots.mjs';
@@ -161,10 +161,18 @@ export async function handleArticleRoutes(context) {
     const batch = store.getBatch(candidate.batch_id);
     const filePath = path.join(batchWorkdir(batch), candidate.candidate_id, 'article-brief.md');
     const file = writeUtf8(filePath, lockedBrief(candidate, editorial));
+    const researchSelectionPath = path.join(batchWorkdir(batch), candidate.candidate_id, 'editorial-research-selection.json');
+    const researchSelection = writeUtf8(researchSelectionPath, JSON.stringify({
+      candidate_id: candidate.candidate_id,
+      selected: editorial.adopted_research_points || [],
+      rejected: normalizeRejectedAngles(editorial.rejected_angles),
+      generated_at: new Date().toISOString(),
+    }, null, 2));
     store.saveEditorial(candidate.id, { ...editorial, brief_status: 'LOCKED' });
     store.updateCandidate(candidate.id, { status: 'locked' });
     store.updateBatch(batch.id, { stage: 'drafting', status: 'running' });
     store.upsertArtifact({ batchId: batch.id, kind: '锁定简报', name: 'article-brief.md', path: filePath, ...file });
+    store.upsertArtifact({ batchId: batch.id, kind: '研判采用清单', name: 'editorial-research-selection.json', path: researchSelectionPath, ...researchSelection });
     return json(response, 200, { candidate: store.getCandidate(candidate.id), filePath });
   }
   const draftMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/draft$/);

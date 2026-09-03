@@ -2,7 +2,6 @@ import { $, $$ } from "../core/dom.js";
 import { request } from "../core/http.js";
 import { escapeHtml, toast, confirmAction } from "../core/ui.js";
 import { state } from "../core/state.js";
-import { DRAFT_SCORE_THRESHOLD } from "../core/constants.js";
 import { dimensionLabels } from "../core/dimensions.js";
 import { distributionLane, distributionLaneClass, readerStakeText } from "../core/distribution-view.js";
 
@@ -16,7 +15,6 @@ function trackElements(track) {
     : { count: "candidate-count", list: "candidate-list" };
 }
 
-function isDraftEligible(item) { return item.f_score == null || Number(item.f_score) >= DRAFT_SCORE_THRESHOLD; }
 const articleScoreFields = [
   ["event_value", "事件 T"], ["research_value", "研判 J"], ["article_value", "文章 A"],
   ["competition_penalty", "竞争 C"], ["f_score", "最终 F"],
@@ -164,9 +162,8 @@ function renderCandidates(candidates, track = activeTrack()) {
     const independent=["wechat-experience","wechat-tutorial"].includes(String(item.output_mode||""));
     return articleType==="independent"?independent:!independent;
   });
-  // 自动入池筛选线 F≥55：低于评分线的候选默认隐藏；展开后经人工锁定简报仍可成稿
-  const hiddenItems = track === "article" && !state.topicShowAll ? typeFiltered.filter((item) => !isDraftEligible(item)) : [];
-  const visible = track === "article" && !state.topicShowAll ? typeFiltered.filter(isDraftEligible) : typeFiltered;
+  // 选题池展示全部已生成候选；F 只作为评分信息，不再承担页面隐藏逻辑。
+  const visible = typeFiltered;
   const count = document.getElementById(elements.count);
   if (count) count.textContent = visible.length + " 条";
   const list = document.getElementById(elements.list);
@@ -182,10 +179,7 @@ function renderCandidates(candidates, track = activeTrack()) {
       .slice(0, 2);
     if (shared.length) overlapByCandidate.set(item.id, shared);
   }
-  const hiddenNotice = hiddenItems.length
-    ? `<button type="button" class="candidate-hidden-toggle" data-toggle-hidden-candidates>${state.topicShowAll ? "收起低于成稿线的选题" : `已隐藏 ${hiddenItems.length} 条低于成稿线（F<${DRAFT_SCORE_THRESHOLD}）的选题，点击显示`}</button>`
-    : "";
-  list.innerHTML = hiddenNotice + (visible.length
+  list.innerHTML = visible.length
     ? visible.map((item) => {
         // 图文候选统一展示图文评分；编辑入口只按工具图文/事件图文分流。
         const isCustom = track === "social_cards" && String(item.output_mode||"").includes("custom-cards");
@@ -244,7 +238,7 @@ function renderCandidates(candidates, track = activeTrack()) {
         </article>`;
         return card;
       }).join("")
-    : `<div class="empty-state">${track === "article" ? (hiddenItems.length ? "当前没有高于成稿线的选题。" : "暂无文章候选。在热点全景创建选题后会进入这里。") : "暂无图文候选。完成事件研判后，达到 G_social 入池线的候选会自动进入这里。"}</div>`);
+    : `<div class="empty-state">${track === "article" ? "暂无文章候选。在热点全景创建选题后会进入这里。" : "暂无图文候选。完成事件研判后，达到 G_social 入池线的候选会自动进入这里。"}</div>`;
 }
 
 // 文章/图文预选排行榜共用的展开收起：状态用 class 表达，按钮同步 aria-expanded
@@ -347,12 +341,6 @@ if (!window.__candidateTrackActionsBound) {
     const research = event.target.closest("[data-topic-research]");
     if (research) {
       await openCandidateResearch(research.dataset.topicResearch);
-      return;
-    }
-    const toggleHidden = event.target.closest("[data-toggle-hidden-candidates]");
-    if (toggleHidden) {
-      state.topicShowAll = !state.topicShowAll;
-      renderCandidates(state.candidates || [], activeTrack());
       return;
     }
     const articleType=event.target.closest("[data-article-type]");

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "likec4-dsl": {
+      "source": "likec4.dev",
+      "sourceUrl": "https://likec4.dev/",
+      "sourceType": "well-known",
+      "computedHash": "36172ada5f58598a5ddca61dc2e8c28995453b88673a73f99eadd283ff59507b",
+      "wellKnownDigest": "sha256:6104361d9b1966a1f0ba193460574e0b4f10bd4766483dbd2c2b3c41647e3174"
+    }
+  }
+}

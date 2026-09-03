@@ -299,6 +299,10 @@ export class Store {
     return this.queries.candidates.list(batchId, track);
   }
 
+  listCandidateSummaries(batchId, track = 'article') {
+    return this.queries.candidates.listSummary(batchId, track);
+  }
+
   getCandidate(id) {
     return this.queries.candidates.get(id);
   }

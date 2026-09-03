@@ -11,7 +11,7 @@ import { securityHeaders } from "./http.js";
 export async function streamChat({ url, body, messages, button, busyLabel, doneLabel, title, errorLabel, onDone, rethrow = false, confirmation = "" }) {
   const sm = document.createElement("div");
   sm.className = "editorial-message assistant streaming";
-  sm.innerHTML = `<b>${title} · 实时回应</b><details class="thinking-box" hidden><summary>思考过程</summary><div class="thinking-text"></div></details><p class="reply-text"></p>`;
+  sm.innerHTML = `<b>${title} · 实时回应</b><details class="thinking-box" hidden><summary>思考过程</summary><div class="thinking-text"></div></details><div class="reply-text markdown-body"></div>`;
   const scrollMessagesToLatest = () => scrollToLatest(messages);
   messages.append(sm);
   scrollMessagesToLatest();

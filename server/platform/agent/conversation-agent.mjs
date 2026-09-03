@@ -4,6 +4,7 @@ import { agentEvent } from './events.mjs';
 import { AgentContractError, normalizeAgentEnvelope, validateAgentEnvelope, toolError } from './tool-protocol.mjs';
 import { executeConversationTool } from './tool-executor.mjs';
 import { capabilityForToolName } from './tool-catalog.mjs';
+import { CONVERSATION_FINISH_CAPABILITY } from './conversation-finish-tool.mjs';
 
 function budgets(input={}){const out={};for(const [key,value] of Object.entries(CONVERSATION_AGENT_BUDGET_DEFAULTS))out[key]=Math.min(CONVERSATION_AGENT_BUDGET_LIMITS[key],Math.max(1,Number(input[key])||value));return Object.freeze(out);}
 function runId(){return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;}
@@ -45,6 +46,18 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       const modelHistory=compactAgentHistory(history,limits.maxHistoryChars);
       const modelEnvelope=await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining);
       const native = nativeToolEnvelope(modelEnvelope,catalog,limits.maxParallelToolCalls);
+      // 对话 Agent 可以在没有业务工具需求时直接返回普通文本。
+      // 普通文本只作为本轮回复，不再回退到旧 JSON 信封解析；若模型主动调用
+      // agent.conversation.finish，则仍按显式结束工具处理。
+      if (modelEnvelope?.nativeTools === true && !native) {
+        const assistantReply = String(modelEnvelope.content || '').trim();
+        if (assistantReply) {
+          store?.finishAgentRun?.(id, { status: 'completed', modelSteps: step + 1, toolCalls });
+          emit('done', { status: 'completed' });
+          return { agentRunId: id, type: 'final', assistantReply, output: {}, modelSteps: step + 1, toolCalls };
+        }
+        throw new AgentContractError('EMPTY_AGENT_REPLY', '模型未返回工具调用或有效文本回复');
+      }
       const envelope=native?.envelope||validateAgentEnvelope(normalizeAgentEnvelope(modelEnvelope),{maxRequests:limits.maxParallelToolCalls});
       if(envelope.type==='final'){
         store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
@@ -65,6 +78,19 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
           emit(result.status==='ok'?'tool.completed':'tool.failed',{requestId:request.requestId,capability:request.capability,status:result.status,error:result.error,...(result.status==='ok'?completedEvent(result):{})});return result;
         }));
         results.push(...groupResults);
+        // 显式结束也是业务工具调用，而不是模型输出中的 final JSON。
+        // 允许同一轮先写表单再结束；所有同组工具执行完后再提交最终回复。
+        const finishEntries = group
+          .map((request, index) => ({ request, result: groupResults[index] }))
+          .filter(({ request }) => request.capability === CONVERSATION_FINISH_CAPABILITY);
+        const successfulFinish = finishEntries.find(({ result }) => result?.status === 'ok');
+        if (successfulFinish) {
+          const assistantReply = String(successfulFinish.result.data?.assistantReply || '').trim();
+          if (!assistantReply) throw new AgentContractError('INVALID_AGENT_ENVELOPE', '结束工具未返回有效 assistantReply');
+          store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
+          emit('done',{status:'completed'});
+          return {agentRunId:id,type:'final',assistantReply,output:{},modelSteps:step+1,toolCalls};
+        }
       }
       if(native) history.push(...nativeHistory(modelEnvelope,results,native.callByRequestId));
       else history.push({role:'assistant',content:JSON.stringify(envelope),protected:true},{role:'tool',content:JSON.stringify(results),protected:true});

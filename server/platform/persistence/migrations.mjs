@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 34;
+export const WORKBENCH_SCHEMA_VERSION = 35;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -613,6 +613,13 @@ export function runDatabaseMigrations(db, migrateSchema) {
       const columns=new Set(db.prepare('PRAGMA table_info(editorial_sessions)').all().map((column)=>column.name));
       if(!columns.has('research_basis'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN research_basis TEXT NOT NULL DEFAULT ''");
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(34,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v35：保存作者在编辑室明确采用的事件内/事件间研判拓展点。
+    if(applied<35){db.exec('BEGIN IMMEDIATE');try{
+      const columns=new Set(db.prepare('PRAGMA table_info(editorial_sessions)').all().map((column)=>column.name));
+      if(!columns.has('adopted_research_points_json'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN adopted_research_points_json TEXT NOT NULL DEFAULT '[]'");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(35,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

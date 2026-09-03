@@ -230,6 +230,16 @@ function socialCardGate(candidate, contentType, facts, editorial, eventAnalysis)
   return evaluateCardGate(candidate,facts,editorial);
 }
 
+function researchPointsBrief(points) {
+  const items = Array.isArray(points) ? points : [];
+  return items.length
+    ? items.map((item) => {
+      const boundary = item.evidence_boundary && typeof item.evidence_boundary === 'object' ? JSON.stringify(item.evidence_boundary) : item.evidence_boundary;
+      return `- ${item.label || (item.scope === 'inter_event' ? '事件间关系' : '事件内研判')}：${item.statement || item.question || item.relationship_statement || ''}${item.event_title ? `（涉及：${item.event_title}）` : ''}${item.expected ? `；基线/预期：${item.expected}` : ''}${item.observed ? `；观察：${item.observed}` : ''}${item.gap ? `；落差：${item.gap}` : ''}${item.difference ? `；差异：${item.difference}` : ''}${item.impact ? `；影响：${item.impact}` : ''}${item.supporting_facts?.length ? `；支撑事实：${item.supporting_facts.join('；')}` : ''}${boundary ? `；证据边界：${boundary}` : ''}`;
+    }).join('\n')
+    : '暂无；成稿时不得自行补写未被作者采用的研判点。';
+}
+
 function lockedBrief(candidate, editorial) {
   return `---
 brief_status: LOCKED
@@ -242,6 +252,10 @@ final_readiness: WRITE_NOW
 ---
 
 # ${candidate.hotspot_title}
+
+## 采用的研判拓展点
+
+${researchPointsBrief(editorial.adopted_research_points)}
 
 ## 采用的研判主线
 

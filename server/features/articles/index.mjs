@@ -8,9 +8,15 @@ export {
   authorizedWritingBrief,
   buildArticleStageSystem,
   buildDraftUserPrompt,
+  buildPublicationClaimRegister,
   compositeSourceText,
+  extractArticleTitle,
   normalizePlanningResult,
+  publicationComplianceIssue,
+  publicationCompliancePrompt,
+  publicationFactBaseIssues,
   runArticlePipeline,
+  scanPublicationRisk,
   selectWriterSkill,
   sourceCacheIssue,
   unverifiedFactBaseIssue,
@@ -38,6 +44,8 @@ export { runAiVisualCoverJob } from './application/ai-visual-cover-generator.mjs
 export { AI_VISUAL_COVER_STAGE_CONTRACT, createAiVisualCoverStageRecorder, writeAiVisualCoverDeliveryGate, writeAiVisualCoverGenerationReport, writeAiVisualCoverSkillManifest } from './application/ai-visual-cover-pipeline.mjs';
 export { AI_VISUAL_COVER_FINAL_HTML, AI_VISUAL_COVER_HEIGHT, AI_VISUAL_COVER_HTML, AI_VISUAL_COVER_WIDTH, buildAiVisualCoverScaffold, buildCoverThemeSnapshot, buildCoverVisualInput } from './application/ai-visual-cover-composer.mjs';
 export { evaluateEditorialReadiness, substantiveDecision, confirmedFactsDecision, researchBasisDecision, EDITORIAL_FIELDS } from './domain/editorial-readiness.mjs';
-export { applyEditorialResult, buildEditorialMessages, reconcileEditorialAnswer } from './llm/editorial-room.mjs';
+export { normalizeResearchPoints, researchPointsComplete, mergeResearchPoints, normalizeRejectedAngles } from './domain/research-selection.mjs';
+export { normalizeResearchCoverageResult, researchCoverageNeedsRevision } from './domain/research-coverage.mjs';
+export { finalizeEditorialResult, buildEditorialMessages } from './llm/editorial-room.mjs';
 export { EDITORIAL_AGENT_CAPABILITIES, runEditorialAgentTurn } from './application/agent/editorial-adapter.mjs';
 export { TUTORIAL_AGENT_CAPABILITIES, runTutorialAgentTurn, tutorialProjectAttachmentArguments } from './application/agent/tutorial-adapter.mjs';

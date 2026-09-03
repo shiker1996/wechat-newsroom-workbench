@@ -54,5 +54,8 @@ dist/
 # 封面调试与采样生成物
 output/
 
+# Agents / skills（本地开发技能，不纳入版本控制）
+.agents/
+
 # 本地清理隔离区（确认回归通过后再人工删除）
 _delete/

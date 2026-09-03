@@ -118,10 +118,11 @@ function sourceDocFor(store, article) {
 }
 
 function compactEvent(event, scopeItem, store, searchEvidence = [], { includeContent = true } = {}) {
-  const sourceIds = [];
+  const eventSourceIds = [];
+  const researchSourceIds = [];
   const localSources = list(event?.articles).slice(0, 8).map((article, index) => {
     const source_id = sourceIdOf(article, index);
-    sourceIds.push(source_id);
+    eventSourceIds.push(source_id);
     const repositoryMeta = article?.repositoryMeta || event?.repositoryMeta;
     const sourceDoc = sourceDocFor(store, article);
     const evidence_level = sourceEvidenceLevel({
@@ -164,7 +165,7 @@ function compactEvent(event, scopeItem, store, searchEvidence = [], { includeCon
     },
   })).filter((source) => source.source_id && (source.url || source.summary || source.content));
   const sources = [...localSources, ...externalSources].filter((source, index, all) => all.findIndex((item) => item.source_id === source.source_id) === index).slice(0, 24);
-  sourceIds.push(...sources.map((source) => source.source_id));
+  externalSources.forEach((source) => researchSourceIds.push(source.source_id));
   return {
     event_id: idOf(event),
     title: text(event?.representative_title, 240),
@@ -174,7 +175,10 @@ function compactEvent(event, scopeItem, store, searchEvidence = [], { includeCon
     event_parts: dimensionPartsOf(event),
     event_card: compactCard(event?.card),
     sources,
-    source_ids: [...new Set(sourceIds)],
+    // 事件卡来源与研判阶段新增的搜索来源必须分开，避免阶段 3 做错误的来源匹配。
+    source_ids: [...new Set(eventSourceIds)],
+    event_source_ids: [...new Set(eventSourceIds)],
+    research_source_ids: [...new Set(researchSourceIds)],
     source_evidence_levels: Object.fromEntries(sources.map((source) => [source.source_id, source.evidence_level])),
   };
 }
@@ -410,7 +414,7 @@ export function buildTopicResearchModelInput({ events = [], baseReport = {}, int
       // 阶段 3 的依据是完整研判报告本身；结构化信号/关系仅用于可选溯源。
       requires_report_input: true,
       requires_research_basis: false,
-      requires_evidence_source_ids: true,
+      requires_evidence_source_ids: false,
       allowed_basis: ['material_ids', 'internal_signal_refs', 'relation_ids'],
       allowed_materials: ['verified_research_materials'],
       material_statuses: ['verified', 'needs_review', 'model_reported'],
@@ -445,7 +449,7 @@ const PHASE_INSTRUCTIONS = {
   inter_event: '现在只执行第 2 阶段（2A）：事件间研判假设。批次内关系只能在 candidate_pairs 或 candidate_groups 中判断，不能自行把关键词相同当成关系；外部关系发现可以使用 external_anchor_events 作为单事件锚点。先使用一次模型原生联网搜索，合并查询并控制在不超过 5 个查询；搜索返回后立即停止搜索并输出 JSON。允许搜索探索 Top-K 锚点的外部关系：同一主体的不同动作、近似主体的同一动作、同一对象的不同策略、不同动作的结果反差，以及趋势样本和反例样本。联网发现只能帮助提出更可靠的关系假设和搜索线索，不能直接形成已确认关系；外部事件必须先作为待验证 reference event。请提出前后、回应、对比、趋势、反例假设，并为需要外部求证的关系输出 search_tasks。只输出 {"relations":[],"search_tasks":[]}。search_tasks 必须绑定 Top-K 锚点事件和 candidate pair/group 或 external anchor；外部关系发现必须填写 relation_axis，可用 same_subject_different_action、similar_subject_same_action、same_object_different_strategy、contrasting_action_or_outcome、same_occasion_comparison、trend_sample、counterexample_sample。',
   internal_verify: '现在执行第 1B 阶段：先使用一次模型原生联网搜索，合并查询并控制在不超过 5 个查询；搜索返回后立即停止搜索并输出 JSON。直接验证或修正事件内研判假设。输入中只有一个事件、假设和定向搜索任务；不得引入其他事件。不要抓取整篇正文，只使用联网搜索返回的公开摘要和引用。对每条反常必须说明 expected、observed、gap；对利益冲突必须说明 parties、issue、difference；发散方向必须说明 baseline、impact 和待验证问题。每条保留的信号必须引用 evidence_sources 中的 source_id。只有来源足以支持才标记 supported；不成立返回 rejected；摘要不足以确定时保留 needs_review。evidence_sources 必须返回 source_id、url、title、excerpt。只输出 {"items":[{"event_id":"...","anomalies":[],"interest_conflicts":[],"divergence_directions":[]}],"evidence_sources":[]}。',
   inter_event_verify: '现在执行第 2B 阶段：先使用一次模型原生联网搜索，合并查询并控制在不超过 5 个查询；搜索返回后立即停止搜索并输出 JSON。直接验证或修正事件间研判假设。只能处理输入中的 candidate_pairs、candidate_groups 和 external_reference_events。不要抓取整篇正文，只使用联网搜索返回的公开摘要和引用。外部参考事件可以作为关系端点，但必须通过 reference_event_ids 绑定；不得把它变成 Top-K 事件。关系类型只能是 sequence、response、comparison、trend、counterexample；comparison 必须给出具体 differences 或 comparison_basis；trend 必须有至少 3 个独立事件；counterexample 必须说明 refutes。关系不成立返回 rejected，摘要不足返回 needs_review。每条保留的关系都必须给出 insight、writing_angles、thesis_seeds 和 source_ids，并在 evidence_sources 中返回对应 source_id、url、title、excerpt。只输出 {"relations":[],"evidence_sources":[]}。',
-  topic_generation: '现在只执行第 3 阶段：候选选题生成。只能使用输入中列出的 research_reports、internal_research、inter_event_research 和 verified_research_materials；这些内容共同构成研判报告及其整理结果。model_reported/needs_review 是模型联网研判素材，可以形成候选，但必须在候选中保留待核边界，不能把它写成已核实事实。不能重新联网、重新发明事件关系、把事件摘要改写成标题，或把 external_reference_events 当成独立事实事件。请直接从研判报告中提炼可讨论的命题：可以来自事件内反常、利益/成本/责任冲突、可发散方向，也可以来自事件间前后、回应、对比、趋势、反例关系；重点是问题、解释、影响和观点，不是新闻复述。候选不要求填写 material_ids、internal_signal_refs 或 relation_ids；如果能够准确对应报告中的结构化素材，可以作为可选溯源填写，但它们不参与候选保留、排序或比例门禁。必须填写 evidence_source_ids（如果报告中没有可用来源则保留待核边界）、以及具体的 core_question、angle 和 thesis_seed。summary_only 或 model_reported 素材生成的候选必须使用待验证、可能、是否等限定表达，并填写 research_status=needs_review；不要因为缺少 full_text 就丢弃候选。只输出 {"topic_candidates":[]}。',
+  topic_generation: '现在只执行第 3 阶段：候选选题生成。只能使用输入中列出的 research_reports、internal_research、inter_event_research 和 verified_research_materials；这些内容共同构成研判报告及其整理结果。model_reported/needs_review 是模型联网研判素材，可以形成候选，但必须在候选中保留待核边界，不能把它写成已核实事实。不能重新联网、重新发明事件关系、把事件摘要改写成标题，或把 external_reference_events 当成独立事实事件。请直接从研判报告中提炼可讨论的命题：可以来自事件内反常、利益/成本/责任冲突、可发散方向，也可以来自事件间前后、回应、对比、趋势、反例关系；重点是问题、解释、影响和观点，不是新闻复述。每个候选必须包含 candidate_title、event_ids、core_question、angle、thesis_seed、research_status 六个字段；单事件也必须使用 event_ids 数组，不能使用 event_id。candidate_title 是文章选题标题，不是事件原始标题，必须明确讨论对象和问题。event_ids 只能填写输入中已有的事件 ID。research_status 只能是 verified 或 needs_review；使用 summary_only 或 model_reported 素材时必须是 needs_review，并在标题、问题或命题中使用待验证、可能、是否等限定表达。material_ids、internal_signal_refs、relation_ids、evidence_source_ids 均为可选字段，填写错误或缺失不得导致候选被丢弃。至少生成 1 条有效候选；没有足够依据时返回空数组。严格按照以下格式输出，不要输出解释、前置进度文本或 Markdown：{"topic_candidates":[{"candidate_title":"追觅一年造车归零：高调跨界为何被快速清算？","event_ids":["S_EVENT_001"],"core_question":"一家扫地机器人公司为何在官宣造车后快速收缩？","angle":"从战略承诺、执行投入与对外回应的落差切入","thesis_seed":"跨界失败的关键不只是项目终止，而是高调承诺与真实投入之间的责任落差","research_status":"needs_review","relation_ids":[],"internal_signal_refs":[],"material_ids":[],"evidence_source_ids":[]}]}.',
   all: '',
 };
 
@@ -788,7 +792,7 @@ function normalizeTopic(raw, selectedIds, allSources, allowedRelations, index, a
     .filter(Boolean);
   const relationIds = [...new Set([...list(raw?.relation_ids), ...inferredRelationIds]
     .map((item) => text(item, 100)).filter((item) => allowedRelations.has(item)))].slice(0, 8);
-  if (!title || !eventIds.length || eventIds.some((item) => !selectedIds.has(item)) || !sourceIds.length || !coreQuestion || !angle || !thesis) return null;
+  if (!title || !eventIds.length || eventIds.some((item) => !selectedIds.has(item)) || !coreQuestion || !angle || !thesis) return null;
   if (requireBasis && !relationIds.length && !signalRefs.length && !materialIds.length) return null;
   const evidenceLevels = [...new Set(sourceIds.map((sourceId) => levelForSource(sourceMap.get(sourceId))))];
   const researchStatus = raw?.research_status === 'verified' || raw?.research_status === 'needs_review'
@@ -861,11 +865,8 @@ export function normalizeDiscussionResearchModel(raw, { events = [], baseReport 
     mode: 'model_analysis',
     research_source: 'model',
     internal_signals: internal,
-    internal_research: internal,
     relations,
-    inter_event_research: relations,
     topic_candidates: topics,
-    topic_candidate: topics[0] || null,
     model_research: { status: 'completed', selected_event_count: byEvent.size, relation_count: relations.length, topic_count: topics.length },
   };
 }
@@ -1663,13 +1664,10 @@ export async function generateDiscussionResearch({ gateway, store, events = [], 
     mode: 'model_analysis',
     research_source: 'model',
     internal_signals: internalResearch,
-    internal_research: internalResearch,
     relations,
-    inter_event_research: relations,
     verified_research_materials: verifiedResearchMaterials,
     reference_events: referenceEvents,
     topic_candidates: topics,
-    topic_candidate: topics[0] || null,
     model_research: {
       status: 'completed',
       phase_count: 3,
