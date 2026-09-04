@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260904-model-provider-groups-1">
+  <link rel="stylesheet" href="/styles.css?v=20260904-brief-moved-to-writing-1">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -313,7 +313,35 @@
           <div id="column-list" class="column-list"></div>
         </section>
       </div>
-      <section class="panel material-list-panel"><div class="panel-head"><div><span class="kicker">RAW MATERIALS</span><h3>素材箱</h3><small>勾选一条或多条素材，直接带入自主写作</small></div><div class="material-filters"><select id="material-status-filter"><option value="">全部状态</option><option value="inbox">待整理</option><option value="developing">整理中</option></select><select id="material-sort-filter" aria-label="素材排序"><option value="latest">最近更新</option><option value="feedback">复盘优先</option></select><span id="material-count"></span></div></div><div class="material-selection-toolbar" id="material-selection-toolbar" hidden><span id="material-selection-count">已选 0 条素材</span><small>进入自主写作后，素材正文会作为【素材】事实带入，仍可在表单和对话中补充、删改。</small><button type="button" class="primary-button" data-material-write-selected>用选中素材写作 →</button></div><div id="material-list" class="material-list"></div></section>
+      <section class="panel material-list-panel"><div class="panel-head"><div><span class="kicker">RAW MATERIALS</span><h3>素材箱</h3><small>先整理，可直接用于自主写作；主线和目标读者由 AI 在写作阶段提议、你来确认</small></div><div class="material-filters"><select id="material-status-filter"><option value="">全部状态</option><option value="inbox">待整理</option><option value="developing">整理中</option><option value="planned">已计划</option><option value="archived">归档</option></select><select id="material-sort-filter" aria-label="素材排序"><option value="latest">最近更新</option><option value="feedback">复盘优先</option></select><span id="material-count"></span></div></div><div class="material-selection-toolbar" id="material-selection-toolbar" hidden><span id="material-selection-count">已选 0 条素材</span><small>进入自主写作后，素材正文会作为【素材】事实带入，仍可在表单和对话中补充、删改。</small><button type="button" class="primary-button" data-material-write-selected>用选中素材写作 →</button><button type="button" class="outline-button" data-material-social-selected>用选中素材做图文 →</button></div><div id="material-list" class="material-list"></div></section>
+
+      <dialog class="material-dialog" id="material-edit-dialog">
+        <form method="dialog" class="material-dialog-shell" id="material-edit-form">
+          <div class="material-dialog-head"><div><span class="material-mark">EDIT</span><h3>编辑素材卡</h3><small id="material-edit-subtitle">修改不破坏来源追踪；模型评估保存在独立字段，不会被覆盖。</small></div><button type="button" class="ghost-button" data-material-dialog-close aria-label="关闭">✕</button></div>
+          <div class="material-dialog-body">
+            <details open><summary>基础整理</summary><div class="material-edit-grid">
+              <label>素材标题<input name="title" id="edit-title" placeholder="例如：我第一次发现自动化也会制造残局"></label>
+              <label>发生 / 记录时间<input type="date" name="capturedAt" id="edit-capturedAt"></label>
+              <label>来源类型<select name="sourceType" id="edit-sourceType"><option value="conversation">与 AI 的会话</option><option value="reading">读书 / 阅读</option><option value="life">生活经历</option><option value="project">项目 / 开发</option><option value="text">其他文本</option></select></label>
+              <label>素材状态<select name="status" id="edit-status"><option value="inbox">待整理</option><option value="developing">整理中</option><option value="planned">已计划</option><option value="archived">归档</option></select></label>
+              <label>推荐栏目<select name="recommendedColumnId" id="edit-recommendedColumnId"><option value="">（未指定，沿用评估推荐）</option></select></label>
+              <label>标签（用逗号分隔）<input name="tags" id="edit-tags" placeholder="AI写作，失败复盘，工作流"></label>
+              <label class="wide">正文 / Markdown<textarea name="rawText" id="edit-rawText" rows="10" required placeholder="原始记录，可继续补充"></textarea></label>
+            </div></details>
+            <details><summary>继续加工（Problem / Options / Verdict / Result / Value）</summary><div class="material-edit-grid">
+              <label>具体问题（为什么值得记录）<textarea name="problem" id="edit-problem" rows="3" placeholder="发生了什么、我在纠结什么"></textarea></label>
+              <label>考虑过的方案<textarea name="options" id="edit-options" rows="3" placeholder="还有哪些选项"></textarea></label>
+              <label>最终选择 / 放弃了什么<textarea name="verdict" id="edit-verdict" rows="3" placeholder="最终怎么选、放弃了什么、牺牲了什么"></textarea></label>
+              <label>结果 / 失败结论<textarea name="result" id="edit-result" rows="3" placeholder="结果、失败、反转或尚未验证"></textarea></label>
+              <label>读者可复用的结论<textarea name="value" id="edit-value" rows="3" placeholder="读者能带走什么判断"></textarea></label>
+              <label class="wide">证据与来源链接（一行一个：截图 / 日志 / 链接）<textarea name="evidence" id="edit-evidence" rows="3" placeholder="https://... 或 本地证据路径"></textarea></label>
+              <label class="wide">下一步想验证什么 / 下一篇预告<textarea name="nextTeaser" id="edit-nextTeaser" rows="2"></textarea></label>
+            </div></details>
+          </div>
+          <footer class="material-dialog-foot"><span class="muted" id="material-edit-hint">保存后会保留评估、来源类型和记录时间。</span><button type="button" class="outline-button" data-material-dialog-close>取消</button><button type="submit" class="primary-button">保存修改</button></footer>
+        </form>
+      </dialog>
+
     </section>
 
     <section class="view" id="view-wechat-review-prep">

@@ -115,10 +115,36 @@ function hydrateSelectedMaterials() {
   updateProgress();
 }
 
+async function hydrateLockedBrief() {
+  const briefId = Number(state.pendingIndependentWritingBriefId || 0);
+  if (!Number.isInteger(briefId) || briefId <= 0) return;
+  try {
+    const brief = await request(`/api/writing-material-briefs/${briefId}`);
+    if (!brief?.id || brief.status !== "confirmed") return;
+    const mainline = (brief.mainlineCandidates || []).find((item) => String(item.id) === String(brief.selectedMainlineId));
+    const patch = {};
+    if (!field("topic").value.trim()) patch.topic = brief.confirmedTopic || mainline?.title || field("topic").value;
+    if (!field("thesis").value.trim()) patch.thesis = brief.confirmedThesis || mainline?.thesis || "";
+    if (!field("audience").value.trim()) patch.audience = brief.audience || "";
+    const additions = [];
+    if (brief.authorExperienceConfirmed && (brief.confirmedThesis || mainline?.thesis)) additions.push(`【体验】${brief.confirmedThesis || mainline.thesis}`);
+    for (const fact of brief.factSummary || []) { if (fact?.text) additions.push(`【素材】${fact.text}`); }
+    for (const arg of mainline?.argument || []) additions.push(`【建议】${arg}`);
+    const points = field("points");
+    if (points && additions.length) {
+      const existing = new Set(lines(points.value));
+      points.value = [...lines(points.value), ...additions.filter((item) => !existing.has(item))].slice(0, 24).join("\n");
+    }
+    applyUpdates(patch);
+    toast("已带入锁定主线，可修改后生成");
+  } catch { /* 简报读取失败不阻断进入旧表单 */ }
+}
+
 function draft() {
   const value = payload();
   for (const key of ["points", "steps", "prerequisites", "expected_results", "common_errors", "materialUrls"]) value[key] = lines(value[key]);
   value.selectedMaterialIds = selectedMaterials().map((item) => Number(item.id));
+  value.briefId = Number(state.pendingIndependentWritingBriefId || 0) || undefined;
   return value;
 }
 
@@ -319,6 +345,7 @@ async function submit() {
   try {
     const input=payload();
     input.selectedMaterialIds = selectedMaterials().map((item) => Number(item.id));
+    input.briefId = Number(state.pendingIndependentWritingBriefId || 0) || undefined;
     input.stageSkills=selectedStageSkills(document.getElementById("tutorial-stage-skills"));
     input.creationRequestId=globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const url=retrying
@@ -438,5 +465,6 @@ export default async function loadTutorial() {
   document.getElementById("tutorial-provider").innerHTML = providerOptions(state.models?.defaultProvider || "");
   hydrateSelectedMaterials();
   syncMode();
+  await hydrateLockedBrief();
   await loadProjects();
 }

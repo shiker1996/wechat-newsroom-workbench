@@ -104,6 +104,7 @@ export class ContentPlanningRepository {
     if (input.title !== undefined) assign('title', String(input.title || '').trim());
     if (input.rawText !== undefined) { const text = String(input.rawText || '').trim(); if (!text) throw new Error('素材正文不能为空'); assign('raw_text', text); }
     if (input.sourceType !== undefined) assign('source_type', SOURCE_TYPES.has(input.sourceType) ? input.sourceType : 'text');
+    if (input.capturedAt !== undefined) assign('captured_at', dateValue(input.capturedAt) || new Date().toISOString().slice(0, 10));
     if (input.status !== undefined) assign('status', ['inbox', 'developing', 'planned', 'archived'].includes(input.status) ? input.status : 'inbox');
     if (input.tags !== undefined) assign('tags_json', JSON.stringify(input.tags));
     if (input.evidence !== undefined) assign('evidence_json', JSON.stringify(input.evidence));
@@ -120,6 +121,160 @@ export class ContentPlanningRepository {
   saveAssessment(id, assessment) {
     const payload = { ...assessment, assessed_at: now() };
     return this.updateMaterial(id, { assessment: payload, recommendedColumnId: assessment.recommended_column_id || null });
+  }
+
+  createWritingMaterialBrief({ materialIds = [], ...fields } = {}) {
+    const ids = this.#validMaterialIds(materialIds);
+    if (!ids.length) throw new Error('素材简报至少需要关联一条素材');
+    this.#assertMaterialIds(ids);
+    const timestamp = now();
+    const prepared = this.#prepareBriefFields(fields);
+    const result = this.db.prepare(`INSERT INTO writing_material_briefs(
+      material_ids_json,status,fact_summary_json,context,tension,why_it_matters,mainline_candidates_json,selected_mainline_id,
+      confirmed_topic,confirmed_thesis,discussion_question,audience,evidence_refs_json,missing_evidence_json,recommended_formats_json,
+      author_experience_confirmed,readiness_flags_json,confirmed_by,confirmed_at,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(JSON.stringify(ids), 'draft', prepared.fact_summary_json, prepared.context, prepared.tension, prepared.why_it_matters,
+        prepared.mainline_candidates_json, prepared.selected_mainline_id, prepared.confirmed_topic, prepared.confirmed_thesis,
+        prepared.discussion_question, prepared.audience, prepared.evidence_refs_json, prepared.missing_evidence_json, prepared.recommended_formats_json,
+        prepared.author_experience_confirmed, prepared.readiness_flags_json, prepared.confirmed_by, prepared.confirmed_at, timestamp, timestamp);
+    const briefId = Number(result.lastInsertRowid);
+    this.#linkBriefMaterials(briefId, ids);
+    return this.getWritingMaterialBrief(briefId);
+  }
+
+  getWritingMaterialBrief(id) {
+    const row = this.db.prepare('SELECT b.*,(SELECT json_group_array(material_id) FROM writing_material_brief_materials WHERE brief_id=b.id) AS material_ids_json_actual FROM writing_material_briefs b WHERE b.id=?')
+      .get(Number(id));
+    return row ? this.#brief(row) : null;
+  }
+
+  listWritingMaterialBriefs({ materialId = '', materialIds = [] } = {}) {
+    if (materialIds && !Array.isArray(materialIds)) materialIds = [materialIds];
+    const wanted = [...new Set([...this.#validMaterialIds([String(materialId)]), ...(Array.isArray(materialIds) ? this.#validMaterialIds(materialIds) : [])])];
+    let rows;
+    if (wanted.length) {
+      const placeholders = wanted.map(() => '?').join(',');
+      rows = this.db.prepare(`SELECT b.*,(SELECT json_group_array(material_id) FROM writing_material_brief_materials WHERE brief_id=b.id) AS material_ids_json_actual
+        FROM writing_material_briefs b WHERE EXISTS (
+          SELECT 1 FROM writing_material_brief_materials m WHERE m.brief_id=b.id AND m.material_id IN (${placeholders})
+        ) ORDER BY b.updated_at DESC LIMIT 200`).all(...wanted);
+    } else {
+      rows = this.db.prepare(`SELECT b.*,(SELECT json_group_array(material_id) FROM writing_material_brief_materials WHERE brief_id=b.id) AS material_ids_json_actual
+        FROM writing_material_briefs b ORDER BY b.updated_at DESC LIMIT 200`).all();
+    }
+    return rows.map((row) => this.#brief(row));
+  }
+
+  updateWritingMaterialBrief(id, input = {}) {
+    const current = this.getWritingMaterialBrief(id); if (!current) return null;
+    const fields = [], values = [];
+    const assign = (column, value) => { fields.push(`${column}=?`); values.push(value); };
+    if (input.status !== undefined) {
+      if (input.status === 'confirmed' && current.status !== 'confirmed') throw new Error('请通过确认接口锁定素材简报');
+      assign('status', ['draft', 'confirmed', 'superseded'].includes(input.status) ? input.status : 'draft');
+    }
+    if (input.factSummary !== undefined) assign('fact_summary_json', JSON.stringify(input.factSummary || []));
+    if (input.context !== undefined) assign('context', String(input.context || '').trim());
+    if (input.tension !== undefined) assign('tension', String(input.tension || '').trim());
+    if (input.whyItMatters !== undefined) assign('why_it_matters', String(input.whyItMatters || '').trim());
+    if (input.mainlineCandidates !== undefined) assign('mainline_candidates_json', JSON.stringify(input.mainlineCandidates || []));
+    if (input.selectedMainlineId !== undefined) assign('selected_mainline_id', String(input.selectedMainlineId || '').trim());
+    if (input.confirmedTopic !== undefined) assign('confirmed_topic', String(input.confirmedTopic || '').trim());
+    if (input.confirmedThesis !== undefined) assign('confirmed_thesis', String(input.confirmedThesis || '').trim());
+    if (input.discussionQuestion !== undefined) assign('discussion_question', String(input.discussionQuestion || '').trim());
+    if (input.audience !== undefined) assign('audience', String(input.audience || '').trim());
+    if (input.evidenceRefs !== undefined) assign('evidence_refs_json', JSON.stringify(input.evidenceRefs || []));
+    if (input.missingEvidence !== undefined) assign('missing_evidence_json', JSON.stringify(input.missingEvidence || []));
+    if (input.recommendedFormats !== undefined) assign('recommended_formats_json', JSON.stringify(input.recommendedFormats || []));
+    if (input.authorExperienceConfirmed !== undefined) assign('author_experience_confirmed', input.authorExperienceConfirmed ? 1 : 0);
+    if (input.readinessFlags !== undefined) assign('readiness_flags_json', JSON.stringify(input.readinessFlags || []));
+    if (input.materialIds !== undefined) {
+      const ids = this.#validMaterialIds(input.materialIds);
+      if (!ids.length) throw new Error('素材简报至少需要关联一条素材');
+      this.#assertMaterialIds(ids);
+      if (ids.length) this.db.prepare('DELETE FROM writing_material_brief_materials WHERE brief_id=?').run(Number(id));
+      this.#linkBriefMaterials(Number(id), ids);
+      assign('material_ids_json', JSON.stringify(ids));
+    }
+    if (!fields.length) return current;
+    assign('updated_at', now()); values.push(Number(id));
+    this.db.prepare(`UPDATE writing_material_briefs SET ${fields.join(',')} WHERE id=?`).run(...values);
+    return this.getWritingMaterialBrief(id);
+  }
+
+  confirmWritingMaterialBrief(id, { confirmedBy = '' } = {}) {
+    const timestamp = now();
+    this.db.prepare(`UPDATE writing_material_briefs SET status='confirmed', confirmed_by=?, confirmed_at=?, updated_at=? WHERE id=?`)
+      .run(String(confirmedBy || '').trim(), timestamp, timestamp, Number(id));
+    return this.getWritingMaterialBrief(id);
+  }
+
+  supersedeWritingMaterialBrief(id) {
+    this.db.prepare(`UPDATE writing_material_briefs SET status='superseded', updated_at=? WHERE id=?`).run(now(), Number(id));
+    return this.getWritingMaterialBrief(id);
+  }
+
+  mainlineBriefStatuses(materialIds = []) {
+    const ids = this.#validMaterialIds(materialIds);
+    const result = new Map();
+    if (!ids.length) return result;
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT b.id AS brief_id,b.status,b.mainline_candidates_json,b.confirmed_topic,b.confirmed_thesis,m.material_id FROM writing_material_briefs b
+      JOIN writing_material_brief_materials m ON m.brief_id=b.id
+      WHERE m.material_id IN (${placeholders}) ORDER BY b.updated_at DESC`).all(...ids);
+    for (const row of rows) {
+      const existing = result.get(Number(row.material_id));
+      const candidates = jsonValue(row.mainline_candidates_json, []);
+      const hasDraftContent = (Array.isArray(candidates) && candidates.length > 0)
+        || String(row.confirmed_topic || '').trim()
+        || String(row.confirmed_thesis || '').trim();
+      const status = row.status === 'confirmed' ? '已锁定' : row.status === 'draft' && hasDraftContent ? '有候选' : '未提炼';
+      if (!existing) {
+        result.set(Number(row.material_id), { mainline_status: status, status: row.status === 'draft' && !hasDraftContent ? '' : row.status, brief_id: Number(row.brief_id) });
+        continue;
+      }
+      if (row.status === 'confirmed' && existing.status !== 'confirmed') result.set(Number(row.material_id), { mainline_status: '已锁定', status: 'confirmed', brief_id: Number(row.brief_id) });
+      else if (!existing.status && row.status === 'draft' && hasDraftContent) result.set(Number(row.material_id), { mainline_status: '有候选', status: 'draft', brief_id: Number(row.brief_id) });
+    }
+    for (const [materialId, value] of result) if (value.status !== 'confirmed' && value.status !== 'draft') result.set(materialId, { mainline_status: '未提炼', status: '', brief_id: value.brief_id || null });
+    return result;
+  }
+
+  #validMaterialIds(materialIds = []) {
+    return [...new Set((Array.isArray(materialIds) ? materialIds : [materialIds]).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))];
+  }
+
+  #assertMaterialIds(ids) {
+    const missing = ids.filter((materialId) => !this.getMaterial(materialId));
+    if (missing.length) throw new Error('关联的素材不存在：' + missing.join('、'));
+  }
+
+  #linkBriefMaterials(briefId, ids) {
+    const insert = this.db.prepare('INSERT OR IGNORE INTO writing_material_brief_materials(brief_id,material_id) VALUES(?,?)');
+    for (const materialId of ids) insert.run(briefId, materialId);
+  }
+
+  #prepareBriefFields(fields = {}) {
+    return {
+      fact_summary_json: JSON.stringify(fields.factSummary || []),
+      context: String(fields.context || '').trim(),
+      tension: String(fields.tension || '').trim(),
+      why_it_matters: String(fields.whyItMatters || '').trim(),
+      mainline_candidates_json: JSON.stringify(fields.mainlineCandidates || []),
+      selected_mainline_id: String(fields.selectedMainlineId || '').trim(),
+      confirmed_topic: String(fields.confirmedTopic || '').trim(),
+      confirmed_thesis: String(fields.confirmedThesis || '').trim(),
+      discussion_question: String(fields.discussionQuestion || '').trim(),
+      audience: String(fields.audience || '').trim(),
+      evidence_refs_json: JSON.stringify(fields.evidenceRefs || []),
+      missing_evidence_json: JSON.stringify(fields.missingEvidence || []),
+      recommended_formats_json: JSON.stringify(fields.recommendedFormats || []),
+      author_experience_confirmed: fields.authorExperienceConfirmed ? 1 : 0,
+      readiness_flags_json: JSON.stringify(fields.readinessFlags || []),
+      confirmed_by: String(fields.confirmedBy || '').trim(),
+      confirmed_at: fields.confirmedAt || null,
+    };
   }
 
   createPlan({ materialId, columnId = null, titleDirection = '', titleIntent = '', planType = 'draft', plannedDate = null, status = 'idea', teaser = '' } = {}) {
@@ -512,6 +667,34 @@ export class ContentPlanningRepository {
   listCalendarPlans(month) { return this.listPlans({ month }).map((plan) => ({ content_type: 'writing_plan', id: plan.id, title: plan.title_direction || plan.material_title || '待发展素材', batch_date: plan.planned_date, updated_at: plan.updated_at, pool_role: plan.column_name || '主动写作', plan_status: plan.status, column_name: plan.column_name, column_id: plan.column_id, material_id: plan.material_id, material_title: plan.material_title, raw_text: plan.raw_text, title_direction: plan.title_direction, title_intent: plan.title_intent, teaser: plan.teaser, publication_id: plan.publication_id, publication_status: plan.publication_status, publication_url: plan.publication_url, publication_published_at: plan.publication_published_at })); }
 
   #material(row) { return { ...row, tags: jsonValue(row.tags_json, []), evidence: jsonValue(row.evidence_json, []), iteration: jsonValue(row.iteration_json, {}), assessment: jsonValue(row.assessment_json, {}), recommended_column_id: row.recommended_column_id ? Number(row.recommended_column_id) : null }; }
+
+  #brief(row) {
+    return {
+      id: Number(row.id),
+      material_ids_json: row.material_ids_json,
+      materialIds: jsonValue(row.material_ids_json_actual ?? null, jsonValue(row.material_ids_json, [])).map(Number),
+      status: row.status,
+      factSummary: jsonValue(row.fact_summary_json, []),
+      context: row.context,
+      tension: row.tension,
+      whyItMatters: row.why_it_matters,
+      mainlineCandidates: jsonValue(row.mainline_candidates_json, []),
+      selectedMainlineId: row.selected_mainline_id,
+      confirmedTopic: row.confirmed_topic,
+      confirmedThesis: row.confirmed_thesis,
+      discussionQuestion: row.discussion_question,
+      audience: row.audience,
+      evidenceRefs: jsonValue(row.evidence_refs_json, []),
+      missingEvidence: jsonValue(row.missing_evidence_json, []),
+      recommendedFormats: jsonValue(row.recommended_formats_json, []),
+      authorExperienceConfirmed: Boolean(row.author_experience_confirmed),
+      readinessFlags: jsonValue(row.readiness_flags_json, []),
+      confirmedBy: row.confirmed_by,
+      confirmedAt: row.confirmed_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
   #decorateMatch(row) { return row ? { ...row, candidate_ids: jsonValue(row.candidate_ids_json, []), candidate_snapshot: jsonValue(row.candidate_snapshot_json, []) } : null; }
   #decorateContentSnapshot(row) { return row ? { ...row, content_chars: Number(row.content_chars || 0), is_current: Boolean(row.is_current) } : null; }
   #decorateContentFeatures(row) { return row ? { ...row, features: jsonValue(row.features_json, {}) } : null; }

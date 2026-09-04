@@ -15,6 +15,7 @@ import { buildWechatStrategyRecommendations } from '../../../features/content-pl
 import { buildAdjustmentDraft, buildFeedbackAdjustmentMessages, buildFeedbackAdjustmentPatchMessages, confirmAdjustmentDraft, currentSkillFile, currentSkillPackageFiles, FEEDBACK_ADJUSTMENT_VERSION, listWriterSkillCatalog, resolveTitleSkillTarget, WRITER_SKILL_IDS, WRITER_SKILL_LABELS } from '../../../features/content-planning/feedback-adjustment.mjs';
 import { buildSocialFeedbackAdjustmentDraft, buildSocialFeedbackAdjustmentPatchMessages, buildSocialFeedbackAdjustmentPlanningMessages, resolveSocialSkillTargets } from '../../../features/content-planning/social-feedback-adjustment.mjs';
 import { parseModelJson } from '../../llm/model-json.mjs';
+import { materialBriefReadiness } from '../../../features/content-planning/material-brief-service.mjs';
 import { getAccountContext } from '../../../shared/domain/account-context.mjs';
 
 const ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
@@ -112,6 +113,15 @@ function enrichMaterial(material, insights, feedback) {
   };
 }
 
+function attachMainlineStatus(store, materials) {
+  if (!Array.isArray(materials) || !materials.length) return materials || [];
+  const statuses = store.mainlineBriefStatuses(materials.map((item) => Number(item.id)).filter(Boolean));
+  return materials.map((material) => {
+    const line = statuses.get(Number(material.id));
+    return { ...material, mainline_status: line?.mainline_status || '未提炼', active_brief_id: line?.brief_id || null };
+  });
+}
+
 function enrichCalendarEntry(entry, insights, feedback) {
   if (entry?.content_type !== 'writing_plan') return entry;
   return {
@@ -133,15 +143,20 @@ export async function handleContentRoutes(context) {
   if (request.method === 'POST' && pathname === '/api/content-columns') {
     json(response, 201, store.saveContentColumn(await body(request))); return true;
   }
-  if (request.method === 'GET' && pathname === '/api/writing-materials') {
+if (request.method === 'GET' && pathname === '/api/writing-materials') {
     const insights = enrichWechatReview(store.getWechatReview()).insights;
     const feedback = store.getLatestContentFeedbackSnapshot();
     let materials = store.listWritingMaterials({ status: searchParams.get('status') || '', sourceType: searchParams.get('source_type') || '', query: searchParams.get('q') || '', limit: boundedLimit(searchParams, 200, 500) }).map((material) => enrichMaterial(material, insights, feedback));
+    materials = attachMainlineStatus(store, materials);
     if (searchParams.get('sort') === 'feedback') materials = sortMaterialsByPlanningRecommendation(materials);
     json(response, 200, materials); return true;
   }
   const materialMatch = pathname.match(/^\/api\/writing-materials\/(\d+)$/);
-  if (materialMatch && request.method === 'GET') { const insights = enrichWechatReview(store.getWechatReview()).insights; const material = enrichMaterial(store.getWritingMaterial(Number(materialMatch[1])), insights, store.getLatestContentFeedbackSnapshot()); json(response, material ? 200 : 404, material || { error: '素材不存在' }); return true; }
+  if (materialMatch && request.method === 'GET') {
+    const insights = enrichWechatReview(store.getWechatReview()).insights;
+    const material = enrichMaterial(store.getWritingMaterial(Number(materialMatch[1])), insights, store.getLatestContentFeedbackSnapshot());
+    json(response, material ? 200 : 404, material ? attachMainlineStatus(store, [material])[0] : { error: '素材不存在' }); return true;
+  }
   if (materialMatch && ['PATCH', 'PUT'].includes(request.method)) { json(response, 200, store.updateWritingMaterial(Number(materialMatch[1]), await body(request))); return true; }
   if (request.method === 'POST' && pathname === '/api/writing-materials') {
     const material = store.createWritingMaterial(await body(request));
@@ -156,8 +171,98 @@ export async function handleContentRoutes(context) {
   }
   if (request.method === 'GET' && pathname === '/api/writing-material-plans') { json(response, 200, store.listWritingPlans({ month: searchParams.get('month') || '', limit: boundedLimit(searchParams, 300, 500) })); return true; }
   if (request.method === 'POST' && pathname === '/api/writing-material-plans') { json(response, 201, store.createWritingPlan(await body(request))); return true; }
-  const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
+const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
   if (planMatch && ['PATCH', 'PUT'].includes(request.method)) { json(response, 200, store.updateWritingPlan(Number(planMatch[1]), await body(request))); return true; }
+  if (request.method === 'GET' && pathname === '/api/writing-material-briefs') {
+    const materialId = searchParams.get('materialId') || '';
+    json(response, 200, store.listWritingMaterialBriefs(materialId ? { materialId } : {})); return true;
+  }
+  if (request.method === 'POST' && pathname === '/api/writing-material-briefs') {
+    try { const brief = store.createWritingMaterialBrief(await body(request)); brief.readiness = materialBriefReadiness(brief); json(response, 201, brief); }
+    catch (error) { json(response, 400, { error: error.message }); }
+    return true;
+  }
+  const briefMatch = pathname.match(/^\/api\/writing-material-briefs\/(\d+)$/);
+  if (briefMatch && request.method === 'GET') { const brief = store.getWritingMaterialBrief(Number(briefMatch[1])); if (brief) brief.readiness = materialBriefReadiness(brief); json(response, brief ? 200 : 404, brief || { error: '素材简报不存在' }); return true; }
+  if (briefMatch && ['PATCH', 'PUT'].includes(request.method)) {
+    try {
+      const brief = store.updateWritingMaterialBrief(Number(briefMatch[1]), await body(request));
+      if (brief) brief.readiness = materialBriefReadiness(brief);
+      json(response, brief ? 200 : 404, brief || { error: '素材简报不存在' });
+    } catch (error) { json(response, 400, { error: error.message }); }
+    return true;
+  }
+  const briefGenerateMatch = pathname.match(/^\/api\/writing-material-briefs\/(\d+)\/generate$/);
+  if (briefGenerateMatch && request.method === 'POST') {
+    const brief = store.getWritingMaterialBrief(Number(briefGenerateMatch[1]));
+    if (!brief) { json(response, 404, { error: '素材简报不存在' }); return true; }
+    if (brief.status === 'confirmed') { json(response, 409, { error: '简报已锁定；生成新候选请先创建新简报' }); return true; }
+    if (!models?.complete) { json(response, 400, { error: '模型能力不可用' }); return true; }
+    try {
+      const materials = brief.materialIds.map((id) => store.getWritingMaterial(id)).filter(Boolean);
+      const context = materials.map((item) => `素材 ${item.id}（${item.source_type}）${item.title ? `标题：${item.title}` : ''}\n${String(item.raw_text || '').slice(0, 6000)}`).join('\n\n---\n\n');
+      const routedProvider = typeof models.resolveForInput === 'function'
+        ? models.resolveForInput({ purpose: 'material-brief' })?.provider
+        : null;
+      const providerConfig = models.config?.providers?.[routedProvider || models.config.defaultProvider] || {};
+      const result = await models.complete({
+        purpose: 'material-brief', batchId: null, jsonMode: true, maxOutputTokens: Math.min(4000, providerConfig.maxOutputTokens || 4000),
+        messages: [
+          { role: 'system', protected: true, content: '你是素材主编。基于给定素材产出一份可被作者确认的写作主线简报。约束：事实摘要只能归纳素材原文，不得新增事实；冲突/反差/未解决问题必须有素材依据；主线候选 2-4 个，每个包含 id（mainline-1）、title 主线名称、question 围绕什么问题展开、thesis 候选核心观点（可被读者同意或反对）、argument 论据方向数组、counter_argument 反方或限制、evidence_refs 引用 fact_summary 中给出的事实 id；不把模型生成的观点伪装成作者经历。返回严格 JSON：{"fact_summary":[{"id":"material-fact-1","text":"已确认事实","source":"material","confidence":"confirmed"}],"context":"背景","tension":"冲突反差","why_it_matters":"对目标读者的影响","mainline_candidates":[{"id":"mainline-1","title":"主线名称","question":"问题","thesis":"核心观点","argument":["论据"],"counter_argument":"反方","evidence_refs":["material-fact-1"]}],"discussion_question":"读者可能争论的问题","missing_evidence":["仍需补充或核验的内容"],"recommended_formats":["article-experience","social-opinion"]}' },
+          { role: 'user', protected: true, content: `请提炼以下素材的写作主线：\n\n${context}` },
+        ],
+      });
+      const parsed = parseModelJson(result, { label: '素材简报主线' });
+      const factSummary = (Array.isArray(parsed.fact_summary) ? parsed.fact_summary : []).map((item, index) => ({
+        id: String(item.id || `material-fact-${index + 1}`),
+        text: String(item.text || '').trim(),
+        source: String(item.source || 'material'),
+        confidence: String(item.confidence || 'confirmed'),
+      })).filter((item) => item.text);
+      const mainlineCandidates = (Array.isArray(parsed.mainline_candidates) ? parsed.mainline_candidates : []).map((item, index) => ({
+        id: String(item.id || `mainline-${index + 1}`),
+        title: String(item.title || `主线 ${index + 1}`).trim(),
+        question: String(item.question || '').trim(),
+        thesis: String(item.thesis || '').trim(),
+        argument: Array.isArray(item.argument) ? item.argument.map((v) => String(v).trim()).filter(Boolean) : [],
+        counter_argument: String(item.counter_argument || '').trim(),
+        evidence_refs: Array.isArray(item.evidence_refs) ? item.evidence_refs.map((v) => String(v).trim()).filter(Boolean) : [],
+      })).filter((item) => item.thesis).slice(0, 4);
+      const updated = store.updateWritingMaterialBrief(brief.id, {
+        factSummary,
+        context: String(parsed.context || '').trim(),
+        tension: String(parsed.tension || '').trim(),
+        whyItMatters: String(parsed.why_it_matters || '').trim(),
+        mainlineCandidates,
+        discussionQuestion: String(parsed.discussion_question || '').trim(),
+        missingEvidence: Array.isArray(parsed.missing_evidence) ? parsed.missing_evidence.map((v) => String(v).trim()).filter(Boolean) : [],
+        recommendedFormats: Array.isArray(parsed.recommended_formats) ? parsed.recommended_formats.map((v) => String(v).trim()).filter(Boolean) : [],
+      });
+      updated.readiness = materialBriefReadiness(updated);
+      json(response, 200, updated);
+    } catch (error) {
+      json(response, 400, { error: `提炼主线失败：${error.message}` });
+    }
+    return true;
+  }
+  const briefConfirmMatch = pathname.match(/^\/api\/writing-material-briefs\/(\d+)\/confirm$/);
+  if (briefConfirmMatch && request.method === 'POST') {
+    const brief = store.getWritingMaterialBrief(Number(briefConfirmMatch[1]));
+    if (!brief) { json(response, 404, { error: '素材简报不存在' }); return true; }
+    const input = await body(request);
+    const draft = input.draft && typeof input.draft === 'object' ? input.draft : null;
+    if (draft) {
+      const allowed = ['factSummary', 'context', 'tension', 'whyItMatters', 'mainlineCandidates', 'selectedMainlineId', 'confirmedTopic', 'confirmedThesis', 'discussionQuestion', 'audience', 'missingEvidence', 'authorExperienceConfirmed'];
+      const patch = Object.fromEntries(allowed.filter((key) => draft[key] !== undefined).map((key) => [key, draft[key]]));
+      if (Object.keys(patch).length) store.updateWritingMaterialBrief(brief.id, patch);
+    }
+    const current = store.getWritingMaterialBrief(brief.id);
+    const readiness = materialBriefReadiness(current);
+    store.updateWritingMaterialBrief(brief.id, { readinessFlags: readiness.flags });
+    const confirmed = store.confirmWritingMaterialBrief(brief.id, { confirmedBy: String(input.confirmedBy || 'editor').trim() });
+    confirmed.readiness = materialBriefReadiness(confirmed);
+    json(response, 200, confirmed); return true;
+  }
   if (request.method === 'GET' && pathname === '/api/article-publications') {
     const publication = store.getArticlePublication({
       id: searchParams.get('id') || null,

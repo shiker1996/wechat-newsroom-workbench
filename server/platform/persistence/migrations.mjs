@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 36;
+export const WORKBENCH_SCHEMA_VERSION = 37;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -643,6 +643,45 @@ export function runDatabaseMigrations(db, migrateSchema) {
         `);
       }
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(36,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v37：素材简报实体。保存“素材可以从什么角度写”的提炼结果，与素材评估（系统推荐）分开，
+    // 不与评估覆盖；一条素材可对应多份简报，作者确认后锁定为主题进入文章/图文生产。
+    if(applied<37){db.exec('BEGIN IMMEDIATE');try{
+      db.exec(`CREATE TABLE IF NOT EXISTS writing_material_briefs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        material_ids_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','confirmed','superseded')),
+        fact_summary_json TEXT NOT NULL DEFAULT '[]',
+        context TEXT NOT NULL DEFAULT '',
+        tension TEXT NOT NULL DEFAULT '',
+        why_it_matters TEXT NOT NULL DEFAULT '',
+        mainline_candidates_json TEXT NOT NULL DEFAULT '[]',
+        selected_mainline_id TEXT NOT NULL DEFAULT '',
+        confirmed_topic TEXT NOT NULL DEFAULT '',
+        confirmed_thesis TEXT NOT NULL DEFAULT '',
+        discussion_question TEXT NOT NULL DEFAULT '',
+        audience TEXT NOT NULL DEFAULT '',
+        evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        missing_evidence_json TEXT NOT NULL DEFAULT '[]',
+        recommended_formats_json TEXT NOT NULL DEFAULT '[]',
+        author_experience_confirmed INTEGER NOT NULL DEFAULT 0,
+        readiness_flags_json TEXT NOT NULL DEFAULT '[]',
+        confirmed_by TEXT NOT NULL DEFAULT '',
+        confirmed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_material_briefs_status ON writing_material_briefs(material_ids_json,status,updated_at DESC);
+      CREATE TABLE IF NOT EXISTS writing_material_brief_materials (
+        brief_id INTEGER NOT NULL,
+        material_id INTEGER NOT NULL,
+        PRIMARY KEY(brief_id, material_id),
+        FOREIGN KEY(brief_id) REFERENCES writing_material_briefs(id) ON DELETE CASCADE,
+        FOREIGN KEY(material_id) REFERENCES writing_materials(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_material_brief_materials_material ON writing_material_brief_materials(material_id,brief_id);`);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(37,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

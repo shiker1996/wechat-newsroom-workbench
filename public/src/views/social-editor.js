@@ -546,6 +546,8 @@ async function loadSocialEditor(view) {
   if(view)currentMode=view==='social-custom'?'custom':view==='social-event'?'event':'tools';
   applyModeLayout();
   setupSocialTabNavigation();
+  maybeAutoOpenCustomSocial();
+  setupSocialTabNavigation();
   const batch=state.batches.find((item)=>item.id===state.activeBatchId); if(!batch)return;
   const all=await request(`/api/batches/${encodeURIComponent(batch.id)}/candidates?track=social_cards`);
   const candidates=all.filter((item)=>candidateMode(item.output_mode,item.content_class)===currentMode);
@@ -774,6 +776,19 @@ beautifyButton?.addEventListener('click',async()=>{
 
 window.openSocialEditor=openSocialEditor;
 
+// 素材箱 → 自定义图文：带入 selectedMaterialIds 与（可选的）已锁定简报
+function pendingSocialMaterials(){
+  return Array.isArray(state.pendingCustomSocialMaterials)?state.pendingCustomSocialMaterials.filter((item)=>item&&Number(item.id)>0):[];
+}
+
+function maybeAutoOpenCustomSocial(){
+  if(!pendingSocialMaterials().length)return;
+  const toggle=document.getElementById('create-custom-social'),panel=document.getElementById('custom-social-panel');
+  if(!toggle||!panel)return;
+  if(!panel.hidden)return;
+  toggle.click();
+}
+
 // 创建自定义图文（待办 1+6：教程/清单/观点 × 公众号/小红书）
 // 对话式策划：AI 通过多轮对话把方案填进下方表单，表单始终可手改，创建仍走原有路由与门禁
 function bindCustomSocialForm(){
@@ -783,12 +798,40 @@ function bindCustomSocialForm(){
   const syncTypeFields=()=>{const type=typeSelect.value;panel.querySelectorAll('[data-custom-only]').forEach((node)=>{node.hidden=node.dataset.customOnly!==type;});};
   const chat={history:[]};
   const lines=(id)=>document.getElementById(id).value.split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+  const hydratePendingMaterials=async()=>{
+    const pending=pendingSocialMaterials();if(!pending.length)return;
+    const brief=state.pendingCustomSocialBriefId?await request('/api/writing-material-briefs/'+state.pendingCustomSocialBriefId).catch(()=>null):null;
+    const mainline=brief?.mainlineCandidates?.find((item)=>String(item.id)===String(brief.selectedMainlineId))||null;
+    const topic=document.getElementById('custom-topic');
+    if(topic&&!topic.value.trim())topic.value=String(brief?.confirmedTopic||mainline?.title||pending[0].title||'').trim();
+    const audience=document.getElementById('custom-audience');
+    if(audience&&!audience.value.trim()&&brief?.audience)audience.value=String(brief.audience).trim();
+    const thesis=document.getElementById('custom-thesis');
+    if(thesis&&!thesis.value.trim()&&(brief?.confirmedThesis||mainline?.thesis))thesis.value=String(brief.confirmedThesis||mainline.thesis).trim();
+    const pointsEl=document.getElementById('custom-points');
+    if(pointsEl){
+      const existing=pointsEl.value.split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);
+      const briefPoints=brief?[...(brief.authorExperienceConfirmed&&brief.confirmedThesis?['【体验】'+brief.confirmedThesis]:[]),...(brief.factSummary||[]).map((item)=>item&&item.text?'【素材】'+item.text:''),...(mainline?.argument||[]).map((item)=>'【建议】'+item)].filter(Boolean):[];
+      const additions=pending.flatMap((item)=>{
+        const title=String(item.title||'未命名素材').trim();
+        return String(item.raw_text||'').split(/\r?\n|(?<=[。！？])/).map((value)=>value.trim()).filter(Boolean).slice(0,8).map((value)=>`【素材】${title}：${value.slice(0,900)}`);
+      }).slice(0,24);
+      pointsEl.value=[...existing,...briefPoints,...additions.filter((line)=>!existing.includes(line)&&!briefPoints.includes(line))].filter((line,index,array)=>array.indexOf(line)===index).join('\n');
+    }
+    toast(`已带入 ${pending.length} 条素材箱素材（作【素材】事实，不会自动当作者经历）`);
+  };
+  const clearPendingMaterials=()=>{
+    state.pendingCustomSocialMaterials=[];
+    state.pendingCustomSocialBriefId=null;
+  };
   const collectDraft=()=>({
     content_type:typeSelect.value,channel:document.getElementById('custom-channel').value,
     topic:document.getElementById('custom-topic').value.trim(),audience:document.getElementById('custom-audience').value.trim(),
     scenario:document.getElementById('custom-scenario').value.trim(),thesis:document.getElementById('custom-thesis').value.trim(),
     points:lines('custom-points'),steps:lines('custom-steps'),items:lines('custom-items'),materialUrls:lines('custom-materials'),
     limitations:document.getElementById('custom-limitations').value.trim(),expected_pages:Number(document.getElementById('custom-expected-pages').value)||6,
+    selectedMaterialIds:pendingSocialMaterials().map((item)=>Number(item.id)),
+    briefId:state.pendingCustomSocialBriefId||null,
   });
   const applyFormUpdates=(updates)=>{
     if(!updates||typeof updates!=='object')return;
@@ -833,6 +876,7 @@ function bindCustomSocialForm(){
   // 创建成功后重置面板：清空表单与对话，折叠表单区，下次打开是全新状态
   const resetCustomPanel=()=>{
     chat.history=[];
+    clearPendingMaterials();
     typeSelect.value='tutorial';syncTypeFields();
     document.getElementById('custom-channel').value='wechat';
     for(const id of ['custom-topic','custom-audience','custom-scenario','custom-thesis','custom-points','custom-steps','custom-items','custom-materials','custom-limitations','custom-chat-input']){const el=document.getElementById(id);if(el)el.value='';}
@@ -841,12 +885,13 @@ function bindCustomSocialForm(){
     const messages=document.getElementById('custom-chat-messages');
     if(messages)messages.innerHTML='<div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div>';
   };
-  toggle.addEventListener('click',()=>{
+  toggle.addEventListener('click',async()=>{
     panel.hidden=!panel.hidden;syncTypeFields();
     if(!panel.hidden){
       const prov=document.getElementById('custom-chat-provider');
       if(prov)prov.innerHTML=providerOptions(state.models?.defaultProvider||state.models?.providers?.find((p)=>p.configured)?.name||'');
       chat.history=[];
+      await hydratePendingMaterials();
       const messages=document.getElementById('custom-chat-messages');
       if(messages)messages.innerHTML='<div class="editorial-chat-empty">说说你想做的图文主题，AI 会逐个问题帮你补齐方案并填入下方表单。</div>';
       sendCustomChat();
@@ -854,7 +899,7 @@ function bindCustomSocialForm(){
   });
   typeSelect.addEventListener('change',syncTypeFields);
   document.getElementById('custom-chat-send')?.addEventListener('click',sendCustomChat);
-  document.getElementById('custom-social-cancel')?.addEventListener('click',()=>{panel.hidden=true;});
+  document.getElementById('custom-social-cancel')?.addEventListener('click',()=>{clearPendingMaterials();panel.hidden=true;});
   document.getElementById('custom-social-submit')?.addEventListener('click',async()=>{
     const batch=state.batches.find((item)=>item.id===state.activeBatchId);
     if(!batch){toast('请先选择批次');return;}
@@ -867,6 +912,8 @@ function bindCustomSocialForm(){
         points:document.getElementById('custom-points').value,steps:document.getElementById('custom-steps').value,
         items:document.getElementById('custom-items').value,materialUrls:document.getElementById('custom-materials').value,
         limitations:document.getElementById('custom-limitations').value,expected_pages:Number(document.getElementById('custom-expected-pages').value)||6,
+        selectedMaterialIds:pendingSocialMaterials().map((item)=>Number(item.id)),
+        briefId:state.pendingCustomSocialBriefId||null,
       })});
       panel.hidden=true;resetCustomPanel();toast('自定义图文已创建');
       await loadSocialEditor();

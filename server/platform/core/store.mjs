@@ -581,6 +581,13 @@ export class Store {
   listWritingMaterials(input = {}) { return this.repositories.contentPlanning.listMaterials(input); }
   updateWritingMaterial(id, input = {}) { return this.repositories.contentPlanning.updateMaterial(id, input); }
   saveWritingAssessment(id, assessment) { return this.repositories.contentPlanning.saveAssessment(id, assessment); }
+  createWritingMaterialBrief(input) { return this.repositories.contentPlanning.createWritingMaterialBrief(input); }
+  getWritingMaterialBrief(id) { return this.repositories.contentPlanning.getWritingMaterialBrief(id); }
+  listWritingMaterialBriefs(input = {}) { return this.repositories.contentPlanning.listWritingMaterialBriefs(input); }
+  updateWritingMaterialBrief(id, input = {}) { return this.repositories.contentPlanning.updateWritingMaterialBrief(id, input); }
+  confirmWritingMaterialBrief(id, input = {}) { return this.repositories.contentPlanning.confirmWritingMaterialBrief(id, input); }
+  supersedeWritingMaterialBrief(id) { return this.repositories.contentPlanning.supersedeWritingMaterialBrief(id); }
+  mainlineBriefStatuses(materialIds = []) { return this.repositories.contentPlanning.mainlineBriefStatuses(materialIds); }
   createWritingPlan(input) { return this.repositories.contentPlanning.createPlan(input); }
   getWritingPlan(id) { return this.repositories.contentPlanning.getPlan(id); }
   listWritingPlans(input = {}) { return this.repositories.contentPlanning.listPlans(input); }

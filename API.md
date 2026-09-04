@@ -1001,6 +1001,22 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 
 修改主动写作内容计划的栏目、标题方向、日期或状态。
 
+### GET|POST /api/writing-material-briefs
+
+读取或创建素材简报。简报回答“这条素材可以从什么角度写”，是素材评估（系统推荐）与作者确认命题之间的中间层；一条素材可对应多份简报。创建时传 `materialIds`，后续用 `PATCH` 写入事实摘要、冲突、主线候选、核心观点、目标读者、证据引用、待补内容等字段。素材列表接口会附带 `mainline_status`（未提炼 / 有候选 / 已锁定）与 `active_brief_id`。
+
+### GET|PATCH|PUT /api/writing-material-briefs/:id
+
+读取或编辑一份素材简报。请求体字段使用驼峰命名：`factSummary`、`context`、`tension`、`whyItMatters`、`mainlineCandidates`、`selectedMainlineId`、`confirmedTopic`、`confirmedThesis`、`discussionQuestion`、`audience`、`evidenceRefs`、`missingEvidence`、`recommendedFormats`、`authorExperienceConfirmed`。`GET` 时返回 `readiness`（待补主线 / 待补证据 / 待补边界，仅反映锁定门槛，不阻断写作）。
+
+### POST /api/writing-material-briefs/:id/generate
+
+调用模型按素材生成主线简报候选草案并覆盖当前简报的草案字段（不改作者已确认字段）。已锁定的简报返回 409，需新建简报再生成。模型输出只作为候选，作者修改并确认后才能成为锁定命题。
+
+### POST /api/writing-material-briefs/:id/confirm
+
+将简报锁定为可复用的命题（可选动作，不阻断自主写作）。锁定要求已选定候选主线、补齐证据与边界；这些只影响复用，不作为进入自主写作的前置门槛。目标读者与最终主线由自主写作阶段在对话中提议并由作者确认，因此不计入锁定门槛。返回 `200`，含 `readiness`（仅作提示）。已锁定的简报返回 409，需新建简报再锁定。
+
 ### GET /api/article-publications
 
 按 `documentId`、`planId` 或 `id` 读取文章的公众号发布元数据；不存在时返回 404。
