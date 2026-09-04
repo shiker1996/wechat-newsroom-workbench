@@ -1,5 +1,5 @@
 import { loadSkillBundle } from '../../../platform/llm/skill-runtime.mjs';
-import { parseJsonText } from '../../../platform/llm/model-json.mjs';
+import { parseModelJson } from '../../../platform/llm/model-json.mjs';
 
 // 技能缺失时的内置回退，与 skills/article-visual-planner/SKILL.md 保持一致
 const FALLBACK_SYSTEM = `你是公众号文章可视化编辑，只提出真正提升理解效率的图表建议。
@@ -12,8 +12,8 @@ const FALLBACK_SYSTEM = `你是公众号文章可视化编辑，只提出真正�
 5. 不输出 Markdown 围栏，不修改文章，不建议纯装饰图。
 6. 每张 Mermaid 最多 8 个节点、12 条关系线；如果完整逻辑超过限制，必须拆成两张独立 placement，每张都能单独阅读。`;
 
-function parseJson(text) {
-  return parseJsonText(text);
+function parseJson(result) {
+  return parseModelJson(result, { label: '图表规划' });
 }
 
 function headingKey(value) {
@@ -141,7 +141,7 @@ export function insertVisualFences(markdown, placements = []) {
   return output;
 }
 
-export async function planArticleVisuals({ gateway, provider, batchId, candidateId, markdown, factBase, preferences = [], maxOutputTokens = 5000, workspaceRoot = process.cwd() }) {
+export async function planArticleVisuals({ gateway, provider, batchId, candidateId, markdown, factBase, preferences = [], maxOutputTokens = 8000, workspaceRoot = process.cwd() }) {
   const skill = loadSkillBundle({ workspaceRoot, skillName:'article-visual-planner' });
   const system = skill.fallback ? FALLBACK_SYSTEM : skill.prompt;
   const messages=[
@@ -152,7 +152,7 @@ export async function planArticleVisuals({ gateway, provider, batchId, candidate
     provider, purpose:'article-visual-plan', batchId, candidateId, jsonMode:true, maxOutputTokens,
     messages,
   });
-  let plan=normalizeVisualPlan(parseJson(result.content), markdown, factBase);
+  let plan=normalizeVisualPlan(parseJson(result), markdown, factBase);
   if(plan.placements.some((item)=>!item.complexity.mobileReady)){
     const retry=await gateway.complete({
       provider,purpose:'article-visual-plan-mobile-retry',batchId,candidateId,jsonMode:true,maxOutputTokens,
@@ -162,7 +162,7 @@ export async function planArticleVisuals({ gateway, provider, batchId, candidate
         {role:'user',protected:true,content:'上版方案存在移动端超限图。请保持事实与表达目标不变，把超过 8 个节点或 12 条关系线的 Mermaid 拆成两张独立图；返回完整 JSON，不要解释。'},
       ],
     });
-    plan=normalizeVisualPlan(parseJson(retry.content),markdown,factBase);
+    plan=normalizeVisualPlan(parseJson(retry),markdown,factBase);
   }
   const rejected=plan.placements.filter((item)=>!item.complexity.mobileReady);
   if(rejected.length){

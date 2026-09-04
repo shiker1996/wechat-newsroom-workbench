@@ -25,7 +25,7 @@ export async function illustrateArticle({
   }
   output = await planImagePlaceholders({
     gateway, store, batchId, candidateId, provider, markdown:output,
-    maxOutputTokens:Math.min(3000, maxOutputTokens), skillPrompt:imageSkillPrompt,
+    maxOutputTokens:Math.min(5000, maxOutputTokens), skillPrompt:imageSkillPrompt,
   });
   return { markdown:output, visualPlan };
 }

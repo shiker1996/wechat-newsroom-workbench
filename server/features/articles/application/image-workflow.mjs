@@ -114,7 +114,7 @@ export function applyImagePlan(markdown, placements = []) {
   return `${output.trim()}\n\n<!-- IMAGE-SUPPLY-LIST\n# 手动供图清单\n${list}\n-->`;
 }
 
-export async function planImagePlaceholders({ gateway, store, batchId, candidateId, provider, markdown, maxOutputTokens = 3000, skillPrompt = '' }) {
+export async function planImagePlaceholders({ gateway, store, batchId, candidateId, provider, markdown, maxOutputTokens = 5000, skillPrompt = '' }) {
   const result = await gateway.complete({ provider, purpose:'article-image-plan', batchId, candidateId, jsonMode:true, maxOutputTokens,
     messages:[{ role:'system', content:`${skillPrompt ? `${skillPrompt}\n\n` : ''}${IMAGE_PLAN_SYSTEM}`, protected:true }, { role:'user', content:String(markdown), protected:true }] });
   const parsed=parseModelJson(result,{store,label:'配图规划'});

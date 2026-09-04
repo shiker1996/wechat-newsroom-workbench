@@ -12,9 +12,16 @@ const string=(title,extra={})=>({type:'string',title,...extra});
 const integer=(title,minimum,maximum,extra={})=>({type:'integer',title,minimum,maximum,...extra});
 
 function systemResources(config){
+  const connections=config.llm?.connections||{};
   const providers=Object.entries(config.llm?.providers||{}).filter(([,provider])=>provider.enabled!==false);
   const enumValues=['',...providers.map(([id])=>id)];
-  const enumNames=['继承任务默认模型',...providers.map(([id,provider])=>provider.label||id)];
+  const providerLabel=([id,provider])=>{
+    const connection=connections[provider.connectionId||id];
+    const vendor=connection?.label||provider.label||id;
+    const model=provider.model||id;
+    return `${vendor} · ${model}`;
+  };
+  const enumNames=['继承任务默认模型',...providers.map((entry)=>providerLabel(entry))];
   const profileLabels={
     fast:'Fast 档模型', balanced:'Balanced 档模型', quality:'Quality 档模型',
     deterministic:'Deterministic 档（程序化，不调用模型）',

@@ -595,7 +595,7 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   onProgress('Step 7 自动配图：先插入 Mermaid/ECharts 图表，再规划手动供图占位');
   const illustration=await illustrateArticle({
     gateway,store,provider,batchId,candidateId,markdown:final,factBase:JSON.stringify(factBase),
-    workspaceRoot,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),
+    workspaceRoot,maxOutputTokens:Math.min(8000,providerConfig.maxOutputTokens),
     imageSkillPrompt:buildArticleStageSystem(orchestratorSkill,'image-planning',stageSkills['article-image-placeholders']),
     onProgress,
   });

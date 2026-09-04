@@ -223,7 +223,7 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
   onProgress('早报 7/7 自动配图：先插入 Mermaid/ECharts 图表，再规划手动供图占位');
   const illustration=await illustrateArticle({
     gateway,store,provider,batchId,markdown:final,factBase:JSON.stringify({items:newsItems}),
-    workspaceRoot,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),
+    workspaceRoot,maxOutputTokens:Math.min(8000,providerConfig.maxOutputTokens),
     imageSkillPrompt:loadSkillBundle({workspaceRoot,skillName:'article-image-placeholders'}).prompt,
     onProgress,
   });
