@@ -3,7 +3,7 @@ import path from 'node:path';
 import { atomicWriteJson } from '../core/atomic-file.mjs';
 import { RESOURCE_KIND_PROFILES } from '../agent/resource-adaptation.mjs';
 
-const ID=/^[a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+$/;
+const ID=/^cap_[a-z][a-z0-9]*(?:[_-][a-z0-9]+)+$/;
 const fileFor=(root)=>path.join(root,'config','capabilities.json');
 
 // 条目可选声明 resourceKind（值必须是 RESOURCE_KIND_PROFILES 的 key）：声明后该能力走

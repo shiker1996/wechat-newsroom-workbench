@@ -3,7 +3,7 @@
   "name": "ECharts 图片渲染",
   "version": "1.0.1",
   "capabilities": [
-    "diagram.echarts.render"
+    "cap_diagram_echarts_render"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "local-write",

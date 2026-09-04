@@ -18,7 +18,7 @@ test('URL 抓取被技能白名单拒绝时不访问网络并持久化审计', a
       toolContext:{store,skillId:'wechat-mp-tutorial',allowedCapabilities:[]},
     });
     assert.equal(result.status,'error');
-    const records=store.listToolExecutions({capability:'content.url.fetch'});
+    const records=store.listToolExecutions({capability:'cap_content_url_fetch'});
     assert.equal(records.length,1);
     assert.equal(records[0].status,'error');
     assert.equal(records[0].error_code,'PERMISSION_DENIED');
@@ -36,7 +36,7 @@ test('本地项目读取被技能白名单拒绝时抛出标准错误并持久�
       }),
       (error)=>error.code==='PERMISSION_DENIED',
     );
-    const [record]=store.listToolExecutions({capability:'filesystem.project.read'});
+    const [record]=store.listToolExecutions({capability:'cap_filesystem_project_read'});
     assert.equal(record.error_code,'PERMISSION_DENIED');
     assert.equal(record.skill_id,'wechat-mp-tutorial');
     assert.deepEqual(record.input_keys,['options','path']);

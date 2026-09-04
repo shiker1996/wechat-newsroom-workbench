@@ -20,41 +20,41 @@ const catalogShape=(registry,entryCapabilities,allowedCapabilities=null)=>buildC
 
 test('三个 Agent 的能力常量快照保持不变',()=>{
   assert.deepEqual(EDITORIAL_AGENT_CAPABILITIES,Object.freeze([
-    'filesystem.project.read','content.url.fetch','content.passage.retrieve','content.web.search','content.news.search',
+    'cap_filesystem_project_read','cap_content_url_fetch','cap_content_passage_retrieve','cap_content_web_search','cap_content_news_search',
   ]));
   assert.deepEqual(TUTORIAL_AGENT_CAPABILITIES,Object.freeze([
-    'filesystem.project.read','content.url.fetch','content.web.search','content.news.search','content.document.search','content.passage.retrieve',
+    'cap_filesystem_project_read','cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_passage_retrieve',
   ]));
   assert.deepEqual(CUSTOM_SOCIAL_AGENT_CAPABILITIES,Object.freeze([
-    'filesystem.project.read','content.url.fetch','content.web.search','content.news.search','content.document.search','content.repository.inspect','content.passage.retrieve',
+    'cap_filesystem_project_read','cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_repository_inspect','cap_content_passage_retrieve',
   ]));
 });
 
 test('三个 Agent 的会话工具目录快照（真实注册表）',async ()=>{
   const registry=await getToolRegistry();
   assert.deepEqual(catalogShape(registry,EDITORIAL_AGENT_CAPABILITIES),[
-    {capability:'content.news.search',implementations:['tavily-search']},
-    {capability:'content.passage.retrieve',implementations:['local-passage-retrieval']},
-    {capability:'content.url.fetch',implementations:['url-fetch']},
-    {capability:'content.web.search',implementations:['tavily-search']},
-    {capability:'filesystem.project.read',implementations:['local-project-reader']},
+    {capability:'cap_content_news_search',implementations:['tavily-search']},
+    {capability:'cap_content_passage_retrieve',implementations:['local-passage-retrieval']},
+    {capability:'cap_content_url_fetch',implementations:['url-fetch']},
+    {capability:'cap_content_web_search',implementations:['tavily-search']},
+    {capability:'cap_filesystem_project_read',implementations:['local-project-reader']},
   ]);
   assert.deepEqual(catalogShape(registry,TUTORIAL_AGENT_CAPABILITIES),[
-    {capability:'content.document.search',implementations:['document-folder-search']},
-    {capability:'content.news.search',implementations:['tavily-search']},
-    {capability:'content.passage.retrieve',implementations:['local-passage-retrieval']},
-    {capability:'content.url.fetch',implementations:['url-fetch']},
-    {capability:'content.web.search',implementations:['tavily-search']},
-    {capability:'filesystem.project.read',implementations:['local-project-reader']},
+    {capability:'cap_content_document_search',implementations:['document-folder-search']},
+    {capability:'cap_content_news_search',implementations:['tavily-search']},
+    {capability:'cap_content_passage_retrieve',implementations:['local-passage-retrieval']},
+    {capability:'cap_content_url_fetch',implementations:['url-fetch']},
+    {capability:'cap_content_web_search',implementations:['tavily-search']},
+    {capability:'cap_filesystem_project_read',implementations:['local-project-reader']},
   ]);
   assert.deepEqual(catalogShape(registry,CUSTOM_SOCIAL_AGENT_CAPABILITIES),[
-    {capability:'content.document.search',implementations:['document-folder-search']},
-    {capability:'content.news.search',implementations:['tavily-search']},
-    {capability:'content.passage.retrieve',implementations:['local-passage-retrieval']},
-    {capability:'content.repository.inspect',implementations:['repository-inspector']},
-    {capability:'content.url.fetch',implementations:['url-fetch']},
-    {capability:'content.web.search',implementations:['tavily-search']},
-    {capability:'filesystem.project.read',implementations:['local-project-reader']},
+    {capability:'cap_content_document_search',implementations:['document-folder-search']},
+    {capability:'cap_content_news_search',implementations:['tavily-search']},
+    {capability:'cap_content_passage_retrieve',implementations:['local-passage-retrieval']},
+    {capability:'cap_content_repository_inspect',implementations:['repository-inspector']},
+    {capability:'cap_content_url_fetch',implementations:['url-fetch']},
+    {capability:'cap_content_web_search',implementations:['tavily-search']},
+    {capability:'cap_filesystem_project_read',implementations:['local-project-reader']},
   ]);
 });
 
@@ -69,10 +69,10 @@ test('登记派生的 Agent 目录与能力常量一致（阶段 2 机制二的�
 
 test('技能白名单收窄三个 Agent 的可见能力',async ()=>{
   const registry=await getToolRegistry();
-  assert.deepEqual(catalogShape(registry,EDITORIAL_AGENT_CAPABILITIES,['content.web.search','content.news.search']),
-    [{capability:'content.news.search',implementations:['tavily-search']},{capability:'content.web.search',implementations:['tavily-search']}]);
-  assert.deepEqual(catalogShape(registry,CUSTOM_SOCIAL_AGENT_CAPABILITIES,['filesystem.project.read']),
-    [{capability:'filesystem.project.read',implementations:['local-project-reader']}]);
+  assert.deepEqual(catalogShape(registry,EDITORIAL_AGENT_CAPABILITIES,['cap_content_web_search','cap_content_news_search']),
+    [{capability:'cap_content_news_search',implementations:['tavily-search']},{capability:'cap_content_web_search',implementations:['tavily-search']}]);
+  assert.deepEqual(catalogShape(registry,CUSTOM_SOCIAL_AGENT_CAPABILITIES,['cap_filesystem_project_read']),
+    [{capability:'cap_filesystem_project_read',implementations:['local-project-reader']}]);
 });
 
 test('capability-graph 对三个 Agent 能力的现状快照',async ()=>{
@@ -89,13 +89,13 @@ test('capability-graph 对三个 Agent 能力的现状快照',async ()=>{
     return [capability,{status:node.status,implementations:node.implementations.map((item)=>item.id)}];
   }));
   assert.deepEqual(snapshot,{
-    'content.document.search':{status:'degraded',implementations:['document-folder-search']},
-    'content.news.search':{status:'degraded',implementations:['tavily-search']},
-    'content.passage.retrieve':{status:'degraded',implementations:['local-passage-retrieval']},
-    'content.repository.inspect':{status:'degraded',implementations:['repository-inspector']},
-    'content.url.fetch':{status:'degraded',implementations:['url-fetch']},
-    'content.web.search':{status:'degraded',implementations:['tavily-search']},
-    'filesystem.project.read':{status:'degraded',implementations:['local-project-reader']},
+    'cap_content_document_search':{status:'degraded',implementations:['document-folder-search']},
+    'cap_content_news_search':{status:'degraded',implementations:['tavily-search']},
+    'cap_content_passage_retrieve':{status:'degraded',implementations:['local-passage-retrieval']},
+    'cap_content_repository_inspect':{status:'degraded',implementations:['repository-inspector']},
+    'cap_content_url_fetch':{status:'degraded',implementations:['url-fetch']},
+    'cap_content_web_search':{status:'degraded',implementations:['tavily-search']},
+    'cap_filesystem_project_read':{status:'degraded',implementations:['local-project-reader']},
   });
 });
 

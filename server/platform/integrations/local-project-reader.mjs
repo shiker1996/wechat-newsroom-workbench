@@ -3,7 +3,7 @@ import { readLocalProjectImplementation } from '../../../plugins/local-project-r
 import { createStoreExecutionLogger } from '../tools/execution-log.mjs';
 import { executeInformationCapabilitySlot } from '../tools/capability-slots.mjs';
 
-// capability-call: filesystem.project.read
+// capability-call: cap_filesystem_project_read
 
 // 兼容旧的同步入口；新代码应使用 readLocalProjectViaRegistry。
 export const readLocalProject = readLocalProjectImplementation;

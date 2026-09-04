@@ -1,6 +1,7 @@
 import { createGenerationSnapshot } from './registry.mjs';
 import { getToolRegistry } from '../tools/index.mjs';
 import { readActiveSkillConfig } from './configuration.mjs';
+import { resolveStageModelsSnapshot } from '../llm/stage-model-routing.mjs';
 
 export function bindGenerationSnapshot(gateway, generationSnapshotId) {
   if (!generationSnapshotId) return gateway;
@@ -85,9 +86,14 @@ export async function prepareSkillRun({ gateway, store, batchId, candidateId = n
     }
   }
   if(!historical&&hasWhitelist&&allowed.length!==tools.length)throw new Error('技能工具白名单包含已禁用或不存在的能力');
-  const snapshot=historical?{...historical.snapshot,reusedFromSnapshotId:historical.id,createdAt:new Date().toISOString()}:createGenerationSnapshot({
+  const stageModels = historical
+    ? (historical.snapshot?.stageModels || {})
+    : (gateway.stageModelConfig?.() || {});
+  const stageModelsResolved = historical?.snapshot?.stageModelsResolved
+    || resolveStageModelsSnapshot({ stageModels, providers: gateway.config?.providers || {} });
+  const snapshot=historical?{...historical.snapshot,stageModels:{...stageModels},stageModelsResolved:{...stageModelsResolved},reusedFromSnapshotId:historical.id,createdAt:new Date().toISOString()}:createGenerationSnapshot({
     skillBundles:bundles,tools,provider:selectedProvider,
-    model:resolved.model || '',purpose,selection,
+    model:resolved.model || '',purpose,selection,stageModels,stageModelsResolved,
   });
   snapshot.skillConfig={...(snapshot.skillConfig||{}),defaultModel:primary?.config?.defaultModel||'',allowedTools:hasFrozenWhitelist?[...frozenAllowedTools]:(hasPrimaryWhitelist?[...allowed]:null),
     gates:primary?.config?.gates||null,version:primary?.config?.version||null,configHash:primary?.config?.configHash||''};

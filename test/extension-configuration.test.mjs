@@ -47,13 +47,13 @@ test('技能 Manifest 可以声明动态 configuration',async()=>{
 
 test('未配置工具被阻断，已配置工具只向 adapter 注入解析值并审计非秘密快照',async()=>{
   const records=[];let received=null;
-  const manifest={id:'configured-tool',version:'1.0.0',capabilities:['demo.configured'],riskLevel:'read-only',
+  const manifest={id:'configured-tool',version:'1.0.0',capabilities:['cap_demo_configured'],riskLevel:'read-only',
     inputSchema:{type:'object',properties:{}},outputSchema:{type:'object',properties:{}},configuration:schema};
   const adapter={execute:async(_input,context)=>{received=context.configuration;return ok({});}};
   const blocked=new ToolRegistry().register({manifest,adapter});
-  assert.equal((await blocked.execute('demo.configured',{},{})).error.code,'DEPENDENCY_MISSING');
+  assert.equal((await blocked.execute('cap_demo_configured',{},{})).error.code,'DEPENDENCY_MISSING');
   const registry=new ToolRegistry({configurationResolver:()=>({configured:true,values:{endpoint:'https://example.com',apiKey:'secret-value'},snapshot:{status:'ready',configHash:'sha256:redacted'}})}).register({manifest,adapter});
-  const result=await registry.execute('demo.configured',{}, {executionLog:(record)=>records.push(record)});
+  const result=await registry.execute('cap_demo_configured',{}, {executionLog:(record)=>records.push(record)});
   assert.equal(result.status,'ok');assert.equal(received.apiKey,'secret-value');
   assert.deepEqual(records[0].configurationSnapshot,{status:'ready',configHash:'sha256:redacted'});
   assert.equal(JSON.stringify(records[0]).includes('secret-value'),false);

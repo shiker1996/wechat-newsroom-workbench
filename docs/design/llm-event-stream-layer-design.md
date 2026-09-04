@@ -332,7 +332,7 @@ AgentEvent: tool.completed / tool.failed
 现有 `capability` 继续作为业务授权和工具路由标识。由于部分供应商的 function name 不允许点号，需要建立传输名映射：
 
 ```text
-业务 capability：content.url.fetch
+业务 capability：cap_content_url_fetch
 传输工具名：    cap_content_url_fetch
 ```
 

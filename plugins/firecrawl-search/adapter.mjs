@@ -31,6 +31,6 @@ export async function execute(input, context = {}) {
 export async function health(context = {}) {
   const { failure, ok } = context.result || fallback;
   return context.configuration?.apiKey
-    ? ok({ available: true, provider: 'firecrawl', capabilities: ['content.research.search'] })
+    ? ok({ available: true, provider: 'firecrawl', capabilities: ['cap_content_research_search'] })
     : failure('DEPENDENCY_MISSING', 'Firecrawl Search 凭据未配置', { action: '前往系统与配置中心完成 Firecrawl 搜索配置' });
 }

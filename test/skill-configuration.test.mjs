@@ -15,13 +15,13 @@ test('技能配置拒绝未知工具、非法字数和 Prompt/门禁冲突', () 
     prompt:'请使用第一人称写作',allowedTools:['unknown.tool'],
     gates:{length:{minVisibleChars:3000,maxVisibleChars:1000},voice:{firstPerson:'off'},repair:{maxAttempts:1}},
   });
-  const issues=validateSkillConfig(config,['content.url.fetch']);
+  const issues=validateSkillConfig(config,['cap_content_url_fetch']);
   assert.ok(issues.some((item)=>item.field==='allowedTools'));
   assert.ok(issues.some((item)=>item.field==='gates.length'));
   assert.ok(issues.some((item)=>item.field==='gates.voice.firstPerson'));
 });
 
-test('allowedTools 兼容读取并规范化为能力授权覆盖层',()=>{const config=normalizeSkillConfig({prompt:'test',allowedTools:['content.url.fetch']});assert.deepEqual(config.capabilityAuthorization,{mode:'allow-list',capabilities:['content.url.fetch']});const modern=normalizeSkillConfig({prompt:'test',capabilityAuthorization:{capabilities:['content.web.search']}});assert.deepEqual(modern.allowedTools,['content.web.search']);});
+test('allowedTools 兼容读取并规范化为能力授权覆盖层',()=>{const config=normalizeSkillConfig({prompt:'test',allowedTools:['cap_content_url_fetch']});assert.deepEqual(config.capabilityAuthorization,{mode:'allow-list',capabilities:['cap_content_url_fetch']});const modern=normalizeSkillConfig({prompt:'test',capabilityAuthorization:{capabilities:['cap_content_web_search']}});assert.deepEqual(modern.allowedTools,['cap_content_web_search']);});
 
 test('技能门禁配置深合并默认值并拒绝未知枚举', () => {
   const config=normalizeSkillConfig({prompt:'规则',gates:{
@@ -89,13 +89,13 @@ test('统一创作运行时应用默认模型、工具白名单并冻结配置�
     default:{model:'model-default'},configured:{model:'model-configured'},
   }}};
   const bundle={skillName:'demo',prompt:'规则',hash:'abc',files:[],fallback:false,config:{
-    defaultModel:'configured',allowedTools:['content.url.fetch'],version:3,configHash:'sha256:cfg',
+    defaultModel:'configured',allowedTools:['cap_content_url_fetch'],version:3,configHash:'sha256:cfg',
     gates:{length:{minVisibleChars:900,maxVisibleChars:1500}},
   }};
   const result=await prepareSkillRun({gateway,store:{saveGenerationSnapshot:(item)=>saved.push(item)},
     batchId:'batch-1',candidateId:2,purpose:'tutorial',bundles:[bundle]});
   assert.equal(result.provider,'configured');
-  assert.deepEqual(result.tools.map((item)=>item.capability),['content.url.fetch']);
+  assert.deepEqual(result.tools.map((item)=>item.capability),['cap_content_url_fetch']);
   assert.equal(saved[0].snapshot.skillConfig.version,3);
   assert.equal(saved[0].snapshot.model,'model-configured');
 });
@@ -115,8 +115,8 @@ test('历史重试复用快照中的 Prompt、模型和工具版本', async () =
     id:9,batch_id:'batch-1',candidate_row_id:2,snapshot:{
       schemaVersion:1,purpose:'tutorial',modelProvider:'configured',model:'model-configured',
       skills:[{id:'demo',version:2,configHash:'sha256:old',promptHash:'sha256:oldprompt',prompt:'历史 Prompt',files:[],fallback:false}],
-      tools:[{capability:'content.url.fetch',plugin:'url-fetch',version:'1.0.0'}],
-      skillConfig:{defaultModel:'configured',allowedTools:['content.url.fetch'],gates:{length:{minVisibleChars:900,maxVisibleChars:1500},repair:{enabled:true,maxAttempts:1}}},
+      tools:[{capability:'cap_content_url_fetch',plugin:'url-fetch',version:'1.0.0'}],
+      skillConfig:{defaultModel:'configured',allowedTools:['cap_content_url_fetch'],gates:{length:{minVisibleChars:900,maxVisibleChars:1500},repair:{enabled:true,maxAttempts:1}}},
     },
   };
   const store={getGenerationSnapshot:()=>original,saveGenerationSnapshot:(item)=>{snapshots.push(item);return{id:10};}};
@@ -134,7 +134,7 @@ test('历史快照中的显式空白名单冻结为全部禁止', async () => {
     id:11,batch_id:'batch-1',candidate_row_id:2,snapshot:{
       schemaVersion:1,purpose:'social-cards-repository',modelProvider:'default',model:'model-default',
       skills:[{id:'xiaohongshu-article-generator',version:'builtin',config:null,promptHash:'sha256:p',prompt:'生成 Prompt',files:[],fallback:false}],
-      tools:[{capability:'content.url.fetch',plugin:'url-fetch',version:'1.0.0'}],
+      tools:[{capability:'cap_content_url_fetch',plugin:'url-fetch',version:'1.0.0'}],
       skillConfig:{defaultModel:'',allowedTools:[],gates:null,version:null,configHash:''},
     },
   };
@@ -144,7 +144,7 @@ test('历史快照中的显式空白名单冻结为全部禁止', async () => {
   const runtime=await prepareSkillRun({gateway,store,batchId:'batch-1',candidateId:2,purpose:'social-cards-repository',bundles:[bundle],snapshotId:11});
   // 显式空数组 = 全部禁止；历史工具列表仍按快照冻结恢复
   assert.deepEqual(runtime.allowedCapabilities,[]);
-  assert.deepEqual(runtime.tools.map((item)=>item.capability),['content.url.fetch']);
+  assert.deepEqual(runtime.tools.map((item)=>item.capability),['cap_content_url_fetch']);
   assert.deepEqual(snapshots[0].snapshot.skillConfig.allowedTools,[]);
 });
 
@@ -184,12 +184,12 @@ test('子技能配置只冻结自身 Prompt，不接管主技能的模型、工�
 test('工具策略可从活动配置和历史快照恢复精确白名单', async () => {
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'skill-tool-policy-'));
   try{
-    writeActiveSkillConfig(tempRoot,'wechat-mp-tutorial',{allowedTools:['filesystem.project.read']});
+    writeActiveSkillConfig(tempRoot,'wechat-mp-tutorial',{allowedTools:['cap_filesystem_project_read']});
     const active=await resolveSkillToolPolicy({workspaceRoot:tempRoot,skillId:'wechat-mp-tutorial'});
-    assert.deepEqual(active.allowedCapabilities,['filesystem.project.read']);
+    assert.deepEqual(active.allowedCapabilities,['cap_filesystem_project_read']);
     const historical=await resolveSkillToolPolicy({workspaceRoot:tempRoot,skillId:'wechat-mp-tutorial',snapshot:{
-      skills:[{id:'wechat-mp-tutorial',config:{allowedTools:['content.url.fetch']}}],
+      skills:[{id:'wechat-mp-tutorial',config:{allowedTools:['cap_content_url_fetch']}}],
     }});
-    assert.deepEqual(historical.allowedCapabilities,['content.url.fetch']);
+    assert.deepEqual(historical.allowedCapabilities,['cap_content_url_fetch']);
   }finally{fs.rmSync(tempRoot,{recursive:true,force:true});}
 });

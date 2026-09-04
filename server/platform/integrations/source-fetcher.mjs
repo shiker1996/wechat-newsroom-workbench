@@ -1,7 +1,7 @@
 import { createStoreExecutionLogger } from '../tools/execution-log.mjs';
 import { executeInformationCapabilitySlot } from '../tools/capability-slots.mjs';
 
-// capability-call: content.url.fetch
+// capability-call: cap_content_url_fetch
 import {
   fetchCandidateSourceImplementation,
   fetchMaterialSourceImplementation,

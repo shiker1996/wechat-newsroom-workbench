@@ -13,7 +13,7 @@ import {
 function manifest(overrides={}){
   return {
     schemaVersion:1,id:'remote-demo',name:'Remote Demo',version:'1.0.0',type:'remote-api',
-    capabilities:['remote.demo'],riskLevel:'network-read',endpoint:'https://api.example.com/tool',
+    capabilities:['cap_remote_demo'],riskLevel:'network-read',endpoint:'https://api.example.com/tool',
     credentialProfile:'remote-demo',inputSchema:{type:'object'},outputSchema:{type:'object'},
     timeoutMs:5000,maxResponseBytes:2048,compatibleApp:'>=0.1.0',...overrides,
   };

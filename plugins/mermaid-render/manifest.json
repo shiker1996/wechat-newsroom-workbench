@@ -3,7 +3,7 @@
   "name": "Mermaid 图片渲染",
   "version": "1.0.0",
   "capabilities": [
-    "diagram.mermaid.render"
+    "cap_diagram_mermaid_render"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "local-write",

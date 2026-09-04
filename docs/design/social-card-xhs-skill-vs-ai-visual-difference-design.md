@@ -259,21 +259,21 @@ references/ 下的 Markdown 参考文件
 Pipeline 将技能提示词、运行参数和工具目录交给 `runSocialCardAiVisualGenerationAgent`。生成阶段只开放：
 
 ```text
-filesystem.project.read
-filesystem.project.write
+cap_filesystem_project_read
+cap_filesystem_project_write
 ```
 
 浏览器观察和布局审计在这个阶段不可用。
 
 ### 8.4 Agent 读取资料
 
-正常路径下，Agent 第一次模型动作被约束为一次 `filesystem.project.read`，读取上面的四份候选工作文件。读取结果随后保留在对话历史中，用于生成 CSS 和页面，不把正文重新复制到用户消息。
+正常路径下，Agent 第一次模型动作被约束为一次 `cap_filesystem_project_read`，读取上面的四份候选工作文件。读取结果随后保留在对话历史中，用于生成 CSS 和页面，不把正文重新复制到用户消息。
 
 如果 Agent 提前返回 `final`，包装器会拒绝结束并要求继续完成 CSS 或缺失页面；这属于生成过程控制，不是视觉审计。
 
 ### 8.5 Agent 写入 CSS
 
-Agent 先通过 `filesystem.project.write` 的 `set_head` 写入基础 CSS：
+Agent 先通过 `cap_filesystem_project_write` 的 `set_head` 写入基础 CSS：
 
 - 主题变量；
 - 页面画布；

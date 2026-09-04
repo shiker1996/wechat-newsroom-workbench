@@ -1,7 +1,7 @@
 import { executeInformationCapabilitySlot } from '../tools/capability-slots.mjs';
 import { createStoreExecutionLogger } from '../tools/execution-log.mjs';
 
-// capability-call: content.repository.inspect
+// capability-call: cap_content_repository_inspect
 export async function inspectRepositoryViaRegistry(sourceUrl,{workspaceRoot,cacheDir=null,toolContext={}}={}){
   const result=await executeInformationCapabilitySlot('repository',{sourceUrl,cacheDir},{
     workspaceRoot,

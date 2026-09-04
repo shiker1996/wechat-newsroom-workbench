@@ -6,7 +6,7 @@ export function saveFactAttachment(store,{batchId,entryPoint='independent-writin
 export function getFactAttachment(store,{batchId,entryPoint='independent-writing',capability,arguments:args}){return store?.getConversationFactAttachment?.({batchId,entryPoint,capability,fingerprint:factAttachmentFingerprint(args)})||null;}
 
 // 创建端回填用的搜索类能力（repository.inspect 无 query 语义，不在放宽范围内）
-export const SEARCH_ATTACHMENT_CAPABILITIES=Object.freeze(['content.web.search','content.news.search','content.document.search']);
+export const SEARCH_ATTACHMENT_CAPABILITIES=Object.freeze(['cap_content_web_search','cap_content_news_search','cap_content_document_search']);
 
 // 同 batch+entryPoint 的会话 Agent 检索结果选择：优先 _agentQuery 与 topic 精确匹配；
 // 无精确匹配时回退到该能力最近一次结果（调用方传入的列表须按 updated_at DESC 排序，

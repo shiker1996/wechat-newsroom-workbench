@@ -1,7 +1,7 @@
 import { webSearch } from './client.mjs';
 const fallback={ok:(data={},extras={})=>({status:'ok',data,artifacts:[],provenance:{},warnings:[],metrics:{durationMs:0},...extras}),failure:(code,message,options={})=>({status:'error',error:{code,message:String(message),retryable:Boolean(options.retryable),...(options.action?{action:options.action}:{})}})};
 
-const NEWS_CAPABILITY = 'content.news.search';
+const NEWS_CAPABILITY = 'cap_content_news_search';
 const MISSING_KEY_ACTION = '前往系统与配置中心完成 Tavily 搜索配置';
 
 function hostname(url) {
@@ -66,5 +66,5 @@ export async function health(context={}) {
   if (!context.configuration?.apiKey) {
     return failure('DEPENDENCY_MISSING', 'Tavily 搜索凭据未配置', { action: MISSING_KEY_ACTION });
   }
-  return ok({ available: true, provider: 'tavily', capabilities: ['content.web.search', NEWS_CAPABILITY] });
+  return ok({ available: true, provider: 'tavily', capabilities: ['cap_content_web_search', NEWS_CAPABILITY] });
 }

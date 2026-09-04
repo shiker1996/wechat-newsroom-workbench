@@ -70,9 +70,9 @@ const clampInt=(value,min,max,fallback)=>Math.min(max,Math.max(min,Number(value)
 
 // resourceId 模式能力 = 命中 CAPABILITY_RESOURCE_PROFILE（有默认档案）或列入
 // RESOURCE_ADAPTED_CAPABILITIES 常量的能力；这些能力依赖适配代码（资源注册、参数改写、输入 Schema 注入）。
-// 其余能力（content.web.search/content.news.search 只做 query 清洗与 maxResults 截断，
+// 其余能力（cap_content_web_search/cap_content_news_search 只做 query 清洗与 maxResults 截断，
 // default 直接透传）是纯参数能力：无需适配代码，登记即生效。
-export const RESOURCE_ADAPTED_CAPABILITIES=Object.freeze(['filesystem.project.read','content.url.fetch','content.document.search','content.repository.inspect','content.passage.retrieve']);
+export const RESOURCE_ADAPTED_CAPABILITIES=Object.freeze(['cap_filesystem_project_read','cap_content_url_fetch','cap_content_document_search','cap_content_repository_inspect','cap_content_passage_retrieve']);
 // catalogProfiles（resolveCatalogResourceProfiles 的结果）可选传入：目录声明了 resourceKind 的能力同样算资源类
 export const isResourceAdaptedCapability=(capability,catalogProfiles={})=>CAPABILITY_RESOURCE_PROFILE[capability]!=null||catalogProfiles[capability]!=null||RESOURCE_ADAPTED_CAPABILITIES.includes(capability);
 
@@ -110,11 +110,11 @@ export const RESOURCE_KIND_PROFILES=Object.freeze({
 
 // 能力 → resourceKind 档案映射（静态权威表）
 export const CAPABILITY_RESOURCE_PROFILE=Object.freeze({
-  'filesystem.project.read':'project-path',
-  'content.url.fetch':'url-fetch',
-  'content.document.search':'document-root',
-  'content.repository.inspect':'github-url',
-  'content.passage.retrieve':'passage-content',
+  'cap_filesystem_project_read':'project-path',
+  'cap_content_url_fetch':'url-fetch',
+  'cap_content_document_search':'document-root',
+  'cap_content_repository_inspect':'github-url',
+  'cap_content_passage_retrieve':'passage-content',
 });
 
 // 阶段 3：目录条目（config/capabilities.json）声明的 resourceKind 派生映射。
@@ -154,8 +154,8 @@ export function resolveResourceArguments(args,request,{resources,workspaceRoot,m
     return profile.resolve(resource,args,{resources,workspaceRoot,messages,capability:request.capability});
   }
   switch(request.capability){
-    case 'content.web.search':
-    case 'content.news.search':{
+    case 'cap_content_web_search':
+    case 'cap_content_news_search':{
       const query=sanitizeQuery(args?.query,300);
       return searchMaxResults===false?{...args,query}:{...args,query,maxResults:clampInt(args?.maxResults,1,searchMaxResults,5)};
     }
@@ -172,13 +172,13 @@ export function trimProjectReadResult(result){
 
 // 通用清洗分发：业务解释（事实附件、【素材】升级判定）不在此层
 export function sanitizeCapabilityResult(result,request){
-  return request.capability==='filesystem.project.read'?trimProjectReadResult(result):result;
+  return request.capability==='cap_filesystem_project_read'?trimProjectReadResult(result):result;
 }
 
 // 确定性前置 ToolRequest（deterministic-first-step）：用户明确给出本地项目时首步发起读取
 export function deterministicProjectReadRequest({resources,skip=false,note,reason}={}){
   if(skip||!resources.has('project:current'))return null;
-  return {type:'tool_requests',assistant_note:note,requests:[{requestId:'tr_project_current',capability:'filesystem.project.read',arguments:{resourceId:'project:current'},reason}]};
+  return {type:'tool_requests',assistant_note:note,requests:[{requestId:'tr_project_current',capability:'cap_filesystem_project_read',arguments:{resourceId:'project:current'},reason}]};
 }
 
 // 结果 data 中的 http(s) URL 收集（原 custom-social-adapter 的 sourceUrls，字段与过滤规则不变）
@@ -293,7 +293,7 @@ export const RESULT_HANDLERS=Object.freeze({
     const trimmed=sanitizeCapabilityResult(result,request),data={...trimmed.data,_agentQuery:String(request.arguments?.query||'')};
     // passage content 回填（设计文档 §13）：tutorial/custom-social 的素材资源注册时不含正文，
     // url.fetch 成功后把正文写回资源目录条目，后续 passage.retrieve 的 resourceIds 即可走严格分支
-    if(request.capability==='content.url.fetch'){
+    if(request.capability==='cap_content_url_fetch'){
       const resource=resources?.get(String(request.arguments?.resourceId||'')),content=String(data.content||data.text||data.excerpt||'');
       if(resource&&!resource.content&&content)resource.content=content;
     }

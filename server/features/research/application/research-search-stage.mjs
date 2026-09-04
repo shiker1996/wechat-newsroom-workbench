@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createStoreExecutionLogger } from '../../../platform/tools/execution-log.mjs';
 import { executeCapabilityWithPreference } from '../../../platform/tools/capability-slots.mjs';
-// capability-call: content.research.search
+// capability-call: cap_content_research_search
 import {
   RESEARCH_SEARCH_POLICY,
   emptyResearchSearchLedger,
@@ -89,7 +89,7 @@ function addLedgerEntry(ledger, task, entry) {
 
 function defaultSearchExecutor({ workspaceRoot, batchId, store }) {
   return async (task) => {
-    const capability = task.source_type === 'news' ? 'content.news.search' : 'content.web.search';
+    const capability = task.source_type === 'news' ? 'cap_content_news_search' : 'cap_content_web_search';
     return executeCapabilityWithPreference(workspaceRoot, capability, {
       query: task.query,
       maxResults: task.limit,
@@ -105,7 +105,7 @@ function defaultSearchExecutor({ workspaceRoot, batchId, store }) {
 }
 
 function defaultFallbackSearchExecutor({ workspaceRoot, batchId, store }) {
-  return async (task) => executeCapabilityWithPreference(workspaceRoot, 'content.research.search', {
+  return async (task) => executeCapabilityWithPreference(workspaceRoot, 'cap_content_research_search', {
     query: task.query,
     maxResults: task.limit,
     sourceType: task.source_type,
@@ -113,7 +113,7 @@ function defaultFallbackSearchExecutor({ workspaceRoot, batchId, store }) {
     workspaceRoot,
     batchId,
     store,
-    allowedCapabilities: ['content.research.search'],
+    allowedCapabilities: ['cap_content_research_search'],
     executionLog: createStoreExecutionLogger(store, { batchId, skillId: 'discussion-researcher' }),
   });
 }

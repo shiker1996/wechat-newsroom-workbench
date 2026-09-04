@@ -3,7 +3,7 @@ import { createStoreExecutionLogger } from '../../tools/execution-log.mjs';
 import { generateArticleImage, registerGeneratedSlotImage } from '../../../features/articles/index.mjs';
 import { pipeFile } from '../route-helpers.mjs';
 
-// capability-call: diagram.mermaid.render, diagram.echarts.render
+// capability-call: cap_diagram_mermaid_render, cap_diagram_echarts_render
 
 export async function handleMediaRoutes(context) {
   const { request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity } = context;
@@ -318,7 +318,7 @@ export async function handleMediaRoutes(context) {
       fs.writeFileSync(source, `\`\`\`${type}\n${code}\n\`\`\`\n`, 'utf8');
       const themeTokens = TYPESET_THEMES[input.theme]?.tokens || {};
       fs.writeFileSync(tokensPath, JSON.stringify({ ...themeTokens, ...(input.tokens || {}), colors:{ ...(themeTokens.colors || {}), ...(input.tokens?.colors || {}) } }), 'utf8');
-      const rendered = await executeCapability({consumerId:'feature.diagram-preview',capability:`diagram.${type}.render`,input:{
+      const rendered = await executeCapability({consumerId:'feature.diagram-preview',capability:`cap_diagram_${String(type).replace(/[^A-Za-z0-9_]/g,'_')}_render`,input:{
         inputPath:source, outputPath:output, imageDir, tokensPath,
       },context:{allowedRoots:[tempDir],cwd:root,timeoutMs:180000,executionLog:createStoreExecutionLogger(store,{skillId:'visual-preview'})}});
       if (rendered.status === 'error') throw new Error(rendered.error.message);

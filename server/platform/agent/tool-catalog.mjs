@@ -24,16 +24,10 @@ export function buildConversationToolCatalog({registry,entryCapabilities=[],allo
 
 export function visibleCapabilitySet(catalog){return new Set((catalog||[]).map((item)=>item.capability));}
 
-// 原生 function tool 的名称不能直接依赖 capability 中的点号/连字符，
-// 但映射必须稳定且可逆，避免模型调用后找不到真实能力。
-export function toolNameForCapability(capability) {
-  return `cap_${String(capability || '').replace(/[^A-Za-z0-9_]/g, '_')}`.slice(0, 64);
-}
-
 export function buildNativeToolDefinitions(catalog = []) {
   const names = new Set();
   return catalog.map((item) => {
-    const name = toolNameForCapability(item.capability);
+    const name = String(item.capability || '');
     if (!name || names.has(name)) throw new Error(`原生工具名称冲突：${name}`);
     names.add(name);
     return {
@@ -48,7 +42,7 @@ export function buildNativeToolDefinitions(catalog = []) {
 }
 
 export function capabilityForToolName(name, catalog = []) {
-  const match = catalog.find((item) => toolNameForCapability(item.capability) === String(name || ''));
+  const match = catalog.find((item) => item.capability === String(name || ''));
   return match?.capability || null;
 }
 

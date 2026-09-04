@@ -20,7 +20,7 @@ description: 把文章标题、摘要和封面主题 SPEC 转译成一张 900×3
 
 ## 内置视觉参考
 
-本技能随 Prompt 注入以下三份内置参考，不属于 `workspace.files`，不要通过 `filesystem.project.read` 重复读取，也不要把它们渲染成正文：
+本技能随 Prompt 注入以下三份内置参考，不属于 `workspace.files`，不要通过 `cap_filesystem_project_read` 重复读取，也不要把它们渲染成正文：
 
 | 内置参考 | 唯一职责 |
 | --- | --- |

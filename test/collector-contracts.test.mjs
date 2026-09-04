@@ -9,7 +9,7 @@ import { createBuiltinCollectorRegistry } from '../server/platform/collectors/bu
 import { createStoreCollectionRunner } from '../server/features/collection/application/store-collection-runner.mjs';
 import { CollectionSourceService } from '../server/features/collection/application/source-service.mjs';
 
-function manifest(id='demo-collector'){const inputSchema={type:'object',additionalProperties:false,required:['url'],properties:{url:{type:'string',format:'url'}}};return {schemaVersion:1,id,name:'演示采集器',version:'1.0.0',kind:'collector',entry:'./adapter.mjs',capabilities:['collect.demo'],riskLevel:'network-read',inputSchema,outputSchema:{type:'object',properties:{items:{type:'array'}}},runtime:{timeoutMs:10000,concurrency:'parallel'},collector:{sourceTypes:['demo'],sourceConfigSchema:inputSchema}};}
+function manifest(id='demo-collector'){const inputSchema={type:'object',additionalProperties:false,required:['url'],properties:{url:{type:'string',format:'url'}}};return {schemaVersion:1,id,name:'演示采集器',version:'1.0.0',kind:'collector',entry:'./adapter.mjs',capabilities:['cap_collect_demo'],riskLevel:'network-read',inputSchema,outputSchema:{type:'object',properties:{items:{type:'array'}}},runtime:{timeoutMs:10000,concurrency:'parallel'},collector:{sourceTypes:['demo'],sourceConfigSchema:inputSchema}};}
 function workspace(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'collector-stage0-'));const store=new Store(path.join(root,'workbench.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});return {root,store};}
 
 test('Collector Manifest、来源配置和标准输出执行严格校验',()=>{

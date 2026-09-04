@@ -1,7 +1,7 @@
 import { executeInformationCapabilitySlot, listInformationCapabilitySlots } from '../tools/capability-slots.mjs';
 import { createStoreExecutionLogger } from '../tools/execution-log.mjs';
 
-// capability-call: content.web.search, content.news.search, content.document.search
+// capability-call: cap_content_web_search, cap_content_news_search, cap_content_document_search
 
 // 联网搜索补充资料（待办「补齐三个信息工具能力」步骤 4）：
 // 自主写作与自定义图文在创建事实基座时自动执行 web-search / news-search / document 信息槽位，

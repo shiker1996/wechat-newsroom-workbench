@@ -50,7 +50,7 @@ consumable（可消费，按消费者逐个计算）
 1. `skill.json` 的 `requiredCapabilities`/`optionalCapabilities` 加一项（门禁自动校验目录存在性与登记一致性）。
 2. `active.json` 白名单放行，或在页面"技能与工具 → 消费者接入"开开关。
 
-边界：resourceId 模式能力（`filesystem.project.read`、`content.url.fetch`、`content.document.search`、`content.repository.inspect`、`content.passage.retrieve`，见 `RESOURCE_ADAPTED_CAPABILITIES`）技能单独运行时不可用，必须走 Agent 通道——有意的安全边界。
+边界：resourceId 模式能力（`cap_filesystem_project_read`、`cap_content_url_fetch`、`cap_content_document_search`、`cap_content_repository_inspect`、`cap_content_passage_retrieve`，见 `RESOURCE_ADAPTED_CAPABILITIES`）技能单独运行时不可用，必须走 Agent 通道——有意的安全边界。
 
 ### 3.2 Agent 接入已有能力
 
@@ -67,7 +67,7 @@ consumable（可消费，按消费者逐个计算）
 - [ ] capability-consumers.json：登记依赖（declaration/adapterStatus/resourceKinds/triggerPolicy/authorizationAction/resultPolicy）
 - [ ] skill.json Manifest 同步
 
-六件清单经 custom-social 接入 `filesystem.project.read` 实战验证（阶段 A）。
+六件清单经 custom-social 接入 `cap_filesystem_project_read` 实战验证（阶段 A）。
 2026-08-15 起（agent-adapter-configurability 阶段 3）：新能力命中存量 resourceKind 时在 `config/capabilities.json` 条目声明 `resourceKind` 即走默认档案路径，前三件 Adapter 清单免除，纯配置接入、不改 `.mjs`。
 2026-08-16 起：授权拒绝文案外置 `config/agent-adaptation-messages.json`（`messages.<consumerId>.<capability>` 二维），Adapter 不再传 messages；缺省回退档案内联兜底文案。
 
@@ -105,5 +105,5 @@ feature 的能力调用是业务流程里确定性的一环，"改代码"即功�
 1. ~~S3 默认适配档案~~ 已实施（2026-08-15，[agent-adapter-configurability-design.md](./agent-adapter-configurability-design.md) 阶段 1–4）：resourceKind 档案表 + 目录条目 resourceKind 声明 + Agent 适配声明（`capability-consumers.json` 的 `adaptation` 字段），资源类能力接入从 L2 降为纯配置。
 2. ~~第三方本地工具 Manifest 声明目录外能力时不产出目录草案~~ 已实施（2026-08-16）：本地工具包 validate/install 路由与远程一样返回 `catalogDrafts`，R3 缺口闭合。
 3. ~~基线脚本 adaptation 静态表手工维护~~ 已实施（2026-08-16）：`snapshot-consumer-capability-baseline.mjs` 改为从 `config/capability-consumers.json` 登记推导（3.5 注记）。
-4. ~~tutorial/custom-social 的 passage content 回填~~ 已实施（2026-08-16）：url.fetch 成功结果回填资源目录条目正文，`content.passage.retrieve` 的 resourceIds 严格分支在这两个入口可用。
+4. ~~tutorial/custom-social 的 passage content 回填~~ 已实施（2026-08-16）：url.fetch 成功结果回填资源目录条目正文，`cap_content_passage_retrieve` 的 resourceIds 严格分支在这两个入口可用。
 5. Agent 纯参数能力的声明路径当前是"手改 JSON"；如需更低成本，可考虑只读登记 + 草案辅助的轻量入口（原页面入口的教训：候选范围太窄时不值得做完整写入链路）。

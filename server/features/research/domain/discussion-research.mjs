@@ -356,6 +356,7 @@ export function buildDiscussionResearch({ events = [], eventHeatRanking = {}, to
     internal_signals: [],
     relations: [],
     topic_candidates: [],
+    topic_coverage: [],
   };
 }
 
@@ -399,6 +400,12 @@ export function discussionResearchMarkdown(report) {
     '## 写作研判素材',
     '',
     ...(materials.length ? materials.map((item) => `- ${item.material_type}（${item.status}）：${item.statement || item.interpretation || '暂无说明'}${item.writing_angles?.length ? `；可写角度：${item.writing_angles.join('、')}` : ''}${item.thesis_seeds?.length ? `；观点种子：${item.thesis_seeds.join('、')}` : ''}`) : ['- 暂无模型研判素材']),
+    '',
+    '## 候选选题事件覆盖',
+    '',
+    ...(list(report?.topic_coverage).length
+      ? list(report.topic_coverage).map((item) => `- ${item.status === 'covered' ? '✅ 已覆盖' : item.status === 'uncovered' ? '⚠️ 未形成候选' : '❔ 未说明'} · ${item.title || item.event_id}${item.candidate_ids?.length ? ` → ${item.candidate_ids.join('、')}` : ''}${item.reason ? `：${item.reason}` : ''}`)
+      : ['- 暂无候选覆盖清单']),
     '',
     '## 下一阶段',
     '',

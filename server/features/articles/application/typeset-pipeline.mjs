@@ -9,7 +9,7 @@ import { batchArticlesDir, candidateArticleDir } from '../../../platform/core/wo
 import { executeCapability } from '../../../platform/tools/capability-runtime.mjs';
 import { createStoreExecutionLogger } from '../../../platform/tools/execution-log.mjs';
 
-// capability-call: diagram.mermaid.render, diagram.echarts.render
+// capability-call: cap_diagram_mermaid_render, cap_diagram_echarts_render
 import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
 import { articleThemeCompatibilityView, articleThemeDefinition, compileArticleTheme } from '../../../shared/themes/article-theme-compiler.mjs';
@@ -168,8 +168,8 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   // Mermaid / ECharts 围栏由确定性脚本渲染为本地 PNG 并替换为图片引用；
   // 渲染失败的围栏保留原文并报错，绝不静默丢图
   const chartSteps = [
-    [/```\s*mermaid\b/i, 'diagram.mermaid.render', 'Mermaid', '09-FINAL.mermaid.md'],
-    [/```\s*echarts\b/i, 'diagram.echarts.render', 'ECharts', '09-FINAL.echarts.md'],
+    [/```\s*mermaid\b/i, 'cap_diagram_mermaid_render', 'Mermaid', '09-FINAL.mermaid.md'],
+    [/```\s*echarts\b/i, 'cap_diagram_echarts_render', 'ECharts', '09-FINAL.echarts.md'],
   ];
   const chartNotes = [];
   let chartReadyPath = renderedPath;

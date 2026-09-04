@@ -19,14 +19,14 @@ test('统一日志查询的模型分支返回调用详情字段',t=>{
     estimatedInputTokens:120,promptTokens:100,completionTokens:30,reasoningTokens:12,
     latencyMs:456,compressed:true,outputBudget:{maxTokens:8192},
     outputText:'{"items":[]}',reasoningText:'先分析再输出',
-    toolCalls:[{id:'call-1',name:'filesystem.project.document_write',input:{operation:'append'}}],
+    toolCalls:[{id:'call-1',name:'cap_filesystem_project_document_write',input:{operation:'append'}}],
   });
   const [row]=store.listLogs({logType:'model'});
   assert.equal(row.log_type,'model');
   assert.equal(row.model,'deepseek-chat');
   assert.equal(row.output_text,'{"items":[]}');
   assert.equal(row.reasoning_text,'先分析再输出');
-  assert.deepEqual(JSON.parse(row.tool_calls_json),[{id:'call-1',name:'filesystem.project.document_write',input:{operation:'append'}}]);
+  assert.deepEqual(JSON.parse(row.tool_calls_json),[{id:'call-1',name:'cap_filesystem_project_document_write',input:{operation:'append'}}]);
   assert.equal(row.prompt_tokens,100);
   assert.equal(row.completion_tokens,30);
   assert.equal(row.reasoning_tokens,12);

@@ -28,7 +28,7 @@
 | AI Agent 入口 | `social-card-ai-visual-generation` |
 | AI 输出 | `ai-beautified.html`、`ai-beautified-output/` |
 | 程序化输出 | `my-design.html`、`output/` |
-| 页面写入 | Agent 调用 `filesystem.project.document_write`，原样分块追加 |
+| 页面写入 | Agent 调用 `cap_filesystem_project_document_write`，原样分块追加 |
 | 截图 | `html-pages-to-images` 在生成完成后执行 |
 | 交付检查 | 检查 HTML、copy 和 PNG 是否完整并登记 |
 | 失败回退 | 不生成程序化回退页面 |

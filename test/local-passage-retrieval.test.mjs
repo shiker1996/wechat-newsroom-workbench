@@ -65,9 +65,9 @@ test('adapter.execute：按文档返回摘录与块统计', async () => {
   assert.equal(result.data.selections[0].id, 'a');
 });
 
-test('注册表可解析 content.passage.retrieve 并执行', async () => {
+test('注册表可解析 cap_content_passage_retrieve 并执行', async () => {
   const registry = await getToolRegistry();
-  const result = await registry.execute('content.passage.retrieve', {
+  const result = await registry.execute('cap_content_passage_retrieve', {
     documents: [{ id: 'x', content: 'hello world '.repeat(2000) }],
     query: 'hello', k: 2,
   }, {});

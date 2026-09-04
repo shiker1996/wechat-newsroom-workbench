@@ -3,7 +3,7 @@
   "name": "AI 视觉文档分块写入",
   "version": "1.0.0",
   "capabilities": [
-    "filesystem.project.document_write"
+    "cap_filesystem_project_document_write"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "local-write",

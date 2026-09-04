@@ -28,7 +28,7 @@ function withKey(value, run) {
 
 test('tavily-search plugin implements web and news search capabilities', async () => {
   const registry = await getToolRegistry();
-  for (const capability of ['content.web.search', 'content.news.search']) {
+  for (const capability of ['cap_content_web_search', 'cap_content_news_search']) {
     const plugin = registry.resolve(capability);
     assert.equal(plugin?.manifest.id, 'tavily-search');
   }
@@ -37,7 +37,7 @@ test('tavily-search plugin implements web and news search capabilities', async (
 test('missing Tavily credential points to the configuration center', async () => {
   const registry = await getToolRegistry();
   await withKey(undefined, async () => {
-    const result = await registry.execute('content.web.search', { query: '测试' });
+    const result = await registry.execute('cap_content_web_search', { query: '测试' });
     assert.equal(result.status, 'error');
     assert.equal(result.error.code, 'DEPENDENCY_MISSING');
     assert.match(result.error.message, /凭据未配置/);
@@ -56,7 +56,7 @@ test('web search normalizes results with provenance', async () => {
       ],
     }, capture);
     try {
-      const result = await registry.execute('content.web.search', { query: 'AI 新闻', maxResults: 3 });
+      const result = await registry.execute('cap_content_web_search', { query: 'AI 新闻', maxResults: 3 });
       assert.equal(result.status, 'ok');
       assert.equal(capture.body.topic, undefined);
       assert.equal(capture.body.query, 'AI 新闻');
@@ -82,7 +82,7 @@ test('news search requests news topic and warns on missing published date', asyn
       results: [{ title: '快讯', url: 'https://news.example.com/1', content: '内容' }],
     }, capture);
     try {
-      const result = await registry.execute('content.news.search', { query: '科技快讯', timeRange: 'week' });
+      const result = await registry.execute('cap_content_news_search', { query: '科技快讯', timeRange: 'week' });
       assert.equal(result.status, 'ok');
       assert.equal(capture.body.topic, 'news');
       assert.equal(capture.body.time_range, 'week');
@@ -95,13 +95,13 @@ test('news search requests news topic and warns on missing published date', asyn
 test('health reports missing credential with configuration action', async () => {
   const registry = await getToolRegistry();
   await withKey(undefined, async () => {
-    const result = await registry.health('content.web.search');
+    const result = await registry.health('cap_content_web_search');
     assert.equal(result.status, 'error');
     assert.equal(result.error.code, 'DEPENDENCY_MISSING');
     assert.equal(result.error.action, '前往系统与配置中心完成 Tavily 搜索配置');
   });
   await withKey('test-key', async () => {
-    const result = await registry.health('content.web.search');
+    const result = await registry.health('cap_content_web_search');
     assert.equal(result.status, 'ok');
     assert.equal(result.data.available, true);
   });

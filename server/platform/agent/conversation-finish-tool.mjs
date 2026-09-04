@@ -3,7 +3,7 @@
 // 表单变化由业务工具写入；模型也可以直接返回普通文本作为本轮回复。
 // 只有模型主动调用本工具时，才使用这个显式结束出口。
 
-export const CONVERSATION_FINISH_CAPABILITY = 'agent.conversation.finish';
+export const CONVERSATION_FINISH_CAPABILITY = 'cap_agent_conversation_finish';
 
 export function buildConversationFinishTool({
   capability = CONVERSATION_FINISH_CAPABILITY,

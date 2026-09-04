@@ -10,7 +10,7 @@ import { installRemotePlugin, readRemotePluginCatalog, setRemotePluginStatus } f
 const schema={type:'object',additionalProperties:false,properties:{endpoint:{type:'string'},apiKey:{type:'string',secret:true}},required:['endpoint','apiKey']};
 const resource={type:'tool',id:'sample',name:'Sample',manifest:{id:'sample',configuration:schema}};
 function workspace(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'r5-trust-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}
-function remoteManifest(){return {schemaVersion:1,id:'remote-sample',name:'Remote sample',version:'1.0.0',type:'remote-api',capabilities:['content.search'],riskLevel:'network-read',endpoint:'https://example.com/tool',inputSchema:{type:'object'},outputSchema:{type:'object'},timeoutMs:5000,compatibleApp:'>=0.5.0'};}
+function remoteManifest(){return {schemaVersion:1,id:'remote-sample',name:'Remote sample',version:'1.0.0',type:'remote-api',capabilities:['cap_content_search'],riskLevel:'network-read',endpoint:'https://example.com/tool',inputSchema:{type:'object'},outputSchema:{type:'object'},timeoutMs:5000,compatibleApp:'>=0.5.0'};}
 
 test('R5.2 远程插件保存 Manifest 摘要并在启用前重新校验',t=>{
   const root=workspace(t),installed=installRemotePlugin(root,remoteManifest());

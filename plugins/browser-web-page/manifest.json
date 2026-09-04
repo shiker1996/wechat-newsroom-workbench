@@ -7,7 +7,7 @@
   "entry": "./adapter.mjs",
   "riskLevel": "browser-read",
   "capabilities": [
-    "collect.browser-page"
+    "cap_collect_browser_page"
   ],
   "inputSchema": {
     "type": "object",

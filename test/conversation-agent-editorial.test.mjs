@@ -5,12 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { Store } from '../server/platform/core/store.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
-import { toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
 import { runEditorialAgentTurn, selectEditorialResearchPoints } from '../server/features/articles/application/agent/editorial-adapter.mjs';
 import { buildEditorialMessages } from '../server/features/articles/llm/editorial-room.mjs';
 
 function call(capability, input, id = capability) {
-  return { id, name: toolNameForCapability(capability), input };
+  return { id, name: capability, input };
 }
 
 function native(callId, toolCalls, model = 'mock') {
@@ -33,7 +32,7 @@ function registry() {
   const value = new ToolRegistry();
   value.register({
     manifest: {
-      id: 'mock-url', name: '网页读取', version: '1.0.0', capabilities: ['content.url.fetch'], riskLevel: 'network-read', pathInputs: ['root'],
+      id: 'mock-url', name: '网页读取', version: '1.0.0', capabilities: ['cap_content_url_fetch'], riskLevel: 'network-read', pathInputs: ['root'],
       inputSchema: { type: 'object', required: ['targetUrl', 'root'], properties: { targetUrl: { type: 'string' }, title: { type: 'string' }, root: { type: 'string' } } }, outputSchema: { type: 'object' },
     },
     adapter: { async execute(input) { return { status: 'ok', data: { url: input.targetUrl, title: input.title, content: '原文证据：产品实测数据为 42。' }, artifacts: [], warnings: [], provenance: { requestedUrl: input.targetUrl, finalUrl: input.targetUrl } }; } },
@@ -99,11 +98,11 @@ test('编辑室通过原生工具读取资料、更新底稿，并用结束工�
   const { root, store, hotspot, candidate } = fixture(t);
   const events = [{ event_id: 'E001', title: '测试事件', hotspots: [{ ...hotspot, sourceDoc: null }] }];
   const sequence = [
-    native('m1', [call('content.url.fetch', { resourceId: `source:${hotspot.id}` }, 'source')]),
+    native('m1', [call('cap_content_url_fetch', { resourceId: `source:${hotspot.id}` }, 'source')]),
       ({ messages, toolChoice }) => {
       assert.notEqual(toolChoice, 'required');
       assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('产品实测数据为 42')));
-      return native('m2', [call('agent.form.update', { operations: [
+      return native('m2', [call('cap_agent_form_update', { operations: [
         { field: 'angle', op: 'replace', value: '从实测落差切入' },
         { field: 'thesis', op: 'replace', value: '宣传与实际效果的差异值得解释' },
         { field: 'confirmed_facts', op: 'append', values: ['来源显示实测数据为 42'] },
@@ -114,7 +113,7 @@ test('编辑室通过原生工具读取资料、更新底稿，并用结束工�
     },
     ({ messages }) => {
       assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('从实测落差切入')));
-      return native('m3', [call('agent.conversation.finish', { assistantReply: '事实已核对，已记录实测落差主线。' }, 'finish')]);
+      return native('m3', [call('cap_agent_conversation_finish', { assistantReply: '事实已核对，已记录实测落差主线。' }, 'finish')]);
     },
   ];
   const eventsSeen = [];
@@ -125,7 +124,7 @@ test('编辑室通过原生工具读取资料、更新底稿，并用结束工�
   assert.equal(result.candidate.thesis, '宣传与实际效果的差异值得解释');
   assert.match(result.editorial.research_basis, /反常主线/);
   assert.equal(store.getAgentRun(result.agentRunId).status, 'completed');
-  assert.ok(eventsSeen.some((event) => event.type === 'tool.completed' && event.capability === 'agent.conversation.finish'));
+  assert.ok(eventsSeen.some((event) => event.type === 'tool.completed' && event.capability === 'cap_agent_conversation_finish'));
 });
 
 test('编辑室业务工具可选择有效研判拓展点，结束工具不需要再提交 JSON', async (t) => {
@@ -139,8 +138,8 @@ test('编辑室业务工具可选择有效研判拓展点，结束工具不需�
     relations: [], reference_events: [], verified_research_materials: [], research_reports: [], generated_at: '2026-08-14T00:00:00Z',
   }), 'utf8');
   const result = await runEditorialAgentTurn({ gateway: gateway([
-    native('select', [call('editorial.research.select', { point_ids: ['I1'], rationale: '支撑当前命题' }, 'select')]),
-    native('finish', [call('agent.conversation.finish', { assistantReply: '已采用实测落差研判点。' }, 'finish')]),
+    native('select', [call('cap_editorial_research_select', { point_ids: ['I1'], rationale: '支撑当前命题' }, 'select')]),
+    native('finish', [call('cap_agent_conversation_finish', { assistantReply: '已采用实测落差研判点。' }, 'finish')]),
   ]), store, registry: registry(), candidateId: candidate.id, provider: 'mock', events: [{ event_id: 'E1', title: '工具发布', hotspots: [] }], workspaceRoot: root });
   assert.equal(result.toolCalls, 2);
   assert.equal(store.getCandidate(candidate.id).editorial.adopted_research_points[0].point_id, 'I1');

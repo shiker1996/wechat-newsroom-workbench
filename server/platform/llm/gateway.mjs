@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { applyModelProviderConfiguration } from '../extensions/model-provider-configuration.mjs';
 import { chatCompletionsEvents, normalizeChatToolCalls, normalizeChatToolChoice } from './stream-events.mjs';
 import { normalizeResponsesResponse, responsesEndpoint, responsesEvents, responsesPayload } from './responses-api.mjs';
+import { modelProfilesFromUiFields, normalizeModelProfiles, normalizeStageModels, resolveStageModelProvider, stageModelsFromProfiles, stageModelsFromUiFields, stageForPurpose } from './stage-model-routing.mjs';
 
 // 后台任务 thinking 实时进度：AiJobManager 在 run() 外层注册当前任务的接收器，
 // complete() 检测到接收器且本次 thinking 开启时，内部改用流式把 reasoning 实时转发给接收器。
@@ -135,6 +136,46 @@ export class ModelGateway {
     const apiKey = resolved.apiKey;
     if (!apiKey) throw new Error(`模型服务 ${providerName} 凭据未配置，请前往系统与配置中心完成配置`);
     return { providerName, provider, apiKey };
+  }
+
+  stageModelConfig() {
+    const configured = normalizeStageModels(this.config.stageModels);
+    const stored = this.store?.getExtensionSetting?.('system', 'llm-stage-routing')?.value;
+    const profiles = normalizeModelProfiles(this.config.modelProfiles);
+    return {
+      ...stageModelsFromProfiles({ ...profiles, ...modelProfilesFromUiFields(stored) }),
+      // 兼容早期页面产生的逐节点配置；新的页面不再暴露这些字段。
+      ...stageModelsFromUiFields(stored),
+      ...configured,
+    };
+  }
+
+  resolveForInput(input = {}) {
+    const historical = input.generationSnapshotId ? this.store?.getGenerationSnapshot?.(input.generationSnapshotId) : null;
+    const snapshot = historical?.snapshot || null;
+    const stage = String(input.stage || '').trim() || stageForPurpose(input.purpose);
+    const fallbackProvider = input.provider || snapshot?.modelProvider || this.config.defaultProvider;
+    const historicalResolved = snapshot?.stageModelsResolved || {};
+    const effectiveStage = stage || undefined;
+    const ancestorsFor = (value) => {
+      const parts = String(value || '').split('.').filter(Boolean);
+      return parts.length ? [parts.join('.'), ...parts.slice(0, -1).map((_, index) => parts.slice(0, parts.length - index - 1).join('.'))] : [];
+    };
+    for (const key of ancestorsFor(effectiveStage)) {
+      const frozen = historicalResolved[key];
+      if (!frozen) continue;
+      if (frozen.disabled) throw Object.assign(new Error(`阶段 ${key} 已配置为不调用模型`), { code: 'STAGE_MODEL_DISABLED', stage: key });
+      const resolvedProvider = this.resolve(frozen.provider);
+      if (frozen.model && resolvedProvider.provider.model !== frozen.model) {
+        throw new Error(`历史阶段模型版本不可用：${frozen.provider}/${frozen.model}`);
+      }
+      return resolvedProvider;
+    }
+    // 历史快照没有阶段路由字段时，按旧的单模型快照执行，不能被当前新配置影响。
+    const stageModels = historical ? normalizeStageModels(snapshot?.stageModels) : this.stageModelConfig();
+    const resolved = resolveStageModelProvider({ stage: effectiveStage, purpose: input.purpose, stageModels, providers: this.config.providers, fallbackProvider });
+    if (resolved.disabled) throw Object.assign(new Error(`阶段 ${resolved.stage || input.purpose || 'unknown'} 已配置为不调用模型`), { code: 'STAGE_MODEL_DISABLED', stage: resolved.stage });
+    return this.resolve(resolved.provider || fallbackProvider);
   }
 
   async rawResponsesComplete({ providerName, provider, apiKey, messages, maxOutputTokens, temperature = 0.2, jsonMode = false, webSearch = false, thinking, signal, tools = [], toolChoice = null, nativeTools = false }) {
@@ -332,7 +373,7 @@ export class ModelGateway {
 
   // 协议层事件流：直接暴露一轮模型请求的规范化事件；上下文压缩和 Agent 编排仍由上层负责。
   async *streamEvents(input = {}) {
-    const { providerName, provider, apiKey } = this.resolve(input.provider);
+    const { providerName, provider, apiKey } = this.resolveForInput(input);
     const thinking = input.thinking ?? thinkingEnabledFor(input.purpose);
     const outputBudget = outputBudgetFor({ purpose: input.purpose, providerMax: provider.maxOutputTokens, requested: input.maxOutputTokens, adaptive: false });
     yield* this.rawStreamEvents({ providerName, provider, apiKey, messages: input.messages || [],
@@ -350,7 +391,7 @@ export class ModelGateway {
   }
 
   async complete(input) {
-    const { providerName, provider, apiKey } = this.resolve(input.provider);
+    const { providerName, provider, apiKey } = this.resolveForInput(input);
     const thinking = input.thinking ?? thinkingEnabledFor(input.purpose);
     const started = Date.now();
     const outputBudget = outputBudgetFor({
@@ -483,7 +524,7 @@ export class ModelGateway {
   }
 
   async streamComplete(input,onDelta=()=>{},onThinking=()=>{},onEvent=()=>{}) {
-    const {providerName,provider,apiKey}=this.resolve(input.provider);const started=Date.now();
+    const {providerName,provider,apiKey}=this.resolveForInput(input);const started=Date.now();
     const thinking=input.thinking??thinkingEnabledFor(input.purpose);
     const thinkingReserve=thinking&&provider.supportsThinkingToggle===true?Math.max(0,Number(provider.thinkingReserveTokens??8000)||0):0;
     const outputBudget=outputBudgetFor({purpose:input.purpose,providerMax:provider.maxOutputTokens,requested:input.maxOutputTokens,adaptive:input.adaptiveOutput});

@@ -13,9 +13,9 @@ test('浏览器审计工具对 AI 暴露独立能力并把目标页传给本地�
   const registry = new ToolRegistry().register(plugin);
   const catalog = buildConversationToolCatalog({
     registry,
-    entryCapabilities: ['content.social_card.browser_audit'],
+    entryCapabilities: ['cap_content_social_card_browser_audit'],
   });
-  assert.deepEqual(catalog.map((item) => item.capability), ['content.social_card.browser_audit']);
+  assert.deepEqual(catalog.map((item) => item.capability), ['cap_content_social_card_browser_audit']);
 
   let received = null;
   const result = await plugin.adapter.execute({

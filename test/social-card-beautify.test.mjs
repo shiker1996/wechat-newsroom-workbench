@@ -35,7 +35,7 @@ test('共享发布文案模块统一组装事实输入并清理标签结果', as
 
 test('模型输出只缺失最外层闭合括号时安全恢复 JSON', () => {
   const result = parseModelJson({
-    content: '{"type":"tool_requests","assistant_note":"调用浏览器审计","requests":[{"requestId":"tr_1","capability":"content.social_card.browser_audit","arguments":{"page":1},"reason":"审计页面"}]',
+    content: '{"type":"tool_requests","assistant_note":"调用浏览器审计","requests":[{"requestId":"tr_1","capability":"cap_content_social_card_browser_audit","arguments":{"page":1},"reason":"审计页面"}]',
     finishReason: 'length',
   });
   assert.equal(result.type, 'tool_requests');
@@ -44,7 +44,7 @@ test('模型输出只缺失最外层闭合括号时安全恢复 JSON', () => {
 
 test('模型工具请求尾部括号错位但页面内容完整时安全恢复 JSON', () => {
   const result = parseModelJson({
-    content: '{"type":"tool_requests","assistant_note":"调用浏览器审计","requests":[{"requestId":"tr_1","capability":"content.social_card.browser_audit","arguments":{"page":1,"patch":{"css":".card{color:red}","pages":[{"page":1,"page_html":"<div class=\\"card\\">P1</div>"}}],"reason":"审计 P1"}}]',
+    content: '{"type":"tool_requests","assistant_note":"调用浏览器审计","requests":[{"requestId":"tr_1","capability":"cap_content_social_card_browser_audit","arguments":{"page":1,"patch":{"css":".card{color:red}","pages":[{"page":1,"page_html":"<div class=\\"card\\">P1</div>"}}],"reason":"审计 P1"}}]',
     finishReason: 'length',
   });
   assert.equal(result.requests[0].arguments.patch.pages[0].page_html, '<div class="card">P1</div>');

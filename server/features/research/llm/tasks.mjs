@@ -90,7 +90,7 @@ export async function tagBatch({ gateway, store, batchId, provider, limit, hotsp
   const requestedLimit = limit == null ? available.length : Math.max(1, Math.min(Number(limit) || 60, 500));
   const items = available.slice(0, requestedLimit);
   const providerConfig = gateway.config.providers[provider || gateway.config.defaultProvider];
-  const chunkSize = Math.max(1, Math.min(12, Number(providerConfig.taggingChunkSize) || (providerConfig.maxOutputTokens <= 2048 ? 2 : 8)));
+  const chunkSize = Math.max(1, Math.min(12, Number(providerConfig.taggingChunkSize) || (providerConfig.maxOutputTokens <= 2048 ? 2 : 12)));
   const concurrency = Math.max(1, Math.min(10, Number(providerConfig.taggingConcurrency) || 6));
   const chunks = [];
   for (let i = 0; i < items.length; i += chunkSize) chunks.push(items.slice(i, i + chunkSize));

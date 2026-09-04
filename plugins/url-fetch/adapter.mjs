@@ -28,7 +28,7 @@ export async function execute(input,context={}) {
   try {
     const configuration=context.configuration||{};
     const inspectImpl=input.inspectImpl||(context.capabilities?.invoke?async(sourceUrl,{cacheDir}={})=>{
-      const result=await context.capabilities.invoke('content.repository.inspect',{sourceUrl,cacheDir});
+      const result=await context.capabilities.invoke('cap_content_repository_inspect',{sourceUrl,cacheDir});
       if(result.status!=='ok')throw new Error(result.error?.message||'仓库分析能力不可用');
       return result.data;
     }:null);

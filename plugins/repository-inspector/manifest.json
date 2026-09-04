@@ -3,7 +3,7 @@
   "name": "GitHub 仓库分析",
   "version": "1.0.0",
   "capabilities": [
-    "content.repository.inspect"
+    "cap_content_repository_inspect"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",

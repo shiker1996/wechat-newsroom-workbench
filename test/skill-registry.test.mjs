@@ -39,7 +39,7 @@ test('生成快照冻结技能、工具和模型版本', () => {
   const bundle = loadSkillBundle({ workspaceRoot, skillName:'article-reviewer' });
   const snapshot = createGenerationSnapshot({
     skillBundles:[bundle],
-    tools:[{ capability:'content.url.fetch', plugin:'url-fetch', version:'1.0.0' }],
+    tools:[{ capability:'cap_content_url_fetch', plugin:'url-fetch', version:'1.0.0' }],
     provider:'provider-a', model:'model-a', purpose:'review',
   });
   assert.equal(snapshot.skills[0].id, 'article-reviewer');
@@ -89,7 +89,7 @@ test('技能清单校验角色、目录 ID、契约和工具声明', () => {
     schemaVersion:1,id:'Wrong_ID',name:'',version:'latest',kind:'agent',
     entryPoints:['unknown'],contentTypes:['article','article'],
     inputContract:'Bad-Contract',outputContract:'markdown',
-    requiredCapabilities:['content.url.fetch'],optionalCapabilities:['content.url.fetch'],
+    requiredCapabilities:['cap_content_url_fetch'],optionalCapabilities:['cap_content_url_fetch'],
     compatibleApp:'*',source:{type:'remote'},
   },{expectedId:'demo'});
   for(const field of ['id','name','version','kind','entryPoints','contentTypes','inputContract',
@@ -102,6 +102,6 @@ test('注册中心暴露技能角色、入口、契约和工具需求', () => {
   assert.equal(skill.kind,'writer');
   assert.deepEqual(skill.entryPoints,['independent-writing']);
   assert.equal(skill.inputContract,'tutorial_fact_base');
-  assert.ok(skill.optionalCapabilities.includes('filesystem.project.read'));
+  assert.ok(skill.optionalCapabilities.includes('cap_filesystem_project_read'));
   assert.equal(skill.packageVersion,'1.0.0');
 });

@@ -14,7 +14,7 @@
       ],
       "dependencies": [
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -22,7 +22,7 @@
           "resultPolicy": "source-content"
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -30,7 +30,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -38,7 +38,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.research.search",
+          "capability": "cap_content_research_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -46,7 +46,7 @@
           "resultPolicy": "research-material"
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -54,7 +54,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.repository.inspect",
+          "capability": "cap_content_repository_inspect",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -62,7 +62,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -81,7 +81,7 @@
       ],
       "dependencies": [
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "requirement": "required",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -101,7 +101,7 @@
       ],
       "dependencies": [
         {
-          "capability": "diagram.mermaid.render",
+          "capability": "cap_diagram_mermaid_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -109,7 +109,7 @@
           "resultPolicy": "article-asset"
         },
         {
-          "capability": "diagram.echarts.render",
+          "capability": "cap_diagram_echarts_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -117,7 +117,7 @@
           "resultPolicy": "article-asset"
         },
         {
-          "capability": "image.cdn.upload",
+          "capability": "cap_image_cdn_upload",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -136,7 +136,7 @@
       ],
       "dependencies": [
         {
-          "capability": "diagram.mermaid.render",
+          "capability": "cap_diagram_mermaid_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -144,7 +144,7 @@
           "resultPolicy": "preview-response"
         },
         {
-          "capability": "diagram.echarts.render",
+          "capability": "cap_diagram_echarts_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -174,7 +174,7 @@
       },
       "dependencies": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -188,7 +188,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -203,7 +203,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -217,7 +217,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -229,7 +229,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -259,12 +259,12 @@
           {"source": "documentRoots"},
           {"source": "project"}
         ],
-        "resultHandlers": {"filesystem.project.read": "project-fact-attachment"},
+        "resultHandlers": {"cap_filesystem_project_read": "project-fact-attachment"},
         "defaultResultHandler": "fact-attachment"
       },
       "dependencies": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -278,7 +278,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -292,7 +292,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -304,7 +304,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -316,7 +316,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -330,7 +330,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -364,7 +364,7 @@
       },
       "dependencies": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -378,7 +378,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -392,7 +392,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -404,7 +404,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -416,7 +416,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -430,7 +430,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.repository.inspect",
+          "capability": "cap_content_repository_inspect",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",
@@ -444,7 +444,7 @@
           "source": "builtin"
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "requirement": "optional",
           "failurePolicy": "continue-with-warning",
           "declaration": "optional",

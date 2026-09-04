@@ -96,13 +96,13 @@ capability
 
 能力是稳定业务接口，例如：
 
-- `filesystem.project.read`；
-- `content.url.fetch`；
-- `content.document.search`；
-- `content.web.search`；
-- `content.news.search`；
-- `content.repository.inspect`；
-- `content.passage.retrieve`。
+- `cap_filesystem_project_read`；
+- `cap_content_url_fetch`；
+- `cap_content_document_search`；
+- `cap_content_web_search`；
+- `cap_content_news_search`；
+- `cap_content_repository_inspect`；
+- `cap_content_passage_retrieve`。
 
 ### 4.3 工具实现 Implementation
 
@@ -119,7 +119,7 @@ capability
 ```json
 {
   "consumerId": "agent.editorial",
-  "capability": "filesystem.project.read",
+  "capability": "cap_filesystem_project_read",
   "declaration": "optional",
   "adapterStatus": "ready",
   "resourceKinds": ["local-project"],
@@ -247,11 +247,11 @@ callableForRequest =
 
 建议登记：
 
-- `filesystem.project.read`：明确路径时确定性首步调用；
-- `content.url.fetch`：用户提供 URL 或事件来源时按需调用；
-- `content.passage.retrieve`：长来源材料检索；
-- `content.web.search`：按需补充公开资料；
-- `content.news.search`：按需补充新闻资料。
+- `cap_filesystem_project_read`：明确路径时确定性首步调用；
+- `cap_content_url_fetch`：用户提供 URL 或事件来源时按需调用；
+- `cap_content_passage_retrieve`：长来源材料检索；
+- `cap_content_web_search`：按需补充公开资料；
+- `cap_content_news_search`：按需补充新闻资料。
 
 结果策略：工具内容属于事实材料；本地项目材料只有结合用户明确亲身使用陈述时才能写入体验。
 
@@ -259,12 +259,12 @@ callableForRequest =
 
 建议登记：
 
-- `filesystem.project.read`；
-- `content.url.fetch`；
-- `content.document.search`；
-- `content.passage.retrieve`；
-- `content.web.search`；
-- `content.news.search`。
+- `cap_filesystem_project_read`；
+- `cap_content_url_fetch`；
+- `cap_content_document_search`；
+- `cap_content_passage_retrieve`；
+- `cap_content_web_search`；
+- `cap_content_news_search`。
 
 结果策略：写入事实附件和表单素材；工具结果不得自动升级为作者体验。
 
@@ -272,13 +272,13 @@ callableForRequest =
 
 当前建议登记已有适配：
 
-- `content.url.fetch`；
-- `content.repository.inspect`；
-- `content.document.search`；
-- `content.web.search`；
-- `content.news.search`。
+- `cap_content_url_fetch`；
+- `cap_content_repository_inspect`；
+- `cap_content_document_search`；
+- `cap_content_web_search`；
+- `cap_content_news_search`。
 
-`filesystem.project.read` 在未完成资源接入前显示为“工具存在、消费者未适配”，不因工具已启用而自动开放。
+`cap_filesystem_project_read` 在未完成资源接入前显示为“工具存在、消费者未适配”，不因工具已启用而自动开放。
 
 ## 8. 服务端接口建议
 
@@ -299,7 +299,7 @@ GET /api/system/capability-graph   # 现有接口，扩展返回消费者维度�
   "skillId": "editorial-room-chat",
   "capabilities": [
     {
-      "capability": "filesystem.project.read",
+      "capability": "cap_filesystem_project_read",
       "declared": true,
       "adapterStatus": "ready",
       "skillAllowed": true,

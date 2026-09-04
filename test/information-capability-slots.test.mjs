@@ -15,7 +15,7 @@ test('information slots expose stable writing-oriented capability contracts',()=
   assert.deepEqual(INFORMATION_CAPABILITY_SLOTS.map((item)=>item.id),[
     'web-page','web-search','news-search','repository','document','local-project',
   ]);
-  assert.equal(INFORMATION_CAPABILITY_SLOTS.find((item)=>item.id==='repository').capability,'content.repository.inspect');
+  assert.equal(INFORMATION_CAPABILITY_SLOTS.find((item)=>item.id==='repository').capability,'cap_content_repository_inspect');
 });
 
 test('information slots report connected and missing implementations explicitly',async()=>{
@@ -59,10 +59,10 @@ test('slot list covers every registered capability, not only the fixed six',asyn
     // 固定 6 个信息槽位仍在
     for(const id of ['web-page','web-search','news-search','repository','document','local-project'])assert.ok(ids.includes(id));
     // 其余注册能力以能力名自动生成槽位
-    assert.ok(ids.includes('content.passage.retrieve'));
-    assert.ok(ids.includes('diagram.mermaid.render'));
-    assert.ok(ids.includes('image.cdn.upload'));
-    const passage=items.find((item)=>item.id==='content.passage.retrieve');
+    assert.ok(ids.includes('cap_content_passage_retrieve'));
+    assert.ok(ids.includes('cap_diagram_mermaid_render'));
+    assert.ok(ids.includes('cap_image_cdn_upload'));
+    const passage=items.find((item)=>item.id==='cap_content_passage_retrieve');
     assert.equal(passage.stage,'工具能力');
     assert.equal(passage.selectedPlugin,'local-passage-retrieval');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
@@ -71,17 +71,17 @@ test('slot list covers every registered capability, not only the fixed six',asyn
 test('capability-level preference can be set by capability id and honored on execute',async()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'capability-pref-'));
   try{
-    const selected=await setInformationCapabilitySlot(root,'content.passage.retrieve','local-passage-retrieval');
+    const selected=await setInformationCapabilitySlot(root,'cap_content_passage_retrieve','local-passage-retrieval');
     assert.equal(selected.preferredPlugin,'local-passage-retrieval');
-    assert.equal(preferredPluginForCapability(root,'content.passage.retrieve'),'local-passage-retrieval');
-    await assert.rejects(setInformationCapabilitySlot(root,'content.passage.retrieve','url-fetch'),/不实现该能力/);
+    assert.equal(preferredPluginForCapability(root,'cap_content_passage_retrieve'),'local-passage-retrieval');
+    await assert.rejects(setInformationCapabilitySlot(root,'cap_content_passage_retrieve','url-fetch'),/不实现该能力/);
     await assert.rejects(setInformationCapabilitySlot(root,'no.such.capability','url-fetch'),/未知能力槽位/);
-    const result=await executeCapabilityWithPreference(root,'content.passage.retrieve',{documents:[{id:'a',content:'测试内容 '.repeat(100)}],query:'测试'});
+    const result=await executeCapabilityWithPreference(root,'cap_content_passage_retrieve',{documents:[{id:'a',content:'测试内容 '.repeat(100)}],query:'测试'});
     assert.equal(result.status,'ok');
     assert.equal(result.provenance.plugin,'local-passage-retrieval');
     // 固定槽位的偏好同样能被能力级查询命中
     await setInformationCapabilitySlot(root,'web-page','url-fetch');
-    assert.equal(preferredPluginForCapability(root,'content.url.fetch'),'url-fetch');
+    assert.equal(preferredPluginForCapability(root,'cap_content_url_fetch'),'url-fetch');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

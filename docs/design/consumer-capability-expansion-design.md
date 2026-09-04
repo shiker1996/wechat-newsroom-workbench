@@ -15,7 +15,7 @@
 
 | 事项 | 内容 | 性质 |
 |---|---|---|
-| 一 | custom-social 接入 `filesystem.project.read` | Agent 接入清单的首次实战试点 |
+| 一 | custom-social 接入 `cap_filesystem_project_read` | Agent 接入清单的首次实战试点 |
 | 二 | 4 条 feature 消费者补齐登记字段并上页面 | 消除不可见的消费者 |
 | 三 | 技能消费者的定位澄清与页面展示 | 消除概念重复与展示缺口 |
 
@@ -32,13 +32,13 @@
    |---|---|---|
    | `feature.information-research` | 资料检索与来源抓取（server/platform/integrations/） | url.fetch / web.search / news.search / document.search / repository.inspect / project.read |
    | `feature.article-passage-retrieval` | 编辑会摘录检索（article-routes.mjs:34-41） | passage.retrieve（required/block） |
-   | `feature.wechat-typeset` | 公众号排版 job（typeset-pipeline） | mermaid / echarts / image.cdn.upload |
+   | `feature.wechat-typeset` | 公众号排版 job（typeset-pipeline） | mermaid / echarts / cap_image_cdn_upload |
    | `feature.diagram-preview` | 图表预览端点（media-routes） | mermaid / echarts |
 3. **图文和文章流水线不需新增登记**：它们的能力消费经由 Agent 消费者（图文资料补充走 `agent.custom-social`，文章走 `agent.independent-writing`），流水线 LLM 主体不直接调工具。再新增 feature 记录会造成同一调用被重复计入。
 4. **技能消费者机制已存在**：skill.json 声明运行时聚合为 `type:'skill'` 消费者，参与图谱计算；授权走 active.json 白名单；pipeline-runtime 将 allowedTools 冻结进快照。缺的是概念定位与页面展示。
 5. **feature 消费者登记与运行时授权无耦合**：pipeline-runtime 只看技能配置 allowedTools，本批不改变这一点。
 
-## 3. 事项一：custom-social 接入 filesystem.project.read
+## 3. 事项一：custom-social 接入 cap_filesystem_project_read
 
 ### 3.1 设计决策
 

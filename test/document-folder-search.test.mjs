@@ -22,7 +22,7 @@ test('document-folder-search ranks vault notes and returns sourced snippets', as
   const { root, cleanup } = makeVault();
   try {
     const registry = await getToolRegistry();
-    const result = await registry.execute('content.document.search', { query: '卡片笔记法', root, maxResults: 5 }, { allowedRoots: [root] });
+    const result = await registry.execute('cap_content_document_search', { query: '卡片笔记法', root, maxResults: 5 }, { allowedRoots: [root] });
     assert.equal(result.status, 'ok');
     assert.equal(result.provenance.plugin, 'document-folder-search');
     assert.equal(result.data.documents.length, 2);
@@ -40,11 +40,11 @@ test('document search skips dot directories, non-text files and empty hits', asy
   const { root, cleanup } = makeVault();
   try {
     const registry = await getToolRegistry();
-    const empty = await registry.execute('content.document.search', { query: '量子引力', root }, { allowedRoots: [root] });
+    const empty = await registry.execute('cap_content_document_search', { query: '量子引力', root }, { allowedRoots: [root] });
     assert.equal(empty.status, 'ok');
     assert.equal(empty.data.documents.length, 0);
     assert.ok(empty.warnings.some((item) => /没有命中/.test(item)));
-    const app = await registry.execute('content.document.search', { query: 'app json', root }, { allowedRoots: [root] });
+    const app = await registry.execute('cap_content_document_search', { query: 'app json', root }, { allowedRoots: [root] });
     assert.equal(app.status, 'ok');
     assert.equal(app.data.documents.length, 0);
   } finally { cleanup(); }
@@ -55,10 +55,10 @@ test('document search rejects queries without effective keywords and roots outsi
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'doc-outside-'));
   try {
     const registry = await getToolRegistry();
-    const short = await registry.execute('content.document.search', { query: '的 了', root }, { allowedRoots: [root] });
+    const short = await registry.execute('cap_content_document_search', { query: '的 了', root }, { allowedRoots: [root] });
     assert.equal(short.status, 'error');
     assert.equal(short.error.code, 'INVALID_INPUT');
-    const denied = await registry.execute('content.document.search', { query: '卡片笔记', root: outside }, { allowedRoots: [root] });
+    const denied = await registry.execute('cap_content_document_search', { query: '卡片笔记', root: outside }, { allowedRoots: [root] });
     assert.equal(denied.status, 'error');
     assert.equal(denied.error.code, 'PATH_OUTSIDE_ALLOWED_ROOTS');
   } finally {

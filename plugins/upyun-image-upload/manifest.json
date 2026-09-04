@@ -3,7 +3,7 @@
   "name": "又拍云图片上传",
   "version": "1.0.0",
   "capabilities": [
-    "image.cdn.upload"
+    "cap_image_cdn_upload"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "external-write",

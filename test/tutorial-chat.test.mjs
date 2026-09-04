@@ -24,7 +24,7 @@ test('教程对话明确本地项目只是素材而非执行证明', () => {
   assert.match(messages[0].content, /绝不是“已执行成功”的证明/);
   assert.match(messages[1].content, /README\.md/);
   assert.doesNotMatch(messages[1].content, /E:\\/);
-  assert.match(messages[0].content, /必须在 agent\.form\.update 的 points 操作文本前实际写入“【体验】”/);
+  assert.match(messages[0].content, /必须在 cap_agent_form_update 的 points 操作文本前实际写入“【体验】”/);
 });
 
 test('教程对话就绪状态由完整事实表确定而不是采信模型自报', () => {

@@ -319,9 +319,9 @@ export function selectTopicCandidates(candidates = [], { coreLimit = 8, blackLim
   }
   return { selected, core: selected.filter((item) => item.poolRole === '核心8条'), black: selected.filter((item) => item.poolRole === '黑马2条'), backup, all: candidates };
 }
-export function topicCandidatesMarkdown({ candidates = [], selection = {} } = {}) {
+export function topicCandidatesMarkdown({ candidates = [], selection = {}, coverage = [] } = {}) {
   const role = (candidate) => candidate.poolRole || '未入选';
-  return ['# 阶段 3 · 讨论导向候选选题', '', '> 候选命题必须来自已确认的事件内研判信号，或模型确认的事件间前后、回应、对比、趋势、反例关系；不代表作者最终立场。', '', '核心 ' + (selection.core?.length || 0) + ' 条；黑马 ' + (selection.black?.length || 0) + ' 条；候补 ' + (selection.backup?.length || 0) + ' 条。', '', ...candidates.map((candidate) => {
+  return ['# 阶段 3 · 讨论导向候选选题', '', '> 候选命题必须来自已确认的事件内研判信号，或模型确认的事件间前后、回应、对比、趋势、反例关系；不代表作者最终立场。', '', '核心 ' + (selection.core?.length || 0) + ' 条；黑马 ' + (selection.black?.length || 0) + ' 条；候补 ' + (selection.backup?.length || 0) + ' 条。', '', ...(coverage.length ? ['## 事件覆盖清单', '', ...coverage.map((item) => `- ${item.status === 'covered' ? '✅ 已覆盖' : item.status === 'uncovered' ? '⚠️ 未形成候选' : '❔ 未说明'} · ${item.title || item.event_id}${item.candidate_ids?.length ? ` → ${item.candidate_ids.join('、')}` : ''}${item.reason ? `：${item.reason}` : ''}`), ''] : []), ...candidates.map((candidate) => {
     const signals = candidate.research_context?.internal_signals || [];
     const signalCount = signals.reduce((sum, item) => sum + [item.anomalies, item.conflicts, item.divergences, item.internal_research?.anomalies, item.internal_research?.interest_conflicts, item.internal_research?.divergence_directions].reduce((n, values) => n + (Array.isArray(values) ? values.length : 0), 0), 0);
     const relationCount = candidate.research_context?.relations?.length || 0;

@@ -48,10 +48,10 @@
 
 | 调用方 | 能力 | 行为 |
 | --- | --- | --- |
-| 信息检索集成 | `content.url.fetch`、`content.web.search`、`content.news.search`、`content.document.search`、`content.repository.inspect`、`filesystem.project.read` | 通过信息能力槽位调用，支持首选实现 |
-| 文章段落检索接口 | `content.passage.retrieve` | 通过能力首选调用 |
-| 排版流程 | `diagram.mermaid.render`、`diagram.echarts.render` | 代码直接调用；失败会中断排版 |
-| 图片工作流 | `image.cdn.upload` | 代码直接调用；失败会中断上传/交付 |
+| 信息检索集成 | `cap_content_url_fetch`、`cap_content_web_search`、`cap_content_news_search`、`cap_content_document_search`、`cap_content_repository_inspect`、`cap_filesystem_project_read` | 通过信息能力槽位调用，支持首选实现 |
+| 文章段落检索接口 | `cap_content_passage_retrieve` | 通过能力首选调用 |
+| 排版流程 | `cap_diagram_mermaid_render`、`cap_diagram_echarts_render` | 代码直接调用；失败会中断排版 |
+| 图片工作流 | `cap_image_cdn_upload` | 代码直接调用；失败会中断上传/交付 |
 | 图表预览接口 | `diagram.*.render` | 代码直接调用；失败返回预览错误 |
 | 采集任务 | `sourceType -> collector plugin` | 使用独立采集注册表，按来源执行 |
 
@@ -104,7 +104,7 @@
 ### 4.1 统一节点
 
 - **Consumer（消费者）**：技能、业务功能、流程阶段、API、定时任务。
-- **Capability（能力）**：稳定的语义契约，例如 `content.web.search`。
+- **Capability（能力）**：稳定的语义契约，例如 `cap_content_web_search`。
 - **Implementation（实现）**：工具或采集插件。
 - **Dependency（依赖边）**：消费者需要某能力，标明必需/可选、触发条件和失败策略。
 - **Route（路由）**：能力的首选实现和有序兜底候选。
@@ -118,8 +118,8 @@
 ```json
 {
   "capabilityDependencies": [
-    {"capability":"content.web.search","requirement":"optional","when":"research_enabled","failurePolicy":"continue-with-warning"},
-    {"capability":"diagram.mermaid.render","requirement":"required","when":"contains_mermaid","failurePolicy":"block"}
+    {"capability":"cap_content_web_search","requirement":"optional","when":"research_enabled","failurePolicy":"continue-with-warning"},
+    {"capability":"cap_diagram_mermaid_render","requirement":"required","when":"contains_mermaid","failurePolicy":"block"}
   ]
 }
 ```
@@ -131,8 +131,8 @@
   "id":"feature.wechat.typeset",
   "name":"公众号排版",
   "capabilityDependencies":[
-    {"capability":"diagram.mermaid.render","requirement":"conditional","when":"contains_mermaid","failurePolicy":"block"},
-    {"capability":"image.cdn.upload","requirement":"conditional","when":"auto_upload","failurePolicy":"block"}
+    {"capability":"cap_diagram_mermaid_render","requirement":"conditional","when":"contains_mermaid","failurePolicy":"block"},
+    {"capability":"cap_image_cdn_upload","requirement":"conditional","when":"auto_upload","failurePolicy":"block"}
   ]
 }
 ```
@@ -229,8 +229,8 @@ flowchart LR
 
 ```text
 停用 tavily-search 后：
-✓ content.news.search 将切换到 backup-search
-△ content.web.search 只剩 1 个可用实现
+✓ cap_content_news_search 将切换到 backup-search
+△ cap_content_web_search 只剩 1 个可用实现
 ✕ custom-card-storyboard 的必需能力将不可用
 ```
 

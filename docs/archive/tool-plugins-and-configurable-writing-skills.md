@@ -153,7 +153,7 @@ plugins/
   "id": "mermaid-render",
   "name": "Mermaid 图片渲染",
   "version": "1.0.0",
-  "capabilities": ["diagram.mermaid.render"],
+  "capabilities": ["cap_diagram_mermaid_render"],
   "entry": "./adapter.mjs",
   "riskLevel": "local-write",
   "inputSchema": {},
@@ -272,13 +272,13 @@ registry.execute(capability, input, context)
 同一能力可以存在多个实现，例如：
 
 ```text
-content.url.fetch
+cap_content_url_fetch
   ├─ builtin-direct-fetch
   ├─ firecrawl-fetch
   └─ rsshub-fetch
 ```
 
-注册中心根据启用状态、健康检查和优先级选择实现。业务代码只调用 `content.url.fetch`。
+注册中心根据启用状态、健康检查和优先级选择实现。业务代码只调用 `cap_content_url_fetch`。
 
 ## 7. 创作技能配置模型
 
@@ -306,9 +306,9 @@ writing-skills/
   "inputContract": "tutorial_fact_base",
   "outputContract": "wechat_markdown",
   "allowedTools": [
-    "content.url.fetch",
-    "filesystem.project.read",
-    "diagram.mermaid.render"
+    "cap_content_url_fetch",
+    "cap_filesystem_project_read",
+    "cap_diagram_mermaid_render"
   ],
   "stages": [
     "draft",
@@ -397,7 +397,7 @@ generation_snapshots
   "promptHash": "sha256:...",
   "gateHash": "sha256:...",
   "tools": [
-    { "capability": "filesystem.project.read", "plugin": "local-project-reader", "version": "1.0.0" }
+    { "capability": "cap_filesystem_project_read", "plugin": "local-project-reader", "version": "1.0.0" }
   ],
   "modelProvider": "custom-openai",
   "model": "example-model"
@@ -455,9 +455,9 @@ generation_snapshots
 
 ### 阶段 B：URL 抓取与 CDN
 
-1. 将 URL 抓取策略统一到 `content.url.fetch`。
+1. 将 URL 抓取策略统一到 `cap_content_url_fetch`。
 2. 保留现有来源审计与缓存结构。
-3. 将 CDN 上传统一到 `image.cdn.upload`。
+3. 将 CDN 上传统一到 `cap_image_cdn_upload`。
 4. 增加外部写入授权记录。
 
 ### 阶段 C：技能注册中心只读化

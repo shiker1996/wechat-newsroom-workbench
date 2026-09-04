@@ -102,7 +102,7 @@ flowchart LR
 - GitHub 插件执行 Trending、增长搜索和兴趣查询；
 - 页面插件执行 5 个用户配置的网站。
 
-因此不能把所有来源都注册成 `content.feed.collect` 后只解析出一个优先插件。
+因此不能把所有来源都注册成 `cap_content_feed_collect` 后只解析出一个优先插件。
 
 建议新增 `CollectorRegistry`，但复用下列现有组件：
 

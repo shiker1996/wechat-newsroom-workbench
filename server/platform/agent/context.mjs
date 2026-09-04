@@ -45,7 +45,7 @@ export function compactAgentHistory(messages,maxChars=120000){
     if(source[index]?.role==='tool'){firstTool=index;break;}
     if(source[index]?.role==='system'||source[index]?.role==='user')keep.add(index);
   }
-  const projectRead=source.findIndex((message)=>messageCapability(message)==='filesystem.project.read');
+  const projectRead=source.findIndex((message)=>messageCapability(message)==='cap_filesystem_project_read');
   if(projectRead>=0)keep.add(projectRead);
   const latestTool=[...source.keys()].reverse().find((index)=>source[index]?.role==='tool');
   if(latestTool!==undefined){

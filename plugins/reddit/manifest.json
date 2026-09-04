@@ -45,7 +45,7 @@
     }
   },
   "capabilities": [
-    "collect.reddit"
+    "cap_collect_reddit"
   ],
   "inputSchema": {
     "type": "object",

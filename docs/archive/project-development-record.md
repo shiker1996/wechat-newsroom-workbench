@@ -526,9 +526,9 @@
 
 ### 已规划、待实施
 
-1. 网络搜索 `content.web.search`；
-2. 新闻搜索 `content.news.search`；
-3. 文档检索 `content.document.search`；
+1. 网络搜索 `cap_content_web_search`；
+2. 新闻搜索 `cap_content_news_search`；
+3. 文档检索 `cap_content_document_search`；
 4. 普通 REST API 的 GET、路径模板和响应映射向导；
 5. MCP 地址握手、`tools/list` 自动发现和工具选择；
 6. 技能调用链可视化；

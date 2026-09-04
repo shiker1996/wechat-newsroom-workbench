@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260901-model-call-log-css-1">
+  <link rel="stylesheet" href="/styles.css?v=20260904-atlas-relation-css-1">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -165,8 +165,18 @@
           <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
           <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button><button data-graph-lens="relation" role="tab" aria-selected="false">关系</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
         </div>
-        <section class="panel atlas-relation-panel"><div class="panel-head"><div><span class="kicker">TOPIC RESEARCH</span><h3>事件间研判</h3><p>只展示能继续形成选题的前后变化、回应关系、对比关系和趋势关系；关键词相同但没有讨论意义的事件不会进入这里。</p></div><span id="discussion-relation-count"></span></div><div id="discussion-relation-list" class="discussion-relation-list"></div></section>
-        <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+        <section class="atlas-insight-panel">
+          <div class="atlas-insight-tabs" role="tablist" aria-label="研判与维度" data-atlas-insight-tabs>
+            <button type="button" class="active" role="tab" aria-selected="true" aria-controls="atlas-insight-relations" data-atlas-insight-tab="relations">事件间研判 <small>TOPIC RESEARCH</small></button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="atlas-insight-dimensions" data-atlas-insight-tab="dimensions">事件维度分组 <small>EVENT DIMENSION</small></button>
+          </div>
+          <section id="atlas-insight-relations" class="atlas-insight-content" data-atlas-insight-panel="relations">
+            <section class="panel atlas-relation-panel"><div class="panel-head"><div><span class="kicker">TOPIC RESEARCH</span><h3>事件间研判</h3><p>只展示能继续形成选题的前后变化、回应关系、对比关系和趋势关系；关键词相同但没有讨论意义的事件不会进入这里。</p></div><span id="discussion-relation-count"></span></div><div id="discussion-relation-list" class="discussion-relation-list"></div></section>
+          </section>
+          <section id="atlas-insight-dimensions" class="atlas-insight-content" data-atlas-insight-panel="dimensions" hidden>
+            <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
+          </section>
+        </section>
       </section>
     </section>
 
@@ -832,7 +842,7 @@
   "name": "我的网络搜索",
   "version": "1.0.0",
   "type": "remote-api",
-  "capabilities": ["content.web.search"],
+  "capabilities": ["cap_content_web_search"],
   "riskLevel": "network-read",
   "endpoint": "https://api.example.com/search",
   "inputSchema": {

@@ -1,6 +1,6 @@
 import { parseRepositoryUrl } from './repository-url.mjs';
 
-// capability-call: content.repository.inspect
+// capability-call: cap_content_repository_inspect
 
 function decodeContent(value) {
   try{return Buffer.from(String(value||'').replace(/\s/g,''),'base64').toString('utf8');}catch{return '';}

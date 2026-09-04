@@ -11,25 +11,25 @@ test('AI 视觉文档插件按 revision 原样追加并支持 requestId 幂等',
   const target = path.join(root, 'ai-beautified.html');
   try {
     const context = { allowedRoots: [root], consumerId: 'test.ai-visual-document-writer' };
-    const begin = await registry.execute('filesystem.project.document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
+    const begin = await registry.execute('cap_filesystem_project_document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
     assert.equal(begin.status, 'ok');
     assert.equal(begin.data.revision, 0);
 
-    const first = await registry.execute('filesystem.project.document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-1', expectedRevision: 0, path: target, content: '<style>.neon-card{gap:8px}</style>' }, context);
+    const first = await registry.execute('cap_filesystem_project_document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-1', expectedRevision: 0, path: target, content: '<style>.neon-card{gap:8px}</style>' }, context);
     assert.equal(first.status, 'ok');
     assert.equal(first.data.revision, 1);
     assert.equal(first.data.appendedBytes, Buffer.byteLength('<style>.neon-card{gap:8px}</style>'));
 
-    const duplicate = await registry.execute('filesystem.project.document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-1', expectedRevision: 0, path: target, content: '<style>SHOULD NOT DUPLICATE</style>' }, context);
+    const duplicate = await registry.execute('cap_filesystem_project_document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-1', expectedRevision: 0, path: target, content: '<style>SHOULD NOT DUPLICATE</style>' }, context);
     assert.equal(duplicate.status, 'ok');
     assert.equal(duplicate.data.alreadyApplied, true);
 
-    const second = await registry.execute('filesystem.project.document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-2', expectedRevision: 1, path: target, content: '<section class="page">P1</section>' }, context);
+    const second = await registry.execute('cap_filesystem_project_document_write', { operation: 'append', sessionId: 'test-session', requestId: 'chunk-2', expectedRevision: 1, path: target, content: '<section class="page">P1</section>' }, context);
     assert.equal(second.status, 'ok');
     assert.equal(second.data.revision, 2);
     assert.equal(fs.readFileSync(target, 'utf8'), '<style>.neon-card{gap:8px}</style><section class="page">P1</section>');
 
-    const finish = await registry.execute('filesystem.project.document_write', { operation: 'finish', sessionId: 'test-session', expectedRevision: 2, path: target }, context);
+    const finish = await registry.execute('cap_filesystem_project_document_write', { operation: 'finish', sessionId: 'test-session', expectedRevision: 2, path: target }, context);
     assert.equal(finish.status, 'ok');
     assert.equal(finish.data.status, 'finished');
   } finally {
@@ -43,9 +43,9 @@ test('AI 视觉文档插件接受 Agent 协议中的下划线 requestId', async 
   const target = path.join(root, 'ai-beautified.html');
   try {
     const context = { allowedRoots: [root], consumerId: 'test.ai-visual-document-writer' };
-    const begin = await registry.execute('filesystem.project.document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
+    const begin = await registry.execute('cap_filesystem_project_document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
     assert.equal(begin.status, 'ok');
-    const append = await registry.execute('filesystem.project.document_write', {
+    const append = await registry.execute('cap_filesystem_project_document_write', {
       operation: 'append', sessionId: 'test-session', requestId: 'tr_visual_append_3', expectedRevision: 0,
       path: target, content: '<!doctype html>',
     }, context);
@@ -63,9 +63,9 @@ test('AI 视觉文档插件处理无效 requestId 时不会产生未处理拒绝
   process.on('unhandledRejection', onUnhandled);
   try {
     const context = { allowedRoots: [root], consumerId: 'test.ai-visual-document-writer' };
-    const begin = await registry.execute('filesystem.project.document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
+    const begin = await registry.execute('cap_filesystem_project_document_write', { operation: 'begin', sessionId: 'test-session', path: target }, context);
     assert.equal(begin.status, 'ok');
-    const result = await registry.execute('filesystem.project.document_write', {
+    const result = await registry.execute('cap_filesystem_project_document_write', {
       operation: 'append', sessionId: 'test-session', requestId: 'invalid request id', expectedRevision: 0,
       path: target, content: '<p>不会写入</p>',
     }, context);
@@ -83,7 +83,7 @@ test('AI 视觉文档插件拒绝越过授权根目录', async () => {
   const allowed = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-visual-writer-allowed-'));
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-visual-writer-outside-'));
   try {
-    const result = await registry.execute('filesystem.project.document_write', { operation: 'begin', sessionId: 'test-session', path: path.join(outside, 'ai-beautified.html') }, { allowedRoots: [allowed] });
+    const result = await registry.execute('cap_filesystem_project_document_write', { operation: 'begin', sessionId: 'test-session', path: path.join(outside, 'ai-beautified.html') }, { allowedRoots: [allowed] });
     assert.equal(result.status, 'error');
     assert.equal(result.error.code, 'PATH_OUTSIDE_ALLOWED_ROOTS');
   } finally {

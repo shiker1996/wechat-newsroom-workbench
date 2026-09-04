@@ -3,10 +3,10 @@
   "name": "URL 内容抓取",
   "version": "1.0.0",
   "capabilities": [
-    "content.url.fetch"
+    "cap_content_url_fetch"
   ],
   "optionalCapabilities": [
-    "content.repository.inspect"
+    "cap_content_repository_inspect"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",

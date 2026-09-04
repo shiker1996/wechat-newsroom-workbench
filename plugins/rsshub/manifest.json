@@ -67,8 +67,8 @@
     }
   },
   "capabilities": [
-    "collect.rsshub",
-    "collect.twitter"
+    "cap_collect_rsshub",
+    "cap_collect_twitter"
   ],
   "inputSchema": {
     "type": "object",

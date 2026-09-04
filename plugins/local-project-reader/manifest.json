@@ -3,7 +3,7 @@
   "name": "本地项目读取",
   "version": "1.0.0",
   "capabilities": [
-    "filesystem.project.read"
+    "cap_filesystem_project_read"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "read-only",

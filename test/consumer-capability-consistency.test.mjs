@@ -49,26 +49,26 @@ test('Adapter 能力常量与 agent 消费者登记保持一致（机制二：�
     // 登记引用的能力必须在目录中
     for(const dependency of consumer.dependencies)assert.ok(catalogIds.has(dependency.capability),`${consumerId} 登记了目录中不存在的能力：${dependency.capability}`);
   }
-  // 扩展方案阶段 A 后三个 Agent 登记均覆盖各自能力常量；custom-social 的 filesystem.project.read 缺口已消除
+  // 扩展方案阶段 A 后三个 Agent 登记均覆盖各自能力常量；custom-social 的 cap_filesystem_project_read 缺口已消除
   const customSocial=agents.get('agent.custom-social');
-  const projectRead=customSocial.dependencies.find((item)=>item.capability==='filesystem.project.read');
-  assert.ok(projectRead,'agent.custom-social 登记缺少 filesystem.project.read');
+  const projectRead=customSocial.dependencies.find((item)=>item.capability==='cap_filesystem_project_read');
+  assert.ok(projectRead,'agent.custom-social 登记缺少 cap_filesystem_project_read');
   assert.equal(projectRead.adapterStatus,'ready');assert.equal(projectRead.triggerPolicy,'explicit-resource');
   assert.deepEqual(projectRead.resourceKinds,['local-project']);assert.equal(projectRead.authorizationAction,'local-project-read');
 });
 
 test('技能 Manifest 与登记不一致时产生 warning 而不是报错',()=>{
   // 引用目录中不存在的能力 → warning
-  const unknown=auditSkillCapabilityReferences(root,{skillId:'demo',entryPoints:[],capabilities:['vendor.custom.lookup']});
-  assert.ok(unknown.some((item)=>item.level==='warning'&&item.message.includes('vendor.custom.lookup')));
+  const unknown=auditSkillCapabilityReferences(root,{skillId:'demo',entryPoints:[],capabilities:['cap_vendor_custom_lookup']});
+  assert.ok(unknown.some((item)=>item.level==='warning'&&item.message.includes('cap_vendor_custom_lookup')));
   // 引用了对应 agent 消费者未登记的能力 → warning
-  const unregistered=auditSkillCapabilityReferences(root,{skillId:'demo',entryPoints:['custom-social'],capabilities:['image.cdn.upload']});
+  const unregistered=auditSkillCapabilityReferences(root,{skillId:'demo',entryPoints:['custom-social'],capabilities:['cap_image_cdn_upload']});
   assert.ok(unregistered.some((item)=>item.level==='warning'&&item.message.includes('agent.custom-social')));
   // 校正后的运行时技能与登记一致 → 无 warning
   for(const [skillId,entryPoints,capabilities] of [
-    ['editorial-room-chat',[],['filesystem.project.read','content.url.fetch','content.passage.retrieve','content.web.search','content.news.search']],
-    ['wechat-mp-tutorial',['independent-writing'],['filesystem.project.read','content.url.fetch','content.web.search','content.news.search','content.document.search','content.passage.retrieve']],
-    ['custom-card-storyboard',['custom-social'],['content.url.fetch','content.web.search','content.news.search','content.document.search','content.repository.inspect','content.passage.retrieve']],
+    ['editorial-room-chat',[],['cap_filesystem_project_read','cap_content_url_fetch','cap_content_passage_retrieve','cap_content_web_search','cap_content_news_search']],
+    ['wechat-mp-tutorial',['independent-writing'],['cap_filesystem_project_read','cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_passage_retrieve']],
+    ['custom-card-storyboard',['custom-social'],['cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_repository_inspect','cap_content_passage_retrieve']],
   ])assert.deepEqual(auditSkillCapabilityReferences(root,{skillId,entryPoints,capabilities}),[],skillId);
 });
 
@@ -115,8 +115,8 @@ test('feature 依赖适配字段校验：真实仓库通过，缺字段与非法
   target[1].triggerPolicy='not-a-policy';
   fs.writeFileSync(path.join(dir,'config','capability-consumers.json'),JSON.stringify(mutated));
   const issues=auditCapabilityConsumers(dir).issues.filter((issue)=>issue.startsWith('feature.wechat-typeset/'));
-  assert.ok(issues.some((issue)=>issue.includes('diagram.mermaid.render')&&issue.includes('resultPolicy 缺失或无效')),issues.join('\n'));
-  assert.ok(issues.some((issue)=>issue.includes('diagram.echarts.render')&&issue.includes('triggerPolicy 无效')),issues.join('\n'));
+  assert.ok(issues.some((issue)=>issue.includes('cap_diagram_mermaid_render')&&issue.includes('resultPolicy 缺失或无效')),issues.join('\n'));
+  assert.ok(issues.some((issue)=>issue.includes('cap_diagram_echarts_render')&&issue.includes('triggerPolicy 无效')),issues.join('\n'));
 });
 
 test('全部技能 Manifest 的能力声明与能力目录一致',()=>{

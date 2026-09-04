@@ -4,7 +4,7 @@ import { atomicWriteJson } from '../core/atomic-file.mjs';
 
 const fileFor=(root)=>path.join(root,'data','capability-routes.json');
 const legacyFileFor=(root)=>path.join(root,'data','information-capability-slots.json');
-const LEGACY_SLOTS={'web-page':'content.url.fetch','web-search':'content.web.search','news-search':'content.news.search',repository:'content.repository.inspect',document:'content.document.search','local-project':'filesystem.project.read'};
+const LEGACY_SLOTS={'web-page':'cap_content_url_fetch','web-search':'cap_content_web_search','news-search':'cap_content_news_search',repository:'cap_content_repository_inspect',document:'cap_content_document_search','local-project':'cap_filesystem_project_read'};
 function atomic(file,value){atomicWriteJson(file,value);}
 export function readCapabilityRoutes(root){const file=fileFor(root);if(!fs.existsSync(file))return {schemaVersion:1,routes:{}};let value;try{value=JSON.parse(fs.readFileSync(file,'utf8'));}catch(error){console.warn(`统一能力路由配置文件损坏，回退为空配置: ${file} (${error.message})`);return {schemaVersion:1,routes:{}};}if(value.schemaVersion!==1||!value.routes)throw new Error('统一能力路由配置无效');return value;}
 export function preferredImplementation(root,capability){return readCapabilityRoutes(root).routes[capability]?.preferredImplementationId||'';}

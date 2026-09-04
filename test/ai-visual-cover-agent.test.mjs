@@ -61,7 +61,7 @@ test('shared AI visual document Agent supports a single 900x383 article cover', 
     catalog: [
       { capability: AI_VISUAL_PROJECT_READ },
       { capability: AI_VISUAL_DOCUMENT_WRITE },
-      { capability: 'filesystem.project.delete' },
+      { capability: 'cap_filesystem_project_delete' },
     ],
     agentSystem: '你是封面视觉 Agent。',
     renderRequest: { canvas: { width: 900, height: 383 }, outputPath: 'ai-cover.html' },

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const fallback={ok:(data={},extras={})=>({status:'ok',data,artifacts:[],provenance:{},warnings:[],metrics:{durationMs:0},...extras}),failure:(code,message,options={})=>({status:'error',error:{code,message:String(message),retryable:Boolean(options.retryable),...(options.action?{action:options.action}:{})}})};
 
-// 本地知识库检索（content.document.search）：
+// 本地知识库检索（cap_content_document_search）：
 // 只读扫描用户明确授权的文档根目录（如 Obsidian vault），按关键词打分返回片段。
 // 不建索引库——个人知识库量级（数千篇 Markdown）一次全量扫描仅数百毫秒；
 // 审计侧只记录路径与命中数（执行日志本就只记参数名），正文不离开本机。

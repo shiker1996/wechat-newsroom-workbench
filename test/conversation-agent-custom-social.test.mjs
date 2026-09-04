@@ -5,10 +5,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { Store } from '../server/platform/core/store.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
-import { toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
 import { runCustomSocialAgentTurn } from '../server/features/social-cards/application/agent/custom-social-adapter.mjs';
 
-function call(capability, input, id = capability) { return { id, name: toolNameForCapability(capability), input }; }
+function call(capability, input, id = capability) { return { id, name: capability, input }; }
 function native(callId, toolCalls) { return { callId, content: '', toolCalls, model: 'mock', usage: { total_tokens: 10 } }; }
 function gateway(sequence) {
   let index = 0;
@@ -20,11 +19,11 @@ function gateway(sequence) {
 function registry() {
   const value = new ToolRegistry();
   value.register({
-    manifest: { id: 'search', name: '搜索', version: '1.0.0', capabilities: ['content.web.search'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, maxResults: { type: 'integer' } } }, outputSchema: { type: 'object' } },
+    manifest: { id: 'search', name: '搜索', version: '1.0.0', capabilities: ['cap_content_web_search'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, maxResults: { type: 'integer' } } }, outputSchema: { type: 'object' } },
     adapter: { async execute() { return { status: 'ok', data: { answer: '公开资料', results: [{ title: '官方说明', url: 'https://docs.example.com/guide' }] }, artifacts: [], warnings: [], provenance: {} }; } },
   });
   value.register({
-    manifest: { id: 'repo', name: '仓库', version: '1.0.0', capabilities: ['content.repository.inspect'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['sourceUrl'], properties: { sourceUrl: { type: 'string' } } }, outputSchema: { type: 'object' } },
+    manifest: { id: 'repo', name: '仓库', version: '1.0.0', capabilities: ['cap_content_repository_inspect'], riskLevel: 'network-read', inputSchema: { type: 'object', required: ['sourceUrl'], properties: { sourceUrl: { type: 'string' } } }, outputSchema: { type: 'object' } },
     adapter: { async execute(input) { return { status: 'ok', data: { sourceUrl: input.sourceUrl, description: '仓库事实', readmeMarkdown: '安装说明' }, artifacts: [], warnings: [], provenance: {} }; } },
   });
   return value;
@@ -43,10 +42,10 @@ test('自定义图文先搜索素材，再用表单工具更新，最后用结�
   const { root, store, batch } = fixture(t);
   const result = await runCustomSocialAgentTurn({
     gateway: gateway([
-      native('search', [call('content.web.search', { query: 'Agent 教程' }, 'search')]),
+      native('search', [call('cap_content_web_search', { query: 'Agent 教程' }, 'search')]),
       ({ messages }) => {
         assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('docs.example.com')));
-        return native('form', [call('agent.form.update', { operations: [
+        return native('form', [call('cap_agent_form_update', { operations: [
           { field: 'content_type', op: 'replace', value: 'tutorial' },
           { field: 'channel', op: 'replace', value: 'wechat' },
           { field: 'topic', op: 'replace', value: 'Agent 教程' },
@@ -56,7 +55,7 @@ test('自定义图文先搜索素材，再用表单工具更新，最后用结�
           { field: 'expected_pages', op: 'set', value: 6 },
         ] }, 'form')]);
       },
-      native('finish', [call('agent.conversation.finish', { assistantReply: '素材已加入图文策划，方案已整理。' }, 'finish')]),
+      native('finish', [call('cap_agent_conversation_finish', { assistantReply: '素材已加入图文策划，方案已整理。' }, 'finish')]),
     ]),
     store, registry: registry(), batchId: batch.id, draft: {}, workspaceRoot: root,
   });
@@ -67,15 +66,15 @@ test('自定义图文先搜索素材，再用表单工具更新，最后用结�
   assert.match(result.formUpdates.points[0], /https:\/\/docs\.example\.com\/guide/);
   assert.deepEqual(result.formUpdates.materialUrls, ['https://docs.example.com/guide']);
   const attachments = store.listConversationFactAttachments({ batchId: batch.id, entryPoint: 'custom-social' });
-  assert.ok(attachments.some((item) => item.capability === 'content.web.search'));
+  assert.ok(attachments.some((item) => item.capability === 'cap_content_web_search'));
 });
 
 test('仓库分析只接受用户提供的 GitHub 资源', async (t) => {
   const { root, store, batch } = fixture(t);
   const result = await runCustomSocialAgentTurn({
     gateway: gateway([
-      native('repo', [call('content.repository.inspect', { resourceId: 'material:1' }, 'repo')]),
-      native('finish', [call('agent.conversation.finish', { assistantReply: '请提供 GitHub 仓库地址。' }, 'finish')]),
+      native('repo', [call('cap_content_repository_inspect', { resourceId: 'material:1' }, 'repo')]),
+      native('finish', [call('cap_agent_conversation_finish', { assistantReply: '请提供 GitHub 仓库地址。' }, 'finish')]),
     ]),
     store, registry: registry(), batchId: batch.id, draft: { materialUrls: ['https://example.com/not-github'] }, workspaceRoot: root,
   });
@@ -93,7 +92,7 @@ test('自定义图文允许普通文本回复；不解析旧 JSON', async (t) =>
 test('自定义图文生产路由使用 Agent、事实附件和原生工具设置', () => {
   const adapter = fs.readFileSync(new URL('../server/features/social-cards/application/agent/custom-social-adapter.mjs', import.meta.url), 'utf8');
   const route = fs.readFileSync(new URL('../server/platform/http/routes/candidate-routes.mjs', import.meta.url), 'utf8');
-  assert.match(adapter, /agent\.conversation\.finish/);
+  assert.match(adapter, /cap_agent_conversation_finish/);
   assert.match(adapter, /nativeTools: true/);
   assert.match(route, /runCustomSocialAgentTurn/);
   assert.match(route, /listConversationFactAttachments/);

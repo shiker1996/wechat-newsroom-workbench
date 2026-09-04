@@ -6,7 +6,9 @@ import {
   buildDiscussionResearchModelInput,
   buildDiscussionResearchModelMessages,
   buildSingleEventResearchModelInput,
+  shouldEnableNativeSearch,
   buildTopicResearchModelInput,
+  buildResearchDigest,
   cleanSingleEventResearchReport,
   buildTopicCandidates,
   buildVerifiedResearchMaterials,
@@ -202,6 +204,25 @@ Let me compile the report now.
   assert.equal(result.verifiedResearchMaterials.some((item) => item.material_type === 'discussion_report'), true);
 });
 
+test('联网门控：本地来源充分且低热度事件关闭原生搜索，并在提示中明确约束', () => {
+  const localEvent = {
+    ...event('E6', 6),
+    t: 40,
+    articles: [
+      { title: '来源一', source: '来源一', summary: '本地摘要一' },
+      { title: '来源二', source: '来源二', summary: '本地摘要二' },
+    ],
+  };
+  const gate = shouldEnableNativeSearch({ event: localEvent, scopeItem: { rank: 6, t: 40 } });
+  assert.equal(gate.enabled, false);
+  assert.equal(gate.reason, 'sufficient_local_sources_and_low_heat');
+  const input = buildSingleEventResearchModelInput({ event: localEvent, scopeItem: { rank: 6, t: 40 }, events: [localEvent], baseReport: { policy: { top_k: 1 }, scope: { items: [{ event_id: 'E6', rank: 6, t: 40 }] } }, nativeWebSearch: gate });
+  assert.equal(input.policy.native_web_search, false);
+  const messages = buildDiscussionResearchModelMessages({ workspaceRoot: process.cwd(), input, phase: 'single_event' });
+  assert.match(messages.user_prompt, /已关闭原生联网搜索/u);
+  assert.match(messages.user_prompt, /不得调用搜索/u);
+});
+
 test('单事件研判清理前置进度文本但保留无正式标题的原始输出', () => {
   assert.equal(
     cleanSingleEventResearchReport('Let me search.\n\n# 事件研判报告\n\n## 事件内研判'),
@@ -302,6 +323,32 @@ test('阶段3输入同时携带事件内搜索证据、事件间搜索证据和�
   assert.equal(input.relation_search_tasks[0].target_signal, 'counterexample');
 });
 
+test('阶段3使用单一压缩研究摘要，不重复发送完整报告和来源片段', () => {
+  const digest = buildResearchDigest({
+    internalResearch: [{ event_id: 'E1', status: 'verified', anomalies: [{ signal_id: 'S1', statement: '反常', evidence_source_ids: ['SRC-1'] }] }],
+    relations: [{ relation_id: 'R1', relation_kind: 'comparison', event_ids: ['E1', 'E2'], relationship_statement: '关系', evidence_source_ids: ['SRC-2'] }],
+    verifiedResearchMaterials: [{ material_id: 'M1', status: 'model_reported', anchor_event_ids: ['E1'], statement: '素材', evidence_clips: [{ source_id: 'SRC-1', excerpt: '很长的来源摘录' }] }],
+    researchReports: [{ report_id: 'REPORT-1', event_id: 'E1', report_markdown: '# 研判\n\n结论\n\n来源\n\n' + 'x'.repeat(10000) }],
+  });
+  const input = buildTopicResearchModelInput({
+    events: [event('E1', 1), event('E2', 2)],
+    baseReport: baseReport([event('E1', 1), event('E2', 2)]),
+    internalResearch: [{ event_id: 'E1', anomalies: [{ signal_id: 'S1', statement: '反常' }] }],
+    relations: [{ relation_id: 'R1', relation_kind: 'comparison', event_ids: ['E1', 'E2'] }],
+    verifiedResearchMaterials: [{ material_id: 'M1', status: 'verified', anchor_event_ids: ['E1'], statement: '素材' }],
+    researchReports: [{ report_id: 'REPORT-1', event_id: 'E1', report_markdown: '完整报告'.repeat(3000) }],
+  });
+  assert.equal(digest.version, 'research-digest-v1');
+  assert.equal(digest.materials[0].material_id, 'M1');
+  assert.equal(digest.omitted.source_clips, 1);
+  assert.equal(input.research_digest.version, 'research-digest-v1');
+  assert.equal('internal_research' in input, false);
+  assert.equal('inter_event_research' in input, false);
+  assert.equal('verified_research_materials' in input, false);
+  assert.equal('research_reports' in input, false);
+  assert.ok(JSON.stringify(input).length < 20000);
+});
+
 test('阶段3不要求关系型选题配额，关系来源仅在模型提供素材时可选回填', async () => {
   const events = [event('E1', 1), event('E2', 2)];
   const base = baseReport(events);
@@ -326,11 +373,44 @@ test('阶段3不要求关系型选题配额，关系来源仅在模型提供素�
     ],
   });
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].thinking, false);
   assert.equal(result.audit.required, 0);
   assert.equal(result.audit.actual, 0);
   assert.equal(result.audit.repair_attempted, false);
   assert.equal(result.topics.length, 1);
   assert.deepEqual(result.topics[0].relation_ids, []);
+});
+
+test('阶段3记录聚合候选与未覆盖事件，不强行生成低质量选题', async () => {
+  const events = [event('E1', 1), event('E2', 2), event('E3', 3)];
+  const base = buildDiscussionResearch({
+    events,
+    topK: 3,
+    eventHeatRanking: { items: events.map((item) => ({ eventId: item.event_id, rank: item.eventHeatRank, t: item.t, eventValue: item.t, state: 'new_event' })) },
+  });
+  const gateway = {
+    config: { providers: { fake: { maxOutputTokens: 20000 } } },
+    complete: async () => ({ content: JSON.stringify({
+      topic_candidates: [{
+        candidate_title: '两个事件合并后的讨论命题', event_ids: ['E1', 'E2'],
+        core_question: '两个事件为什么应放在一起讨论？', angle: '从共同变化切入', thesis_seed: '共同变化比单点新闻更值得讨论',
+      }],
+      event_coverage: [
+        { event_id: 'E1', status: 'covered', candidate_indexes: [1], reason: '' },
+        { event_id: 'E2', status: 'covered', candidate_indexes: [1], reason: '' },
+        { event_id: 'E3', status: 'uncovered', candidate_indexes: [], reason: '研判信号不足以形成独立文章角度' },
+      ],
+    }) }),
+  };
+  const result = await generateDiscussionResearchTopics({
+    gateway, events, baseReport: base, provider: 'fake', workspaceRoot: process.cwd(),
+    researchReports: events.map((item) => ({ event_id: item.event_id, report_markdown: `报告 ${item.event_id}` })),
+  });
+  assert.deepEqual(result.coverage, [
+    { event_id: 'E1', title: '事件 E1', status: 'covered', candidate_ids: ['MR-T-001'], candidate_indexes: [1], reason: '' },
+    { event_id: 'E2', title: '事件 E2', status: 'covered', candidate_ids: ['MR-T-001'], candidate_indexes: [1], reason: '' },
+    { event_id: 'E3', title: '事件 E3', status: 'uncovered', candidate_ids: [], candidate_indexes: [], reason: '研判信号不足以形成独立文章角度' },
+  ]);
 });
 
 test('阶段3兼容研判报告来源别名，并从关系素材继承来源与关系 ID', async () => {

@@ -12,7 +12,7 @@ function editorialSystem(workspaceRoot) {
   return prompt.replaceAll('{{ACCOUNT_CONTEXT}}', formatAccountContext({workspaceRoot}));
 }
 
-// 单源摘录预算：长正文经由 content.passage.retrieve 检索压缩（头部+相关段落），
+// 单源摘录预算：长正文经由 cap_content_passage_retrieve 检索压缩（头部+相关段落），
 // 检索不可用或失败时回退为头部截断。
 const EXCERPT_BUDGET=8000;
 const EXCERPT_OPTIONS={k:6,headChars:1500,chunkChars:500,maxCharsPerDoc:EXCERPT_BUDGET};
@@ -167,7 +167,7 @@ function researchDrivenInstruction(researchBrief) {
   if (!topic && !basisCount && !reportCount) return '当前没有可用的模型研判内容；按事件卡和来源事实推进，但不要自行编造反常、利益冲突或事件关系。';
   const materialCount = researchBrief.verified_research_materials?.length || 0;
   const pointCount = researchBrief.selectable_research_points?.length || 0;
-  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组结构化研判、${reportCount} 份单事件模型研判报告、${materialCount} 条模型研判素材）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从单事件模型研判报告中的事件内或事件外素材中帮助作者形成写作判断。'} 研判点现在只作为事实、观点、角度和命题的讨论依据，页面默认不选，也不要在作者尚未明确角度和命题前选择研判点。先具体追问作者想解释哪一个反常、利益/成本/责任冲突、发散方向或事件间关系，并据此协助作者明确观点、角度和命题。角度和命题明确后，直接从 researchBrief 的 selectable_research_points 中挑选 1～3 条最能支撑当前命题的研判拓展点，调用 editorial.research.select 工具写入当前选题；完整可选目录单独位于 research-selection-catalog（共 ${pointCount} 条），只能使用目录中的原样 point_id。工具会校验 point_id 是否属于当前研判，不需要再询问作者确认。工具返回后，说明每条点承担的写作作用，再用 research_basis 总结已选择的素材及其如何服务于文章。不能把所有素材自动选入，也不能自行构造研判点 ID；如果目录标记为截断或找不到合适点，不要猜 ID，也不要调用选择工具。每个问题都要明确引用对应素材中的事实落差、利益差异、影响、前后变化、回应、对比、趋势或反例。外部参考事件只能作为关系研判的参考材料，不能直接写成本文已确认事实。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
+  return `本轮必须以模型研判为提问主线（当前有 ${basisCount} 组结构化研判、${reportCount} 份单事件模型研判报告、${materialCount} 条模型研判素材）。${topic ? `优先围绕候选命题「${topic.candidate_title || topic.core_question || topic.angle}」确认作者是否接受、如何修改，不要让作者从空白开始泛泛回答。` : '先从单事件模型研判报告中的事件内或事件外素材中帮助作者形成写作判断。'} 研判点现在只作为事实、观点、角度和命题的讨论依据，页面默认不选，也不要在作者尚未明确角度和命题前选择研判点。先具体追问作者想解释哪一个反常、利益/成本/责任冲突、发散方向或事件间关系，并据此协助作者明确观点、角度和命题。角度和命题明确后，直接从 researchBrief 的 selectable_research_points 中挑选 1～3 条最能支撑当前命题的研判拓展点，调用 cap_editorial_research_select 工具写入当前选题；完整可选目录单独位于 research-selection-catalog（共 ${pointCount} 条），只能使用目录中的原样 point_id。工具会校验 point_id 是否属于当前研判，不需要再询问作者确认。工具返回后，说明每条点承担的写作作用，再用 research_basis 总结已选择的素材及其如何服务于文章。不能把所有素材自动选入，也不能自行构造研判点 ID；如果目录标记为截断或找不到合适点，不要猜 ID，也不要调用选择工具。每个问题都要明确引用对应素材中的事实落差、利益差异、影响、前后变化、回应、对比、趋势或反例。外部参考事件只能作为关系研判的参考材料，不能直接写成本文已确认事实。不得退回“你想写什么”“你的看法是什么”这类脱离研判的泛问。`;
 }
 
 function researchSelectionCatalog(points = []) {
@@ -231,7 +231,7 @@ export async function buildEditorialMessages(current,answer,events=[],retrieve=n
   const {ready,fields}=evaluateEditorialReadiness({candidate:current,editorial:current.editorial||{}});
   const fieldStatus=fields.map((field)=>`- ${field.label}（${field.required?'必填':'选填'}）：${field.value?`当前值「${field.value.slice(0,200)}」${field.ok?'，合格':'，不合格（占位符不算实质表态）'}`:'未填写'}`).join('\n');
   const researchInstruction = researchDrivenInstruction(researchBrief);
-  const instruction=answer.trim()?`处理用户刚才的回答；需要更新底稿字段时调用 agent.form.update，使用 operations:[{field,op,value/values}]；${researchInstruction} 若仍有不合格的必填项，围绕依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）上最靠前的一个不合格必填项提出下一个问题。`: (current.messages?.length?`用户本轮未输入新内容，不是重新开始。基于当前底稿继续推进：${researchInstruction} 需要更新底稿字段时调用 agent.form.update，使用 operations:[{field,op,value/values}]；有不合格必填项则按依赖链顺序提问最靠前的一个；全部合格则说明底稿已可成稿，直接告知作者。`:`编辑会刚开始。先用一两句话概括事件卡与来源已给出的事实基座，再用具体研判依据帮助作者形成观点、角度和命题。${researchInstruction} 按依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）提出第一个关键问题。${current.editorial?.editor_question?`选题编排阶段预置的首问供参考：${current.editorial.editor_question}`:''}`);
+  const instruction=answer.trim()?`处理用户刚才的回答；需要更新底稿字段时调用 cap_agent_form_update，使用 operations:[{field,op,value/values}]；${researchInstruction} 若仍有不合格的必填项，围绕依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）上最靠前的一个不合格必填项提出下一个问题。`: (current.messages?.length?`用户本轮未输入新内容，不是重新开始。基于当前底稿继续推进：${researchInstruction} 需要更新底稿字段时调用 cap_agent_form_update，使用 operations:[{field,op,value/values}]；有不合格必填项则按依赖链顺序提问最靠前的一个；全部合格则说明底稿已可成稿，直接告知作者。`:`编辑会刚开始。先用一两句话概括事件卡与来源已给出的事实基座，再用具体研判依据帮助作者形成观点、角度和命题。${researchInstruction} 按依赖链（事实→观点→角度→命题→采用研判拓展点→研判主线→边界）提出第一个关键问题。${current.editorial?.editor_question?`选题编排阶段预置的首问供参考：${current.editorial.editor_question}`:''}`);
   // 装配结构：不可信块只放纯数据（候选/事件/底稿/字段状态）；对话历史展开为真实 user/assistant 回合，
   // 作者回答（已在 current.messages 末尾）保有 user 回合权重，指令作为最后一条 user 消息收尾。
   return [

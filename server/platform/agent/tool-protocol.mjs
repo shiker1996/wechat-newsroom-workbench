@@ -1,7 +1,7 @@
 import { CONVERSATION_AGENT_ERROR_CODES } from './contracts.mjs';
 
 const ERROR_CODES=new Set(CONVERSATION_AGENT_ERROR_CODES);
-const CAPABILITY=/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$/;
+const CAPABILITY=/^cap_[a-z][a-z0-9]*(?:[_-][a-z0-9]+)+$/;
 const REQUEST_ID=/^tr_[A-Za-z0-9_-]{1,61}$/;
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value);
 

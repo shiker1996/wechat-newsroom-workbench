@@ -54,9 +54,9 @@
 
 | 信息能力 | capability | 主要使用场景 | 状态 |
 | --- | --- | --- | --- |
-| 网络搜索 | `content.web.search` | 自主写作资料发现、事实补充、关键词外部检索 | ✅ 已实现（tavily-search） |
-| 新闻搜索 | `content.news.search` | 热点事件追踪、时效性核验、补充独立新闻来源 | ✅ 已实现（tavily-search） |
-| 文档检索 | `content.document.search` | 从已授权知识库、云盘或文档服务检索内部材料 | ✅ 已实现（document-folder-search，本地文件夹只读检索，2026-07-31） |
+| 网络搜索 | `cap_content_web_search` | 自主写作资料发现、事实补充、关键词外部检索 | ✅ 已实现（tavily-search） |
+| 新闻搜索 | `cap_content_news_search` | 热点事件追踪、时效性核验、补充独立新闻来源 | ✅ 已实现（tavily-search） |
+| 文档检索 | `cap_content_document_search` | 从已授权知识库、云盘或文档服务检索内部材料 | ✅ 已实现（document-folder-search，本地文件夹只读检索，2026-07-31） |
 
 实施原则：
 
@@ -73,7 +73,7 @@
 1. ✅ 固化 capability 的输入输出 Schema 和错误码（网络 / 新闻搜索见 `plugins/tavily-search/manifest.json`）。
 2. ✅ 提供最小可运行实现与连接预检（`tavily-search` 内置插件，健康检查明确报告凭据缺失与配置指引）。
 3. ✅ 槽位可用状态在「技能与工具」页展示并可切换实现（原有机制，实现注册后自动生效）。
-4. ✅ 网络搜索与新闻搜索已接入创作流程（2026-07-31）：自主写作（心得经验 / 使用教程）与自定义图文在创建事实基座时自动执行检索，不在创作表单提供单独开关，启停统一由「技能与工具 → 信息工具」槽位配置管控；结果作为带来源的外部素材持久化进事实基座（`web_search` / `news_search` 字段），重新生成复用不重复计费；检索失败记录为事实基座备注，不阻止创建。热点事实补充接入搜索已评估不实施（2026-08-01）：事件卡 95% 的 unverified 缺口是「RSS 摘要没写全」而非「事实存疑」，正确补法是原文抓取而非搜索二手转述，且实际写作路径（编辑室选中事件）已被原文抓取覆盖。替代方案已落地——编辑室两步备料：进入候选编辑室时先对全部事件来源跑 `force:false` 幂等抓取再解锁对话，抓取失败的来源只提示不阻断（可在对话中补充链接），「跳过，直接对话」保留旧路径；对话中 autoFetchEditorialEvents 继续作为兜底。配套优化（2026-08-01）：编辑室来源摘录从全量截断改为检索式注入——新插件 `local-passage-retrieval`（`content.passage.retrieve`，本地 BM25，无外部依赖）按「头部 + 相关段落」压缩长正文（实测 30000 字 → 4201 字），插件禁用或失败时自动回退截断。
+4. ✅ 网络搜索与新闻搜索已接入创作流程（2026-07-31）：自主写作（心得经验 / 使用教程）与自定义图文在创建事实基座时自动执行检索，不在创作表单提供单独开关，启停统一由「技能与工具 → 信息工具」槽位配置管控；结果作为带来源的外部素材持久化进事实基座（`web_search` / `news_search` 字段），重新生成复用不重复计费；检索失败记录为事实基座备注，不阻止创建。热点事实补充接入搜索已评估不实施（2026-08-01）：事件卡 95% 的 unverified 缺口是「RSS 摘要没写全」而非「事实存疑」，正确补法是原文抓取而非搜索二手转述，且实际写作路径（编辑室选中事件）已被原文抓取覆盖。替代方案已落地——编辑室两步备料：进入候选编辑室时先对全部事件来源跑 `force:false` 幂等抓取再解锁对话，抓取失败的来源只提示不阻断（可在对话中补充链接），「跳过，直接对话」保留旧路径；对话中 autoFetchEditorialEvents 继续作为兜底。配套优化（2026-08-01）：编辑室来源摘录从全量截断改为检索式注入——新插件 `local-passage-retrieval`（`cap_content_passage_retrieve`，本地 BM25，无外部依赖）按「头部 + 相关段落」压缩长正文（实测 30000 字 → 4201 字），插件禁用或失败时自动回退截断。
 5. ✅ 文档检索已接入知识库场景（自主写作与自定义图文创建时自动执行，只读扫描 config.local.json `documentSearch.roots` 授权目录，未配置授权目录则仅记录备注、不扫描任何文档）；云端知识库 / 云盘类远程实现仍可后续以远程插件形式扩展，复用同一槽位契约。
 6. ✅ 搜索插件回归测试（缺凭据、结果归一化、新闻发布时间告警、健康检查、创作链接线与技能声明）；⬜ 超时、限流、空结果的端到端回归随使用观察再补。
 
@@ -178,7 +178,7 @@
 
 能力契约稳定、实现可插拔是现有插件架构的设计意图，两条拓展线等新需求出现时按契约实现即可，不预建：
 
-1. `content.passage.retrieve` → RAG 方向：现为本地 BM25（`local-passage-retrieval` 插件，编辑室唯一消费方）。拓展路径为向量实现（embedding + 外部向量库），以远程声明式插件接入，输入输出契约不变。**前提缺口**：现有三家 LLM 供应商均无 embedding API，需先解决 embedding 基础设施。
-2. `content.document.search` → 知识库方向：现为本地文件夹扫描（Obsidian vault，自主写作 / 自定义图文消费）。拓展路径为企业文档库 / Notion / Confluence / 飞书 / 语雀等远程知识库实现，同样以远程插件声明同一能力接入，消费方零改动。
+1. `cap_content_passage_retrieve` → RAG 方向：现为本地 BM25（`local-passage-retrieval` 插件，编辑室唯一消费方）。拓展路径为向量实现（embedding + 外部向量库），以远程声明式插件接入，输入输出契约不变。**前提缺口**：现有三家 LLM 供应商均无 embedding API，需先解决 embedding 基础设施。
+2. `cap_content_document_search` → 知识库方向：现为本地文件夹扫描（Obsidian vault，自主写作 / 自定义图文消费）。拓展路径为企业文档库 / Notion / Confluence / 飞书 / 语雀等远程知识库实现，同样以远程插件声明同一能力接入，消费方零改动。
 
-**已知机制缺口（2026-08-01 已解决）**：「技能与工具」页的实现切换原本围绕 6 个信息槽位建设，`content.passage.retrieve` 等能力不在槽位体系内。已于当日将槽位体系推广到注册表全部能力：固定 6 个信息槽位保留展示元数据，其余能力（`content.passage.retrieve`、`diagram.echarts.render`、`diagram.mermaid.render`、`image.cdn.upload`）以能力名自动生成槽位卡片，均可在「技能与工具 → 信息工具」页查看状态并指定偏好实现；调用侧新增 `executeCapabilityWithPreference`（先查固定槽位映射再查能力名直配），编辑室摘录检索已改走该通道。
+**已知机制缺口（2026-08-01 已解决）**：「技能与工具」页的实现切换原本围绕 6 个信息槽位建设，`cap_content_passage_retrieve` 等能力不在槽位体系内。已于当日将槽位体系推广到注册表全部能力：固定 6 个信息槽位保留展示元数据，其余能力（`cap_content_passage_retrieve`、`cap_diagram_echarts_render`、`cap_diagram_mermaid_render`、`cap_image_cdn_upload`）以能力名自动生成槽位卡片，均可在「技能与工具 → 信息工具」页查看状态并指定偏好实现；调用侧新增 `executeCapabilityWithPreference`（先查固定槽位映射再查能力名直配），编辑室摘录检索已改走该通道。

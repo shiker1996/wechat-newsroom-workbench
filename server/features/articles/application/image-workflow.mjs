@@ -4,7 +4,7 @@ import { parseModelJson } from '../../../platform/llm/model-json.mjs';
 import crypto from 'node:crypto';
 import { executeCapability } from '../../../platform/tools/capability-runtime.mjs';
 
-// capability-call: image.cdn.upload
+// capability-call: cap_image_cdn_upload
 import { createStoreExecutionLogger } from '../../../platform/tools/execution-log.mjs';
 
 const TYPES = new Set(['来源', '资料', '参考']);
@@ -237,7 +237,7 @@ export async function uploadImageToCdn(workdir, id, options = {}) {
   if (!item?.localPath || !fs.existsSync(item.localPath)) throw new Error('请先选择并保存本地图片');
   const auditPath = path.join(workdir, 'tool-executions.jsonl');
   const persistExecution=createStoreExecutionLogger(options.store,options);
-  const result = await executeCapability({consumerId:'feature.wechat-typeset',capability:'image.cdn.upload',input:{localPath:item.localPath},context:{
+  const result = await executeCapability({consumerId:'feature.wechat-typeset',capability:'cap_image_cdn_upload',input:{localPath:item.localPath},context:{
     allowedRoots:[workdir],
     authorizedExternalWrite:options.authorizedExternalWrite === true,
     allowedCapabilities:options.allowedCapabilities,

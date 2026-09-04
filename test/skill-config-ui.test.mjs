@@ -124,7 +124,7 @@ test('远程工具入口明确要求 Manifest 而不是单独 URL',()=>{
   assert.match(html,/这里不能直接粘贴 API 或 MCP 地址/);
   assert.match(html,/MCP 还必须声明 toolName/);
   assert.match(html,/暂不支持[^<]*<\/b>从 URL 自动发现工具、读取远程技能、GET 路径模板 API/);
-  assert.match(html,/placeholder='\{\s*"schemaVersion": 1,[\s\S]*"capabilities": \["content\.web\.search"\][\s\S]*"compatibleApp": ">=0\.1\.0"\s*\}'/);
+  assert.match(html,/placeholder='\{\s*"schemaVersion": 1,[\s\S]*"capabilities": \["cap_content_web_search"\][\s\S]*"compatibleApp": ">=0\.1\.0"\s*\}'/);
   assert.match(html,/保存远程工具/);
   assert.match(styles,/\.remote-manifest-notice/);
 });

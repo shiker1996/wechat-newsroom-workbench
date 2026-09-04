@@ -75,7 +75,7 @@ export class SkillRegistry {
   get(id) { return this.list().find((item) => item.id === id) || null; }
 }
 
-export function createGenerationSnapshot({ skillBundles, tools = [], provider, model, purpose, selection = null }) {
+export function createGenerationSnapshot({ skillBundles, tools = [], provider, model, purpose, selection = null, stageModels = {}, stageModelsResolved = {} }) {
   const skills = skillBundles.map((bundle) => ({
     id:bundle.skillName || bundle.writerSkill,
     version:bundle.config?.version || 'builtin',
@@ -96,6 +96,8 @@ export function createGenerationSnapshot({ skillBundles, tools = [], provider, m
     schemaVersion:2, purpose, skills, tools,
     capabilityAuthorization,capabilityRoutes,resolutionPolicy:{mode:'compatible-fallback',strictHistoricalBinding:false},resolvedImplementations:[],
     modelProvider:provider, model,
+    stageModels: { ...stageModels },
+    stageModelsResolved: { ...stageModelsResolved },
     selection:selection ? {
       requestedSkill:selection.requestedSkill || '',
       selectedSkill:selection.selectedSkill || skills[0]?.id || '',

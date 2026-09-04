@@ -9,7 +9,7 @@ import { filterAiVisualGenerationCatalog, runSocialCardAiVisualGenerationAgent, 
 import { normalizeToolRequest, validateToolRequest } from '../server/platform/agent/tool-protocol.mjs';
 
 test('AI 视觉 Agent 的工具理由过长时在严格校验前截断', () => {
-  const request = normalizeToolRequest({ requestId: 'tr_visual', capability: 'filesystem.project.read', arguments: {}, reason: '很长的工具调用说明'.repeat(40) });
+  const request = normalizeToolRequest({ requestId: 'tr_visual', capability: 'cap_filesystem_project_read', arguments: {}, reason: '很长的工具调用说明'.repeat(40) });
   assert.equal([...request.reason].length, 160);
   assert.equal(validateToolRequest(request).reason, request.reason);
 });
@@ -65,26 +65,26 @@ test('AI 视觉技能清单记录快照、模型和实际可见能力', () => {
   const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'social-card-ai-visual-manifest-'));
   const result = writeSocialCardAiVisualSkillManifest({
     workdir,
-    runtime: { snapshotId: 'snapshot-1', provider: 'deepseek', providerConfig: { model: 'deepseek-chat' }, allowedCapabilities: ['filesystem.project.read'] },
+    runtime: { snapshotId: 'snapshot-1', provider: 'deepseek', providerConfig: { model: 'deepseek-chat' }, allowedCapabilities: ['cap_filesystem_project_read'] },
     bundles: [{ skillName: 'social-card-ai-visual-generator', hash: 'hash-1', files: ['SKILL.md'] }],
-    catalog: [{ capability: 'filesystem.project.read', name: '项目文件读取', implementations: [{ riskLevel: 'read-only' }] }],
+    catalog: [{ capability: 'cap_filesystem_project_read', name: '项目文件读取', implementations: [{ riskLevel: 'read-only' }] }],
   });
   const manifest = JSON.parse(fs.readFileSync(result.path, 'utf8'));
   assert.equal(manifest.snapshotId, 'snapshot-1');
   assert.equal(manifest.model, 'deepseek-chat');
   assert.equal(manifest.skills[0].skill, 'social-card-ai-visual-generator');
-  assert.equal(manifest.tools[0].capability, 'filesystem.project.read');
+  assert.equal(manifest.tools[0].capability, 'cap_filesystem_project_read');
 });
 
 test('全量生成 Agent 的工具目录不包含浏览器观察和审计能力', () => {
   const catalog = filterAiVisualGenerationCatalog([
-    { capability: 'filesystem.project.read' },
-    { capability: 'filesystem.project.write' },
-    { capability: 'filesystem.project.document_write' },
-    { capability: 'content.social_card.browser_inspect' },
-    { capability: 'content.social_card.browser_audit' },
+    { capability: 'cap_filesystem_project_read' },
+    { capability: 'cap_filesystem_project_write' },
+    { capability: 'cap_filesystem_project_document_write' },
+    { capability: 'cap_content_social_card_browser_inspect' },
+    { capability: 'cap_content_social_card_browser_audit' },
   ]);
-  assert.deepEqual(catalog.map((item) => item.capability), ['filesystem.project.read', 'filesystem.project.document_write']);
+  assert.deepEqual(catalog.map((item) => item.capability), ['cap_filesystem_project_read', 'cap_filesystem_project_document_write']);
 });
 
 test('AI 视觉生成只在首次实际写入前开启 thinking', () => {
@@ -96,8 +96,8 @@ test('AI 视觉生成只在首次实际写入前开启 thinking', () => {
 test('AI 视觉分块 JSON 完整时直接写入，不受 content.length 人为门槛影响', async () => {
   const oversizedContent = '<section class="page">P1</section>' + 'x'.repeat(8_001);
   const replies = [
-    JSON.stringify({ type: 'tool_requests', assistant_note: '追加页面', requests: [{ requestId: 'tr_visual_oversized', capability: 'filesystem.project.document_write', arguments: { operation: 'append', content: oversizedContent }, reason: '追加 HTML' }] }),
-    JSON.stringify({ type: 'tool_requests', assistant_note: '完成文档', requests: [{ requestId: 'tr_visual_finish', capability: 'filesystem.project.document_write', arguments: { operation: 'finish' }, reason: '结束文档写入' }] }),
+    JSON.stringify({ type: 'tool_requests', assistant_note: '追加页面', requests: [{ requestId: 'tr_visual_oversized', capability: 'cap_filesystem_project_document_write', arguments: { operation: 'append', content: oversizedContent }, reason: '追加 HTML' }] }),
+    JSON.stringify({ type: 'tool_requests', assistant_note: '完成文档', requests: [{ requestId: 'tr_visual_finish', capability: 'cap_filesystem_project_document_write', arguments: { operation: 'finish' }, reason: '结束文档写入' }] }),
     JSON.stringify({ type: 'final', assistantReply: '已完成' }),
   ];
   const calls = [];
@@ -110,8 +110,8 @@ test('AI 视觉分块 JSON 完整时直接写入，不受 content.length 人为�
     },
   };
   const toolHandlers = {
-    'filesystem.project.read': async () => ({ status: 'ok', data: { files: [] } }),
-    'filesystem.project.document_write': async (args) => {
+    'cap_filesystem_project_read': async () => ({ status: 'ok', data: { files: [] } }),
+    'cap_filesystem_project_document_write': async (args) => {
       writes.push(args);
       if (args.operation === 'append') html += args.content;
       return { status: 'ok', data: { operation: args.operation } };
@@ -124,7 +124,7 @@ test('AI 视觉分块 JSON 完整时直接写入，不受 content.length 人为�
     candidateId: 1,
     provider: 'mock',
     registry: {},
-    catalog: [{ capability: 'filesystem.project.read' }, { capability: 'filesystem.project.document_write' }],
+    catalog: [{ capability: 'cap_filesystem_project_read' }, { capability: 'cap_filesystem_project_document_write' }],
     agentSystem: '',
     renderRequest: {},
     workspaceFiles: ['card-plan.json'],

@@ -11,8 +11,8 @@ test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', asyn
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-cover-job-'));
   const store = new Store(path.join(root, 'cover.db'));
   const replies = [
-    JSON.stringify({ type: 'tool_requests', assistant_note: '追加封面', requests: [{ requestId: 'tr_cover_append_job', capability: 'filesystem.project.document_write', arguments: { operation: 'append', content: '<!doctype html><html><head><style>.page{width:900px;height:383px;background:#111;color:#fff;border:2px solid #e8b84b}.decor{background:linear-gradient(90deg,#111,#e8b84b)}</style></head><body><main class="page"><i class="decor"></i><h1>模型直接生成的标题</h1><p>模型直接生成的摘要</p><small>模型直接生成的信息</small></main></body></html>' }, reason: '追加封面 HTML' }] }),
-    JSON.stringify({ type: 'tool_requests', assistant_note: '完成封面', requests: [{ requestId: 'tr_cover_finish_job', capability: 'filesystem.project.document_write', arguments: { operation: 'finish' }, reason: '完成封面写入' }] }),
+    JSON.stringify({ type: 'tool_requests', assistant_note: '追加封面', requests: [{ requestId: 'tr_cover_append_job', capability: 'cap_filesystem_project_document_write', arguments: { operation: 'append', content: '<!doctype html><html><head><style>.page{width:900px;height:383px;background:#111;color:#fff;border:2px solid #e8b84b}.decor{background:linear-gradient(90deg,#111,#e8b84b)}</style></head><body><main class="page"><i class="decor"></i><h1>模型直接生成的标题</h1><p>模型直接生成的摘要</p><small>模型直接生成的信息</small></main></body></html>' }, reason: '追加封面 HTML' }] }),
+    JSON.stringify({ type: 'tool_requests', assistant_note: '完成封面', requests: [{ requestId: 'tr_cover_finish_job', capability: 'cap_filesystem_project_document_write', arguments: { operation: 'finish' }, reason: '完成封面写入' }] }),
     JSON.stringify({ type: 'final', assistantReply: '已完成 AI 视觉封面 HTML 生成' }),
   ];
   const batch = store.createBatch({ date: '2026-08-30', title: '封面测试批次' });

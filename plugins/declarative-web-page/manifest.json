@@ -7,7 +7,7 @@
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",
   "capabilities": [
-    "collect.web-page"
+    "cap_collect_web_page"
   ],
   "inputSchema": {
     "type": "object",

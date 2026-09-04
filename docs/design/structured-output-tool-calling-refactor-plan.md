@@ -46,7 +46,7 @@
 
 - provider 支持原生工具时，读取 `result.toolCalls`；
 - provider 不支持时，继续使用旧 JSON 信封；
-- `filesystem.project.document_write` 已经支持 begin/append/finish 会话。
+- `cap_filesystem_project_document_write` 已经支持 begin/append/finish 会话。
 
 因此视觉 Agent 的工作不是“从零改成工具调用”，而是补齐协议适配、严格工具选择和测试，并确保原生路径不会进入旧 JSON 修复循环。
 
@@ -345,7 +345,7 @@ tools 与 JSON mode 仍保持互斥发送：
 - 工具执行失败时仍保留会话级恢复；
 - provider 不支持 native tools 时继续使用 JSON 信封。
 
-HTML/CSS 仍然使用 `filesystem.project.document_write` 分块写入；文章 Markdown 正文仍使用普通文本生成。
+HTML/CSS 仍然使用 `cap_filesystem_project_document_write` 分块写入；文章 Markdown 正文仍使用普通文本生成。
 
 ### 批 5：反馈调整（可选）
 

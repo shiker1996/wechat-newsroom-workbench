@@ -46,7 +46,7 @@
 ### Changed
 
 - 消费者—能力基线脚本的适配信息改为从 `config/capability-consumers.json` 登记推导，不再手工维护静态表；登记变更后重跑 `npm run capability:consumer-baseline` 即可。
-- 自主写作与自定义图文 Agent 的 url.fetch 成功结果回填资源目录正文，段落检索（`content.passage.retrieve`）在这两个入口可对已抓取素材走严格资源分支。
+- 自主写作与自定义图文 Agent 的 url.fetch 成功结果回填资源目录正文，段落检索（`cap_content_passage_retrieve`）在这两个入口可对已抓取素材走严格资源分支。
 - 资源适配层的授权拒绝文案外置到 `config/agent-adaptation-messages.json`，按"Agent + capability"二维维护（`messages.<consumerId>.<capability>`），各 Agent 措辞直接改配置；文件或条目缺失时回退档案内联兜底。
 
 ### Fixed
@@ -234,7 +234,7 @@
 - 文章配图可生成类别：IMG-DATA 结构化占位（事件线 / 数据卡，数据必须来自正文）、确定性单图渲染管线、配图工作台一键生成与放大查看
 - 首次安装引导：`npm run setup` / `setup-workbench.cmd` 交互向导（依赖、配置、LLM Key），RSSHub 缺失时可自动从 GitHub 浅克隆并安装依赖，附 Linux/macOS `.sh` 对应脚本
 - 编辑室两步备料：进入候选编辑室先幂等抓取全部事件来源原文再解锁对话，失败来源提示不阻断，可跳过
-- 本地段落检索插件 `local-passage-retrieval`（`content.passage.retrieve`）：编辑室长正文按「头部 + BM25 相关段落」摘录注入，替代全量截断，检索不可用时自动回退
+- 本地段落检索插件 `local-passage-retrieval`（`cap_content_passage_retrieve`）：编辑室长正文按「头部 + BM25 相关段落」摘录注入，替代全量截断，检索不可用时自动回退
 - 能力槽位体系推广到注册表全部能力：固定 6 个信息槽位之外的工具能力（段落检索、图表渲染、图床上传）自动生成槽位卡片，可在「技能与工具」页统一查看状态并切换偏好实现
 
 - 开源前置整理：MIT 许可证与 `THIRD_PARTY_NOTICES.md`、`SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、Issue / PR 模板、CODEOWNERS

@@ -259,14 +259,14 @@ Agent 只有在以下条件都满足时才返回完成：
 不要求模型在一次响应中输出整份 HTML。为避免超过模型单次输出上限，生成阶段采用
 “单 Agent、分块追加”的写入协议。
 
-新增仅允许在生成阶段使用的项目插件能力 `filesystem.project.document_write`：
+新增仅允许在生成阶段使用的项目插件能力 `cap_filesystem_project_document_write`：
 
 ```json
 {
   "type": "tool_requests",
   "requests": [
     {
-      "capability": "filesystem.project.document_write",
+      "capability": "cap_filesystem_project_document_write",
       "arguments": {
         "operation": "append",
         "sessionId": "<agent-run-id>",
@@ -407,7 +407,7 @@ runSocialCardAiVisualGenerationAgent()
 ### 11.1 单元测试
 
 - Single Visual Agent 能读取全部工作文件。
-- `filesystem.project.document_write` 的 `begin`、`append` 和 `finish` 生命周期可用。
+- `cap_filesystem_project_document_write` 的 `begin`、`append` 和 `finish` 生命周期可用。
 - 分块追加属于同一个 Agent 会话，不重新启动 CSS Agent 或 Page Agent。
 - 写入结果必须逐字保留 Agent 提交的 HTML/CSS。
 - 不允许调用 `renderStoryboardHtml` 或本地模板渲染器。
@@ -452,7 +452,7 @@ AI 版达到以下标准即可进入下一阶段：
 ### 第一步：建立单 Agent 生成模式
 
 - 新增 `runSocialCardAiVisualFullDocumentAgent`。
-- 新增并接入 `filesystem.project.document_write` 分块写入插件。
+- 新增并接入 `cap_filesystem_project_document_write` 分块写入插件。
 - 默认关闭旧 CSS/Page 双 Agent。
 - 保持修复、审计和后置阶段关闭。
 

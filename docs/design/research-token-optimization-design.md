@@ -1,6 +1,6 @@
 # 采集与研判阶段 Token 优化方案
 
-状态：待 Review（仅设计，未改实现）  
+状态：已实施 P0、P1-C 与 P2-D 的后端无感部分；P1-B 需补齐兼容按需读取后实施，P2-E 待实施
 日期：2026-09-04  
 适用范围：常规热点批次的采集后打标、事件卡、讨论研判、候选生成、脑暴与综合复排
 
@@ -403,6 +403,14 @@ sources/token-budget-report.json
 
 ## 10. 实施顺序与建议
 
+当前实施记录：
+
+- P0-A/P0-B/P0-C：已完成 canonical research digest、候选依据定向筛选、token budget report 和相关测试；
+- P1-C：已完成单事件原生联网确定性门控，并记录门控原因与本地来源数；
+- P2-D：已完成打标/事件卡默认批量调整、阶段 3 关闭 thinking，以及紧凑输入与输出上限；
+- P1-B：暂缓直接切换，避免非候选事件的详情在没有按需读取兼容层时发生可见变化；
+- P2-E：尚未实施跨批次 hash 缓存，现有阶段 checkpoint 复用保持不变。
+
 建议按以下顺序实施：
 
 1. **P0-A：canonical research digest**；
@@ -440,4 +448,3 @@ P0 完成后先跑 2～3 个真实批次，确认候选质量和 T/J/A/C/F 稳�
 - `server/features/research/application/research-pipeline.mjs`
   - `discussionResearchTopK`：深度研判范围；
   - 阶段 3 checkpoint 和研究产物持久化。
-

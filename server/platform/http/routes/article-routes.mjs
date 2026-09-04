@@ -8,7 +8,7 @@ import { extractLocalProjectPath } from '../../integrations/local-project-reader
 import { createNdjsonSession } from '../route-helpers.mjs';
 import { runWithThinkingSink } from '../../llm/gateway.mjs';
 
-// capability-call: content.passage.retrieve
+// capability-call: cap_content_passage_retrieve
 
 export async function handleArticleRoutes(context) {
   // agent-callsite: editorial — Phase 0 baseline; current production flow remains bespoke.
@@ -31,11 +31,11 @@ export async function handleArticleRoutes(context) {
       },
     });
   }
-  // 编辑会摘录检索：经能力槽位偏好调用 content.passage.retrieve（read-only 纯本地计算），
+  // 编辑会摘录检索：经能力槽位偏好调用 cap_content_passage_retrieve（read-only 纯本地计算），
   // 插件缺失或被禁用时返回 null，编辑室自动回退截断注入。
   async function editorialRetrieve(candidate) {
     return async ({ documents, query, ...options }) => {
-      const result = await executeCapabilityWithPreference(root, 'content.passage.retrieve', { documents, query, ...options },
+      const result = await executeCapabilityWithPreference(root, 'cap_content_passage_retrieve', { documents, query, ...options },
         { store, batchId: candidate.batch_id, candidateId: candidate.id });
       return result.status === 'ok' ? result.data.selections : null;
     };

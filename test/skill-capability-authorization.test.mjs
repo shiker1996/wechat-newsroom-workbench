@@ -33,13 +33,13 @@ async function graphFor(root){
 
 test('版本化写入：单调递增、parentHash 链、旧格式升级',(t)=>{
   const root=makeWorkspace(t);
-  const first=writeVersionedSkillConfig(root,'demo-skill',{prompt:'规则',allowedTools:['content.web.search']});
+  const first=writeVersionedSkillConfig(root,'demo-skill',{prompt:'规则',allowedTools:['cap_content_web_search']});
   assert.equal(first.version,1);assert.equal(first.parentHash,'');assert.match(first.configHash,/^sha256:/);
-  const second=writeVersionedSkillConfig(root,'demo-skill',{prompt:'规则 v2',allowedTools:['content.web.search']},{expectedVersion:1});
+  const second=writeVersionedSkillConfig(root,'demo-skill',{prompt:'规则 v2',allowedTools:['cap_content_web_search']},{expectedVersion:1});
   assert.equal(second.version,2);assert.equal(second.parentHash,first.configHash);
   assert.equal(activeConfigIntegrity(JSON.parse(fs.readFileSync(path.join(root,'writing-skills','demo-skill','active.json'),'utf8'))).status,'verified');
   // 旧格式（无 version/configHash）读取正常，下次写入升级为 version 1
-  writeActiveSkillConfig(root,'legacy-skill',{prompt:'旧配置',allowedTools:['content.web.search']});
+  writeActiveSkillConfig(root,'legacy-skill',{prompt:'旧配置',allowedTools:['cap_content_web_search']});
   assert.equal(describeActiveSkillConfig(root,'legacy-skill').integrity,'legacy');
   assert.equal(readActiveSkillConfig(root,'legacy-skill').prompt,'旧配置');
   const upgraded=writeVersionedSkillConfig(root,'legacy-skill',{prompt:'旧配置 v2'},{expectedVersion:0});
@@ -65,12 +65,12 @@ test('Agent run 启动时冻结能力授权快照',(t)=>{
   const store=new Store(path.join(root,'test.db'));
   try{
     const batch=store.createBatch({date:'2026-08-14',title:'授权冻结'});
-    const run=store.startAgentRun({id:'agent-run-freeze',entryPoint:'editorial',batchId:batch.id,allowedCapabilities:['content.web.search','filesystem.project.read']});
-    assert.deepEqual(run.allowedCapabilities,['content.web.search','filesystem.project.read']);
+    const run=store.startAgentRun({id:'agent-run-freeze',entryPoint:'editorial',batchId:batch.id,allowedCapabilities:['cap_content_web_search','cap_filesystem_project_read']});
+    assert.deepEqual(run.allowedCapabilities,['cap_content_web_search','cap_filesystem_project_read']);
     // 运行后配置变更不影响历史 run 的冻结快照
-    writeVersionedSkillConfig(root,'editorial-room-chat',{prompt:'规则',allowedTools:['content.news.search']});
-    assert.deepEqual(store.getAgentRun('agent-run-freeze').allowedCapabilities,['content.web.search','filesystem.project.read']);
-    assert.deepEqual(store.listAgentRuns()[0].allowedCapabilities,['content.web.search','filesystem.project.read']);
+    writeVersionedSkillConfig(root,'editorial-room-chat',{prompt:'规则',allowedTools:['cap_content_news_search']});
+    assert.deepEqual(store.getAgentRun('agent-run-freeze').allowedCapabilities,['cap_content_web_search','cap_filesystem_project_read']);
+    assert.deepEqual(store.listAgentRuns()[0].allowedCapabilities,['cap_content_web_search','cap_filesystem_project_read']);
   }finally{store.close();}
 });
 
@@ -79,46 +79,46 @@ test('授权边界：required、未声明与目录外能力都被服务端拒绝
   // 阶段 5 起 custom-card-storyboard 的 passage.retrieve 已补齐适配（ready 且 optional），允许从白名单移除；
   // 原"degraded 不得停用"场景随适配完成而消失（server/platform/agent/resource-adaptation.mjs 的 resourceIds 映射 + 透传回退）
   assert.doesNotThrow(()=>assertAuthorizationChange(root,graph,'custom-card-storyboard',
-    ['content.url.fetch','content.web.search','content.news.search','content.document.search','content.repository.inspect']));
+    ['cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_repository_inspect']));
   // 未在消费者登记中声明的能力不得通过配置引入
   assert.throws(()=>assertAuthorizationChange(root,graph,'custom-card-storyboard',
-    ['content.url.fetch','content.passage.retrieve','image.cdn.upload']),
-    (error)=>error.issues.some((issue)=>issue.capability==='image.cdn.upload'));
+    ['cap_content_url_fetch','cap_content_passage_retrieve','cap_image_cdn_upload']),
+    (error)=>error.issues.some((issue)=>issue.capability==='cap_image_cdn_upload'));
   // 目录外能力
-  assert.throws(()=>assertAuthorizationChange(root,graph,'editorial-room-chat',['content.web.search','vendor.unknown']),
-    (error)=>error.issues.some((issue)=>issue.capability==='vendor.unknown'));
+  assert.throws(()=>assertAuthorizationChange(root,graph,'editorial-room-chat',['cap_content_web_search','cap_vendor_unknown']),
+    (error)=>error.issues.some((issue)=>issue.capability==='cap_vendor_unknown'));
   // 非 Agent 运行时技能
-  assert.throws(()=>assertAuthorizationChange(root,graph,'article-reviewer',['content.web.search']),
+  assert.throws(()=>assertAuthorizationChange(root,graph,'article-reviewer',['cap_content_web_search']),
     (error)=>error.code==='CAPABILITY_AUTHORIZATION_INVALID');
   // required 判定：构造一个 declaration=required 的登记
   const raw=JSON.parse(fs.readFileSync(path.join(root,'config','capability-consumers.json'),'utf8'));
-  raw.consumers.find((item)=>item.id==='agent.editorial').dependencies.find((item)=>item.capability==='content.web.search').declaration='required';
+  raw.consumers.find((item)=>item.id==='agent.editorial').dependencies.find((item)=>item.capability==='cap_content_web_search').declaration='required';
   fs.writeFileSync(path.join(root,'config','capability-consumers.json'),JSON.stringify(raw));
   const requiredGraph=await graphFor(root);
   assert.throws(()=>assertAuthorizationChange(root,requiredGraph,'editorial-room-chat',
-    ['filesystem.project.read','content.url.fetch','content.passage.retrieve','content.news.search']),
-    (error)=>error.issues.some((issue)=>issue.capability==='content.web.search'&&/必需能力/.test(issue.message)));
+    ['cap_filesystem_project_read','cap_content_url_fetch','cap_content_passage_retrieve','cap_content_news_search']),
+    (error)=>error.issues.some((issue)=>issue.capability==='cap_content_web_search'&&/必需能力/.test(issue.message)));
 });
 
 test('影响预览：单技能停用只影响自己的消费者',async (t)=>{
   const root=makeWorkspace(t),graph=await graphFor(root);
-  const next=['filesystem.project.read','content.url.fetch','content.passage.retrieve','content.news.search'];
+  const next=['cap_filesystem_project_read','cap_content_url_fetch','cap_content_passage_retrieve','cap_content_news_search'];
   const preview=previewSkillAuthorizationChange(root,graph,{skillId:'editorial-room-chat',capabilities:next});
-  assert.deepEqual(preview.changes,[{consumerId:'agent.editorial',consumerName:'编辑室 Agent',capability:'content.web.search',capabilityName:'网络搜索',from:'available',to:'unavailable'}]);
+  assert.deepEqual(preview.changes,[{consumerId:'agent.editorial',consumerName:'编辑室 Agent',capability:'cap_content_web_search',capabilityName:'网络搜索',from:'available',to:'unavailable'}]);
 });
 
 test('写入后图谱状态翻转，清除白名单后恢复；版本随写入递增',async (t)=>{
   const root=makeWorkspace(t);
-  const next=['filesystem.project.read','content.url.fetch','content.passage.retrieve','content.news.search'];
+  const next=['cap_filesystem_project_read','cap_content_url_fetch','cap_content_passage_retrieve','cap_content_news_search'];
   const saved=saveSkillAuthorization(root,await graphFor(root),'editorial-room-chat',{capabilities:next,expectedVersion:0});
   assert.equal(saved.version,1);
-  assert.deepEqual(saved.impact,[{consumerId:'agent.editorial',consumerName:'编辑室 Agent',capability:'content.web.search',capabilityName:'网络搜索',from:'available',to:'unavailable'}]);
+  assert.deepEqual(saved.impact,[{consumerId:'agent.editorial',consumerName:'编辑室 Agent',capability:'cap_content_web_search',capabilityName:'网络搜索',from:'available',to:'unavailable'}]);
   const after=await graphFor(root);
-  const blocked=after.consumerStates.find((item)=>item.consumerId==='agent.editorial'&&item.capability==='content.web.search');
+  const blocked=after.consumerStates.find((item)=>item.consumerId==='agent.editorial'&&item.capability==='cap_content_web_search');
   assert.equal(blocked.available,false);assert.deepEqual(blocked.reasons,['SKILL_NOT_ALLOWED']);
   // 其他消费者不受影响（文档 §11）
   for(const consumerId of ['agent.independent-writing','agent.custom-social'])
-    assert.equal(after.consumerStates.find((item)=>item.consumerId===consumerId&&item.capability==='content.web.search').available,true,consumerId);
+    assert.equal(after.consumerStates.find((item)=>item.consumerId===consumerId&&item.capability==='cap_content_web_search').available,true,consumerId);
   // 基于过期版本再次写入 → 冲突
   assert.throws(()=>saveSkillAuthorization(root,after,'editorial-room-chat',{capabilities:next,expectedVersion:0}),
     (error)=>error.code==='CONFIG_VERSION_CONFLICT'&&error.currentVersion===1);
@@ -126,18 +126,18 @@ test('写入后图谱状态翻转，清除白名单后恢复；版本随写入�
   const restored=saveSkillAuthorization(root,after,'editorial-room-chat',{capabilities:null,expectedVersion:1});
   assert.equal(restored.version,2);
   const final=await graphFor(root);
-  assert.equal(final.consumerStates.find((item)=>item.consumerId==='agent.editorial'&&item.capability==='content.web.search').available,true);
+  assert.equal(final.consumerStates.find((item)=>item.consumerId==='agent.editorial'&&item.capability==='cap_content_web_search').available,true);
 });
 
 test('无归属技能作为独立消费者：授权启停走既有边界校验并只影响自身',async (t)=>{
   const root=makeWorkspace(t),graph=await graphFor(root);
   // 注意：空 allowedTools 语义为全放行，故用多能力的无归属技能（wechat-article-typeset）验证停用
-  const stateOf=(g)=>g.consumerStates.find((item)=>item.consumerId==='wechat-article-typeset'&&item.capability==='diagram.mermaid.render');
+  const stateOf=(g)=>g.consumerStates.find((item)=>item.consumerId==='wechat-article-typeset'&&item.capability==='cap_diagram_mermaid_render');
   assert.equal(stateOf(graph).available,true);
-  const next=['diagram.echarts.render','image.cdn.upload'];
+  const next=['cap_diagram_echarts_render','cap_image_cdn_upload'];
   // 影响预览覆盖技能消费者自身
   const preview=previewSkillAuthorizationChange(root,graph,{skillId:'wechat-article-typeset',capabilities:next});
-  assert.ok(preview.changes.some((item)=>item.consumerId==='wechat-article-typeset'&&item.capability==='diagram.mermaid.render'&&item.to==='unavailable'));
+  assert.ok(preview.changes.some((item)=>item.consumerId==='wechat-article-typeset'&&item.capability==='cap_diagram_mermaid_render'&&item.to==='unavailable'));
   // agent 消费者不受影响（agent 以自身 runtimeSkillIds 的白名单为准，wechat-article-typeset 不在其中）
   assert.ok(!preview.changes.some((item)=>String(item.consumerId).startsWith('agent.')));
   const saved=saveSkillAuthorization(root,graph,'wechat-article-typeset',{capabilities:next,expectedVersion:0});
@@ -148,20 +148,20 @@ test('无归属技能作为独立消费者：授权启停走既有边界校验�
   saveSkillAuthorization(root,after,'wechat-article-typeset',{capabilities:null,expectedVersion:1});
   assert.equal(stateOf(await graphFor(root)).available,true);
   // 边界：无归属技能也不能通过配置引入 Manifest 未声明的能力
-  assert.throws(()=>assertAuthorizationChange(root,graph,'wechat-article-typeset',[...next,'content.news.search']),
-    (error)=>error.issues.some((issue)=>issue.capability==='content.news.search'));
+  assert.throws(()=>assertAuthorizationChange(root,graph,'wechat-article-typeset',[...next,'cap_content_news_search']),
+    (error)=>error.issues.some((issue)=>issue.capability==='cap_content_news_search'));
 });
 
 test('custom-social 本地项目读取授权启停往返，不影响其他消费者',async (t)=>{
   const root=makeWorkspace(t),graph=await graphFor(root);
-  const stateOf=(g,consumerId)=>g.consumerStates.find((item)=>item.consumerId===consumerId&&item.capability==='filesystem.project.read');
+  const stateOf=(g,consumerId)=>g.consumerStates.find((item)=>item.consumerId===consumerId&&item.capability==='cap_filesystem_project_read');
   const before=await graphFor(root);
   assert.equal(stateOf(before,'agent.custom-social').available,true,'阶段 A 接入后默认应可用');
   // 停用：从 custom-card-storyboard 白名单移除该能力
-  const next=['content.url.fetch','content.web.search','content.news.search','content.document.search','content.repository.inspect','content.passage.retrieve'];
+  const next=['cap_content_url_fetch','cap_content_web_search','cap_content_news_search','cap_content_document_search','cap_content_repository_inspect','cap_content_passage_retrieve'];
   const saved=saveSkillAuthorization(root,before,'custom-card-storyboard',{capabilities:next,expectedVersion:0});
   assert.equal(saved.version,1);
-  assert.ok(saved.impact.some((item)=>item.consumerId==='agent.custom-social'&&item.capability==='filesystem.project.read'&&item.to==='unavailable'));
+  assert.ok(saved.impact.some((item)=>item.consumerId==='agent.custom-social'&&item.capability==='cap_filesystem_project_read'&&item.to==='unavailable'));
   const after=await graphFor(root);
   const blocked=stateOf(after,'agent.custom-social');
   assert.equal(blocked.available,false);assert.deepEqual(blocked.reasons,['SKILL_NOT_ALLOWED']);
@@ -188,11 +188,11 @@ async function putAuthorization(t,root,skillId,input){
 test('PUT 技能配置路由：dryRun 预览不落盘，过期版本返回 409',async (t)=>{
   const root=makeWorkspace(t);
   // 路由层图谱走真实配置状态：tmp 工作区里带配置/凭据的插件未就绪，选用无配置的 local-project-reader 对应能力验证可用性翻转
-  const next=['content.url.fetch','content.passage.retrieve','content.web.search','content.news.search'];
+  const next=['cap_content_url_fetch','cap_content_passage_retrieve','cap_content_web_search','cap_content_news_search'];
   const dryRun=await putAuthorization(t,root,'editorial-room-chat',{capabilityAuthorization:{mode:'allow-list',capabilities:next},dryRun:true});
   assert.equal(dryRun.status,200);assert.equal(dryRun.data.dryRun,true);
   assert.deepEqual(dryRun.data.impact.map((item)=>[item.consumerId,item.capability,item.from,item.to]),
-    [['agent.editorial','filesystem.project.read','available','unavailable']]);
+    [['agent.editorial','cap_filesystem_project_read','available','unavailable']]);
   assert.ok(!fs.existsSync(path.join(root,'writing-skills','editorial-room-chat','active.json')),'dryRun 不应写入');
   const saved=await putAuthorization(t,root,'editorial-room-chat',{capabilityAuthorization:{mode:'allow-list',capabilities:next},expectedVersion:0});
   assert.equal(saved.status,200);assert.equal(saved.data.version,1);
@@ -202,6 +202,6 @@ test('PUT 技能配置路由：dryRun 预览不落盘，过期版本返回 409',
   const missing=await putAuthorization(t,root,'editorial-room-chat',{capabilityAuthorization:{mode:'allow-list',capabilities:next}});
   assert.equal(missing.status,400);assert.equal(missing.data.code,'CAPABILITY_AUTHORIZATION_INVALID');
   // 未在消费者登记中声明的能力仍被路由拒绝
-  const rejected=await putAuthorization(t,root,'custom-card-storyboard',{capabilityAuthorization:{mode:'allow-list',capabilities:['content.url.fetch','image.cdn.upload']}});
+  const rejected=await putAuthorization(t,root,'custom-card-storyboard',{capabilityAuthorization:{mode:'allow-list',capabilities:['cap_content_url_fetch','cap_image_cdn_upload']}});
   assert.equal(rejected.status,400);assert.equal(rejected.data.code,'CAPABILITY_AUTHORIZATION_INVALID');
 });

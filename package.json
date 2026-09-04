@@ -18,6 +18,7 @@
         "check:legacy-config-guidance": "node scripts/quality/check-legacy-configuration-guidance.mjs",
         "postinstall": "node scripts/runtime/install-skill-deps.mjs",
         "build:watch": "node --watch scripts/build/build.mjs",
+        "check:style-coverage": "node scripts/quality/check-style-coverage.mjs",
         "skill:validate": "node scripts/quality/validate-skill-package.mjs",
         "plugin:validate": "node scripts/quality/validate-tool-plugin.mjs",
         "plugin:audit-boundaries": "node scripts/quality/audit-plugin-boundaries.mjs",

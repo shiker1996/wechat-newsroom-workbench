@@ -3,7 +3,7 @@
   "name": "本地段落检索",
   "version": "1.0.0",
   "capabilities": [
-    "content.passage.retrieve"
+    "cap_content_passage_retrieve"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "read-only",

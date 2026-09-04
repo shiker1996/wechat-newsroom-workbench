@@ -29,22 +29,22 @@ test('真实仓库通过消费者—能力治理门禁',()=>{
 test('门禁 A：登记声明但适配缺失（adapterStatus=missing）被捕获',(t)=>{
   const root=makeRoot(t,(consumers)=>{
     consumers.consumers.find((item)=>item.id==='agent.editorial').dependencies
-      .find((item)=>item.capability==='content.web.search').adapterStatus='missing';
+      .find((item)=>item.capability==='cap_content_web_search').adapterStatus='missing';
   });
   const issues=checkConsumerCapabilityGates(root);
-  assert.ok(issues.some((issue)=>issue.includes('agent.editorial/content.web.search')&&issue.includes('适配缺失')),issues.join('\n'));
+  assert.ok(issues.some((issue)=>issue.includes('agent.editorial/cap_content_web_search')&&issue.includes('适配缺失')),issues.join('\n'));
 });
 
 test('门禁 B：适配已接线但未登记被捕获；命中档案表的资源类登记超出常量放行（纯参数超出放行）',(t)=>{
   const missing=makeRoot(t,(consumers)=>{
     const agent=consumers.consumers.find((item)=>item.id==='agent.custom-social');
-    agent.dependencies=agent.dependencies.filter((item)=>item.capability!=='content.repository.inspect');
+    agent.dependencies=agent.dependencies.filter((item)=>item.capability!=='cap_content_repository_inspect');
   });
-  assert.ok(checkConsumerCapabilityGates(missing).some((issue)=>issue.includes('agent.custom-social')&&issue.includes('content.repository.inspect')&&issue.includes('未在登记中声明')));
-  // content.document.search 命中 resourceKind 档案表（默认适配路径），登记了但常量未含 → 合法
+  assert.ok(checkConsumerCapabilityGates(missing).some((issue)=>issue.includes('agent.custom-social')&&issue.includes('cap_content_repository_inspect')&&issue.includes('未在登记中声明')));
+  // cap_content_document_search 命中 resourceKind 档案表（默认适配路径），登记了但常量未含 → 合法
   const extra=makeRoot(t,(consumers)=>{
     consumers.consumers.find((item)=>item.id==='agent.editorial').dependencies.push({
-      capability:'content.document.search',requirement:'optional',failurePolicy:'continue-with-warning',
+      capability:'cap_content_document_search',requirement:'optional',failurePolicy:'continue-with-warning',
       declaration:'optional',adapterStatus:'ready',resourceKinds:[],triggerPolicy:'model-request',
       authorizationAction:null,resultPolicy:'passthrough',source:'builtin',
     });
@@ -53,7 +53,7 @@ test('门禁 B：适配已接线但未登记被捕获；命中档案表的资源
   // 纯参数能力登记超出常量 → 放行（机制二：登记即生效）
   const pure=makeRoot(t,(consumers)=>{
     consumers.consumers.find((item)=>item.id==='agent.editorial').dependencies.push({
-      capability:'vendor.pure.lookup',requirement:'optional',failurePolicy:'continue-with-warning',
+      capability:'cap_vendor_pure_lookup',requirement:'optional',failurePolicy:'continue-with-warning',
       declaration:'optional',adapterStatus:'ready',resourceKinds:[],triggerPolicy:'model-request',
       authorizationAction:null,resultPolicy:'passthrough',source:'builtin',
     });
@@ -66,8 +66,8 @@ test('门禁 A：内置技能 Manifest 声明了消费者未登记的能力被�
   fs.mkdirSync(path.join(root,'skills','rogue-skill'),{recursive:true});
   fs.writeFileSync(path.join(root,'skills','rogue-skill','skill.json'),JSON.stringify({
     schemaVersion:1,id:'rogue-skill',name:'违规技能',version:'1.0.0',kind:'stage',
-    entryPoints:['custom-social'],optionalCapabilities:['image.cdn.upload'],
+    entryPoints:['custom-social'],optionalCapabilities:['cap_image_cdn_upload'],
   }));
   const issues=checkConsumerCapabilityGates(root);
-  assert.ok(issues.some((issue)=>issue.includes('rogue-skill')&&issue.includes('image.cdn.upload')),issues.join('\n'));
+  assert.ok(issues.some((issue)=>issue.includes('rogue-skill')&&issue.includes('cap_image_cdn_upload')),issues.join('\n'));
 });

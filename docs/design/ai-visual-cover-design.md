@@ -394,8 +394,8 @@ export const AI_VISUAL_COVER_STAGE_CONTRACT = Object.freeze([
 生成阶段只开放：
 
 ```text
-filesystem.project.read
-filesystem.project.document_write
+cap_filesystem_project_read
+cap_filesystem_project_document_write
 ```
 
 Agent 不开放：
@@ -758,7 +758,7 @@ test/ai-visual-cover.test.mjs
 
 复用或扩展现有 AI 视觉 Agent 测试，覆盖：
 
-- 只开放 `filesystem.project.read` 和 `filesystem.project.document_write`；
+- 只开放 `cap_filesystem_project_read` 和 `cap_filesystem_project_document_write`；
 - 首次写入必须为 `begin`；
 - 中间使用 `append`；
 - 完成必须执行 `finish` 后再返回 `final`；

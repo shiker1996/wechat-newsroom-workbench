@@ -19,15 +19,15 @@
         "editorial-room-chat": null
       },
       "declaredCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.passage.retrieve",
-        "content.web.search",
-        "content.news.search"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_passage_retrieve",
+        "cap_content_web_search",
+        "cap_content_news_search"
       ],
       "capabilities": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -61,7 +61,7 @@
           ]
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -102,7 +102,7 @@
           ]
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -136,7 +136,7 @@
           ]
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -170,7 +170,7 @@
           ]
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -222,16 +222,16 @@
         "wechat-mp-personal-writing": null
       },
       "declaredCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_passage_retrieve"
       ],
       "capabilities": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -265,7 +265,7 @@
           ]
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -305,7 +305,7 @@
           ]
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -339,7 +339,7 @@
           ]
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -372,7 +372,7 @@
           ]
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -405,7 +405,7 @@
           ]
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -454,17 +454,17 @@
         "custom-card-storyboard": null
       },
       "declaredCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.repository.inspect",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_repository_inspect",
+        "cap_content_passage_retrieve"
       ],
       "capabilities": [
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -498,7 +498,7 @@
           ]
         },
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -538,7 +538,7 @@
           ]
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -572,7 +572,7 @@
           ]
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -605,7 +605,7 @@
           ]
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -638,7 +638,7 @@
           ]
         },
         {
-          "capability": "content.repository.inspect",
+          "capability": "cap_content_repository_inspect",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",
@@ -667,7 +667,7 @@
           ]
         },
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "registered": true,
           "declared": true,
           "adapterStatus": "ready",

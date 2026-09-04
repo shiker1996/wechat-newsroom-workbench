@@ -4,7 +4,7 @@
   "name": "企业资料搜索",
   "version": "1.0.0",
   "type": "remote-api",
-  "capabilities": ["content.company.search"],
+  "capabilities": ["cap_content_company_search"],
   "riskLevel": "network-read",
   "endpoint": "https://api.example.com/company/search",
   "healthEndpoint": "https://api.example.com/health",

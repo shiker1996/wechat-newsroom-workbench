@@ -20,7 +20,7 @@ function manifest() {
     name: '演示远程插件',
     version: '1.0.0',
     type: 'remote-api',
-    capabilities: ['demo.search'],
+    capabilities: ['cap_demo_search'],
     riskLevel: 'network-read',
     endpoint: 'https://api.example.com/search',
     inputSchema: { type: 'object' },

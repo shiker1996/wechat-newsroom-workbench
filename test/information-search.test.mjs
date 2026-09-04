@@ -110,9 +110,9 @@ test('creation chains wire search flags into both autonomous writing and custom 
 test('writer and storyboard skills declare search capabilities and material boundaries', () => {
   for (const id of ['wechat-mp-tutorial', 'wechat-mp-personal-writing', 'custom-card-storyboard']) {
     const manifest = JSON.parse(fs.readFileSync(new URL(`../skills/${id}/skill.json`, import.meta.url), 'utf8'));
-    assert.ok(manifest.optionalCapabilities.includes('content.web.search'), `${id} 缺少 content.web.search`);
-    assert.ok(manifest.optionalCapabilities.includes('content.news.search'), `${id} 缺少 content.news.search`);
-    assert.ok(manifest.optionalCapabilities.includes('content.document.search'), `${id} 缺少 content.document.search`);
+    assert.ok(manifest.optionalCapabilities.includes('cap_content_web_search'), `${id} 缺少 cap_content_web_search`);
+    assert.ok(manifest.optionalCapabilities.includes('cap_content_news_search'), `${id} 缺少 cap_content_news_search`);
+    assert.ok(manifest.optionalCapabilities.includes('cap_content_document_search'), `${id} 缺少 cap_content_document_search`);
     const skill = fs.readFileSync(new URL(`../skills/${id}/SKILL.md`, import.meta.url), 'utf8');
     assert.match(skill, /web_search/);
     assert.match(skill, /document_search/);

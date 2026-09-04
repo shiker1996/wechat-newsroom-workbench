@@ -28,15 +28,15 @@ function makeRoot(t,mutate){
 
 const editorial=(consumers)=>consumers.consumers.find((item)=>item.id==='agent.editorial');
 const PURE_PARAM_DEP={
-  capability:'vendor.pure.lookup',requirement:'optional',failurePolicy:'continue-with-warning',
+  capability:'cap_vendor_pure_lookup',requirement:'optional',failurePolicy:'continue-with-warning',
   declaration:'optional',adapterStatus:'ready',resourceKinds:[],triggerPolicy:'model-request',
   authorizationAction:null,resultPolicy:'passthrough',source:'test',
 };
 
 test('判定规则：resourceId 分支能力为资源类，搜索类为纯参数',()=>{
-  for(const capability of ['filesystem.project.read','content.url.fetch','content.document.search','content.repository.inspect','content.passage.retrieve'])
+  for(const capability of ['cap_filesystem_project_read','cap_content_url_fetch','cap_content_document_search','cap_content_repository_inspect','cap_content_passage_retrieve'])
     assert.ok(isResourceAdaptedCapability(capability),capability);
-  for(const capability of ['content.web.search','content.news.search','vendor.pure.lookup'])
+  for(const capability of ['cap_content_web_search','cap_content_news_search','cap_vendor_pure_lookup'])
     assert.ok(!isResourceAdaptedCapability(capability),capability);
   assert.ok(Object.isFrozen(RESOURCE_ADAPTED_CAPABILITIES));
 });
@@ -44,22 +44,22 @@ test('判定规则：resourceId 分支能力为资源类，搜索类为纯参数
 test('登记即生效：纯参数能力登记超出常量即进入派生目录（不改常量）',(t)=>{
   const root=makeRoot(t,(consumers)=>{editorial(consumers).dependencies.push({...PURE_PARAM_DEP});});
   const derived=deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES);
-  assert.ok(derived.includes('vendor.pure.lookup'));
+  assert.ok(derived.includes('cap_vendor_pure_lookup'));
   assert.equal(derived.length,EDITORIAL_AGENT_CAPABILITIES.length+1);
 });
 
 test('资源类能力登记为 ready 且命中档案表：即使常量未含也合法（默认适配路径）',(t)=>{
   const root=makeRoot(t,(consumers)=>{
-    editorial(consumers).dependencies.push({...PURE_PARAM_DEP,capability:'content.document.search',resourceKinds:['document-root'],triggerPolicy:'explicit-resource'});
+    editorial(consumers).dependencies.push({...PURE_PARAM_DEP,capability:'cap_content_document_search',resourceKinds:['document-root'],triggerPolicy:'explicit-resource'});
   });
   const derived=deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES);
-  assert.ok(derived.includes('content.document.search'));
+  assert.ok(derived.includes('cap_content_document_search'));
 });
 
 test('常量超出登记 → 报错（常量必须是登记的子集）',(t)=>{
   const root=makeRoot(t,(consumers)=>{
     const agent=editorial(consumers);
-    agent.dependencies=agent.dependencies.filter((item)=>item.capability!=='content.news.search');
+    agent.dependencies=agent.dependencies.filter((item)=>item.capability!=='cap_content_news_search');
   });
   assert.throws(()=>deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES),/常量必须是登记的子集/);
 });
@@ -68,7 +68,7 @@ test('adapterStatus=missing 的登记不进入派生目录（缺少适配，与�
   const root=makeRoot(t,(consumers)=>{
     editorial(consumers).dependencies.push({...PURE_PARAM_DEP,adapterStatus:'missing'});
   });
-  assert.ok(!deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES).includes('vendor.pure.lookup'));
+  assert.ok(!deriveAgentEntryCapabilities(root,'agent.editorial',EDITORIAL_AGENT_CAPABILITIES).includes('cap_vendor_pure_lookup'));
 });
 
 test('登记文件缺失时回退常量（无 config 的嵌入式/测试工作区）',(t)=>{
@@ -81,7 +81,7 @@ test('门禁 B 新语义：纯参数与命中档案表的资源类登记超出�
   const pure=makeRoot(t,(consumers)=>{editorial(consumers).dependencies.push({...PURE_PARAM_DEP});});
   assert.deepEqual(checkConsumerCapabilityGates(pure),[]);
   const resource=makeRoot(t,(consumers)=>{
-    editorial(consumers).dependencies.push({...PURE_PARAM_DEP,capability:'content.repository.inspect',resourceKinds:['github-repository-url'],triggerPolicy:'explicit-resource'});
+    editorial(consumers).dependencies.push({...PURE_PARAM_DEP,capability:'cap_content_repository_inspect',resourceKinds:['github-repository-url'],triggerPolicy:'explicit-resource'});
   });
   assert.deepEqual(checkConsumerCapabilityGates(resource),[]);
 });

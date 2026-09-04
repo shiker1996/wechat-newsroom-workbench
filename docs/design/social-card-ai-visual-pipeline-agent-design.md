@@ -67,8 +67,8 @@ copy.txt                       已生成的配套文案
 只开放：
 
 ```text
-filesystem.project.read
-filesystem.project.document_write
+cap_filesystem_project_read
+cap_filesystem_project_document_write
 ```
 
 生成阶段只启动一个 AI 视觉 Agent。它先读取冻结输入，再用 `document_write.begin`、多个 `append` 和 `finish` 原样写入完整 HTML/CSS；分块只解决模型输出长度，不由程序拼接或补写视觉内容。Agent 不调用浏览器审计，也不输出完整 HTML JSON。

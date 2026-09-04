@@ -3,8 +3,8 @@
   "name": "Tavily 搜索",
   "version": "1.0.0",
   "capabilities": [
-    "content.web.search",
-    "content.news.search"
+    "cap_content_web_search",
+    "cap_content_news_search"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",

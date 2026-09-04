@@ -118,8 +118,8 @@ skills/
   "contentTypes": ["product-review"],
   "inputContract": "article_fact_base",
   "outputContract": "wechat_markdown",
-  "requiredCapabilities": ["content.url.fetch"],
-  "optionalCapabilities": ["diagram.mermaid.render"],
+  "requiredCapabilities": ["cap_content_url_fetch"],
+  "optionalCapabilities": ["cap_diagram_mermaid_render"],
   "compatibleApp": ">=0.1.0",
   "source": {
     "type": "builtin",
@@ -266,7 +266,7 @@ disabled → uninstalled
   "name": "企业资料搜索",
   "version": "1.0.0",
   "type": "remote-api",
-  "capabilities": ["content.company.search"],
+  "capabilities": ["cap_content_company_search"],
   "riskLevel": "network-read",
   "endpoint": "https://example.com/api/search",
   "credentialProfile": "company-search",
@@ -484,12 +484,12 @@ PUT    /api/system/tool-plugins/:id/credentials
 
 | 槽位 | capability | 当前接入 |
 | --- | --- | --- |
-| 网页正文读取 | `content.url.fetch` | URL 来源抓取、素材事实基座 |
-| 网络搜索 | `content.web.search` | 等待连接远程搜索实现 |
-| 新闻搜索 | `content.news.search` | 等待连接远程新闻实现 |
-| 代码仓库分析 | `content.repository.inspect` | GitHub 仓库事实基座 |
-| 文档检索 | `content.document.search` | 等待连接知识库或文档服务 |
-| 本地项目读取 | `filesystem.project.read` | 自主写作教程素材 |
+| 网页正文读取 | `cap_content_url_fetch` | URL 来源抓取、素材事实基座 |
+| 网络搜索 | `cap_content_web_search` | 等待连接远程搜索实现 |
+| 新闻搜索 | `cap_content_news_search` | 等待连接远程新闻实现 |
+| 代码仓库分析 | `cap_content_repository_inspect` | GitHub 仓库事实基座 |
+| 文档检索 | `cap_content_document_search` | 等待连接知识库或文档服务 |
+| 本地项目读取 | `cap_filesystem_project_read` | 自主写作教程素材 |
 
 实现规则：
 
@@ -643,9 +643,9 @@ P3 本地工具维持管理员/开发者能力，P4 远程工具优先承接网�
 
 | 信息能力 | capability | 主要使用场景 | 建议优先级 |
 | --- | --- | --- | --- |
-| 网络搜索 | `content.web.search` | 自主写作资料发现、事实补充、关键词外部检索 | P1 |
-| 新闻搜索 | `content.news.search` | 热点事件追踪、时效性核验、补充独立新闻来源 | P1 |
-| 文档检索 | `content.document.search` | 从已授权知识库、云盘或文档服务检索内部材料 | P2 |
+| 网络搜索 | `cap_content_web_search` | 自主写作资料发现、事实补充、关键词外部检索 | P1 |
+| 新闻搜索 | `cap_content_news_search` | 热点事件追踪、时效性核验、补充独立新闻来源 | P1 |
+| 文档检索 | `cap_content_document_search` | 从已授权知识库、云盘或文档服务检索内部材料 | P2 |
 
 实施原则：
 

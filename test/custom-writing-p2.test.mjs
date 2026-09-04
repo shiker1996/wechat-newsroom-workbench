@@ -7,6 +7,8 @@ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8
 const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.meta.url),'utf8');
 const materialInbox=fs.readFileSync(new URL('../public/src/views/material-inbox.js',import.meta.url),'utf8');
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
+const topicsSource=fs.readFileSync(new URL('../public/src/views/topics.js',import.meta.url),'utf8');
+const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 
 test('自主写作项目统一输出四种可恢复状态',()=>{
   assert.match(server,/draft_ready/);
@@ -40,6 +42,14 @@ test('导航与文章池使用单一职责命名并提供类型筛选',()=>{
   assert.match(html,/选题管理[\s\S]*data-view="topics"[\s\S]*主动写作[\s\S]*data-view="material-inbox"[\s\S]*data-view="editorial"[\s\S]*data-view="daily"[\s\S]*data-view="tutorial"[\s\S]*统一编辑与交付/);
   assert.match(html,/data-article-type="hotspot">热点事件/);
   assert.match(html,/data-article-type="independent">自主写作/);
+});
+
+test('选题详情研判抽屉保留结构化内容样式并处理长报告',()=>{
+  assert.match(html,/id="candidate-research-dialog" class="drawer candidate-research-dialog"/);
+  assert.match(topicsSource,/candidate-research-summary/);
+  assert.match(styles,/\.candidate-research-dialog \{ width:min\(760px,94vw\)/);
+  assert.match(styles,/\.candidate-research-topic-section \{[^}]*border:1px solid var\(--accent\)/);
+  assert.match(styles,/\.candidate-research-reports pre \{[^}]*overflow-wrap:anywhere/);
 });
 
 test('素材入箱可以单条或多选进入自主写作，并把素材 ID 交给服务端事实基座',()=>{

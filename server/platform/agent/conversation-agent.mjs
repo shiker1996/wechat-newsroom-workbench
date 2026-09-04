@@ -18,7 +18,7 @@ function nativeToolEnvelope(modelTurn,catalog,maxRequests){
   const callByRequestId=new Map();
   const requests=calls.map((call,index)=>{
     const requestId=nativeRequestId(call,index);
-    const capability=capabilityForToolName(call?.name,catalog)||'model.unknown-tool';
+    const capability=capabilityForToolName(call?.name,catalog)||'cap_model_unknown_tool';
     const request={requestId,capability,arguments:call?.input&&typeof call.input==='object'&&!Array.isArray(call.input)?call.input:{},reason:'模型原生工具调用'};
     callByRequestId.set(requestId,call);
     return request;
@@ -48,7 +48,7 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       const native = nativeToolEnvelope(modelEnvelope,catalog,limits.maxParallelToolCalls);
       // 对话 Agent 可以在没有业务工具需求时直接返回普通文本。
       // 普通文本只作为本轮回复，不再回退到旧 JSON 信封解析；若模型主动调用
-      // agent.conversation.finish，则仍按显式结束工具处理。
+      // cap_agent_conversation_finish，则仍按显式结束工具处理。
       if (modelEnvelope?.nativeTools === true && !native) {
         const assistantReply = String(modelEnvelope.content || '').trim();
         if (assistantReply) {

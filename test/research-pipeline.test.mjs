@@ -373,6 +373,34 @@ test('探索脑暴兼容模型研判候选的 candidate_id，并统一回写 C �
   assert.equal(cards[0].source.candidate_id, 'model:MR-T-001');
 });
 
+test('探索脑暴只发送候选关联研判依据，不回退到整批上下文', async () => {
+  let prompt = '';
+  const gateway = { config: { defaultProvider: 'mock', providers: { mock: { maxOutputTokens: 8000 } } }, async complete(input) {
+    prompt = input.messages[1].content;
+    const candidates = JSON.parse(prompt.split('【候选】\n')[1]);
+    return { content: JSON.stringify({ items: [{ candidateId: candidates[0].candidateId, status: 'PASS', angle: '角度', thesis: '命题', hypotheses: [], packaging: {}, bScores: {}, hProfile: {} }] }) };
+  } };
+  const cards = await brainstorm(gateway, { updateModelCall() {} }, [{
+    candidate_id: 'model:MR-T-001', title: '候选', event_ids: ['E1'],
+    topic_candidate: { event_ids: ['E1'], material_ids: [], internal_signal_refs: [], relation_ids: [] },
+    research_context: {
+      internal_signals: [
+        { event_id: 'E1', anomalies: [{ signal_id: 'S1', statement: '关联反常' }] },
+        { event_id: 'E2', anomalies: [{ signal_id: 'S2', statement: '无关反常' }] },
+      ],
+      verified_research_materials: [
+        { material_id: 'M1', anchor_event_ids: ['E1'], statement: '关联素材' },
+        { material_id: 'M2', anchor_event_ids: ['E2'], statement: '无关素材' },
+      ],
+    },
+  }], [], 'b1', 'mock', () => {}, process.cwd());
+  assert.equal(cards.length, 1);
+  assert.equal(prompt.includes('"research_context"'), false);
+  assert.equal(prompt.includes('关联反常'), true);
+  assert.equal(prompt.includes('无关反常'), false);
+  assert.equal(prompt.includes('无关素材'), false);
+});
+
 test('事件卡生成：截断自动拆分，单事件失败不阻塞整批', async () => {
   const clusters = clusterItems([
     hotspot(11,'事件A','主体|发布|模型'), hotspot(12,'事件B','主体|裁员|团队'), hotspot(13,'事件C','主体|融资|公司'),

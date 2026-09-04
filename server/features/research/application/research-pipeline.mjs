@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { batchTopicsDir } from '../../../platform/core/workspace-paths.mjs';
+import { estimateTokens } from '../../../platform/llm/context-manager.mjs';
 import { formatAccountContext, getAccountContext } from '../../../shared/domain/account-context.mjs';
 import { parseModelJson as parseSharedModelJson } from '../../../platform/llm/model-json.mjs';
 import { enforceNotificationQuota, isConcreteReaderStake, resolveDistributionDecision, resolveNotificationPolicy } from '../../../shared/domain/distribution-strategy.mjs';
@@ -18,7 +19,7 @@ import { ensureBatchEventCards, generateEventCards, overviewHtml, readEventCards
 import { brainstorm, breakingSynthesis, synthesize } from './research/editorial-exploration.mjs';
 import { classifyContentRoute, scoreStatusForCard } from '../domain/content-routing.mjs';
 import { G_SOCIAL_CLASS_CAPS, G_SOCIAL_THRESHOLDS, G_SOCIAL_WEIGHTS, scoreSocialCandidate, selectSocialCandidates, selectSocialPool } from '../domain/social-scoring.mjs';
-import { generateDiscussionResearchSinglePass, generateDiscussionResearchTopics } from './research/discussion-research-stage.mjs';
+import { buildResearchDigest, generateDiscussionResearchSinglePass, generateDiscussionResearchTopics } from './research/discussion-research-stage.mjs';
 
 // 研究子阶段仍统一通过 selectionPrompt 加载项目技能：hotspot-brainstorm、hotspot-synthesis、event-card-generator。
 // 实现分别位于 research/editorial-exploration.mjs 与 research/event-card-stage.mjs，保留这些契约标记便于结构扫描。
@@ -726,6 +727,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   onProgress(`阶段 0 完成：冻结 T 榜前 ${discussionResearchBase.scope.selected_count} 个非项目事件，保留 ${discussionResearchBase.scope.items.reduce((sum, item) => sum + (item.source_refs?.length || 0), 0)} 个来源指针`);
   const discussionResearchInputPath = path.join(sourcesDir, 'discussion-research-input.json');
   const discussionResearchReportsPath = path.join(sourcesDir, 'discussion-research-reports.md');
+  const researchDigestPath = path.join(sourcesDir, 'research-digest.json');
+  const tokenBudgetReportPath = path.join(sourcesDir, 'token-budget-report.json');
   const previousResearchInput = resumeSnapshot ? (() => {
     try { return JSON.parse(fs.readFileSync(discussionResearchInputPath, 'utf8')); } catch { return null; }
   })() : null;
@@ -740,6 +743,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     note: '每个 Top-K 事件执行一次完整模型研判交互；模型在同一次交互中完成事件内和事件外研判并返回 Markdown。程序只记录模型输入、原生联网调用和响应审计；正文抓取延迟到编辑室。第 3 阶段关闭联网，只读取研判报告。',
   }, null, 2));
   const recordDiscussionResearchModelRequest = (pass, request) => {
+    const modelMessages = Array.isArray(request.messages?.messages) ? request.messages.messages : [];
+    const inputChars = modelMessages.reduce((sum, message) => sum + String(message?.content ?? '').length, 0);
     discussionResearchModelRequests.push({
       phase: request.phase,
       attempt: request.attempt,
@@ -751,6 +756,9 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
       skill: request.messages.skill,
       prompt_source: request.messages.prompt_source,
       messages: request.messages.messages,
+      input_profile: request.input?.policy?.input_profile || null,
+      input_chars: inputChars,
+      estimated_input_tokens: estimateTokens(modelMessages),
     });
     persistDiscussionResearchInput();
   };
@@ -784,6 +792,18 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     onModelResponse: recordDiscussionResearchModelResponse,
   });
   const researchReports = singlePass.reports || [];
+  const researchDigest = buildResearchDigest({
+    internalResearch: singlePass.internalResearch,
+    relations: singlePass.relations,
+    verifiedResearchMaterials: singlePass.verifiedResearchMaterials,
+    researchReports,
+  });
+  writeFile(researchDigestPath, JSON.stringify({
+    schema_version: 1,
+    batch_id: batch.id,
+    generated_at: new Date().toISOString(),
+    ...researchDigest,
+  }, null, 2));
   writeFile(stage3CheckpointPath, JSON.stringify({
     schema_version: 1,
     batch_id: batch.id,
@@ -826,6 +846,59 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     onModelRequest: (request) => recordDiscussionResearchModelRequest('topic_generation', request),
     onModelResponse: recordDiscussionResearchModelResponse,
   });
+  const topicRequest = [...discussionResearchModelRequests].reverse().find((request) => request.phase === 'topic_generation');
+  const tokenBudgetStages = [...new Set(discussionResearchModelRequests.map((request) => request.phase))].map((phase) => {
+    const requests = discussionResearchModelRequests.filter((request) => request.phase === phase);
+    return {
+      stage: phase,
+      input_profile: requests.find((request) => request.input_profile)?.input_profile || null,
+      call_count: requests.length,
+      input_chars: requests.reduce((sum, request) => sum + (Number(request.input_chars) || 0), 0),
+      estimated_input_tokens: requests.reduce((sum, request) => sum + (Number(request.estimated_input_tokens) || 0), 0),
+      max_request_input_chars: Math.max(0, ...requests.map((request) => Number(request.input_chars) || 0)),
+      max_request_input_tokens: Math.max(0, ...requests.map((request) => Number(request.estimated_input_tokens) || 0)),
+    };
+  });
+  writeFile(tokenBudgetReportPath, JSON.stringify({
+    schema_version: 1,
+    batch_id: batch.id,
+    generated_at: new Date().toISOString(),
+    scope: 'discussion-research',
+    stages: tokenBudgetStages,
+    topic_generation: {
+      input_profile: topicRequest?.input_profile || topicResult.topicInput?.policy?.input_profile || null,
+      event_count: topicResult.topicInput?.events?.length || 0,
+      coverage_counts: {
+        covered: (topicResult.coverage || []).filter((item) => item.status === 'covered').length,
+        uncovered: (topicResult.coverage || []).filter((item) => item.status === 'uncovered').length,
+        unreported: (topicResult.coverage || []).filter((item) => item.status === 'unreported').length,
+      },
+      digest_counts: {
+        internal_signals: topicResult.topicInput?.research_digest?.internal_signals?.length || 0,
+        relations: topicResult.topicInput?.research_digest?.relations?.length || 0,
+        materials: topicResult.topicInput?.research_digest?.materials?.length || 0,
+        reports: topicResult.topicInput?.research_digest?.reports?.length || 0,
+      },
+    },
+  }, null, 2));
+  writeFile(stage3CheckpointPath, JSON.stringify({
+    schema_version: 1,
+    batch_id: batch.id,
+    generated_at: new Date().toISOString(),
+    base_report: discussionResearchBase,
+    clusters,
+    event_heat_ranking: eventHeatRanking,
+    input_profile: topicResult.topicInput?.policy?.input_profile || null,
+    input_chars: topicRequest?.input_chars || 0,
+    estimated_tokens: topicRequest?.estimated_input_tokens || 0,
+    single_pass: {
+      reports: singlePass.reports || [],
+      internalResearch: singlePass.internalResearch || [],
+      relations: singlePass.relations || [],
+      referenceEvents: singlePass.referenceEvents || [],
+      verifiedResearchMaterials: singlePass.verifiedResearchMaterials || [],
+    },
+  }, null, 2));
   const discussionResearch = {
     ...discussionResearchBase,
     mode: 'model_analysis',
@@ -836,6 +909,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     research_reports: researchReports,
     reference_events: singlePass.referenceEvents,
     topic_candidates: topicResult.topics,
+    topic_coverage: topicResult.coverage || [],
+    research_digest: researchDigest,
     topic_generation_audit: topicResult.audit,
     model_research: {
       status: 'completed',
@@ -855,6 +930,8 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
       selected_event_count: clusters.filter((event) => discussionResearchBase.scope.items.some((item) => item.event_id === event.event_id)).length,
       relation_count: singlePass.relations.length,
       topic_count: topicResult.topics.length,
+      topic_coverage_count: (topicResult.coverage || []).length,
+      topic_coverage_uncovered_count: (topicResult.coverage || []).filter((item) => item.status === 'uncovered').length,
       relation_topic_required: topicResult.audit?.required || 0,
       relation_topic_count: topicResult.audit?.actual || 0,
       relation_topic_repair_attempted: Boolean(topicResult.audit?.repair_attempted),
@@ -884,10 +961,14 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
   const topicCandidatesWithRoles = topicSelection.all.map((item) => ({ ...item, poolRole: topicRoleById.get(item.candidate_id) || '未入选' }));
   const topicCandidatePath = path.join(sourcesDir, 'topic-candidate-generation.json');
   const topicPreselectionPath = path.join(sourcesDir, 'topic-preselection-ranking.json');
+  const topicCoveragePath = path.join(sourcesDir, 'topic-candidate-coverage.json');
   const topicCandidateReportPath = path.join(workdir, 'topic-candidate-report.md');
-  writeFile(topicCandidatePath, JSON.stringify({ generated_at: new Date().toISOString(), batch_id: batch.id, policy: { source_scope: 'event-heat-ranking-top-k', t_unchanged: true, final_f_unchanged: true }, items: topicCandidatesWithRoles }, null, 2));
+  const topicCoverage = topicResult.coverage || [];
+  writeFile(topicCandidatePath, JSON.stringify({ generated_at: new Date().toISOString(), batch_id: batch.id, policy: { source_scope: 'event-heat-ranking-top-k', t_unchanged: true, final_f_unchanged: true }, coverage: topicCoverage, items: topicCandidatesWithRoles }, null, 2));
   writeFile(topicPreselectionPath, JSON.stringify({ generated_at: new Date().toISOString(), batch_id: batch.id, core: topicSelection.core, black: topicSelection.black, backup: topicSelection.backup, items: topicCandidatesWithRoles }, null, 2));
-  writeFile(topicCandidateReportPath, topicCandidatesMarkdown({ candidates: topicCandidatesWithRoles, selection: topicSelection }));
+  writeFile(topicCoveragePath, JSON.stringify({ schema_version: 1, generated_at: new Date().toISOString(), batch_id: batch.id, event_count: topicCoverage.length, covered_count: topicCoverage.filter((item) => item.status === 'covered').length, uncovered_count: topicCoverage.filter((item) => item.status === 'uncovered').length, unreported_count: topicCoverage.filter((item) => item.status === 'unreported').length, items: topicCoverage }, null, 2));
+  writeFile(topicCandidateReportPath, topicCandidatesMarkdown({ candidates: topicCandidatesWithRoles, selection: topicSelection, coverage: topicCoverage }));
+  if (topicCoverage.length) onProgress(`阶段 3 事件覆盖：${topicCoverage.filter((item) => item.status === 'covered').length}/${topicCoverage.length} 个事件形成候选，${topicCoverage.filter((item) => item.status === 'uncovered').length} 个明确未形成`);
   onProgress(`阶段 3 候选生成完成：${topicSelection.all.length} 条（核心 ${topicSelection.core.length}、黑马 ${topicSelection.black.length}、候补 ${topicSelection.backup.length}）`);
   // 维度优先统一选题：who（含单事件主体）/ what / where 混排，账号契合加分来自 account-context.json
   const pool = breaking
@@ -1007,7 +1088,7 @@ export async function runResearchPipeline({ gateway, store, batchId, provider, w
     ['单事件模型研判报告','discussion-research-reports.md',discussionResearchReportsPath],['阶段 3 重试快照','discussion-research-stage3-input.json',stage3CheckpointPath],
     ['事件内研判信号','internal-signals.json',internalSignalsPath],['事件间关系','event-relations.json',eventRelationsPath],['研判素材','verified-research-materials.json',verifiedResearchMaterialsPath],
     ['讨论研判报告','discussion-research-report.md',discussionResearchReportPath],
-    ['候选选题生成','topic-candidate-generation.json',topicCandidatePath],['候选选题预选','topic-preselection-ranking.json',topicPreselectionPath],
+    ['候选选题生成','topic-candidate-generation.json',topicCandidatePath],['候选选题覆盖','topic-candidate-coverage.json',topicCoveragePath],['候选选题预选','topic-preselection-ranking.json',topicPreselectionPath],
     ['候选选题研判报告','topic-candidate-report.md',topicCandidateReportPath],
     ['全量预选排名','preselection-ranking.json',path.join(sourcesDir,'preselection-ranking.json')],
     ['早报维度组','brief-pool.json',path.join(sourcesDir,'brief-pool.json')],

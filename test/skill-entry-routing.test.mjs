@@ -30,7 +30,7 @@ function fixture() {
   writeSkill(root,{id:'hotspot-default',name:'热点默认',entryPoints:['hotspot-article'],contentTypes:['tech_hotspot'],inputContract:'article_fact_base'});
   writeSkill(root,{id:'hotspot-other',name:'热点备选',entryPoints:['hotspot-article'],contentTypes:['tech_hotspot'],inputContract:'article_fact_base'});
   writeSkill(root,{id:'tutorial-writer',name:'教程写作',entryPoints:['independent-writing'],contentTypes:['tutorial'],inputContract:'tutorial_fact_base'});
-  writeSkill(root,{id:'missing-tool',name:'缺工具',entryPoints:['hotspot-article'],contentTypes:['tech_hotspot'],inputContract:'article_fact_base',requiredCapabilities:['content.missing.search']});
+  writeSkill(root,{id:'missing-tool',name:'缺工具',entryPoints:['hotspot-article'],contentTypes:['tech_hotspot'],inputContract:'article_fact_base',requiredCapabilities:['cap_content_missing_search']});
   return root;
 }
 
@@ -50,7 +50,7 @@ test('entry routing filters contracts and blocks missing required capabilities',
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const result=await listEntryWriterSkills({workspaceRoot:root,entryPoint:'hotspot-article',recommendedSkillId:'hotspot-other'});
   assert.equal(result.items.find((item)=>item.id==='missing-tool').available,false);
-  assert.deepEqual(result.items.find((item)=>item.id==='missing-tool').missingCapabilities,['content.missing.search']);
+  assert.deepEqual(result.items.find((item)=>item.id==='missing-tool').missingCapabilities,['cap_content_missing_search']);
   await assert.rejects(
     resolveEntryWriterSkill({workspaceRoot:root,entryPoint:'hotspot-article',requestedSkillId:'tutorial-writer',recommendedSkillId:'hotspot-other'}),
     /不兼容当前创作入口/,
@@ -115,7 +115,7 @@ test('social-card storyboard routing validates entry, content type, contracts an
     inputContract:'social_card_fact_base',outputContract:'social_card_storyboard'});
   writeSkill(root,{id:'custom-storyboard',name:'自定义故事板',...base});
   writeSkill(root,{id:'wrong-contract',name:'错误契约',...base,outputContract:'wechat_markdown'});
-  writeSkill(root,{id:'missing-storyboard-tool',name:'缺少工具',...base,requiredCapabilities:['content.missing.search']});
+  writeSkill(root,{id:'missing-storyboard-tool',name:'缺少工具',...base,requiredCapabilities:['cap_content_missing_search']});
 
   const listed=await listSocialCardStageSkillSlots({
     workspaceRoot:root,entryPoint:'social-tool',contentType:'repository',

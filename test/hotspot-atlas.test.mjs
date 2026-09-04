@@ -2,6 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildHotspotAtlas } from '../server/features/research/index.mjs';
+import { relationEvidenceCount, socialContentClassOf, socialPoolPresentation } from '../public/src/views/atlas.js';
+
+test('热点全景兼容 relation.evidence 的对象和数组形状', () => {
+  assert.equal(relationEvidenceCount({
+    evidence: { source_ids: ['source-1', 'source-2'], evidence_levels: ['full_text'], note: '依据' },
+  }), 2);
+  assert.equal(relationEvidenceCount({
+    evidence: [
+      { event_id: 'E0001', sources: [{ source: 'rsshub' }] },
+      { event_id: 'E0002', sources: [{ source: 'reddit' }, { source: 'rsshub' }] },
+    ],
+  }), 3);
+  assert.equal(relationEvidenceCount({ evidence: null, evidence_source_ids: ['source-3'] }), 1);
+});
+
+test('纯项目加入图文池使用工具图文文案并跳转工具图文', () => {
+  const contentClass = socialContentClassOf({ classification: { content_class: 'github_project' } });
+  assert.equal(contentClass, 'github_project');
+  assert.deepEqual(socialPoolPresentation(contentClass, { eventSocial: true }), {
+    label: '工具图文', target: 'social-editor', poolRole: '工具图文',
+  });
+  assert.equal(socialPoolPresentation('open_source_technology', { eventSocial: true }).target, 'social-event');
+});
 
 test('热点全景按事件覆盖聚合且报道数守恒', () => {
   const clusters=[{
@@ -33,6 +56,16 @@ test('事件关系图使用固定视窗、缩放平移和确定性维度排序',
   assert.match(html, /data-graph-zoom="reset"/);
   assert.match(html, /data-graph-lens="what"[^>]*>动作/);
   assert.match(css, /\.event-graph \{[^}]*height:500px/);
+  assert.match(css, /\.atlas-relation-panel \{[^}]*overflow:hidden/);
+  assert.match(css, /\.discussion-relation-item \{[^}]*display:grid/);
+  assert.match(css, /\.research-relation-label \{[^}]*border:1px solid var\(--red\)/);
+  assert.match(html, /data-atlas-insight-tab="relations"/);
+  assert.match(html, /data-atlas-insight-tab="dimensions"/);
+  assert.match(html, /data-atlas-insight-panel="relations"/);
+  assert.match(html, /data-atlas-insight-panel="dimensions" hidden/);
+  assert.match(css, /\.atlas-insight-tabs \{[^}]*display:flex/);
+  assert.match(ui, /function renderAtlasInsightTabs\(\)/);
+  assert.match(ui, /state\.atlasInsightTab = tab === "dimensions" \? "dimensions" : "relations"/);
   assert.match(ui, /data-event-tracks="article">加入文章池/);
   assert.match(ui, /data-event-tracks="social_cards">加入图文池/);
   assert.match(ui, /socialContentClass: tracks\.includes\("social_cards"\)/);

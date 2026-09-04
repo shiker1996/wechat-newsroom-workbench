@@ -3,8 +3,8 @@ import { AgentContractError, normalizeAgentEnvelope, normalizeToolRequest, valid
 import { parseModelJsonWithRepair } from '../llm/model-json.mjs';
 import { buildNativeToolDefinitions, capabilityForToolName, providerSupportsNativeTools, providerSupportsToolCallStreaming } from './tool-catalog.mjs';
 
-export const AI_VISUAL_PROJECT_READ = 'filesystem.project.read';
-export const AI_VISUAL_DOCUMENT_WRITE = 'filesystem.project.document_write';
+export const AI_VISUAL_PROJECT_READ = 'cap_filesystem_project_read';
+export const AI_VISUAL_DOCUMENT_WRITE = 'cap_filesystem_project_document_write';
 export const AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS = 8_000;
 export const AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS = 5_000;
 
@@ -26,10 +26,10 @@ function readRequest(requestId, workspaceFiles, reason = '读取 AI 视觉生成
 
 function generationInstruction({ sourceRead, documentStarted, documentFinished, pageCount, maxPages, outputPath, documentLabel }) {
   if (!sourceRead) return '先读取 workspace.files 中的全部本次运行输入；技能内置参考已经随系统提示注入，并据此完成视觉解释；不要先写页面。';
-  if (!documentStarted) return `资料已读取。现在开始一次完整的单 Agent ${documentLabel}生成会话：先用 filesystem.project.document_write 的 begin 操作建立文档。不要返回 final。`;
+  if (!documentStarted) return `资料已读取。现在开始一次完整的单 Agent ${documentLabel}生成会话：先用 cap_filesystem_project_document_write 的 begin 操作建立文档。不要返回 final。`;
   if (documentFinished) return `文档 ${outputPath} 已完成 finish。现在只返回严格合法的 {"type":"final","assistantReply":"已完成 AI 视觉 HTML 生成"}，不要调用工具，不要输出 HTML/CSS。`;
-  if (pageCount < maxPages) return `当前检测到 ${pageCount}/${maxPages} 页。继续用 filesystem.project.document_write 的 append 原样追加下一段完整 HTML/CSS，单个 content 不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符。当前仍未完成 ${documentLabel}，不要返回 final。每个 append 使用新的 requestId，并根据上一次工具结果填写 expectedRevision。服务端会自动注入固定的 resourceId、path 和 sessionId。`;
-  return `当前检测到已达到 ${maxPages} 页。检查 ${outputPath} 是否已经包含完整主题 CSS、所有页面结构、闭合标签和可见主题装饰；如果还没写完，继续 append，每个 content 不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符。全部内容写完后，用 filesystem.project.document_write 的 finish 结束会话，随后才能返回 final。`;
+  if (pageCount < maxPages) return `当前检测到 ${pageCount}/${maxPages} 页。继续用 cap_filesystem_project_document_write 的 append 原样追加下一段完整 HTML/CSS，单个 content 不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符。当前仍未完成 ${documentLabel}，不要返回 final。每个 append 使用新的 requestId，并根据上一次工具结果填写 expectedRevision。服务端会自动注入固定的 resourceId、path 和 sessionId。`;
+  return `当前检测到已达到 ${maxPages} 页。检查 ${outputPath} 是否已经包含完整主题 CSS、所有页面结构、闭合标签和可见主题装饰；如果还没写完，继续 append，每个 content 不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符。全部内容写完后，用 cap_filesystem_project_document_write 的 finish 结束会话，随后才能返回 final。`;
 }
 
 function generationStageOverride({ requiredPageCount, canvas, outputPath, documentLabel, nativeTools = false }) {
@@ -40,13 +40,13 @@ function generationStageOverride({ requiredPageCount, canvas, outputPath, docume
 
 你是 ${documentLabel}的唯一视觉设计师、HTML/CSS 执行者和文件写入者。需要生成 ${requiredPageCount} 页，画布基准为 ${width}×${height}。不要把任务拆给 CSS Agent、页面 Agent 或任何后续程序。先完整读取 workspace.files 中的全部本次运行输入；布局、结构和组件参考已随技能提示注入；再在同一个会话中完成视觉解释、主题系统、组件 CSS、全部页面和 HTML 闭合。
 
-- 当前只允许调用 filesystem.project.read 和 filesystem.project.document_write。
-- 只使用 filesystem.project.document_write 写入文件；不要输出完整 HTML/CSS 到 final 或普通回答。
+- 当前只允许调用 cap_filesystem_project_read 和 cap_filesystem_project_document_write。
+- 只使用 cap_filesystem_project_document_write 写入文件；不要输出完整 HTML/CSS 到 final 或普通回答。
 - 写入目标固定为 project:current 下的 ${outputPath}；resourceId、path 和 sessionId 由服务端自动注入。
 - 第一次写入必须是 operation=begin；之后使用 operation=append 原样追加 HTML/CSS 分块；所有内容写完后使用 operation=finish；finish 成功后才能返回 final。
 - append 的 content 是原始 HTML/CSS，不要让程序替你拼接、改写、补 CSS、补结构或插入主题装饰。每块不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符，并为每块使用唯一 requestId；能填写时使用上一次结果中的 expectedRevision。
 - 不要假设程序会保留预置页面壳，最终文件必须由你的分块内容本身构成完整 HTML。
-- 生成阶段不调用浏览器审计，不调用修复能力，不调用旧的 filesystem.project.write，不返回程序化补丁。
+- 生成阶段不调用浏览器审计，不调用修复能力，不调用旧的 cap_filesystem_project_write，不返回程序化补丁。
 - 只有在 ${requiredPageCount} 页、主题 CSS、页面正文、闭合标签和主题装饰全部写完并成功 finish 后，才返回严格的 {"type":"final","assistantReply":"简短说明"}；assistantReply 必须是字符串。
 ${nativeTools ? '- 工具调用必须使用 API 提供的原生 function tool；不要在普通文本中伪造 tool_requests JSON。' : '- 所有工具请求必须是完整合法 JSON；HTML/CSS 放在 JSON 字符串 content 中，正确转义引号、反斜杠和换行。'}
 `;
@@ -137,12 +137,12 @@ export async function runAiVisualDocumentAgent({
     return `${error?.code || 'MODEL_RESPONSE_INVALID'}：${error?.message || '响应不符合要求'}${issueText}`.slice(0, 900);
   };
 
-  const jsonRecoveryInstruction = (error, attempt, maxAttempts) => `上一条模型响应无法安全解析为完整 JSON。第 ${attempt}/${maxAttempts} 次恢复。具体问题：${describeModelResponseError(error)}。只返回一个完整合法的 filesystem.project.document_write append 工具请求；content 只放尚未写入的更短 HTML/CSS 分块，不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符；不要返回解释，不要返回完整 HTML。服务端会补齐 resourceId、path、sessionId、assistant_note 和 reason。`;
+  const jsonRecoveryInstruction = (error, attempt, maxAttempts) => `上一条模型响应无法安全解析为完整 JSON。第 ${attempt}/${maxAttempts} 次恢复。具体问题：${describeModelResponseError(error)}。只返回一个完整合法的 cap_filesystem_project_document_write append 工具请求；content 只放尚未写入的更短 HTML/CSS 分块，不超过 ${AI_VISUAL_DOCUMENT_CHUNK_MAX_CHARS} 字符；不要返回解释，不要返回完整 HTML。服务端会补齐 resourceId、path、sessionId、assistant_note 和 reason。`;
 
   const protocolRecoveryInstruction = (parsed, error) => {
     const detail = describeModelResponseError(error);
     if (parsed?.type === 'final') return `上一条响应 JSON 语法正确，但 final 信封不符合协议。具体问题：${detail}。只返回完整合法的 {"type":"final","assistantReply":"阶段已完成"}，不要调用工具，不要输出解释。`;
-    return `上一条响应 JSON 语法正确，但工具请求信封不符合协议。具体问题：${detail}。只返回一个完整合法的 filesystem.project.document_write append 工具请求；必须保留外层 requestId、capability、arguments.operation 和 append 的 content。assistant_note、reason、resourceId、path、sessionId 可以省略，服务端会自动补齐；不要返回解释。`;
+    return `上一条响应 JSON 语法正确，但工具请求信封不符合协议。具体问题：${detail}。只返回一个完整合法的 cap_filesystem_project_document_write append 工具请求；必须保留外层 requestId、capability、arguments.operation 和 append 的 content。assistant_note、reason、resourceId、path、sessionId 可以省略，服务端会自动补齐；不要返回解释。`;
   };
 
   const parseAndValidateVisualEnvelope = async ({ result, history, step, signal, label }) => {
@@ -263,7 +263,7 @@ export async function runAiVisualDocumentAgent({
         if (!request || ![AI_VISUAL_PROJECT_READ, documentWriteCapability].includes(request.capability)) {
           if (recoveryAttempts >= 2) throw new AgentContractError('INVALID_AGENT_ENVELOPE', 'AI 视觉 Agent 连续返回不可用的工具能力，未执行空写入');
           recoveryAttempts += 1;
-          parsed = await recoverToolRequest({ parsed, history, step, signal, label: 'AI 视觉 Agent 工具能力恢复', instruction: '上一条工具请求未执行，原因：只能使用 filesystem.project.read 和 filesystem.project.document_write。请保留尚未写入的 HTML/CSS 内容，只返回一个完整合法、能力正确的工具请求；不要输出空 append、解释或完整 HTML。服务端会补齐资源参数。' });
+          parsed = await recoverToolRequest({ parsed, history, step, signal, label: 'AI 视觉 Agent 工具能力恢复', instruction: '上一条工具请求未执行，原因：只能使用 cap_filesystem_project_read 和 cap_filesystem_project_document_write。请保留尚未写入的 HTML/CSS 内容，只返回一个完整合法、能力正确的工具请求；不要输出空 append、解释或完整 HTML。服务端会补齐资源参数。' });
           continue;
         }
         if (request.capability === AI_VISUAL_PROJECT_READ) {

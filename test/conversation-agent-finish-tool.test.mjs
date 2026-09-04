@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runConversationAgent } from '../server/platform/agent/conversation-agent.mjs';
-import { buildConversationToolCatalog, toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
+import { buildConversationToolCatalog } from '../server/platform/agent/tool-catalog.mjs';
 import { buildConversationFinishTool, createConversationFinishHandler, CONVERSATION_FINISH_CAPABILITY } from '../server/platform/agent/conversation-finish-tool.mjs';
 
 function registry() { return { listCapabilities: () => [], resolve: () => null }; }
-function nativeFinish(reply) { return { nativeTools: true, content: '', toolCalls: [{ id: 'finish-call', name: toolNameForCapability(CONVERSATION_FINISH_CAPABILITY), input: { assistantReply: reply } }] }; }
+function nativeFinish(reply) { return { nativeTools: true, content: '', toolCalls: [{ id: 'finish-call', name: CONVERSATION_FINISH_CAPABILITY, input: { assistantReply: reply } }] }; }
 
 test('结束工具校验 assistantReply', async () => {
   const handler = createConversationFinishHandler();

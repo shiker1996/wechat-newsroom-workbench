@@ -28,8 +28,8 @@ test('R2：真实仓库没有任何目录外能力的实现（收口前基线）
 
 test('R2：findUnregisteredCapabilities 识别目录外能力',(t)=>{
   const root=makeRoot(t);
-  assert.deepEqual(findUnregisteredCapabilities(root,['content.web.search']),[]);
-  assert.deepEqual(findUnregisteredCapabilities(root,['remote.demo','content.web.search','remote.demo']),['remote.demo']);
+  assert.deepEqual(findUnregisteredCapabilities(root,['cap_content_web_search']),[]);
+  assert.deepEqual(findUnregisteredCapabilities(root,['cap_remote_demo','cap_content_web_search','cap_remote_demo']),['cap_remote_demo']);
 });
 
 test('R2：六个启用/首选写路径均带 CAPABILITY_NOT_REGISTERED 拦截',()=>{
@@ -42,10 +42,10 @@ test('R2：六个启用/首选写路径均带 CAPABILITY_NOT_REGISTERED 拦截',
 
 test('R3：远程 Manifest 声明目录外能力时生成保守占位草案',(t)=>{
   const root=makeRoot(t);
-  const manifest={id:'remote-demo',name:'Remote Demo',capabilities:['content.web.search','remote.demo']};
+  const manifest={id:'remote-demo',name:'Remote Demo',capabilities:['cap_content_web_search','cap_remote_demo']};
   const drafts=catalogDraftsForManifest(root,manifest);
   assert.equal(drafts.length,1);
-  assert.equal(drafts[0].id,'remote.demo');
+  assert.equal(drafts[0].id,'cap_remote_demo');
   assert.equal(drafts[0].needsCompletion,true);
   assert.ok(drafts[0].name&&drafts[0].description&&drafts[0].category);
   assert.match(drafts[0].description,/Remote Demo/);
@@ -53,13 +53,13 @@ test('R3：远程 Manifest 声明目录外能力时生成保守占位草案',(t)
 
 test('R3：本地插件 Manifest 声明目录外能力时同样生成草案，目录内能力不生成',(t)=>{
   const root=makeRoot(t);
-  const manifest={id:'local-demo',name:'Local Demo',capabilities:['content.web.search','local.demo']};
+  const manifest={id:'local-demo',name:'Local Demo',capabilities:['cap_content_web_search','cap_local_demo']};
   const drafts=catalogDraftsForManifest(root,manifest);
   assert.equal(drafts.length,1);
-  assert.equal(drafts[0].id,'local.demo');
+  assert.equal(drafts[0].id,'cap_local_demo');
   assert.equal(drafts[0].needsCompletion,true);
   assert.match(drafts[0].description,/Local Demo/);
-  assert.deepEqual(catalogDraftsForManifest(root,{id:'local-demo',name:'Local Demo',capabilities:['content.web.search']}),[]);
+  assert.deepEqual(catalogDraftsForManifest(root,{id:'local-demo',name:'Local Demo',capabilities:['cap_content_web_search']}),[]);
 });
 
 test('R3：本地插件 validate/install 路由与远程路由一样附 catalogDrafts',()=>{
@@ -69,28 +69,28 @@ test('R3：本地插件 validate/install 路由与远程路由一样附 catalogD
 
 test('R3：草案确认入库后转为已登记（门禁转绿路径），重复/非法条目被拒',(t)=>{
   const root=makeRoot(t);
-  assert.deepEqual(findUnregisteredCapabilities(root,['remote.demo']),['remote.demo']);
-  assert.throws(()=>addCapabilityCatalogEntries(root,[{id:'remote.demo',name:'',description:'演示',category:'扩展能力'}]),/目录条目无效/);
+  assert.deepEqual(findUnregisteredCapabilities(root,['cap_remote_demo']),['cap_remote_demo']);
+  assert.throws(()=>addCapabilityCatalogEntries(root,[{id:'cap_remote_demo',name:'',description:'演示',category:'扩展能力'}]),/目录条目无效/);
   assert.throws(()=>addCapabilityCatalogEntries(root,[{id:'REMOTE.DEMO',name:'演示',description:'演示能力',category:'扩展能力'}]),/目录条目无效/);
-  const added=addCapabilityCatalogEntries(root,[{id:'remote.demo',name:'演示能力',description:'远程演示工具提供的能力。',category:'扩展能力'}]);
-  assert.deepEqual(added.map((item)=>item.id),['remote.demo']);
-  assert.deepEqual(findUnregisteredCapabilities(root,['remote.demo']),[]);
-  assert.equal(readCapabilityCatalog(root).capabilities['remote.demo'].registered,true);
-  assert.throws(()=>addCapabilityCatalogEntries(root,[{id:'remote.demo',name:'演示',description:'重复入库',category:'扩展能力'}]),/已在目录中/);
+  const added=addCapabilityCatalogEntries(root,[{id:'cap_remote_demo',name:'演示能力',description:'远程演示工具提供的能力。',category:'扩展能力'}]);
+  assert.deepEqual(added.map((item)=>item.id),['cap_remote_demo']);
+  assert.deepEqual(findUnregisteredCapabilities(root,['cap_remote_demo']),[]);
+  assert.equal(readCapabilityCatalog(root).capabilities['cap_remote_demo'].registered,true);
+  assert.throws(()=>addCapabilityCatalogEntries(root,[{id:'cap_remote_demo',name:'演示',description:'重复入库',category:'扩展能力'}]),/已在目录中/);
 });
 
 test('R4：实现声明目录外能力时门禁输出 warning（不阻断）',(t)=>{
   const root=makeRoot(t);
   fs.mkdirSync(path.join(root,'data'),{recursive:true});
   fs.writeFileSync(path.join(root,'data','remote-tool-plugins.json'),JSON.stringify({schemaVersion:1,plugins:{
-    'remote-demo':{id:'remote-demo',status:'disabled',manifest:{capabilities:['remote.demo']}},
+    'remote-demo':{id:'remote-demo',status:'disabled',manifest:{capabilities:['cap_remote_demo']}},
   }}));
   const warnings=checkConsumerCapabilityWarnings(root);
   assert.equal(warnings.length,1);
-  assert.match(warnings[0],/remote\.demo/);
+  assert.match(warnings[0],/cap_remote_demo/);
   assert.match(warnings[0],/未登记/);
   // 入库后 warning 消除
-  addCapabilityCatalogEntries(root,[{id:'remote.demo',name:'演示能力',description:'远程演示工具提供的能力。',category:'扩展能力'}]);
+  addCapabilityCatalogEntries(root,[{id:'cap_remote_demo',name:'演示能力',description:'远程演示工具提供的能力。',category:'扩展能力'}]);
   assert.deepEqual(checkConsumerCapabilityWarnings(root),[]);
 });
 

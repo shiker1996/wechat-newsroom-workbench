@@ -91,7 +91,7 @@
     }
   },
   "capabilities": [
-    "collect.github"
+    "cap_collect_github"
   ],
   "inputSchema": {
     "type": "object",

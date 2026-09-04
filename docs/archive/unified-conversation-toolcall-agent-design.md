@@ -83,7 +83,7 @@
 ## 4. 设计原则
 
 1. **模型申请，服务端裁决**：模型没有直接执行权。
-2. **能力而非插件**：模型只看到 `content.url.fetch` 等稳定能力，不看到插件 ID。
+2. **能力而非插件**：模型只看到 `cap_content_url_fetch` 等稳定能力，不看到插件 ID。
 3. **最小权限**：可见能力取入口声明、技能授权和当前可用能力的交集。
 4. **只读优先**：首期仅开放 `riskLevel=read-only`。
 5. **参数收口**：优先让模型提交业务 ID，服务端解析真实 URL 和路径。
@@ -154,7 +154,7 @@ server/platform/agent/
 ```json
 {
   "requestId": "tr_01",
-  "capability": "content.url.fetch",
+  "capability": "cap_content_url_fetch",
   "arguments": {
     "resourceId": "source:123"
   },
@@ -175,7 +175,7 @@ server/platform/agent/
 ```json
 {
   "requestId": "tr_01",
-  "capability": "content.url.fetch",
+  "capability": "cap_content_url_fetch",
   "status": "ok",
   "data": {
     "resourceId": "source:123",
@@ -197,7 +197,7 @@ server/platform/agent/
 ```json
 {
   "requestId": "tr_01",
-  "capability": "content.url.fetch",
+  "capability": "cap_content_url_fetch",
   "status": "error",
   "error": {
     "code": "RESOURCE_NOT_ALLOWED",
@@ -215,7 +215,7 @@ server/platform/agent/
 
 ```json
 {
-  "capability": "filesystem.project.read",
+  "capability": "cap_filesystem_project_read",
   "name": "读取已授权本地项目",
   "description": "只读提取项目结构和支持的文本文件，不执行代码",
   "inputSchema": {
@@ -268,10 +268,10 @@ return adapter.finishWithLimitNotice();
 
 允许能力：
 
-- `content.url.fetch`
-- `content.passage.retrieve`
-- `content.web.search`
-- `content.news.search`（按需，默认不主动使用）
+- `cap_content_url_fetch`
+- `cap_content_passage_retrieve`
+- `cap_content_web_search`
+- `cap_content_news_search`（按需，默认不主动使用）
 
 业务资源：
 
@@ -282,7 +282,7 @@ return adapter.finishWithLimitNotice();
 
 迁移：
 
-1. 把 `fetchEvents[]` 映射为 `content.url.fetch` 的兼容 ToolRequest；
+1. 把 `fetchEvents[]` 映射为 `cap_content_url_fetch` 的兼容 ToolRequest；
 2. 保留用户 URL 前置抓取，随后改为由适配器自动生成请求；
 3. 将 `editorialRetrieve()` 纳入执行器；
 4. 最终移除编辑室专用 `fetchEvents` 字段；
@@ -292,12 +292,12 @@ return adapter.finishWithLimitNotice();
 
 允许能力：
 
-- `filesystem.project.read`
-- `content.url.fetch`
-- `content.web.search`
-- `content.news.search`
-- `content.document.search`
-- `content.passage.retrieve`
+- `cap_filesystem_project_read`
+- `cap_content_url_fetch`
+- `cap_content_web_search`
+- `cap_content_news_search`
+- `cap_content_document_search`
+- `cap_content_passage_retrieve`
 
 业务约束：
 
@@ -319,12 +319,12 @@ return adapter.finishWithLimitNotice();
 
 允许能力：
 
-- `content.url.fetch`
-- `content.web.search`
-- `content.news.search`
-- `content.document.search`
-- `content.repository.inspect`
-- `content.passage.retrieve`
+- `cap_content_url_fetch`
+- `cap_content_web_search`
+- `cap_content_news_search`
+- `cap_content_document_search`
+- `cap_content_repository_inspect`
+- `cap_content_passage_retrieve`
 
 业务约束：
 
@@ -335,9 +335,9 @@ return adapter.finishWithLimitNotice();
 
 迁移：
 
-1. 将 provider `webSearch:true` 改为显式 `content.web.search`；
+1. 将 provider `webSearch:true` 改为显式 `cap_content_web_search`；
 2. 素材 URL 抓取进入统一 ToolCall；
-3. GitHub 仓库入口复用 `content.repository.inspect`；
+3. GitHub 仓库入口复用 `cap_content_repository_inspect`；
 4. 创建阶段信息检索改为缓存复用加兜底；
 5. `sanitizeFormUpdates()` 和自定义事实门禁保持最终裁决权。
 
@@ -443,7 +443,7 @@ error
 示例：
 
 ```json
-{"type":"tool.requested","requestId":"tr_01","capability":"content.url.fetch","label":"读取事件原文","reason":"核对数据出处"}
+{"type":"tool.requested","requestId":"tr_01","capability":"cap_content_url_fetch","label":"读取事件原文","reason":"核对数据出处"}
 {"type":"tool.running","requestId":"tr_01"}
 {"type":"tool.completed","requestId":"tr_01","summary":"读取 1 个来源，共 4,218 字","sources":[{"title":"...","url":"https://..."}]}
 ```
@@ -468,7 +468,7 @@ error
   └─ 无原生工具模型：JSON 信封回退
 ```
 
-无论提供商原生格式如何，上层只接收统一 `ToolRequest[]`。Provider 自带 `webSearch` 应逐步退出三个对话入口，改走 `content.web.search`，从而进入统一权限、费用、来源和执行审计。成稿等非对话任务可暂时继续使用原能力。
+无论提供商原生格式如何，上层只接收统一 `ToolRequest[]`。Provider 自带 `webSearch` 应逐步退出三个对话入口，改走 `cap_content_web_search`，从而进入统一权限、费用、来源和执行审计。成稿等非对话任务可暂时继续使用原能力。
 
 ## 13. 失败、重试与恢复
 

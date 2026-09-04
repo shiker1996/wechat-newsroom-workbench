@@ -9,11 +9,11 @@ test('阶段 5 运行概览关联同一次 Agent run 与工具调用并聚合健
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'agent-overview-')),store=new Store(path.join(root,'test.db'));t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
   const batch=store.createBatch({date:'2026-08-14',title:'Agent 概览'}),id='agent-phase5';
   store.startAgentRun({id,entryPoint:'custom-social',batchId:batch.id,provider:'mock'});
-  const request={requestId:'tr_1',capability:'content.web.search',arguments:{query:'test'},reason:'补充来源'};
+  const request={requestId:'tr_1',capability:'cap_content_web_search',arguments:{query:'test'},reason:'补充来源'};
   store.startAgentToolCall({agentRunId:id,request});store.finishAgentToolCall({agentRunId:id,request,result:{status:'ok',data:{results:[]},provenance:{provider:'mock-search'}}});store.finishAgentRun(id,{status:'completed',modelSteps:2,toolCalls:1});
   const overview=store.getAgentOperationsOverview();
   assert.equal(overview.summary.runs,1);assert.equal(overview.summary.successRate,100);assert.equal(overview.summary.estimatedCost,null);
-  assert.equal(overview.runs[0].toolCalls[0].capability,'content.web.search');assert.equal(overview.byEntryPoint[0].entry_point,'custom-social');assert.equal(overview.byCapability[0].capability,'content.web.search');
+  assert.equal(overview.runs[0].toolCalls[0].capability,'cap_content_web_search');assert.equal(overview.byEntryPoint[0].entry_point,'custom-social');assert.equal(overview.byCapability[0].capability,'cap_content_web_search');
 });
 
 test('阶段 5 三入口共享工具卡协议且新编辑室不再转换 fetchEvents',()=>{

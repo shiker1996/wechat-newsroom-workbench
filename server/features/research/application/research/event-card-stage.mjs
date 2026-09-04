@@ -64,7 +64,7 @@ export async function generateEventCards({ gateway, store, clusters, batchId, pr
   const providerConfig = gateway.config.providers[provider || gateway.config.defaultProvider];
   const cards = new Map();
   const failed = [];
-  const chunkSize = Math.max(1, Math.min(6, Number(providerConfig.eventCardChunkSize) || 3));
+  const chunkSize = Math.max(1, Math.min(6, Number(providerConfig.eventCardChunkSize) || 6));
   const concurrency = Math.max(1, Math.min(10, Number(providerConfig.eventCardConcurrency) || Number(providerConfig.taggingConcurrency) || 4));
   const chunks = [];
   for (let i = 0; i < clusters.length; i += chunkSize) chunks.push(clusters.slice(i, i + chunkSize));

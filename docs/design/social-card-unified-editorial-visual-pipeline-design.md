@@ -943,8 +943,8 @@ AI 视觉 Pipeline 使用 `prepareSkillRun` 建立生成快照，并使用 `bind
 全量生成 Agent 是一次性、短生命周期的创作阶段。它只拥有：
 
 ```text
-filesystem.project.read
-filesystem.project.write
+cap_filesystem_project_read
+cap_filesystem_project_write
 ```
 
 执行顺序：
@@ -956,7 +956,7 @@ filesystem.project.write
 
 生成阶段禁止调用：
 
-- `content.social_card.browser_audit`；
+- `cap_content_social_card_browser_audit`；
 - `replace_page` 或 `replace_pages`；
 - 修改已生成页面；
 - 输出完整 HTML JSON；

@@ -9,7 +9,7 @@ import {
 test('自定义图文策划不再暴露普通文本 JSON 解析协议', () => {
   const source = fs.readFileSync(new URL('../server/features/social-cards/application/agent/custom-social-adapter.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /parseResult|parseModelJson/);
-  assert.match(source, /agent\.conversation\.finish/);
+  assert.match(source, /cap_agent_conversation_finish/);
 });
 
 test('sanitizeFormUpdates 只放行合法字段并清洗取值', () => {

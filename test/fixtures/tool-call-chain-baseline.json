@@ -8,7 +8,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "filesystem.project.document_write"
+        "cap_filesystem_project_document_write"
       ],
       "riskLevel": "local-write"
     },
@@ -18,7 +18,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.document.search"
+        "cap_content_document_search"
       ],
       "riskLevel": "read-only"
     },
@@ -28,7 +28,7 @@
       "version": "1.0.1",
       "kind": "tool",
       "capabilities": [
-        "diagram.echarts.render"
+        "cap_diagram_echarts_render"
       ],
       "riskLevel": "local-write"
     },
@@ -38,7 +38,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.research.search"
+        "cap_content_research_search"
       ],
       "riskLevel": "network-read"
     },
@@ -48,7 +48,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.passage.retrieve"
+        "cap_content_passage_retrieve"
       ],
       "riskLevel": "read-only"
     },
@@ -58,7 +58,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "filesystem.project.read"
+        "cap_filesystem_project_read"
       ],
       "riskLevel": "read-only"
     },
@@ -68,7 +68,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "diagram.mermaid.render"
+        "cap_diagram_mermaid_render"
       ],
       "riskLevel": "local-write"
     },
@@ -78,7 +78,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.repository.inspect"
+        "cap_content_repository_inspect"
       ],
       "riskLevel": "network-read"
     },
@@ -88,8 +88,8 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.social_card.layout_audit",
-        "content.social_card.browser_audit"
+        "cap_content_social_card_layout_audit",
+        "cap_content_social_card_browser_audit"
       ],
       "riskLevel": "read-only"
     },
@@ -99,8 +99,8 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.web.search",
-        "content.news.search"
+        "cap_content_web_search",
+        "cap_content_news_search"
       ],
       "riskLevel": "network-read"
     },
@@ -110,7 +110,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "image.cdn.upload"
+        "cap_image_cdn_upload"
       ],
       "riskLevel": "external-write"
     },
@@ -120,7 +120,7 @@
       "version": "1.0.0",
       "kind": "tool",
       "capabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ],
       "riskLevel": "network-read"
     }
@@ -132,7 +132,7 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.browser-page"
+        "cap_collect_browser_page"
       ],
       "riskLevel": "browser-read"
     },
@@ -142,7 +142,7 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.web-page"
+        "cap_collect_web_page"
       ],
       "riskLevel": "network-read"
     },
@@ -152,7 +152,7 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.direct"
+        "cap_collect_direct"
       ],
       "riskLevel": "network-read"
     },
@@ -162,7 +162,7 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.github"
+        "cap_collect_github"
       ],
       "riskLevel": "network-read"
     },
@@ -172,7 +172,7 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.reddit"
+        "cap_collect_reddit"
       ],
       "riskLevel": "browser-read"
     },
@@ -182,8 +182,8 @@
       "version": "1.0.0",
       "kind": "collector",
       "capabilities": [
-        "collect.rsshub",
-        "collect.twitter"
+        "cap_collect_rsshub",
+        "cap_collect_twitter"
       ],
       "riskLevel": "network-read"
     }
@@ -218,13 +218,13 @@
       "name": "自定义图文故事板",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.repository.inspect",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_repository_inspect",
+        "cap_content_passage_retrieve"
       ]
     },
     {
@@ -232,13 +232,13 @@
       "name": "图文策划对话",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.repository.inspect",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_repository_inspect",
+        "cap_content_passage_retrieve"
       ]
     },
     {
@@ -246,7 +246,7 @@
       "name": "讨论研判编辑",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.web.search"
+        "cap_content_web_search"
       ]
     },
     {
@@ -254,11 +254,11 @@
       "name": "公众号编辑会",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.passage.retrieve",
-        "content.web.search",
-        "content.news.search"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_passage_retrieve",
+        "cap_content_web_search",
+        "cap_content_news_search"
       ]
     },
     {
@@ -319,7 +319,7 @@
       "id": "mermaid-render",
       "name": "Mermaid 图表转图",
       "requiredCapabilities": [
-        "diagram.mermaid.render"
+        "cap_diagram_mermaid_render"
       ],
       "optionalCapabilities": []
     },
@@ -376,19 +376,19 @@
       "name": "自主写作策划对话",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_passage_retrieve"
       ]
     },
     {
       "id": "upyun-upload-image",
       "name": "图片 CDN 上传",
       "requiredCapabilities": [
-        "image.cdn.upload"
+        "cap_image_cdn_upload"
       ],
       "optionalCapabilities": []
     },
@@ -397,16 +397,16 @@
       "name": "公众号文章排版",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "diagram.mermaid.render",
-        "diagram.echarts.render",
-        "image.cdn.upload"
+        "cap_diagram_mermaid_render",
+        "cap_diagram_echarts_render",
+        "cap_image_cdn_upload"
       ]
     },
     {
       "id": "wechat-echarts-blocks-to-images",
       "name": "ECharts 图表转图",
       "requiredCapabilities": [
-        "diagram.echarts.render"
+        "cap_diagram_echarts_render"
       ],
       "optionalCapabilities": []
     },
@@ -439,7 +439,7 @@
       "name": "综合热点文章",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -447,7 +447,7 @@
       "name": "批次早报",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -455,7 +455,7 @@
       "name": "深度分析文章",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -463,7 +463,7 @@
       "name": "轻松职场趣闻",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -471,9 +471,9 @@
       "name": "心得经验文章",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.web.search",
-        "content.news.search",
-        "content.document.search"
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search"
       ]
     },
     {
@@ -481,7 +481,7 @@
       "name": "技术深解文章",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -489,7 +489,7 @@
       "name": "技术热点快评",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     },
     {
@@ -503,12 +503,12 @@
       "name": "技术使用教程",
       "requiredCapabilities": [],
       "optionalCapabilities": [
-        "filesystem.project.read",
-        "content.url.fetch",
-        "content.web.search",
-        "content.news.search",
-        "content.document.search",
-        "content.passage.retrieve"
+        "cap_filesystem_project_read",
+        "cap_content_url_fetch",
+        "cap_content_web_search",
+        "cap_content_news_search",
+        "cap_content_document_search",
+        "cap_content_passage_retrieve"
       ]
     },
     {
@@ -532,7 +532,7 @@
       ],
       "dependencies": [
         {
-          "capability": "content.url.fetch",
+          "capability": "cap_content_url_fetch",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -540,7 +540,7 @@
           "resultPolicy": "source-content"
         },
         {
-          "capability": "content.web.search",
+          "capability": "cap_content_web_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -548,7 +548,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.news.search",
+          "capability": "cap_content_news_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -556,7 +556,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.research.search",
+          "capability": "cap_content_research_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -564,7 +564,7 @@
           "resultPolicy": "research-material"
         },
         {
-          "capability": "content.document.search",
+          "capability": "cap_content_document_search",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -572,7 +572,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "content.repository.inspect",
+          "capability": "cap_content_repository_inspect",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -580,7 +580,7 @@
           "resultPolicy": "fact-material"
         },
         {
-          "capability": "filesystem.project.read",
+          "capability": "cap_filesystem_project_read",
           "requirement": "conditional",
           "failurePolicy": "continue-with-warning",
           "adapterStatus": "ready",
@@ -599,7 +599,7 @@
       ],
       "dependencies": [
         {
-          "capability": "content.passage.retrieve",
+          "capability": "cap_content_passage_retrieve",
           "requirement": "required",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -619,7 +619,7 @@
       ],
       "dependencies": [
         {
-          "capability": "diagram.mermaid.render",
+          "capability": "cap_diagram_mermaid_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -627,7 +627,7 @@
           "resultPolicy": "article-asset"
         },
         {
-          "capability": "diagram.echarts.render",
+          "capability": "cap_diagram_echarts_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -635,7 +635,7 @@
           "resultPolicy": "article-asset"
         },
         {
-          "capability": "image.cdn.upload",
+          "capability": "cap_image_cdn_upload",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -654,7 +654,7 @@
       ],
       "dependencies": [
         {
-          "capability": "diagram.mermaid.render",
+          "capability": "cap_diagram_mermaid_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -662,7 +662,7 @@
           "resultPolicy": "preview-response"
         },
         {
-          "capability": "diagram.echarts.render",
+          "capability": "cap_diagram_echarts_render",
           "requirement": "conditional",
           "failurePolicy": "block",
           "adapterStatus": "ready",
@@ -677,59 +677,59 @@
     {
       "sourceFile": "server/features/articles/application/image-workflow.mjs",
       "capabilities": [
-        "image.cdn.upload"
+        "cap_image_cdn_upload"
       ]
     },
     {
       "sourceFile": "server/features/articles/application/typeset-pipeline.mjs",
       "capabilities": [
-        "diagram.echarts.render",
-        "diagram.mermaid.render"
+        "cap_diagram_echarts_render",
+        "cap_diagram_mermaid_render"
       ]
     },
     {
       "sourceFile": "server/features/research/application/research-search-stage.mjs",
       "capabilities": [
-        "content.research.search"
+        "cap_content_research_search"
       ]
     },
     {
       "sourceFile": "server/platform/http/routes/article-routes.mjs",
       "capabilities": [
-        "content.passage.retrieve"
+        "cap_content_passage_retrieve"
       ]
     },
     {
       "sourceFile": "server/platform/http/routes/media-routes.mjs",
       "capabilities": [
-        "diagram.echarts.render",
-        "diagram.mermaid.render"
+        "cap_diagram_echarts_render",
+        "cap_diagram_mermaid_render"
       ]
     },
     {
       "sourceFile": "server/platform/integrations/information-search.mjs",
       "capabilities": [
-        "content.document.search",
-        "content.news.search",
-        "content.web.search"
+        "cap_content_document_search",
+        "cap_content_news_search",
+        "cap_content_web_search"
       ]
     },
     {
       "sourceFile": "server/platform/integrations/local-project-reader.mjs",
       "capabilities": [
-        "filesystem.project.read"
+        "cap_filesystem_project_read"
       ]
     },
     {
       "sourceFile": "server/platform/integrations/repository-inspector.mjs",
       "capabilities": [
-        "content.repository.inspect"
+        "cap_content_repository_inspect"
       ]
     },
     {
       "sourceFile": "server/platform/integrations/source-fetcher.mjs",
       "capabilities": [
-        "content.url.fetch"
+        "cap_content_url_fetch"
       ]
     }
   ],

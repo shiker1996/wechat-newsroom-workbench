@@ -27,6 +27,12 @@ const defaults = {
     aiQueries:{enabled:true,refreshDays:7,maxQueries:6,perQueryLimit:15,relevanceFilter:true,minInterestScore:6}},
   llm: {
     defaultProvider: 'deepseek',
+    // 页面只配置三个模型档位；deterministic 为固定的程序化档位。
+    // 空对象保持旧的“任务级 provider”行为。
+    modelProfiles: {},
+    // 可选的高级阶段级 provider 覆盖，不在普通配置页暴露。
+    // 子阶段键使用 stage-model-routing.mjs 中的稳定 ID，例如 drafting.body。
+    stageModels: {},
     requestTimeoutMs: 300000,
     safetyReserveTokens: 2048,
     recentMessageCount: 8,
@@ -88,7 +94,7 @@ const defaults = {
     },
   },
   tavily: { enabled: false, apiKeyEnv: 'TAVILY_API_KEY', maxResults: 5 },
-  // 文档检索槽位（content.document.search）：用户明确授权的本地知识库根目录（如 Obsidian vault），
+  // 文档检索槽位（cap_content_document_search）：用户明确授权的本地知识库根目录（如 Obsidian vault），
   // 只读扫描，未配置时文档检索开关不生效
   documentSearch: { roots: [] },
   // 抓取路由与质量评分阈值（待办 7-P1/P2）；评分权重与拦截词表在 plugins/url-fetch/source-quality.mjs 内

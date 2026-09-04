@@ -158,7 +158,7 @@ export function applyFormUpdateOperations(state, operations, fields = {}) {
   return { ok: true, state: normalizeState(next, fields), applied, errors: [] };
 }
 
-export function buildFormUpdateTool({ capability = 'agent.form.update', name = '更新表单', description = '以增量方式更新当前 Agent 的策划表单。多值字段追加/删除，单值字段明确替换。', fields = {} } = {}) {
+export function buildFormUpdateTool({ capability = 'cap_agent_form_update', name = '更新表单', description = '以增量方式更新当前 Agent 的策划表单。多值字段追加/删除，单值字段明确替换。', fields = {} } = {}) {
   const fieldNames = Object.keys(fields);
   return Object.freeze({
     capability,

@@ -6,12 +6,12 @@ import { migrateLegacyCapabilityRoutes, preferredImplementation, readCapabilityR
 // 固定元数据的写作信息槽位：名称/说明/环节仅用于展示，不再是槽位全集。
 // 槽位清单 = 注册表里的全部能力；未出现在本表中的能力以能力名自动生成槽位卡片。
 export const INFORMATION_CAPABILITY_SLOTS=Object.freeze([
-  {id:'web-page',name:'网页正文读取',capability:'content.url.fetch',description:'读取指定网页并提取可引用正文',stage:'事实基座'},
-  {id:'web-search',name:'网络搜索',capability:'content.web.search',description:'按查询词检索公开网页',stage:'资料发现'},
-  {id:'news-search',name:'新闻搜索',capability:'content.news.search',description:'检索带发布时间和来源的新闻结果',stage:'热点调研'},
-  {id:'repository',name:'代码仓库分析',capability:'content.repository.inspect',description:'核验仓库元数据、README、版本与安装入口',stage:'事实基座'},
-  {id:'document',name:'文档检索',capability:'content.document.search',description:'从已授权知识库或文档服务检索材料',stage:'资料发现'},
-  {id:'local-project',name:'本地项目读取',capability:'filesystem.project.read',description:'只读提取本地项目结构和文本材料',stage:'自主写作'},
+  {id:'web-page',name:'网页正文读取',capability:'cap_content_url_fetch',description:'读取指定网页并提取可引用正文',stage:'事实基座'},
+  {id:'web-search',name:'网络搜索',capability:'cap_content_web_search',description:'按查询词检索公开网页',stage:'资料发现'},
+  {id:'news-search',name:'新闻搜索',capability:'cap_content_news_search',description:'检索带发布时间和来源的新闻结果',stage:'热点调研'},
+  {id:'repository',name:'代码仓库分析',capability:'cap_content_repository_inspect',description:'核验仓库元数据、README、版本与安装入口',stage:'事实基座'},
+  {id:'document',name:'文档检索',capability:'cap_content_document_search',description:'从已授权知识库或文档服务检索材料',stage:'资料发现'},
+  {id:'local-project',name:'本地项目读取',capability:'cap_filesystem_project_read',description:'只读提取本地项目结构和文本材料',stage:'自主写作'},
 ]);
 
 function settingsPath(workspaceRoot){return path.join(workspaceRoot,'data','information-capability-slots.json');}

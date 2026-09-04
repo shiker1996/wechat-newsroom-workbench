@@ -3,8 +3,8 @@
   "name": "社交卡布局审计",
   "version": "1.0.0",
   "capabilities": [
-    "content.social_card.layout_audit",
-    "content.social_card.browser_audit"
+    "cap_content_social_card_layout_audit",
+    "cap_content_social_card_browser_audit"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "read-only",

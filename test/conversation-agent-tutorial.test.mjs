@@ -5,12 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { Store } from '../server/platform/core/store.mjs';
 import { ToolRegistry } from '../server/platform/tools/registry.mjs';
-import { toolNameForCapability } from '../server/platform/agent/tool-catalog.mjs';
 import { runTutorialAgentTurn, tutorialProjectAttachmentArguments } from '../server/features/articles/application/agent/tutorial-adapter.mjs';
 import { getFactAttachment } from '../server/platform/agent/fact-attachments.mjs';
 import { buildCustomFactSheet } from '../server/features/social-cards/index.mjs';
 
-function call(capability, input, id = capability) { return { id, name: toolNameForCapability(capability), input }; }
+function call(capability, input, id = capability) { return { id, name: capability, input }; }
 function native(callId, toolCalls) { return { callId, content: '', toolCalls, model: 'mock', usage: { total_tokens: 10 } }; }
 function gateway(sequence) {
   let index = 0;
@@ -22,7 +21,7 @@ function gateway(sequence) {
 function projectRegistry() {
   const registry = new ToolRegistry();
   registry.register({
-    manifest: { id: 'mock-project', name: '项目读取', version: '1.0.0', capabilities: ['filesystem.project.read'], riskLevel: 'read-only', pathInputs: ['path'], inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, options: { type: 'object' } } }, outputSchema: { type: 'object' } },
+    manifest: { id: 'mock-project', name: '项目读取', version: '1.0.0', capabilities: ['cap_filesystem_project_read'], riskLevel: 'read-only', pathInputs: ['path'], inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, options: { type: 'object' } } }, outputSchema: { type: 'object' } },
     adapter: { async execute(input) { return { status: 'ok', data: { root: input.path, summary: '读取 1/1 个文本文件，共 18 字符', files: [{ path: 'README.md', size: 18, excerpt: 'npm run dev\n实际说明', truncated: false }], totalFiles: 1, totalChars: 18, truncated: false, skipped: {} }, artifacts: [], warnings: [], provenance: {} }; } },
   });
   return registry;
@@ -46,7 +45,7 @@ test('自主写作先读取项目，再用表单工具写入，最后用结束�
       ({ messages }) => {
         assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('README.md')));
         assert.doesNotMatch(messages.find((item) => item.role === 'tool').content, /demo-project/);
-        return native('form', [call('agent.form.update', { operations: [
+        return native('form', [call('cap_agent_form_update', { operations: [
           { field: 'articleMode', op: 'replace', value: 'tutorial' },
           { field: 'topic', op: 'replace', value: '运行演示项目' },
           { field: 'audience', op: 'replace', value: '开发者' },
@@ -57,7 +56,7 @@ test('自主写作先读取项目，再用表单工具写入，最后用结束�
       },
       ({ messages }) => {
         assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('运行演示项目')));
-        return native('finish', [call('agent.conversation.finish', { assistantReply: '项目材料已读取，事实表已整理。' }, 'finish')]);
+        return native('finish', [call('cap_agent_conversation_finish', { assistantReply: '项目材料已读取，事实表已整理。' }, 'finish')]);
       },
     ]),
     store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'tutorial' }, answer: `读取 ${project}`, projectPath: project, workspaceRoot: root,
@@ -67,7 +66,7 @@ test('自主写作先读取项目，再用表单工具写入，最后用结束�
   assert.equal(result.ready, true);
   assert.equal(result.projectContext.files[0].path, 'README.md');
   assert.equal('root' in result.projectContext, false);
-  const cached = getFactAttachment(store, { batchId: batch.id, capability: 'filesystem.project.read', arguments: tutorialProjectAttachmentArguments(project) });
+  const cached = getFactAttachment(store, { batchId: batch.id, capability: 'cap_filesystem_project_read', arguments: tutorialProjectAttachmentArguments(project) });
   assert.equal(cached.data.summary, result.projectContext.summary);
 });
 
@@ -76,15 +75,15 @@ test('自主写作 Agent 的表单工具追加去重，不覆盖已有要点', a
   const result = await runTutorialAgentTurn({
     gateway: gateway([
       ({ messages }) => {
-        assert.ok(messages.some((item) => item.role === 'system' && item.content.includes('agent.form.update')));
-        return native('form', [call('agent.form.update', { operations: [
+        assert.ok(messages.some((item) => item.role === 'system' && item.content.includes('cap_agent_form_update')));
+        return native('form', [call('cap_agent_form_update', { operations: [
           { field: 'topic', op: 'replace', value: '工具运行复盘' },
           { field: 'points', op: 'append', values: ['旧要点', '新增要点'] },
         ] }, 'form')]);
       },
       ({ messages }) => {
         assert.ok(messages.some((item) => item.role === 'tool' && item.content.includes('新增要点')));
-        return native('finish', [call('agent.conversation.finish', { assistantReply: '已记录本轮表单变化。' }, 'finish')]);
+        return native('finish', [call('cap_agent_conversation_finish', { assistantReply: '已记录本轮表单变化。' }, 'finish')]);
       },
     ]),
     store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'tutorial', points: ['旧要点'] }, workspaceRoot: root,
@@ -98,14 +97,14 @@ test('项目材料不能让心得模式绕过【体验】门禁', async (t) => {
   const { root, project, store, batch } = fixture(t);
   const result = await runTutorialAgentTurn({
     gateway: gateway([
-      native('form', [call('agent.form.update', { operations: [
+      native('form', [call('cap_agent_form_update', { operations: [
         { field: 'articleMode', op: 'replace', value: 'experience' },
         { field: 'topic', op: 'replace', value: '项目心得' },
         { field: 'audience', op: 'replace', value: '开发者' },
         { field: 'thesis', op: 'replace', value: '工具仍需打磨' },
         { field: 'points', op: 'append', values: ['【素材】项目包含 README', '【素材】有启动命令', '【建议】检查版本'] },
       ] }, 'form')]),
-      native('finish', [call('agent.conversation.finish', { assistantReply: '还需要作者亲自体验后的判断。' }, 'finish')]),
+      native('finish', [call('cap_agent_conversation_finish', { assistantReply: '还需要作者亲自体验后的判断。' }, 'finish')]),
     ]),
     store, registry: projectRegistry(), provider: 'mock', batchId: batch.id, draft: { articleMode: 'experience' }, projectPath: project, workspaceRoot: root,
   });

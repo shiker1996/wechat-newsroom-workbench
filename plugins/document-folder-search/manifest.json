@@ -3,7 +3,7 @@
   "name": "本地知识库检索",
   "version": "1.0.0",
   "capabilities": [
-    "content.document.search"
+    "cap_content_document_search"
   ],
   "entry": "./adapter.mjs",
   "riskLevel": "read-only",

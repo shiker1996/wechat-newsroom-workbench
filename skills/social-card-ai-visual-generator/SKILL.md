@@ -49,7 +49,7 @@ Pipeline 每次运行只把候选专属资料放入 `render_request.workspace.fi
 | `references/layout-guide.md` | 375×667 画布、尺寸、安全区、字号、间距、对齐和视觉占用目标 |
 | `references/visual-component-mapping.md` | 事实语义到主组件和辅助组件的选择建议 |
 
-文件缺失或内容冲突时，以 `card-plan.json` 的页数、页序和事实为准；不得重新规划故事板，不得从候选目录外读取文件。主题规范和内置参考只指导设计，不能变成页面正文。不要通过 `filesystem.project.read` 重复读取内置参考，也不要把同一职责复制进主题 SPEC。
+文件缺失或内容冲突时，以 `card-plan.json` 的页数、页序和事实为准；不得重新规划故事板，不得从候选目录外读取文件。主题规范和内置参考只指导设计，不能变成页面正文。不要通过 `cap_filesystem_project_read` 重复读取内置参考，也不要把同一职责复制进主题 SPEC。
 
 ## 视觉决策
 
@@ -100,7 +100,7 @@ Pipeline 每次运行只把候选专属资料放入 `render_request.workspace.fi
 
 ## 单 Agent 分块写入
 
-生成阶段只允许使用 `filesystem.project.read` 和 `filesystem.project.document_write`。同一个 Agent 同时负责主题 CSS、通用骨架、组件 CSS、全部页面、装饰和 HTML 闭合，不启动 CSS Agent，不启动 Page Agent，不调用浏览器审计或旧的 `filesystem.project.write`。
+生成阶段只允许使用 `cap_filesystem_project_read` 和 `cap_filesystem_project_document_write`。同一个 Agent 同时负责主题 CSS、通用骨架、组件 CSS、全部页面、装饰和 HTML 闭合，不启动 CSS Agent，不启动 Page Agent，不调用浏览器审计或旧的 `cap_filesystem_project_write`。
 
 写入协议：
 

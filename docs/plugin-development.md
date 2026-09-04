@@ -109,7 +109,7 @@ Agent 接入的补充说明：
 `config/capabilities.json` 加条目（含威胁模型评估，见第 2.1 节）：
 
 ```json
-"content.xiaohongshu.fetch": {
+"cap_content_xiaohongshu_fetch": {
   "name": "小红书内容读取",
   "description": "读取用户授权的小红书笔记链接并提取正文。",
   "category": "信息获取",
@@ -129,7 +129,7 @@ Agent 接入的补充说明：
   "version": "1.0.0",
   "kind": "tool",
   "type": "local-adapter",
-  "capabilities": ["content.xiaohongshu.fetch"],
+  "capabilities": ["cap_content_xiaohongshu_fetch"],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",
   "inputSchema": {
@@ -172,7 +172,7 @@ export async function execute(input) {
 `config/capability-consumers.json` 的 `agent.custom-social` 加一条依赖：
 
 ```json
-{"capability": "content.xiaohongshu.fetch", "requirement": "optional",
+{"capability": "cap_content_xiaohongshu_fetch", "requirement": "optional",
  "failurePolicy": "continue-with-warning", "declaration": "optional",
  "adapterStatus": "ready", "resourceKinds": ["material-url"],
  "triggerPolicy": "explicit-resource", "authorizationAction": null,
@@ -181,8 +181,8 @@ export async function execute(input) {
 
 配套：
 
-- `adaptation.resourceSources` 已有 `materials`（素材 URL 自动进入资源目录），无需改动；如需模型结果进事实附件，`adaptation.resultHandlers` 加 `"content.xiaohongshu.fetch": "fact-attachment"`；
-- `config/agent-adaptation-messages.json` 的 `agent.custom-social` 加 `"content.xiaohongshu.fetch": "小红书链接不属于当前素材"`；
+- `adaptation.resourceSources` 已有 `materials`（素材 URL 自动进入资源目录），无需改动；如需模型结果进事实附件，`adaptation.resultHandlers` 加 `"cap_content_xiaohongshu_fetch": "fact-attachment"`；
+- `config/agent-adaptation-messages.json` 的 `agent.custom-social` 加 `"cap_content_xiaohongshu_fetch": "小红书链接不属于当前素材"`；
 - 运行时技能的 `skill.json` 声明 `optionalCapabilities` + `active.json` 白名单放行。
 
 ### 4.5 验证

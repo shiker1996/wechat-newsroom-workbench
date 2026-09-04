@@ -64,6 +64,10 @@ function bindAtlas() {
       });
       renderAtlas();
     }
+    const insightTab = event.target.closest("[data-atlas-insight-tab]");
+    if (insightTab && state.atlas) {
+      setAtlasInsightTab(insightTab.dataset.atlasInsightTab);
+    }
     const scopeButton = event.target.closest("[data-atlas-scope]");
     if (scopeButton && state.atlas) {
       state.atlasFilters.scope = scopeButton.dataset.atlasScope;
@@ -184,24 +188,58 @@ function bindAtlas() {
   });
 }
 
+function renderAtlasInsightTabs() {
+  const selected = state.atlasInsightTab === "dimensions" ? "dimensions" : "relations";
+  $$('[data-atlas-insight-tab]').forEach((button) => {
+    const active = button.dataset.atlasInsightTab === selected;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  $$('[data-atlas-insight-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.atlasInsightPanel !== selected;
+  });
+}
+
+function setAtlasInsightTab(tab, { scroll = false } = {}) {
+  state.atlasInsightTab = tab === "dimensions" ? "dimensions" : "relations";
+  renderAtlasInsightTabs();
+  if (scroll) requestAnimationFrame(() => document.getElementById(`atlas-insight-${state.atlasInsightTab}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+}
+
+function focusSelectedDimension(nodeId) {
+  requestAnimationFrame(() => document.querySelector(`[data-dimension-node="${CSS.escape(nodeId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+}
+
 function toggleGraphNode(nodeId) {
   state.atlasSelectedDimension = state.atlasSelectedDimension === nodeId ? null : nodeId;
+  setAtlasInsightTab("dimensions");
   // 重渲染会重建 SVG，键盘操作后把焦点还给新节点
   const hadFocus = document.activeElement?.matches?.("[data-graph-node]");
   renderAtlas();
   if (hadFocus) document.querySelector(`[data-graph-node="${CSS.escape(nodeId)}"]`)?.focus();
+  focusSelectedDimension(nodeId);
 }
 
 const LENS_LABELS = { ...dimensionLabels, relation: "关系" };
 const DIMENSION_ROLES = dimensionRoles;
 const LENS_COLORS = { who: "#355f55", what: "#7a5c2e", where: "#6b4a7d", relation: "#9a4e42" };
 const CONTENT_CLASS_LABELS = {
-  github_project: "项目图文",
+  github_project: "工具图文",
   open_source_technology: "开源技术",
   open_source_trend: "开源趋势",
   news_event: "普通事件",
 };
 const CLASSIFICATION_STATUS_LABELS = { auto: "规则确认", model_validated: "模型确认", needs_review: "待复核", manual: "人工确认" };
+
+export function socialContentClassOf(item, fallback = "news_event") {
+  return item?.content_class || item?.contentClass || item?.classification?.content_class || item?.classification?.contentClass || fallback;
+}
+
+export function socialPoolPresentation(contentClass, { eventSocial = false } = {}) {
+  if (contentClass === "github_project") return { label: "工具图文", target: "social-editor", poolRole: "工具图文" };
+  if (eventSocial || ["news_event", "open_source_technology", "open_source_trend"].includes(contentClass)) return { label: "事件图文", target: "social-event", poolRole: "事件热榜图文" };
+  return { label: "图文选题池", target: "social-topics", poolRole: "" };
+}
 
 function externalUrl(value) { return /^https?:\/\//.test(value) ? value : null; }
 
@@ -455,6 +493,27 @@ function renderEventHotlist() {
   }).join("");
 }
 
+export function relationEvidenceCount(relation) {
+  const evidence = relation?.evidence;
+  if (Array.isArray(evidence)) {
+    return evidence.reduce((sum, item) => {
+      if (Array.isArray(item?.sources)) return sum + item.sources.length;
+      if (Array.isArray(item?.source_ids)) return sum + item.source_ids.length;
+      if (Array.isArray(item?.sourceIds)) return sum + item.sourceIds.length;
+      return sum + (item?.source_id || item?.sourceId ? 1 : 0);
+    }, 0);
+  }
+  if (evidence && typeof evidence === "object") {
+    if (Array.isArray(evidence.source_ids)) return evidence.source_ids.length;
+    if (Array.isArray(evidence.sourceIds)) return evidence.sourceIds.length;
+    if (Array.isArray(evidence.sources)) return evidence.sources.length;
+    return evidence.source_id || evidence.sourceId ? 1 : 0;
+  }
+  if (Array.isArray(relation?.evidence_source_ids)) return relation.evidence_source_ids.length;
+  if (Array.isArray(relation?.evidenceSourceIds)) return relation.evidenceSourceIds.length;
+  return 0;
+}
+
 function renderDiscussionRelations(events) {
   const container = document.getElementById("discussion-relation-list");
   const count = document.getElementById("discussion-relation-count");
@@ -473,7 +532,7 @@ function renderDiscussionRelations(events) {
   const visible = relations.slice(0, 40);
   container.innerHTML = `<div class="discussion-relation-guide">这些不是“关键词关系”，而是已经可以继续发展成选题的研判：事件内看反常、利益冲突和发散；事件间看前后、回应、对比和趋势。${relations.length > visible.length ? `当前先展示 ${visible.length} 条，另有 ${relations.length - visible.length} 条收进原始数据。` : ""}</div>` + visible.map((relation) => {
     const titles = (relation.event_ids || []).map((id) => eventById.get(String(id))?.representative_title || id);
-    const evidenceCount = (relation.evidence || []).reduce((sum, item) => sum + (item.sources || []).length, 0);
+    const evidenceCount = relationEvidenceCount(relation);
     return `<article class="discussion-relation-item"><div class="discussion-relation-score">${escapeHtml(relation.confidence || "待评估")}<br><small>${escapeHtml(relation.relation_kind === "trend" ? `${relation.event_ids.length} 个事件` : relation.days_apart == null ? "时间待核" : `${relation.days_apart} 天间隔`)}</small></div><div><h4><span class="research-relation-label">${escapeHtml(labels[relation.relation_kind] || labels[relation.relation_type] || "研判关系")}</span></h4><p class="discussion-relation-statement">${escapeHtml(relation.relationship_statement || "这组事件存在可继续验证的变化关系。")}</p><p class="discussion-relation-events">涉及事件：${escapeHtml(titles.join(" · "))}</p><small class="discussion-relation-basis">依据：${escapeHtml(relation.temporal_order === "ordered_by_event_time" ? "按事件时间顺序" : relation.temporal_order || "时间字段")} · ${evidenceCount} 个来源引用</small></div><span class="status-pill">可研判</span></article>`;
   }).join("");
 }
@@ -568,27 +627,30 @@ function renderAtlas() {
   renderGraph(events);
   renderDiscussionRelations(events);
   renderDimensionCards(events);
+  renderAtlasInsightTabs();
 }
 
 async function createCompositeFromEvent(batchId, eventId, tracks = ['article']) {
   const event = state.atlas?.events?.find((item) => item.event_id === eventId);
   if (!event) return toast("没有找到该事件，请先刷新热点全景");
+  const socialContentClass = socialContentClassOf(event);
+  const socialPresentation = socialPoolPresentation(socialContentClass, { eventSocial: true });
   const title = event.representative_title;
   const hotspotIds = event.hotspot_ids || [];
   if (!hotspotIds.length) return toast("该事件簇没有关联的热点");
   let message;
   if (hotspotIds.length === 1) {
     await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, {
-      method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialContentClass: tracks.includes("social_cards") ? (event.contentClass || event.content_class || "news_event") : undefined, poolRole: tracks.includes("social_cards") ? "事件热榜图文" : undefined }),
+      method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialContentClass: tracks.includes("social_cards") ? socialContentClass : undefined, poolRole: tracks.includes("social_cards") ? socialPresentation.poolRole : undefined }),
     });
-    message = tracks.includes("social_cards") ? `已加入事件图文：${event.representative_title}` : `已加入选题池：${event.representative_title}`;
+    message = tracks.includes("social_cards") ? `已加入${socialPresentation.label}：${event.representative_title}` : `已加入选题池：${event.representative_title}`;
   } else {
     const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
-      method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "综合选题", tracks, socialContentClass: tracks.includes("social_cards") ? (event.contentClass || event.content_class || "news_event") : undefined }),
+      method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: tracks.includes("social_cards") ? socialPresentation.poolRole : "综合选题", tracks, socialContentClass: tracks.includes("social_cards") ? socialContentClass : undefined }),
     });
-    message = tracks.includes("social_cards") ? `已从事件簇创建事件图文：${candidate.candidate_id}` : `已从事件簇创建综合选题：${candidate.candidate_id}`;
+    message = tracks.includes("social_cards") ? `已从事件簇创建${socialPresentation.label}：${candidate.candidate_id}` : `已从事件簇创建综合选题：${candidate.candidate_id}`;
   }
-  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards") });
+  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards"), socialContentClass });
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
   if (document.querySelector(".nav-item.active")?.dataset.view === "overview") await loadAtlas();
@@ -597,28 +659,31 @@ async function createCompositeFromEvent(batchId, eventId, tracks = ['article']) 
 async function createCompositeFromHotlist(batchId, eventId, tracks = ['article']) {
   const item = state.atlas?.eventHotlist?.find((entry) => entry.eventId === eventId);
   if (!item) return toast("没有找到该热榜事件，请先刷新热点全景");
+  const socialContentClass = socialContentClassOf(item);
+  const socialPresentation = socialPoolPresentation(socialContentClass, { eventSocial: true });
   const hotspotIds = item.hotspotIds || [];
   if (!hotspotIds.length) return toast("该事件没有可进入研判的当前报道");
   const title = item.title;
   let message;
   if (hotspotIds.length === 1) {
-    await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialContentClass: tracks.includes("social_cards") ? (item.contentClass || item.content_class || "news_event") : undefined, poolRole: tracks.includes("social_cards") ? "事件热榜图文" : undefined }) });
-    message = tracks.includes("social_cards") ? `已加入事件图文：${item.title}` : `已加入选题池：${item.title}`;
+    await request(`/api/batches/${encodeURIComponent(batchId)}/candidates`, { method: "POST", body: JSON.stringify({ hotspotIds, tracks, socialContentClass: tracks.includes("social_cards") ? socialContentClass : undefined, poolRole: tracks.includes("social_cards") ? socialPresentation.poolRole : undefined }) });
+    message = tracks.includes("social_cards") ? `已加入${socialPresentation.label}：${item.title}` : `已加入选题池：${item.title}`;
   } else {
     const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
-      method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: "事件热榜研判", tracks, socialContentClass: tracks.includes("social_cards") ? (item.contentClass || item.content_class || "news_event") : undefined }),
+      method: "POST", body: JSON.stringify({ hotspotIds, title, poolRole: tracks.includes("social_cards") ? socialPresentation.poolRole : "事件热榜研判", tracks, socialContentClass: tracks.includes("social_cards") ? socialContentClass : undefined }),
     });
-    message = tracks.includes("social_cards") ? `已从事件热榜创建事件图文：${candidate.candidate_id}` : `已从事件热榜创建综合选题：${candidate.candidate_id}`;
+    message = tracks.includes("social_cards") ? `已从事件热榜创建${socialPresentation.label}：${candidate.candidate_id}` : `已从事件热榜创建综合选题：${candidate.candidate_id}`;
   }
-  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards") });
+  offerPoolExit(tracks, message, { eventSocial: tracks.includes("social_cards"), socialContentClass });
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
 }
 
 // 创建成功后给出可跳转的出口，避免"成功了但不知道去哪看"的死路
-async function offerPoolExit(tracks, message, { eventSocial = false } = {}) {
-  const target = eventSocial ? "social-event" : tracks.includes("social_cards") ? "social-topics" : "topics";
-  const label = target === "topics" ? "文章选题池" : target === "social-event" ? "事件图文" : "图文选题池";
+async function offerPoolExit(tracks, message, { eventSocial = false, socialContentClass = "" } = {}) {
+  const presentation = socialPoolPresentation(socialContentClass, { eventSocial });
+  const target = tracks.includes("social_cards") ? presentation.target : "topics";
+  const label = tracks.includes("social_cards") ? presentation.label : "文章选题池";
   if (await confirmAction(`${message}\n\n是否前往${label}查看？`, { confirmText: `前往${label}` })) window.go(target);
 }
 
@@ -629,11 +694,12 @@ async function createCompositeFromDimension(batchId, nodeId, tracks = ['article'
   const eventIds = graph.edges.filter((edge) => edge.to === nodeId).map((edge) => edge.from.replace(/^event:/, ""));
   const hotspotIds = [...new Set(eventIds.flatMap((eventId) => (state.atlas.events || []).find((event) => event.event_id === eventId)?.hotspot_ids || []))];
   if (hotspotIds.length < 2) return toast("该维度分组关联的热点不足以创建综合选题");
-  const contentClasses = [...new Set(eventIds.map((eventId) => (state.atlas.events || []).find((event) => event.event_id === eventId)?.contentClass || "news_event"))];
+  const contentClasses = [...new Set(eventIds.map((eventId) => socialContentClassOf((state.atlas.events || []).find((event) => event.event_id === eventId), "")))];
+  const socialContentClass = contentClasses.length === 1 ? contentClasses[0] : "";
   const candidate = await request(`/api/batches/${encodeURIComponent(batchId)}/candidates/composite`, {
-    method: "POST", body: JSON.stringify({ hotspotIds, title: node.label, poolRole: DIMENSION_ROLES[node.type] || "维度选题", tracks, socialContentClass: tracks.includes("social_cards") && contentClasses.length === 1 ? contentClasses[0] : undefined }),
+    method: "POST", body: JSON.stringify({ hotspotIds, title: node.label, poolRole: DIMENSION_ROLES[node.type] || "维度选题", tracks, socialContentClass: tracks.includes("social_cards") && socialContentClass ? socialContentClass : undefined }),
   });
-  offerPoolExit(tracks, `已创建${LENS_LABELS[node.type]}维度选题：${candidate.candidate_id}（${hotspotIds.length} 条报道）`);
+  offerPoolExit(tracks, `已创建${LENS_LABELS[node.type]}维度选题：${candidate.candidate_id}（${hotspotIds.length} 条报道）`, { socialContentClass });
   const { default: loadTopicPool } = await import("./topics.js");
   loadTopicPool();
 }

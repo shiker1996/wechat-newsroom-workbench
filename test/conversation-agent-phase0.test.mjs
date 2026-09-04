@@ -53,14 +53,14 @@ test('Phase 0 基线冻结三入口当前触发方式、能力矩阵、门禁和
   assert.equal(baseline.productionAgentEnabled,true);
   assert.deepEqual(baseline.entries.map((entry)=>entry.id),CONVERSATION_AGENT_ENTRY_POINTS);
   const editorial=baseline.entries.find((entry)=>entry.id==='editorial');
-  assert.ok(editorial.capabilities.includes('content.url.fetch'));
-  assert.ok(editorial.capabilities.includes('content.passage.retrieve'));
+  assert.ok(editorial.capabilities.includes('cap_content_url_fetch'));
+  assert.ok(editorial.capabilities.includes('cap_content_passage_retrieve'));
   assert.equal(editorial.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   const tutorial=baseline.entries.find((entry)=>entry.id==='independent-writing');
-  assert.ok(tutorial.capabilities.includes('filesystem.project.read'));
+  assert.ok(tutorial.capabilities.includes('cap_filesystem_project_read'));
   assert.equal(tutorial.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   const custom=baseline.entries.find((entry)=>entry.id==='custom-social');
-  assert.ok(custom.capabilities.includes('content.repository.inspect'));
+  assert.ok(custom.capabilities.includes('cap_content_repository_inspect'));
   assert.equal(custom.modelDeclaredToolIntent,'NativeFunctionToolCall[]');
   assert.equal(baseline.auditMetadata.knownGaps.length,1);
 });

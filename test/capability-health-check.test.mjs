@@ -21,7 +21,7 @@ function makeRoot(t){
   return dir;
 }
 
-const SEARCH_TOOL={id:'demo-search',name:'演示搜索',version:'1.0.0',capabilities:['content.web.search'],enabled:true,priority:0,riskLevel:'read-only'};
+const SEARCH_TOOL={id:'demo-search',name:'演示搜索',version:'1.0.0',capabilities:['cap_content_web_search'],enabled:true,priority:0,riskLevel:'read-only'};
 const stateOf=(graph,capability)=>graph.consumerStates.find((item)=>item.consumerId==='agent.editorial'&&item.capability===capability);
 
 // 可计数 mock 注册表：listCapabilities 列出启用实现，health 按插件返回预设结果
@@ -41,8 +41,8 @@ test.beforeEach(()=>invalidateCapabilityHealthCache());
 
 test('健康表接入图谱：unhealthy 阻断并输出 IMPLEMENTATION_UNHEALTHY',(t)=>{
   const root=makeRoot(t);
-  const graph=buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['content.web.search','unhealthy']])});
-  const state=stateOf(graph,'content.web.search');
+  const graph=buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['cap_content_web_search','unhealthy']])});
+  const state=stateOf(graph,'cap_content_web_search');
   assert.equal(state.available,false);
   assert.equal(state.status,'blocked');
   assert.deepEqual(state.reasons,['IMPLEMENTATION_UNHEALTHY']);
@@ -50,15 +50,15 @@ test('健康表接入图谱：unhealthy 阻断并输出 IMPLEMENTATION_UNHEALTHY
 
 test('健康表 healthy 维持可用；unknown 回退代理并标注 HEALTH_CHECK_UNAVAILABLE',(t)=>{
   const root=makeRoot(t);
-  const healthy=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['content.web.search','healthy']])}),'content.web.search');
+  const healthy=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['cap_content_web_search','healthy']])}),'cap_content_web_search');
   assert.equal(healthy.available,true);
   assert.deepEqual(healthy.warnings,[]);
-  const unknown=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['content.web.search','unknown']])}),'content.web.search');
+  const unknown=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL],healthByCapability:new Map([['cap_content_web_search','unknown']])}),'cap_content_web_search');
   // 回退代理判定（启用且配置就绪 → 可用），并标注健康检查不可用
   assert.equal(unknown.available,true);
   assert.deepEqual(unknown.warnings,['HEALTH_CHECK_UNAVAILABLE']);
   // 不传健康表：维持代理语义，无任何标注
-  const proxy=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL]}),'content.web.search');
+  const proxy=stateOf(buildCapabilityGraph({root,tools:[SEARCH_TOOL]}),'cap_content_web_search');
   assert.equal(proxy.available,true);
   assert.deepEqual(proxy.warnings,[]);
 });

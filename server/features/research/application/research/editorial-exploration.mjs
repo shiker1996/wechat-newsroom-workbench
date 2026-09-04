@@ -34,6 +34,10 @@ function compactResearchItem(item = {}) {
 function researchBasisForCandidate(item = {}) {
   const topic = item.topic_candidate || item.research_context?.topic_candidate || {};
   const context = item.research_context || {};
+  const candidateEventIds = new Set([
+    ...list(topic.event_ids),
+    ...list(item.event_ids),
+  ].map((value) => String(value ?? '').trim()).filter(Boolean));
   const signalRefs = new Set(list(topic.internal_signal_refs || topic.signal_refs).map((value) => String(typeof value === 'object' ? value.signal_id || value.id : value)));
   const relationIds = new Set(list(topic.relation_ids).map(String));
   const internalResearch = list(context.internal_signals).flatMap((eventResearch) => {
@@ -45,11 +49,16 @@ function researchBasisForCandidate(item = {}) {
     ].map((signal) => ({ ...signal, event_id: eventId }));
   });
   const selectedSignals = internalResearch
-    .filter((signal) => !signalRefs.size || signalRefs.has(String(signal.signal_id)))
-    .map(compactResearchItem);
+    .filter((signal) => candidateEventIds.has(String(signal.event_id)) && (!signalRefs.size || signalRefs.has(String(signal.signal_id))))
+    .map(compactResearchItem)
+    .slice(0, 3);
   const allRelations = list(context.relations || context.inter_event_research);
   const selectedRelations = allRelations
-    .filter((relation) => !relationIds.size || relationIds.has(String(relation.relation_id)))
+    .filter((relation) => {
+      const relationEventIds = list(relation.event_ids || relation.reference_event_ids).map(String);
+      return relationEventIds.some((eventId) => candidateEventIds.has(eventId))
+        && (!relationIds.size || relationIds.has(String(relation.relation_id)));
+    })
     .map((relation) => ({
       relation_id: relation.relation_id,
       relation_kind: relation.relation_kind,
@@ -66,9 +75,15 @@ function researchBasisForCandidate(item = {}) {
       refutes: text(relation.refutes, 300),
       evidence_source_ids: list(relation.evidence_source_ids).map((value) => text(value, 120)).filter(Boolean).slice(0, 8),
       evidence_levels: list(relation.evidence_levels).map((value) => text(value, 40)).filter(Boolean),
-    }));
+    }))
+    .slice(0, 3);
   const materials = list(context.verified_research_materials)
-    .filter((material) => !list(topic.material_ids).length || list(topic.material_ids).map(String).includes(String(material?.material_id)))
+    .filter((material) => {
+      const materialIds = new Set(list(topic.material_ids).map(String));
+      const anchorIds = list(material.anchor_event_ids || material.event_ids).map(String);
+      return (materialIds.size && materialIds.has(String(material?.material_id)))
+        || (!materialIds.size && anchorIds.some((eventId) => candidateEventIds.has(eventId)));
+    })
     .map((material) => ({
       material_id: material.material_id,
       material_type: material.material_type,
@@ -82,23 +97,30 @@ function researchBasisForCandidate(item = {}) {
       thesis_seeds: list(material.thesis_seeds).map((value) => text(value, 240)).filter(Boolean).slice(0, 4),
       evidence_source_ids: list(material.evidence_source_ids).map((value) => text(value, 120)).filter(Boolean).slice(0, 8),
       evidence_levels: list(material.evidence_levels).map((value) => text(value, 40)).filter(Boolean),
-    }));
+    }))
+    .slice(0, 8);
   const evidenceSourceIds = [...new Set([
     ...list(topic.evidence_source_ids),
     ...selectedSignals.flatMap((signal) => signal.evidence_source_ids),
     ...selectedRelations.flatMap((relation) => relation.evidence_source_ids),
     ...materials.flatMap((material) => material.evidence_source_ids),
-  ].map((value) => text(value, 120)).filter(Boolean))];
+  ].map((value) => text(value, 120)).filter(Boolean))].slice(0, 8);
+  const selectionReason = list(topic.internal_signal_refs || topic.signal_refs).length
+    || list(topic.relation_ids).length
+    || list(topic.material_ids).length
+    ? 'explicit_candidate_research_ids'
+    : 'candidate_event_scoped_research_fallback';
   return {
     rule: '选题只能从以下已验证/待复核研判素材发展；事件卡只作背景，不能替代研判依据。',
-    material_ids: list(topic.material_ids).map(String),
-    internal_signal_refs: list(topic.internal_signal_refs || topic.signal_refs).map((value) => String(typeof value === 'object' ? value.signal_id || value.id : value)),
-    relation_ids: list(topic.relation_ids).map(String),
+    basis_selection_reason: selectionReason,
+    material_ids: materials.map((material) => String(material.material_id || '')).filter(Boolean),
+    internal_signal_refs: selectedSignals.map((signal) => String(signal.signal_id || '')).filter(Boolean),
+    relation_ids: selectedRelations.map((relation) => String(relation.relation_id || '')).filter(Boolean),
     evidence_source_ids: evidenceSourceIds,
     internal_research: selectedSignals,
     inter_event_research: selectedRelations,
     verified_research_materials: materials,
-    evidence_boundary: context.evidence_boundary || null,
+    evidence_boundary: text(context.evidence_boundary, 500) || null,
   };
 }
 
@@ -114,6 +136,10 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
     research_basis: researchBasisForCandidate(item),
     candidateAliases: [...new Set([item.candidateId, item.candidate_id, item.eventId].map((value) => String(value ?? '').trim()).filter(Boolean))],
   }));
+  const compactAccount = account.map((entry) => ({
+    label: text(entry?.label, 80),
+    content: text(entry?.content, entry?.label === '账号上下文' ? 5000 : 3500),
+  }));
   const candidateForOutput = (raw, group) => {
     const outputId = String(raw?.candidateId || raw?.candidate_id || raw?.id || '').trim();
     return group.find((item) => item.candidateId === outputId || item.candidateAliases.includes(outputId)) || null;
@@ -121,12 +147,21 @@ export async function brainstorm(gateway, store, selected, account, batchId, pro
   async function processGroup(group, label, retry = false) {
     onProgress(`探索脑暴 ${label}（已完成 ${cards.length}/${selected.length}）`);
     const promptCandidates = group.map((candidate) => ({
-      ...candidate,
+      candidateId: candidate.candidateId,
+      candidate_id: candidate.candidate_id,
+      title: text(candidate.title || candidate.hotspot_title, 260),
+      category: text(candidate.category, 80),
+      poolRole: text(candidate.poolRole, 40),
+      event_ids: list(candidate.event_ids).map((value) => text(value, 100)).filter(Boolean).slice(0, 6),
+      topic_type: text(candidate.topic_type || candidate.topic_candidate?.topic_type, 60),
+      angle: text(candidate.angle, 260),
+      thesis: text(candidate.thesis, 260),
+      riskLevel: text(candidate.riskLevel, 40),
       research_basis: candidate.research_basis || researchBasisForCandidate(candidate),
     }));
     const result = await gateway.complete({ provider, purpose: 'hotspot-brainstorm-explore', batchId, jsonMode: true,
        messages: [{ role: 'system', content: brainstormSystem, protected: true },
-        { role: 'user', content: `${retry ? '【极简重试】每个字符串不超过40个汉字，严格闭合JSON。\n' : ''}【账号与作者资产】\n${account.map((x) => `${x.label}:\n${x.content}`).join('\n\n')}\n\n【脑暴输入规则】\n只允许基于每条候选中的 research_basis 生成角度、命题和包装。research_basis 为空，或其中没有任何研判报告/研判素材时，不得把事件卡摘要自行改造成选题；应返回 NO_ANGLE，并说明缺少研判依据。候选本身未回填 material_ids、internal_signal_refs 或 relation_ids，不等于没有研判依据；只要 research_basis 中存在对应报告或素材即可继续脑暴。候选标题只是研判阶段的临时种子，不是新的事实来源。\n\n【候选】\n${JSON.stringify(promptCandidates)}`, protected: true }],
+        { role: 'user', content: `${retry ? '【极简重试】每个字符串不超过40个汉字，严格闭合JSON。\n' : ''}【账号与作者资产】\n${compactAccount.map((x) => `${x.label}:\n${x.content}`).join('\n\n')}\n\n【脑暴输入规则】\n只允许基于每条候选中的 research_basis 生成角度、命题和包装。research_basis 为空，或其中没有任何研判报告/研判素材时，不得把事件卡摘要自行改造成选题；应返回 NO_ANGLE，并说明缺少研判依据。候选本身未回填 material_ids、internal_signal_refs 或 relation_ids，不等于没有研判依据；只要 research_basis 中存在对应报告或素材即可继续脑暴。候选标题只是研判阶段的临时种子，不是新的事实来源。\n\n【候选】\n${JSON.stringify(promptCandidates)}`, protected: true }],
       maxOutputTokens: Math.min(6500, providerConfig.maxOutputTokens) });
     let parsed;
     try { parsed = parseModelJson(result, store); }

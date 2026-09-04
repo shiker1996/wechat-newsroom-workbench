@@ -31,11 +31,11 @@
 
 三个 Agent 均要求模型使用 API 原生 function tools，不再要求模型在普通输出中返回 JSON 信封，也不再从模型最终文本解析业务字段。
 
-- **表单写入**：本轮有变化的字段调用共享业务工具 `agent.form.update`，参数为 `operations:[{field,op,value/values}]`。工具按字段白名单执行，并返回当前 `formState`。
+- **表单写入**：本轮有变化的字段调用共享业务工具 `cap_agent_form_update`，参数为 `operations:[{field,op,value/values}]`。工具按字段白名单执行，并返回当前 `formState`。
   - 多值字段使用 `append` 追加并去重，使用 `remove` 删除指定条目，使用 `clear` 清空；不能用一份较短数组隐式覆盖或删除旧内容。
   - 单值字段使用 `replace` / `set` 明确替换，使用 `clear` 明确清空；非法字段、非法操作和不符合字段规则的值拒绝执行。
-  - 编辑室的 `adopted_research_points` 仍由专用 `editorial.research.select` 工具写入，不允许通用表单工具绕过研判点 ID 校验。
-- **结束本轮**：调用统一的 `agent.conversation.finish`，只提交 `assistantReply`。工具执行成功后，Agent runtime 直接结束本轮并把回复交给路由；模型不再返回 `final` JSON。
+  - 编辑室的 `adopted_research_points` 仍由专用 `cap_editorial_research_select` 工具写入，不允许通用表单工具绕过研判点 ID 校验。
+- **结束本轮**：调用统一的 `cap_agent_conversation_finish`，只提交 `assistantReply`。工具执行成功后，Agent runtime 直接结束本轮并把回复交给路由；模型不再返回 `final` JSON。
 - **模型能力前置条件**：三个对话 Agent 要求当前模型启用原生 function tools。未启用时立即报错，不退回模型 JSON 协议，避免出现两套行为。
 - **`formUpdates`**：仍作为 HTTP/SSE 返回给前端的当前表单快照，不是模型输出格式；它用于刷新页面，不参与模型协议解析。
 - **`ready`**：由代码根据当前表单计算，模型不再提交或影响该字段。
@@ -80,7 +80,7 @@
 | `server/features/articles/domain/editorial-patch.mjs` | 提供编辑室底稿增量补丁的追加去重、明确删除/清空和单值替换逻辑 |
 | `server/features/articles/application/agent/editorial-adapter.mjs` | 暴露研判选择、表单更新和结束工具；要求原生 function tools |
 | `server/features/articles/llm/tutorial-chat.mjs` / `server/features/social-cards/llm/custom-social-chat.mjs` | 仅提供对话上下文，结构化写入和结束动作由原生工具完成 |
-| `server/features/articles/application/agent/tutorial-adapter.mjs` / `server/features/social-cards/application/agent/custom-social-adapter.mjs` | 暴露 `agent.form.update` 和 `agent.conversation.finish`，维护本轮表单状态；不解析模型最终 JSON |
+| `server/features/articles/application/agent/tutorial-adapter.mjs` / `server/features/social-cards/application/agent/custom-social-adapter.mjs` | 暴露 `cap_agent_form_update` 和 `cap_agent_conversation_finish`，维护本轮表单状态；不解析模型最终 JSON |
 | `server/platform/agent/form-update-tool.mjs` | 提供共享字段白名单、追加去重、明确删除/清空、单值替换、工具 Schema 与执行结果 |
 | `server/platform/http/routes/article-routes.mjs` | 锁简报门禁换 readiness |
 | `server/features/articles/application/article-pipeline.mjs` | 成稿门禁换 readiness |
@@ -94,8 +94,8 @@
 
 - 历史 `editorial_sessions` 行保留旧列数据；新逻辑不读 `next_action`/`editor_question`/`open_questions` 作为判定依据（仅展示回退）
 - `runConversationAgent` 的通用运行器仍保留旧信封能力，供其他尚未迁移的 Agent 使用；三个对话 Agent 在入口处强制 `nativeTools: true`，因此不会走旧信封解析分支。
-- `agent.form.update` 是三个对话 Agent 的唯一结构化表单写入口；工具写入后的当前状态会回传给模型，并作为 HTTP/SSE 的 `formUpdates` 快照返回前端。
-- `agent.conversation.finish` 是三个对话 Agent 的唯一正常结束入口。模型只提交 `assistantReply`，运行器收到成功工具结果后结束本轮。
+- `cap_agent_form_update` 是三个对话 Agent 的唯一结构化表单写入口；工具写入后的当前状态会回传给模型，并作为 HTTP/SSE 的 `formUpdates` 快照返回前端。
+- `cap_agent_conversation_finish` 是三个对话 Agent 的唯一正常结束入口。模型只提交 `assistantReply`，运行器收到成功工具结果后结束本轮。
 - `briefUpdates` 不再是这三个 Agent 的可用协议字段；模型普通文本中的同名内容不会被程序读取。
 - 不支持原生 function tools 的模型直接失败并提示更换模型，不退回 JSON 协议。
 

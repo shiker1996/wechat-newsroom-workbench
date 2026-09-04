@@ -3,7 +3,7 @@
   "name": "Firecrawl 搜索",
   "version": "1.0.0",
   "credentialProfile": "tool-url-fetch",
-  "capabilities": ["content.research.search"],
+  "capabilities": ["cap_content_research_search"],
   "entry": "./adapter.mjs",
   "riskLevel": "network-read",
   "inputSchema": {
