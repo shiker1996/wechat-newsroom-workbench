@@ -34,62 +34,9 @@
     }
   },
   "llm": {
-    "defaultProvider": "deepseek",
     "requestTimeoutMs": 300000,
     "safetyReserveTokens": 2048,
-    "recentMessageCount": 8,
-    "providers": {
-      "deepseek": {
-        "label": "DeepSeek",
-        "baseUrl": "https://api.deepseek.com",
-        "protocol": "chat_completions",
-        "model": "deepseek-v4-flash",
-        "apiKeyEnv": "DEEPSEEK_API_KEY",
-        "contextWindow": 900000,
-        "maxOutputTokens": 16384,
-        "maxTokensField": "max_tokens",
-        "taggingChunkSize": 8,
-        "taggingConcurrency": 6,
-        "supportsJsonMode": true,
-        "supportsNativeTools": true,
-        "supportsToolCallStreaming": true,
-        "supportsThinkingToggle": true,
-        "responsesReasoningToggle": true,
-        "thinkingReserveTokens": 8000,
-        "reasoningEffort": "low",
-        "enabled": true
-      },
-      "minimax": {
-        "label": "MiniMax",
-        "baseUrl": "https://api.minimaxi.com/v1",
-        "protocol": "chat_completions",
-        "model": "MiniMax-M2.7",
-        "apiKeyEnv": "MINIMAX_API_KEY",
-        "contextWindow": 204800,
-        "maxOutputTokens": 2048,
-        "maxTokensField": "max_completion_tokens",
-        "taggingChunkSize": 2,
-        "taggingConcurrency": 4,
-        "supportsJsonMode": true,
-        "enabled": true,
-        "webSearchConfig": { "payloadKey": "enable_web_search", "payloadValue": true }
-      },
-      "kimi": {
-        "label": "Kimi",
-        "baseUrl": "https://api.moonshot.cn/v1",
-        "protocol": "chat_completions",
-        "model": "kimi-k2.6",
-        "apiKeyEnv": "MOONSHOT_API_KEY",
-        "contextWindow": 262144,
-        "maxOutputTokens": 16384,
-        "maxTokensField": "max_tokens",
-        "taggingChunkSize": 8,
-        "taggingConcurrency": 6,
-        "supportsJsonMode": true,
-        "enabled": true,
-        "webSearchConfig": { "payloadKey": "enable_search", "payloadValue": true }
-      }
-    }
+    "recentMessageCount": 8
   },
   "tavily": { "enabled": false, "apiKeyEnv": "TAVILY_API_KEY", "maxResults": 5 },
   "documentSearch": { "roots": [] },

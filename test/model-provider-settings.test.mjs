@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider } from '../server/platform/integrations/model-provider-settings.mjs';
+import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider, syncModelProvidersToDatabase } from '../server/platform/integrations/model-provider-settings.mjs';
 
 test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   const result=normalizeProviderInput({label:'自定义',baseUrl:'https://api.example.com/v1/',model:'model-a'});
@@ -49,6 +49,27 @@ test('创建模型仅注册 config.local.json，不写环境文件',()=>{
   assert.equal(local.llm.providers['openai-main'].maxOutputTokens,8192);
   assert.equal(fs.readFileSync(path.join(root,'.env'),'utf8'),'EXISTING=value\n');
   assert.throws(()=>createModelProvider(root,config,{id:'openai-main',label:'重复',baseUrl:'https://x/v1',model:'m'}),/已存在/);
+});
+
+test('模型旧配置启动时迁移到统一数据库来源并清理旧字段',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'model-db-migration-'));
+  fs.mkdirSync(path.join(root,'data'));
+  fs.writeFileSync(path.join(root,'config.local.json'),JSON.stringify({llm:{defaultProvider:'custom',providers:{custom:{label:'旧模型',baseUrl:'https://example.com/v1',model:'old',apiKeyEnv:'CUSTOM_KEY'}}},tavily:{enabled:true}}));
+  fs.writeFileSync(path.join(root,'.env'),'CUSTOM_KEY=legacy-secret\nOTHER=value\n');
+  const rows=new Map();
+  const repository={
+    list:(type)=>[...rows.values()].filter((row)=>row.extension_type===type),
+    get:(type,id)=>rows.get(`${type}:${id}`)||null,
+    save:(input)=>{const row={extension_type:input.extensionType,extension_id:input.extensionId,value:input.value,configured:input.configured,status:input.status,updated_at:new Date().toISOString()};rows.set(`${input.extensionType}:${input.extensionId}`,row);return row;},
+  };
+  const config={llm:{defaultProvider:'custom',providers:{custom:{label:'旧模型',baseUrl:'https://example.com/v1',model:'old',apiKeyEnv:'CUSTOM_KEY'}}}};
+  syncModelProvidersToDatabase({root,config,repository});
+  assert.equal(repository.get('model-provider','custom').value.model,'old');
+  assert.equal(repository.get('system','llm-runtime').value.defaultProvider,'custom');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'config.local.json'))).llm,undefined);
+  assert.match(fs.readFileSync(path.join(root,'.env'),'utf8'),/OTHER=value/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root,'.env'),'utf8'),/CUSTOM_KEY/);
+  assert.equal(config.llm.providers.custom.model,'old');
 });
 
 test('模型统一接入统一配置资源，模型运行只负责诊断与观测',()=>{

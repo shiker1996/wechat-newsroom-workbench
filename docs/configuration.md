@@ -66,10 +66,9 @@
 - `rsshub`：RSSHub 采集连接参数。`baseUrl`、`maxAgeHours`（168，旧闻窗口）、`concurrency`（5）、`keepAlive`、`startupTimeoutMs`。具体路由 / 直连 Feed 来源在「采集源」页面维护（存入 `collection_sources` 表）。
 - `githubDiscovery`：GitHub 新项目发现采集器参数。`createdWithinDays`（7，最近 7 天）、`minStars`（1000）、`limit`、`cacheTtlMs`。`github:search` 采集源实例在「采集源」页面维护（存入 `collection_sources` 表）。
   - `aiQueries`：AI 兴趣仓库发现。`enabled`、`refreshDays`（7，查询组缓存天数，缓存文件 `data/repo-discovery-queries.json`，可手工编辑）、`maxQueries`（6）、`perQueryLimit`（15）、`relevanceFilter`、`minInterestScore`（6，兴趣分阈值）。LLM 按 `account-context.json` 内容支柱生成 Search 查询组并做相关性打分过滤；任一环节失败自动退化为纯规则发现（Trending + 增长搜索 + 热点提及）。
-- `llm`：模型网关。
-  - `defaultProvider`、`requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。
-  - `providers.<name>`：`label`、`baseUrl`、`model`、`apiKeyEnv`、`contextWindow`、`maxOutputTokens`、`maxTokensField`。
-  - 吞吐参数：`taggingChunkSize`（默认 ≤8，按 `maxOutputTokens` 收紧）、`taggingConcurrency`（默认 6）、`eventCardChunkSize`（默认 3）、`eventCardConcurrency`（默认 4）。
+- `llm`：模型网关运行参数。
+  - `requestTimeoutMs`、`safetyReserveTokens`、`recentMessageCount`。
+  - 模型提供商列表、默认模型、Base URL、协议、模型能力开关、吞吐参数和 API Key 均由配置中心管理：普通字段存入 `extension_settings`，默认模型存入 `system:llm-runtime`，API Key 存入隔离凭据 Profile。启动时会自动把旧 `config.local.json` 的 `llm.providers` / `llm.defaultProvider` 和 `.env` 中的模型密钥迁移，然后清理这些旧字段。
 - `aiJobs`：AI 后台任务并发。`maxConcurrent`（2）为全局并发上限，超过上限的任务进入 FIFO 队列等待；候选级任务（文章 / 图文 / 排版 / 自主写作）按候选并行，批次级任务（打标 / 研判 / 事件卡 / 自动流程 / 早报）同批次互斥。
 - `articleLength`：文章字数门禁（可见字符，统一五处判定：文章 / 早报 / 教程三条 pipeline 的长度返工区间、技能默认门禁、编辑器前端计数与 preflight 检查）。`minVisibleChars`（1300）/ `maxVisibleChars`（2000）为全局默认区间；`pipelines.article` / `pipelines.daily` / `pipelines.tutorial` 可按链路写同名字段做差异覆盖。生效优先级：技能覆盖层 `gates.length` > `articleLength.pipelines[链路]` > `articleLength` 全局 > 内置默认 1300–2000。编辑器前端经 `GET /api/system/settings` 读取全局区间，无需另配。字数门禁为**建议性**：pipeline 会先按区间尽力自动修复，修复后仍超限只记警告、任务照常完成；编辑器保存终稿不再拦截，仅 toast 提示，超限内容可在编辑器手动删减。
 
@@ -82,14 +81,16 @@
 - 画像：`name`、`description`、`readerProfile`、`contentPillars`（前缀映射打标五类，决定账号契合加分命中）、`voiceGuardrails`、`packagingModes`、`followReason`、`conversionBridge`、`differentiators`、`articleFramework`、`contentRatio`。格式化逻辑见 `server/shared/domain/account-context.mjs`。
 - 双分发策略（可选）：`distributionStrategy.recommendation|notification|experiment`。每个池可配置 `purpose`、`preferredTopics` 和 `titleRule`，由选题、编辑会、标题和成稿技能读取；这些字段只描述内容规划，不授予自动群发或发布权限。
 - 通知资格（可选）：`notificationPolicy.minimumMatchedCriteria`、`minimumNotificationFit`（默认 4/5）、`minimumFactSupport`（默认 4/5）、`maxPerBatch`（默认 2，允许 0）、`blockedRiskLevels`、`readerStakes`、`criteria`。通知池必须有具体读者、明确动作或决策和具体后果；传闻、待核事实及禁入风险会确定性降到实验池，缺失配置时使用内置严格规则。
-- `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`server/features/research/application/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；非法数值安全回退。
+- `scoring`（选题评分参数，可整段省略）：只写想改的键，其余回退代码默认值（`server/features/research/application/research-pipeline.mjs` 的 `DEFAULT_SCORING`）；`accountFit` 可按五类内容显式覆盖账号契合分；非法数值安全回退。
 - `weights`：`{ "h": 0.6, "b": 0.25, "p": 0.15 }`——文章化质量 `A = H×h + B×b + P×p`；H/B/P 只是 A 的内部拆分。
 - `eventValueWeight`（默认 0.25，限制在 0.25–0.40）：事件热度 T 在最终分中的权重。
 - `researchValueWeight`（默认 0.20，限制在 0.10–0.30）：事件内研判与事件间关系形成的研判价值 J 权重。
 - 常规文章最终分为 `F = A×(1-eventValueWeight-researchValueWeight) + T×eventValueWeight + J×researchValueWeight - C`，其中 `C = S + D`，S/D 仅作为内部扣分来源保留。
   - `accountFitBonus`（6）：命中 `contentPillars` 对应类目的维度组加分。
   - `categoryPreference`：预排序分类偏好分（大厂 6 / AI 4 / 行业 3 / 综合 1 / 职场 0）。调低或调负可让泛热点沉底。
-  - `pBase`：P 分类基分（大厂 50 / AI 40 / 行业 30 / 综合 20 / 职场 10）。
+  - `pBase`：历史维度报告兼容字段，目前不参与最终 P 计算。
+  - `hBase`：不同历史内容类型的 H 基准分。
+  - 旧版 `toolEngineeringBonus`、`minimumToolCandidates` 不再参与当前评分，示例配置不再提供这两个字段。
   - `hBase`：H 爆款画像基分（worker_social 48、bigtech 33 等，完整键见示例文件）。
   - 选题报告 `topics-ranked.md` 底部的公式文案跟随实际权重显示。
 

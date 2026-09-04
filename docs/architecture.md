@@ -55,7 +55,7 @@
 - `store.mjs` 的 `Store` 类是兼容 facade：负责打开数据库、执行启动迁移、组装 Repository/Query Service/Application Service，并暴露旧公共 API；Store 本身不再直接执行 SQL。
 - 迁移是**幂等的 `CREATE TABLE IF NOT EXISTS` + `PRAGMA table_info` 探测补列**（无 `user_version`），只增不破；跨版本验收见 `test/version-compat.test.mjs`。
 - 整库导入与 `foreign_key_check` 由 `DatabaseRestoreService` 承担，生成快照等领域数据由对应 Repository 存取。
-- 同目录：`config.mjs`（默认值，含 LLM providers 与 RSSHub 路由）、`env.mjs`、`workspace-paths.mjs`（`articles/`、`topics/`、`social-cards/` 等产物目录）。
+- 同目录：`config.mjs`（部署参数与内置默认值）、`env.mjs`、`workspace-paths.mjs`（`articles/`、`topics/`、`social-cards/` 等产物目录）。模型服务商运行配置由 `extension_settings` 统一持久化。
 
 ### 核心实体关系（批次 / 热点 / 事件 / 选题）
 
@@ -75,7 +75,7 @@
 
 ## LLM 网关（server/platform/llm/）
 
-- `gateway.mjs`：OpenAI 兼容客户端，统一 `complete` / `streamComplete`。多服务商在 `config.llm.providers`（含 baseUrl / model / apiKeyEnv / contextWindow / 输出上限 / jsonMode / webSearch 配置），`defaultProvider` 选择，`resolve()` 校验启用状态与 Key。降级：jsonMode 不支持自动去 `response_format` 重试；无原生 webSearch 且配置 Tavily 时注入搜索结果；`finishReason=length` 且 adaptive 时自动扩容重试一次。每次调用（含失败）写 `model_calls` 审计（含原始输出与推理文本，仅保留最近 2000 条，超出自动清理）。
+- `gateway.mjs`：OpenAI 兼容客户端，统一 `complete` / `streamComplete`。启动时从 `extension_settings` 恢复模型服务商注册表，模型配置含 baseUrl / model / 协议 / 能力开关 / 上下文窗口 / 输出上限 / webSearch 配置，默认模型单独保存在 `system:llm-runtime`，`resolve()` 校验启用状态与隔离凭据。降级：jsonMode 不支持自动去 `response_format` 重试；无原生 webSearch 且配置 Tavily 时注入搜索结果；`finishReason=length` 且 adaptive 时自动扩容重试一次。每次调用（含失败）写 `model_calls` 审计（含原始输出与推理文本，仅保留最近 2000 条，超出自动清理）。
 - `context-manager.mjs`：CJK 加权 token 估算与上下文预算；超预算时先 LLM 摘要老消息（不新增事实），仍超则丢弃最老非保护消息，不静默截断。
 - `output-budget.mjs`：按用途（typeset-html、editorial-room 等 16 组画像）定输出预算，截断时带重试提示词重试。
 

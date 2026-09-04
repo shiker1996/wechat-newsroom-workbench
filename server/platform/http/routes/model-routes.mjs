@@ -1,5 +1,4 @@
 import { deleteModelProvider, saveModelProvider } from '../../integrations/model-provider-settings.mjs';
-import { clearRemoteCredential } from '../../tools/remote-credentials.mjs';
 
 export async function handleModelRoutes(context) {
   const { request, response, pathname, root, config, store, models, body, json } = context;
@@ -9,16 +8,13 @@ export async function handleModelRoutes(context) {
     return true;
   }
   if (request.method === 'POST' && pathname === '/api/models/config') {
-    const id = saveModelProvider(root, config, await body(request));
+    const id = saveModelProvider(root, config, await body(request), { repository: store?.repositories?.extensionSettings });
     json(response, 200, { saved: true, id, ...models.listProviders() });
     return true;
   }
   const deleteMatch = pathname.match(/^\/api\/models\/config\/([^/]+)$/);
   if (request.method === 'DELETE' && deleteMatch) {
-    const id = deleteModelProvider(root, config, decodeURIComponent(deleteMatch[1]));
-    // 统一删除：同时清掉扩展配置与远程凭据，避免残留
-    store?.repositories?.extensionSettings?.remove?.('model-provider', id);
-    try { clearRemoteCredential(root, id, `model-provider-${id}`); } catch { /* 无凭据时忽略 */ }
+    const id = deleteModelProvider(root, config, decodeURIComponent(deleteMatch[1]), { repository: store?.repositories?.extensionSettings });
     json(response, 200, { deleted: true, id, ...models.listProviders() });
     return true;
   }

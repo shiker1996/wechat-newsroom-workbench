@@ -29,13 +29,15 @@ test('config.example.json 与内置默认配置结构一致', () => {
     const example = JSON.parse(fs.readFileSync(path.join(root, 'config.example.json'), 'utf8'));
     // 路径类字段会被 loadConfig 解析为绝对路径，只比结构不比值
     const pathFields = new Set(['workspaceRoot', 'contentRoots', 'rsshub.rootDir', 'rsshub.startScript', 'rsshub.stopScript', 'rsshub.pidFile']);
+    // 模型服务商、默认模型及其能力字段已迁入 extension_settings，示例文件只覆盖部署/运行参数。
+    const databaseFields = (key) => key === 'llm.defaultProvider' || key.startsWith('llm.providers.');
     const defaultLeaves = leafEntries(defaults);
     const exampleLeaves = leafEntries(example);
-    const onlyDefault = [...defaultLeaves.keys()].filter((key) => !exampleLeaves.has(key));
-    const onlyExample = [...exampleLeaves.keys()].filter((key) => !defaultLeaves.has(key));
+    const onlyDefault = [...defaultLeaves.keys()].filter((key) => !databaseFields(key) && !exampleLeaves.has(key));
+    const onlyExample = [...exampleLeaves.keys()].filter((key) => !databaseFields(key) && !defaultLeaves.has(key));
     assert.deepEqual({ onlyDefault, onlyExample }, { onlyDefault: [], onlyExample: [] }, '示例配置与默认配置键集合漂移');
     for (const [key, value] of exampleLeaves) {
-      if (pathFields.has(key)) continue;
+      if (pathFields.has(key) || databaseFields(key)) continue;
       assert.deepEqual(value, defaultLeaves.get(key), `config.example.json 的 ${key} 与默认值不一致`);
     }
   } finally {

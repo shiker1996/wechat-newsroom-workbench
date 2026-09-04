@@ -42,6 +42,7 @@ import { createRouteHelpers, writeUtf8 } from './server/platform/http/route-help
 import { setToolConfigurationResolver } from './server/platform/tools/index.mjs';
 import { ExtensionConfigurationService } from './server/platform/extensions/configuration-service.mjs';
 import { modelProviderManifest } from './server/platform/extensions/model-provider-configuration.mjs';
+import { syncModelProvidersToDatabase } from './server/platform/integrations/model-provider-settings.mjs';
 import { seedDemoData } from './server/platform/demo/seed.mjs';
 import { createLocalSecurity } from './server/platform/http/local-security.mjs';
 import { APP_VERSION } from './server/platform/version.mjs';
@@ -53,6 +54,8 @@ const config = loadConfig(root);
 const demo = process.argv.includes('--demo') || process.env.WORKBENCH_DEMO === '1';
 const instanceLock=acquireInstanceLock(root,{name:demo?'demo':'workbench'});
 const store = new Store(path.join(root, 'data', demo ? 'demo.db' : 'workbench.db'));
+// 模型提供商以数据库为唯一持久化来源；首次启动时从旧 config.local.json/.env 迁移。
+syncModelProvidersToDatabase({root,config,repository:store.repositories.extensionSettings,cleanupLegacy:!demo});
 const extensionConfigurationService=new ExtensionConfigurationService({root,repository:store.repositories.extensionSettings});
 setToolConfigurationResolver((manifest)=>{
   return extensionConfigurationService.resolve({extensionType:'tool',extensionId:manifest.id,manifest});

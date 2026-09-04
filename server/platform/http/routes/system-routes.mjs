@@ -15,7 +15,7 @@ import {
 import { validateWorkbenchBackup } from '../../artifacts/backup-archive.mjs';
 import { getGitHubApiHealth } from '../../connectors/github-client.mjs';
 import { getRuntimeSettings, runPowerShellScript, updateRuntimeSettings } from '../../integrations/runtime-settings.mjs';
-import { createModelProvider } from '../../integrations/model-provider-settings.mjs';
+import { createModelProvider, syncModelProviderFromDatabase } from '../../integrations/model-provider-settings.mjs';
 import { SkillRegistry } from '../../skills/registry.mjs';
 import { BUILTIN_PLUGINS, getToolRegistry, reloadToolRegistry } from '../../tools/index.mjs';
 import { writeToolPluginSetting, writeToolPluginSettings } from '../../tools/settings.mjs';
@@ -83,17 +83,11 @@ export async function handleSystemRoutes(context) {
   const resourceFallback=()=>({});
   const describeResource=(resource)=>{
     const state=extensionConfiguration.describe({extensionType:resource.type,extensionId:resource.id,manifest:resource.manifest,fallbackValues:resourceFallback(resource)});
-    // 模型「默认」是运行时渠道状态（config.llm.defaultProvider），不做持久化的多源真值
+    // 模型「默认」是运行时渠道状态，并持久化到 system:llm-runtime。
     if(resource.type==='model-provider'&&state.values)state.values={...state.values,default:config.llm?.defaultProvider===resource.id};
     return state;
   };
-  const persistDefaultProvider=async()=>{
-    const { atomicWriteJson }=await import('../../core/atomic-file.mjs');
-    const localPath=path.join(root,'config.local.json');
-    const local=fs.existsSync(localPath)?JSON.parse(fs.readFileSync(localPath,'utf8')):{};
-    local.llm=local.llm||{};local.llm.defaultProvider=config.llm.defaultProvider;
-    atomicWriteJson(localPath,local);
-  };
+  const persistDefaultProvider=()=>extensionSettingRepository.save({extensionType:'system',extensionId:'llm-runtime',value:{defaultProvider:config.llm.defaultProvider},configured:Boolean(config.llm.defaultProvider),status:'ready'});
   migrateLegacyCapabilityRoutes(root);
   const capabilityGraph=async()=>{
     const registry=await getToolRegistry(),toolCatalog=readToolPluginCatalog(root),remoteCatalog=readRemotePluginCatalog(root);
@@ -230,7 +224,7 @@ export async function handleSystemRoutes(context) {
   if(request.method==='POST'&&pathname==='/api/system/configuration/model-provider'){
     try{
       const input=await body(request);
-      const id=createModelProvider(root,config,input);
+      const id=createModelProvider(root,config,input,{repository:extensionSettingRepository});
       const items=await configurationCatalog();
       const resource=findConfigurationResource(items,'model-provider',id);
       json(response,200,{id,item:resource?{...resource,state:describeResource(resource)}:null});
@@ -249,11 +243,12 @@ export async function handleSystemRoutes(context) {
         const makeDefault=type==='model-provider'?input?.default:undefined;
         if(type==='model-provider'&&input&&'default'in input)delete input.default;
         result=extensionConfiguration.save({extensionType:type,extensionId:id,manifest:resource.manifest,input,fallbackValues:resourceFallback(resource)});
+        if(type==='model-provider')syncModelProviderFromDatabase(config,extensionSettingRepository,id);
         // 模型「默认」由运行时状态唯一决定：勾选即切换；取消当前默认则回退到其他启用模型
         if(type==='model-provider'&&config.llm?.providers?.[id]&&(makeDefault===true||(makeDefault===false&&config.llm.defaultProvider===id))){
           if(makeDefault===true){config.llm.defaultProvider=id;}
           else{const fallback=Object.entries(config.llm.providers).find(([key,provider])=>key!==id&&provider.enabled!==false);config.llm.defaultProvider=fallback?fallback[0]:'';}
-          await persistDefaultProvider();
+          persistDefaultProvider();
         }
         // 不把 default 落扩展配置，避免出现多个「默认」的假状态；顺带清掉历史残留
         if(type==='model-provider'){
