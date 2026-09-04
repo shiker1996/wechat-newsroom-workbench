@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createModelProvider, deleteModelProvider, normalizeProviderInput, saveModelProvider, syncModelProvidersToDatabase } from '../server/platform/integrations/model-provider-settings.mjs';
+import { createModelConnection, createModelProvider, deleteModelConnection, deleteModelProvider, normalizeProviderInput, saveModelProvider, syncModelProvidersToDatabase } from '../server/platform/integrations/model-provider-settings.mjs';
 
 test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   const result=normalizeProviderInput({label:'自定义',baseUrl:'https://api.example.com/v1/',model:'model-a'});
@@ -49,6 +49,36 @@ test('创建模型仅注册 config.local.json，不写环境文件',()=>{
   assert.equal(local.llm.providers['openai-main'].maxOutputTokens,8192);
   assert.equal(fs.readFileSync(path.join(root,'.env'),'utf8'),'EXISTING=value\n');
   assert.throws(()=>createModelProvider(root,config,{id:'openai-main',label:'重复',baseUrl:'https://x/v1',model:'m'}),/已存在/);
+});
+
+test('同一供应商的多个模型共享连接配置与凭据',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'model-connection-'));fs.mkdirSync(path.join(root,'data'));
+  const rows=new Map();
+  const repository={
+    list:(type)=>[...rows.values()].filter((row)=>row.extension_type===type),
+    get:(type,id)=>rows.get(`${type}:${id}`)||null,
+    save:(input)=>{const row={extension_type:input.extensionType,extension_id:input.extensionId,value:structuredClone(input.value),configured:input.configured,status:input.status,updated_at:new Date().toISOString()};rows.set(`${input.extensionType}:${input.extensionId}`,row);return row;},
+    remove:(type,id)=>rows.delete(`${type}:${id}`),
+  };
+  try{
+    const config={llm:{defaultProvider:'',providers:{},connections:{}}};
+    createModelConnection(root,config,{id:'openai',label:'OpenAI',baseUrl:'https://api.openai.com/v1'},{repository});
+    createModelProvider(root,config,{id:'gpt-fast',label:'GPT Fast',connectionId:'openai',model:'gpt-4.1-mini',contextWindow:128000,maxOutputTokens:4096},{repository});
+    createModelProvider(root,config,{id:'gpt-quality',label:'GPT Quality',connectionId:'openai',model:'gpt-4.1',contextWindow:256000,maxOutputTokens:8192},{repository});
+    assert.equal(repository.list('model-connection').length,1);
+    assert.deepEqual(Object.keys(repository.get('model-connection','openai').value).sort(),['baseUrl','label','protocol']);
+    assert.deepEqual(Object.keys(repository.get('model-provider','gpt-fast').value).sort(),['connectionId','contextWindow','enabled','label','maxOutputTokens','maxTokensField','model','responsesReasoningToggle','supportsJsonMode','supportsNativeTools','supportsThinkingToggle','supportsToolCallStreaming','taggingChunkSize','taggingConcurrency','thinkingReserveTokens']);
+    assert.equal(repository.get('model-provider','gpt-fast').value.taggingChunkSize,6);
+    assert.equal(config.llm.providers['gpt-fast'].baseUrl,'https://api.openai.com/v1');
+    assert.equal(config.llm.providers['gpt-quality'].baseUrl,'https://api.openai.com/v1');
+    assert.equal(config.llm.providers['gpt-fast'].connectionId,'openai');
+    assert.throws(()=>createModelProvider(root,config,{id:'gpt-duplicate',label:'重复模型',connectionId:'openai',model:'gpt-4.1'},{repository}),/模型唯一标识 openai\/gpt-4.1 已存在/);
+    assert.throws(()=>deleteModelConnection(root,config,'openai',{repository}),/仍被 2 个模型引用/);
+    const removable={llm:{defaultProvider:'',providers:{},connections:{}}};
+    createModelConnection(root,removable,{id:'unused',label:'Unused',baseUrl:'https://unused.example.com'},{repository});
+    deleteModelConnection(root,removable,'unused',{repository});
+    assert.equal(repository.get('model-connection','unused'),null);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
 test('模型旧配置启动时迁移到统一数据库来源并清理旧字段',()=>{

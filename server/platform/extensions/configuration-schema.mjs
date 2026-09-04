@@ -12,7 +12,7 @@ export function validateConfigurationSchema(schema, { field = 'configuration', r
   if (!plainObject(schema)) return [issue(field, `${field} 必须是对象 Schema`)];
   if (!ALLOWED_TYPES.has(schema.type)) issues.push(issue(`${field}.type`, '配置字段类型不受支持'));
   if (root && schema.type !== 'object') issues.push(issue(`${field}.type`, '配置根节点必须是 object'));
-  const allowed=new Set(['type','title','description','default','enum','enumNames','format','secret','properties','required','items','minimum','maximum','minLength','maxLength','pattern','additionalProperties']);
+  const allowed=new Set(['type','title','description','default','enum','enumNames','format','secret','readOnly','properties','required','items','minimum','maximum','minLength','maxLength','pattern','additionalProperties']);
   for (const key of Object.keys(schema)) if (!allowed.has(key)) issues.push(issue(`${field}.${key}`, '配置 Schema 包含不受支持的关键字'));
   if (schema.format !== undefined && !ALLOWED_FORMATS.has(schema.format)) issues.push(issue(`${field}.format`, '配置字段 format 不受支持'));
   if (schema.secret !== undefined && typeof schema.secret !== 'boolean') issues.push(issue(`${field}.secret`, 'secret 必须是布尔值'));

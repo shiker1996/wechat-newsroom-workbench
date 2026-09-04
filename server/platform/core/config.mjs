@@ -33,6 +33,8 @@ const defaults = {
     // 可选的高级阶段级 provider 覆盖，不在普通配置页暴露。
     // 子阶段键使用 stage-model-routing.mjs 中的稳定 ID，例如 drafting.body。
     stageModels: {},
+    // 供应商连接与可选模型分离；运行时会将 connections + providers 展开为兼容的模型配置。
+    connections: {},
     requestTimeoutMs: 300000,
     safetyReserveTokens: 2048,
     recentMessageCount: 8,

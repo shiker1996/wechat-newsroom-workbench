@@ -1,7 +1,7 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 35;
+export const WORKBENCH_SCHEMA_VERSION = 36;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -620,6 +620,29 @@ export function runDatabaseMigrations(db, migrateSchema) {
       const columns=new Set(db.prepare('PRAGMA table_info(editorial_sessions)').all().map((column)=>column.name));
       if(!columns.has('adopted_research_points_json'))db.exec("ALTER TABLE editorial_sessions ADD COLUMN adopted_research_points_json TEXT NOT NULL DEFAULT '[]'");
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(35,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}}
+    // v36：存量库的 extension_settings 约束增加供应商连接资源类型。
+    // v35 之后的数据库不会再次执行 applyWorkbenchSchema，因此这里必须显式重建旧表约束。
+    if(applied<36){db.exec('BEGIN IMMEDIATE');try{
+      const extensionSettingsSql=String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='extension_settings'").get()?.sql||'');
+      if(extensionSettingsSql && !/model-connection/i.test(extensionSettingsSql)){
+        db.exec(`
+          CREATE TABLE extension_settings_next (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool','collector','model-provider','model-connection','system')),
+            extension_id TEXT NOT NULL, scope TEXT NOT NULL DEFAULT 'workspace', schema_version INTEGER NOT NULL DEFAULT 1,
+            value_json TEXT NOT NULL DEFAULT '{}', configured INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'needs_configuration', config_hash TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(extension_type,extension_id,scope)
+          );
+          INSERT INTO extension_settings_next SELECT * FROM extension_settings;
+          DROP TABLE extension_settings;
+          ALTER TABLE extension_settings_next RENAME TO extension_settings;
+          CREATE INDEX idx_extension_settings_type ON extension_settings(extension_type,extension_id);
+        `);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(36,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
   }

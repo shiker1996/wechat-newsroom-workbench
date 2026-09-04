@@ -89,6 +89,9 @@ function publicProvider(name, provider, configured) {
   return {
     name,
     label: provider.label || name,
+    modelKey: provider.modelKey || (provider.connectionId || name) + '/' + (provider.model || name),
+    connectionId: provider.connectionId || name,
+    connectionLabel: provider.connectionLabel || provider.connection?.label || provider.connectionId || name,
     baseUrl: provider.baseUrl,
     protocol: provider.protocol || 'chat_completions',
     model: provider.model,
@@ -124,7 +127,8 @@ export class ModelGateway {
   listProviders() {
     return {
       defaultProvider: this.config.defaultProvider,
-      providers: Object.keys(this.config.providers).map((name) => {const value=this.configuredProvider(name);return publicProvider(name,value.provider,value.configured);}),
+      connections: Object.entries(this.config.connections||{}).map(([id,connection]) => ({ name:id, label:connection.label||id, baseUrl:connection.baseUrl, configured: Boolean(connection.configured) })),
+      providers: Object.keys(this.config.providers).map((name) => {const value=this.configuredProvider(name);const connection=this.config.connections?.[value.provider?.connectionId||name];return publicProvider(name,{...value.provider,connectionLabel:connection?.label||value.provider?.connectionId||name},value.configured);}),
     };
   }
 

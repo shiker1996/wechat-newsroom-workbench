@@ -441,7 +441,7 @@ export function applyWorkbenchSchema(db) {
       CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_run ON agent_tool_calls(agent_run_id,started_at);
       CREATE TABLE IF NOT EXISTS extension_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool')),
+        extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool','collector','model-provider','model-connection','system')),
         extension_id TEXT NOT NULL,
         scope TEXT NOT NULL DEFAULT 'workspace',
         schema_version INTEGER NOT NULL DEFAULT 1,
@@ -692,11 +692,11 @@ export function applyWorkbenchSchema(db) {
         ON documents(batch_id,kind) WHERE candidate_row_id IS NULL;
     `);
     const extensionSettingsSql=String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='extension_settings'").get()?.sql||'');
-    if(/extension_type\s+IN\s*\(\s*'skill'\s*,\s*'tool'\s*\)/i.test(extensionSettingsSql)){
+    if(extensionSettingsSql && !/'model-connection'/i.test(extensionSettingsSql)){
       db.exec(`
         CREATE TABLE extension_settings_next (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool','collector','model-provider','system')),
+          extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool','collector','model-provider','model-connection','system')),
           extension_id TEXT NOT NULL, scope TEXT NOT NULL DEFAULT 'workspace', schema_version INTEGER NOT NULL DEFAULT 1,
           value_json TEXT NOT NULL DEFAULT '{}', configured INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL DEFAULT 'needs_configuration', config_hash TEXT NOT NULL DEFAULT '',

@@ -11,6 +11,25 @@ let selectedExtension = null;
 let extensionQuery = "";
 let extensionType = "";
 
+function modelCatalogButton(item,connectionLabel=''){
+  const active=selectedExtension===item.type+":"+item.id;
+  const marks={system:'SYS',skill:'SK',tool:'TL',collector:'CL','model-connection':'API','model-provider':'AI'};
+  const labels={system:'系统',skill:'技能',tool:'工具',collector:'采集器','model-connection':'供应商','model-provider':'模型'};
+  const relation=connectionLabel?` · 供应商：${escapeHtml(connectionLabel)}`:'';
+  return `<button type="button" class="${active?'active':''}" data-system-extension="${escapeHtml(item.type+":"+item.id)}"><span class="configuration-resource-mark">${marks[item.type]||'EX'}</span><span class="configuration-resource-copy"><b>${escapeHtml(item.name||item.id)}</b><small>${labels[item.type]||item.type} · ${escapeHtml(item.id)}${relation}</small></span><i class="configuration-resource-state ${item.state.configured?'ready':'attention'}" title="${item.state.configured?'已就绪':'需要配置'}"></i></button>`;
+}
+function renderModelCatalogList(){
+  const node=document.getElementById("system-extension-list");if(!node)return;
+  const connections=new Map(extensionConfigurations.filter((item)=>item.type==='model-connection').map((item)=>[item.id,item.name||item.id]));
+  const items=extensionConfigurations.filter((item)=>(!extensionType||item.type===extensionType)&&(!extensionQuery||(`${item.name||''} ${item.id}`).toLowerCase().includes(extensionQuery)));
+  const count=document.getElementById("configuration-filter-count");
+  if(count)count.textContent=items.length+' / '+extensionConfigurations.length;
+  node.innerHTML=items.length?items.map((item)=>modelCatalogButton(item,item.type==='model-provider'?(connections.get(item.state.values?.connectionId)||item.state.values?.connectionId||'未绑定'):'')).join(''):'<div class="configuration-empty"><b>没有匹配项</b><span>试试清空搜索或切换能力类型。</span></div>';
+}
+function renderConfigurationList(){
+  renderModelCatalogList();
+}
+
 function bindSystem() {
   if (bound) return;
   bound = true;
@@ -24,14 +43,15 @@ function bindSystem() {
     controlRuntime(button).catch((error) => toast(error.message, "error"));
   }));
   document.getElementById("add-rsshub-env")?.addEventListener("click", () => addRsshubKvRow());
+  document.getElementById("add-model-connection")?.addEventListener("click", () => addModelConnection().catch((error) => toast(error.message, "error")));
   document.getElementById("add-model-provider")?.addEventListener("click", () => addModelProvider().catch((error) => toast(error.message, "error")));
   document.querySelector(".config-tabbar")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-config-tab]");
     if (button) selectConfigTab(button.dataset.configTab);
   });
   document.getElementById("system-extension-list")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-system-extension]");if(button)selectSystemExtension(button.dataset.systemExtension);});
-  document.getElementById("system-extension-search")?.addEventListener("input",(event)=>{extensionQuery=event.target.value.trim().toLowerCase();renderSystemExtensionList();});
-  document.getElementById("system-extension-type")?.addEventListener("change",(event)=>{extensionType=event.target.value;renderSystemExtensionList();});
+  document.getElementById("system-extension-search")?.addEventListener("input",(event)=>{extensionQuery=event.target.value.trim().toLowerCase();renderConfigurationList();});
+  document.getElementById("system-extension-type")?.addEventListener("change",(event)=>{extensionType=event.target.value;renderConfigurationList();});
   document.getElementById("system-extension-editor")?.addEventListener("click",(event)=>{const remove=event.target.closest("[data-rsshub-remove]");if(!remove)return;const row=remove.closest(".rsshub-kv-row");if(row.dataset.existing==="true"){row.classList.toggle("pending-delete");row.querySelector("[data-rsshub-clear]").checked=row.classList.contains("pending-delete");remove.textContent=row.classList.contains("pending-delete")?"撤销":"删除";}else row.remove();updateRsshubPendingHint();});
   document.getElementById("rsshub-env-fields")?.addEventListener("click", (event) => {
     const remove = event.target.closest("[data-rsshub-remove]");
@@ -146,12 +166,32 @@ function selectConfigTab(name) {
 }
 
 function extensionRoute(item,suffix=""){return `/api/system/configuration/${encodeURIComponent(item.type)}/${encodeURIComponent(item.id)}${suffix}`;}
-function renderSystemExtensionList(){const node=document.getElementById("system-extension-list");if(!node)return;const labels={system:"系统",'model-provider':"模型",skill:"技能",tool:"工具",collector:"采集器"};const marks={system:"SYS",'model-provider':"AI",skill:"SK",tool:"TL",collector:"CL"};const items=extensionConfigurations.filter((item)=>(!extensionType||item.type===extensionType)&&(!extensionQuery||`${item.name||''} ${item.id}`.toLowerCase().includes(extensionQuery)));const count=document.getElementById("configuration-filter-count");if(count)count.textContent=`${items.length} / ${extensionConfigurations.length}`;node.innerHTML=items.length?items.map((item)=>`<button type="button" class="${selectedExtension===`${item.type}:${item.id}`?'active':''}" data-system-extension="${escapeHtml(`${item.type}:${item.id}`)}"><span class="configuration-resource-mark">${marks[item.type]||'EX'}</span><span class="configuration-resource-copy"><b>${escapeHtml(item.name||item.id)}</b><small>${labels[item.type]||item.type} · ${escapeHtml(item.id)}</small></span><i class="configuration-resource-state ${item.state.configured?'ready':'attention'}" title="${item.state.configured?'已就绪':'需要配置'}"></i></button>`).join(""):'<div class="configuration-empty"><b>没有匹配项</b><span>试试清空搜索或切换能力类型。</span></div>';}function systemSchemaField(name,rule,value){const id=`system-extension-${name}`,common=`id="${id}" data-system-extension-field="${escapeHtml(name)}" data-value-type="${escapeHtml(rule.type||'string')}"`;const heading=`${escapeHtml(rule.title||name)}${rule.description?`<small>${escapeHtml(rule.description)}</small>`:''}`;if(rule.enum)return `<label>${heading}<select ${common}>${rule.enum.map((item,index)=>`<option value="${escapeHtml(item)}" ${item===value?'selected':''}>${escapeHtml(rule.enumNames?.[index]||item)}</option>`).join("")}</select></label>`;if(rule.type==='boolean')return `<label><span>${heading}</span><input ${common} type="checkbox" ${value?'checked':''}></label>`;if(rule.type==='array'){const text=Array.isArray(value)?value.join("\n"):"";return `<label>${heading}<textarea ${common} rows="4" placeholder="每行一项">${escapeHtml(text)}</textarea></label>`;}const configured=value==='__configured__';if(rule.format==='textarea')return `<label>${heading}<textarea ${common} rows="5" ${configured?'placeholder="已配置；留空保持不变"':''}>${configured?'':escapeHtml(value??'')}</textarea></label>`;const type=rule.secret||rule.format==='password'?'password':rule.type==='integer'||rule.type==='number'?'number':rule.format==='url'?'url':'text';return `<label>${heading}<input ${common} type="${type}" value="${configured?'':escapeHtml(value??'')}" ${configured?'placeholder="已配置；留空保持不变"':''}></label>`;}
-function renderSystemExtensionEditor(item){const node=document.getElementById("system-extension-editor");if(!node)return;if(!item){node.innerHTML='<div class="configuration-empty"><b>选择一项能力</b><span>查看配置字段、凭据状态与运行诊断。</span></div>';return;}const state=item.state,schema=state.schema||{properties:{}};const issues=state.issues||[];const advanced=item.renderer==='key-value-secret'?`<section class="resource-advanced"><div class="config-panel-heading"><div><span class="kicker">KEY-VALUE SECRET</span><h4>RSSHub 扩展变量</h4></div><p>键名受控校验，秘密值只显示配置状态。</p></div><div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" data-add-rsshub-kv>＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div><button type="button" class="outline-button" data-save-rsshub-kv>保存扩展变量</button></section>`:'';const deleteBtn=item.type==='model-provider'?'<button type="button" class="ghost-button" data-delete-model-provider style="color:var(--red)">删除模型</button>':'';node.innerHTML=`<header class="configuration-editor-head"><div><span class="kicker">${escapeHtml(item.type.toUpperCase())} / ${escapeHtml(item.id)}</span><h4>${escapeHtml(item.name||item.id)}</h4><p>${state.configured?'该能力已通过配置校验，可以投入运行。':'完成以下配置后，能力才会进入运行队列。'}</p></div><span class="configuration-status-badge ${state.configured?'ready':'attention'}"><i></i>${state.configured?'已就绪':'需要配置'}</span></header>${issues.length?`<div class="configuration-issues"><b>需要处理</b>${issues.map((issue)=>`<span>${escapeHtml(issue.message||issue.field)}</span>`).join('')}</div>`:''}<form id="system-extension-form"><div class="configuration-fields">${Object.entries(schema.properties||{}).map(([name,rule])=>systemSchemaField(name,rule,state.values?.[name])).join("")}</div><div class="configuration-form-actions"><small>保存前会校验字段格式；密钥不会在页面回显。</small><div>${deleteBtn}<button type="button" class="ghost-button" data-system-extension-test>测试配置</button><button type="submit" class="primary-button">保存并应用</button></div></div></form>${advanced}`;const form=node.querySelector("form");form.onsubmit=(event)=>{event.preventDefault();saveSystemExtension(item,form).catch((error)=>toast(error.message, "error"));};form.querySelector("[data-system-extension-test]").onclick=()=>testSystemExtension(item).catch((error)=>toast(error.message, "error"));if(deleteBtn)node.querySelector("[data-delete-model-provider]").onclick=()=>deleteModelProviderUnified(item).catch((error)=>toast(error.message,"error"));if(advanced){renderRsshubKv(runtimeSettings?.rsshub||[]);node.querySelector('[data-add-rsshub-kv]').onclick=addRsshubKvRow;node.querySelector('[data-save-rsshub-kv]').onclick=(event)=>saveRsshubConfiguration(event.currentTarget);}}function selectSystemExtension(key){selectedExtension=key;try{sessionStorage.setItem("system-extension-selection",key);const [type,id]=key.split(':');history.replaceState(null,"",`#system/configuration/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);}catch{}renderSystemExtensionList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===key));}
+function renderSystemExtensionList(){const node=document.getElementById("system-extension-list");if(!node)return;const labels={system:"系统",skill:"技能",tool:"工具",collector:"采集器"};const marks={system:"SYS",skill:"SK",tool:"TL",collector:"CL"};const items=extensionConfigurations.filter((item)=>item.type!=='model-provider'&&item.type!=='model-connection'&&(!extensionType||item.type===extensionType)&&(!extensionQuery||`${item.name||''} ${item.id}`.toLowerCase().includes(extensionQuery)));const count=document.getElementById("configuration-filter-count");if(count)count.textContent=`${items.length} / ${extensionConfigurations.length}`;node.innerHTML=items.length?items.map((item)=>`<button type="button" class="${selectedExtension===`${item.type}:${item.id}`?'active':''}" data-system-extension="${escapeHtml(`${item.type}:${item.id}`)}"><span class="configuration-resource-mark">${marks[item.type]||'EX'}</span><span class="configuration-resource-copy"><b>${escapeHtml(item.name||item.id)}</b><small>${labels[item.type]||item.type} · ${escapeHtml(item.id)}</small></span><i class="configuration-resource-state ${item.state.configured?'ready':'attention'}" title="${item.state.configured?'已就绪':'需要配置'}"></i></button>`).join(""):'<div class="configuration-empty"><b>没有匹配项</b><span>试试清空搜索或切换能力类型。</span></div>';}function systemSchemaField(name,rule,value){const id=`system-extension-${name}`,common=`id="${id}" data-system-extension-field="${escapeHtml(name)}" data-value-type="${escapeHtml(rule.type||'string')}"`;const heading=`${escapeHtml(rule.title||name)}${rule.description?`<small>${escapeHtml(rule.description)}</small>`:''}`;if(rule.enum)return `<label>${heading}<select ${common}>${rule.enum.map((item,index)=>`<option value="${escapeHtml(item)}" ${item===value?'selected':''}>${escapeHtml(rule.enumNames?.[index]||item)}</option>`).join("")}</select></label>`;if(rule.type==='boolean')return `<label><span>${heading}</span><input ${common} type="checkbox" ${value?'checked':''}></label>`;if(rule.type==='array'){const text=Array.isArray(value)?value.join("\n"):"";return `<label>${heading}<textarea ${common} rows="4" placeholder="每行一项">${escapeHtml(text)}</textarea></label>`;}const configured=value==='__configured__';if(rule.format==='textarea')return `<label>${heading}<textarea ${common} rows="5" ${configured?'placeholder="已配置；留空保持不变"':''}>${configured?'':escapeHtml(value??'')}</textarea></label>`;const type=rule.secret||rule.format==='password'?'password':rule.type==='integer'||rule.type==='number'?'number':rule.format==='url'?'url':'text';return `<label>${heading}<input ${common} type="${type}" value="${configured?'':escapeHtml(value??'')}" ${configured?'placeholder="已配置；留空保持不变"':''}></label>`;}
+function renderSystemExtensionEditor(item){const node=document.getElementById("system-extension-editor");if(!node)return;if(!item){node.innerHTML='<div class="configuration-empty"><b>选择一项能力</b><span>查看配置字段、凭据状态与运行诊断。</span></div>';return;}const state=item.state,schema=state.schema||{properties:{}};const issues=state.issues||[];const advanced=item.renderer==='key-value-secret'?`<section class="resource-advanced"><div class="config-panel-heading"><div><span class="kicker">KEY-VALUE SECRET</span><h4>RSSHub 扩展变量</h4></div><p>键名受控校验，秘密值只显示配置状态。</p></div><div class="kv-file-head"><span>KEY</span><span>VALUE</span><button type="button" class="text-button" data-add-rsshub-kv>＋ 新增变量</button></div><div id="rsshub-env-fields" class="rsshub-kv-list"></div><div id="rsshub-pending-hint" class="kv-pending-hint" hidden></div><button type="button" class="outline-button" data-save-rsshub-kv>保存扩展变量</button></section>`:'';const deleteBtn=item.type==='model-provider'?'<button type="button" class="ghost-button" data-delete-model-provider style="color:var(--red)">删除模型</button>':'';node.innerHTML=`<header class="configuration-editor-head"><div><span class="kicker">${escapeHtml(item.type.toUpperCase())} / ${escapeHtml(item.id)}</span><h4>${escapeHtml(item.name||item.id)}</h4><p>${state.configured?'该能力已通过配置校验，可以投入运行。':'完成以下配置后，能力才会进入运行队列。'}</p></div><span class="configuration-status-badge ${state.configured?'ready':'attention'}"><i></i>${state.configured?'已就绪':'需要配置'}</span></header>${issues.length?`<div class="configuration-issues"><b>需要处理</b>${issues.map((issue)=>`<span>${escapeHtml(issue.message||issue.field)}</span>`).join('')}</div>`:''}<form id="system-extension-form"><div class="configuration-fields">${Object.entries(schema.properties||{}).map(([name,rule])=>systemSchemaField(name,rule,state.values?.[name])).join("")}</div><div class="configuration-form-actions"><small>保存前会校验字段格式；密钥不会在页面回显。</small><div>${deleteBtn}<button type="button" class="ghost-button" data-system-extension-test>测试配置</button><button type="submit" class="primary-button">保存并应用</button></div></div></form>${advanced}`;const form=node.querySelector("form");form.onsubmit=(event)=>{event.preventDefault();saveSystemExtension(item,form).catch((error)=>toast(error.message, "error"));};form.querySelector("[data-system-extension-test]").onclick=()=>testSystemExtension(item).catch((error)=>toast(error.message, "error"));if(deleteBtn)node.querySelector("[data-delete-model-provider]").onclick=()=>deleteModelProviderUnified(item).catch((error)=>toast(error.message,"error"));if(advanced){renderRsshubKv(runtimeSettings?.rsshub||[]);node.querySelector('[data-add-rsshub-kv]').onclick=addRsshubKvRow;node.querySelector('[data-save-rsshub-kv]').onclick=(event)=>saveRsshubConfiguration(event.currentTarget);}}function selectSystemExtension(key){selectedExtension=key;try{sessionStorage.setItem("system-extension-selection",key);const [type,id]=key.split(':');history.replaceState(null,"",`#system/configuration/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);}catch{}renderConfigurationList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===key));}
+const renderExtensionEditorBase=renderSystemExtensionEditor;
+renderSystemExtensionEditor=function(item){
+  renderExtensionEditorBase(item);
+  if(item?.type==='model-provider'){
+    const supplier=document.querySelector('#system-extension-connectionId');
+    if(supplier){supplier.disabled=true;supplier.setAttribute('aria-disabled','true');}
+  }
+  if(item?.type!=='model-connection')return;
+  const actions=document.querySelector('#system-extension-editor .configuration-form-actions>div');
+  if(!actions)return;
+  actions.insertAdjacentHTML('afterbegin','<button type="button" class="ghost-button" data-delete-model-connection style="color:var(--red)">删除供应商</button>');
+  actions.querySelector('[data-delete-model-connection]').onclick=()=>deleteModelConnectionUnified(item).catch((error)=>toast(error.message,'error'));
+};
 function readSystemExtensionForm(form){return Object.fromEntries([...form.querySelectorAll("[data-system-extension-field]")].map((field)=>{let value=field.type==='checkbox'?field.checked:field.value;const type=field.dataset.valueType;if(type==='array')value=String(value).split(/\r?\n/).map((item)=>item.trim()).filter(Boolean);if((type==='integer'||type==='number')&&value!=='')value=Number(value);return [field.dataset.systemExtensionField,value];}));}
-async function loadExtensionConfigurations(){const result=await request("/api/system/configuration/catalog");extensionConfigurations=result.items||[];const ready=extensionConfigurations.filter((item)=>item.state.configured).length,attention=extensionConfigurations.length-ready;const summary=document.getElementById("configuration-readiness");if(summary)summary.innerHTML=`<strong>${ready}/${extensionConfigurations.length}</strong><span>${attention?`${attention} 项需要处理`:'全部能力已就绪'}</span>`;const match=location.hash.match(/^#system\/configuration\/([^/]+)\/(.+)$/);if(match)selectedExtension=`${decodeURIComponent(match[1])}:${decodeURIComponent(match[2])}`;else if(!selectedExtension)try{selectedExtension=sessionStorage.getItem("system-extension-selection")||"";}catch{}const current=extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension);if(!current)selectedExtension=extensionConfigurations[0]?`${extensionConfigurations[0].type}:${extensionConfigurations[0].id}`:null;renderSystemExtensionList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension));}
-async function saveSystemExtension(item,form){const state=await request(extensionRoute(item),{method:"PUT",body:JSON.stringify(readSystemExtensionForm(form))});item.state=state;toast("扩展配置已保存");if(item.type==='model-provider'){await Promise.all([loadModelSettings(),loadExtensionConfigurations()]);}else{renderSystemExtensionList();renderSystemExtensionEditor(item);}}
-async function testSystemExtension(item){const result=await request(extensionRoute(item,"/test"),{method:"POST",body:"{}"});toast(result.pass?"扩展配置测试通过":"扩展配置尚未就绪");}
+async function loadExtensionConfigurations(){const result=await request("/api/system/configuration/catalog");extensionConfigurations=result.items||[];const ready=extensionConfigurations.filter((item)=>item.state.configured).length,attention=extensionConfigurations.length-ready;const summary=document.getElementById("configuration-readiness");if(summary)summary.innerHTML=`<strong>${ready}/${extensionConfigurations.length}</strong><span>${attention?`${attention} 项需要处理`:'全部能力已就绪'}</span>`;const match=location.hash.match(/^#system\/configuration\/([^/]+)\/(.+)$/);if(match)selectedExtension=`${decodeURIComponent(match[1])}:${decodeURIComponent(match[2])}`;else if(!selectedExtension)try{selectedExtension=sessionStorage.getItem("system-extension-selection")||"";}catch{}const current=extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension);if(!current)selectedExtension=extensionConfigurations[0]?`${extensionConfigurations[0].type}:${extensionConfigurations[0].id}`:null;renderConfigurationList();renderSystemExtensionEditor(extensionConfigurations.find((item)=>`${item.type}:${item.id}`===selectedExtension));}
+async function saveSystemExtension(item,form){const state=await request(extensionRoute(item),{method:"PUT",body:JSON.stringify(readSystemExtensionForm(form))});item.state=state;toast("扩展配置已保存");if(item.type==='model-provider'||item.type==='model-connection')await Promise.all([loadModelSettings(),loadExtensionConfigurations()]);else await loadExtensionConfigurations();renderConfigurationList();renderSystemExtensionEditor(extensionConfigurations.find((entry)=>`${entry.type}:${entry.id}`===`${item.type}:${item.id}`));}
+async function testSystemExtension(item){
+  if(item.type==='model-provider'){
+    const result=await request("/api/models/test",{method:"POST",body:JSON.stringify({provider:item.id})});
+    toast(`${result.provider} · ${result.model} · 连接成功`);return;
+  }
+  const result=await request(extensionRoute(item,"/test"),{method:"POST",body:"{}"});
+  toast(result.pass?"扩展配置测试通过":"扩展配置尚未就绪");
+}
 
 function rsshubKvMarkup(field = { key: "", configured: false }, existing = false) {
   return `<div class="rsshub-kv-row" data-existing="${existing}">
@@ -191,15 +231,44 @@ async function loadModelSettings() {
   window.__models = runtimeModels;
 }
 
+async function addModelConnection() {
+  const editor=document.getElementById("system-extension-editor");
+  if(!editor)return;
+  editor.innerHTML=`<div class="config-panel-heading"><div><span class="kicker">MODEL CONNECTION</span><h4>添加供应商</h4></div><p>供应商连接只需配置一次；后续可以在它下面添加多个模型。</p></div>
+  <form class="add-model-provider-form">
+    <div class="model-config-grid">
+      <label>供应商 ID<input id="mc-id" required pattern="[a-z0-9-]+" placeholder="例如：openai"></label>
+      <label>供应商名称<input id="mc-label" required placeholder="例如：OpenAI"></label>
+      <label class="wide">Base URL<input id="mc-base-url" required placeholder="https://api.example.com/v1"></label>
+    </div>
+    <div class="configuration-form-actions"><small>API Key 会在供应商保存页单独配置，模型不会重复保存密钥。</small><div><button type="button" class="ghost-button" data-mc-cancel>取消</button><button type="submit" class="primary-button">创建并编辑</button></div></div>
+  </form>`;
+  editor.querySelector("[data-mc-cancel]").onclick=()=>renderSystemExtensionEditor(extensionConfigurations.find((entry)=>`${entry.type}:${entry.id}`===selectedExtension));
+  editor.querySelector("form").onsubmit=async(event)=>{
+    event.preventDefault();
+    const payload={id:editor.querySelector("#mc-id").value.trim().toLowerCase(),label:editor.querySelector("#mc-label").value.trim(),baseUrl:editor.querySelector("#mc-base-url").value.trim()};
+    const result=await request("/api/system/configuration/model-connection",{method:"POST",body:JSON.stringify(payload)});
+    toast("供应商已注册");
+    selectedExtension=`model-connection:${result.id}`;
+    await Promise.all([loadModelSettings(),loadExtensionConfigurations()]);
+    renderConfigurationList();
+    renderSystemExtensionEditor(extensionConfigurations.find((entry)=>`${entry.type}:${entry.id}`===selectedExtension));
+  };
+  editor.querySelector("#mc-id")?.focus();
+}
+
 async function addModelProvider() {
   const editor=document.getElementById("system-extension-editor");
   if(!editor)return;
+  const connections=(extensionConfigurations.filter((item)=>item.type==='model-connection'));
+  if(!connections.length){toast("请先添加一个供应商连接", "error");return;}
+  const connectionOptions=connections.map((item)=>'<option value="'+escapeHtml(item.id)+'">'+escapeHtml(item.name||item.id)+'</option>').join('');
   editor.innerHTML=`<div class="config-panel-heading"><div><span class="kicker">MODEL PROVIDER</span><h4>添加模型</h4></div><p>注册新的 OpenAI 兼容模型渠道；密钥通过统一配置资源的凭据字段保存，不写入环境文件。</p></div>
   <form class="add-model-provider-form">
     <div class="model-config-grid">
       <label>配置 ID<input id="mp-id" required pattern="[a-z0-9-]+" placeholder="例如：openai-main" title="小写字母、数字和连字符，创建后不可修改"><small>创建后不可修改，用于任务选型。</small></label>
       <label>配置名称<input id="mp-label" required placeholder="例如：主力模型"></label>
-      <label class="wide">Base URL<input id="mp-base-url" required placeholder="https://api.example.com/v1"></label>
+      <label>供应商<select id="mp-connection" required>${connectionOptions}</select><small>地址、密钥和协议继承自供应商；模型能力单独配置。</small></label>
       <label>模型名称<input id="mp-name" required placeholder="gpt-4.1"></label>
       <label>上下文窗口<input id="mp-context-window" type="number" min="4096" value="128000"></label>
       <label>最大输出 Token<input id="mp-max-output" type="number" min="256" placeholder="16384"><small>可选，留空默认 16384。</small></label>
@@ -212,7 +281,7 @@ async function addModelProvider() {
     const payload={
       id:editor.querySelector("#mp-id").value.trim().toLowerCase(),
       label:editor.querySelector("#mp-label").value.trim(),
-      baseUrl:editor.querySelector("#mp-base-url").value.trim(),
+      connectionId:editor.querySelector("#mp-connection").value,
       model:editor.querySelector("#mp-name").value.trim(),
       contextWindow:Number(editor.querySelector("#mp-context-window").value),
       maxOutputTokens:Number(editor.querySelector("#mp-max-output").value)||undefined,
@@ -221,6 +290,7 @@ async function addModelProvider() {
     toast("模型已注册");
     await loadModelSettings();
     await loadExtensionConfigurations();
+    renderConfigurationList();
     renderSystemExtensionEditor(result.item||extensionConfigurations.find((entry)=>`${entry.type}:${entry.id}`===`model-provider:${result.id}`));
   };
   editor.querySelector("#mp-id")?.focus();
@@ -239,6 +309,20 @@ async function deleteModelProviderUnified(item) {
   await request(`/api/models/config/${encodeURIComponent(item.id)}`,{method:"DELETE"});
   toast("模型已删除");
   await Promise.all([loadModelSettings(),loadExtensionConfigurations()]);
+}
+
+async function deleteModelConnectionUnified(item){
+  const models=extensionConfigurations.filter((entry)=>entry.type==='model-provider'&&entry.state.values?.connectionId===item.id);
+  const impact=models.length
+    ?`供应商「${item.name||item.id}」下还有 ${models.length} 个模型。请先删除这些模型或把它们改绑到其他供应商。`
+    :`删除供应商「${item.name||item.id}」后，它的连接配置和 API Key 将被清除。`;
+  if(!await confirmAction(impact,{confirmText:models.length?'知道了':'删除供应商'}))return;
+  if(models.length)return;
+  await request(`/api/system/configuration/model-connection/${encodeURIComponent(item.id)}`,{method:'DELETE'});
+  toast('供应商已删除');
+  selectedExtension=null;
+  await Promise.all([loadModelSettings(),loadExtensionConfigurations()]);
+  renderConfigurationList();
 }
 
 async function loadRuntimeSettings() {
@@ -336,4 +420,5 @@ async function loadSystem(target = "all", button = null) {
 export default async function loadSystemView() {
   bindSystem();
   await Promise.all([loadSystem(), loadRuntimeSettings(), loadModelSettings(), loadExtensionConfigurations()]);
+  renderConfigurationList();
 }

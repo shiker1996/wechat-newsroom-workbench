@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260904-atlas-relation-css-1">
+  <link rel="stylesheet" href="/styles.css?v=20260904-model-provider-groups-1">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -967,23 +967,26 @@
           </div>
           <div class="configuration-legend configuration-inline-legend"><span><i class="ready"></i>已就绪</span><span><i class="attention"></i>需要配置</span><span><i class="secret"></i>凭据隔离</span></div>
           <div class="config-panel active" id="config-panel-extensions">
-            <div class="config-panel-heading"><div><span class="kicker">CONFIGURATION CATALOG</span><h4>统一配置资源</h4></div><p>字段由 Manifest 自动生成；模型、技能、工具和采集器使用相同的保存与测试流程。</p><button type="button" class="outline-button" id="add-model-provider">＋ 添加模型</button></div>
-            <div class="configuration-catalog-tools"><label class="configuration-search"><span>⌕</span><input id="system-extension-search" type="search" placeholder="搜索能力名称或 ID"></label><select id="system-extension-type"><option value="">全部能力</option><option value="model-provider">模型</option><option value="skill">技能</option><option value="tool">工具</option><option value="collector">采集器</option><option value="system">系统</option></select></div>
+            <div class="config-panel-heading"><div><span class="kicker">CONFIGURATION CATALOG</span><h4>统一配置资源</h4></div><p>供应商连接只配置一次；同一供应商下的多个模型只维护各自的模型参数。其他能力继续使用统一保存与测试流程。</p><div class="configuration-catalog-actions"><button type="button" class="outline-button" id="add-model-connection">＋ 添加供应商</button><button type="button" class="outline-button" id="add-model-provider">＋ 添加模型</button></div></div>
+            <div class="configuration-catalog-tools"><label class="configuration-search"><span>⌕</span><input id="system-extension-search" type="search" placeholder="搜索能力名称或 ID"></label><select id="system-extension-type"><option value="">全部能力</option><option value="model-connection">供应商</option><option value="model-provider">模型</option><option value="skill">技能</option><option value="tool">工具</option><option value="collector">采集器</option><option value="system">系统</option></select></div>
             <div class="extension-settings-layout"><aside class="configuration-index"><div class="configuration-index-head"><span>能力索引</span><small id="configuration-filter-count">—</small></div><div id="system-extension-list" class="extension-settings-list"><div class="kv-empty">正在读取配置资源…</div></div></aside><section id="system-extension-editor" class="extension-settings-editor"><div class="configuration-empty"><b>选择一项能力</b><span>查看配置字段、凭据状态与运行诊断。</span></div></section></div>
           </div>
         </section>
-        <aside class="maintenance-panel">
-          <div class="maintenance-number">BK</div><span class="kicker">LOCAL RECOVERY</span><h3>备份与恢复</h3>
-          <p>备份数据库和非敏感配置，并在恢复前校验大小与 SHA-256。密钥、依赖和缓存不会进入备份。</p>
-          <div class="maintenance-rule"><b>建议时机</b><span>批量采集前</span><span>模型迁移前</span><span>重要编辑前</span></div>
-          <button class="outline-button" id="download-backup">下载完整备份</button>
-          <label class="backup-picker">选择备份包<input id="backup-file" type="file" accept=".zip,application/zip"></label>
-          <div id="backup-validation" class="backup-validation" role="status">尚未选择备份包</div>
-          <button class="ink-button" id="restore-backup" disabled>恢复已校验备份</button>
-          <div class="maintenance-rule"><b>缓存清理</b><span>GitHub API 缓存</span><span>来源正文缓存</span></div>
-          <p>缓存删除后随采集自动重建，不影响数据库与产物。</p>
-          <button class="ghost-button" id="clear-cache">清理采集缓存</button>
-        </aside>
+        <details class="maintenance-disclosure">
+          <summary><span><b>备份与恢复</b><small>导出配置、恢复工作台数据，或清理采集缓存</small></span><em>低频工具</em><i>展开</i></summary>
+          <aside class="maintenance-panel">
+            <div class="maintenance-number">BK</div><span class="kicker">LOCAL RECOVERY</span><h3>备份与恢复</h3>
+            <p>备份数据库和非敏感配置，并在恢复前校验大小与 SHA-256。密钥、依赖和缓存不会进入备份。</p>
+            <div class="maintenance-rule"><b>建议时机</b><span>批量采集前</span><span>模型迁移前</span><span>重要编辑前</span></div>
+            <button class="outline-button" id="download-backup">下载完整备份</button>
+            <label class="backup-picker">选择备份包<input id="backup-file" type="file" accept=".zip,application/zip"></label>
+            <div id="backup-validation" class="backup-validation" role="status">尚未选择备份包</div>
+            <button class="ink-button" id="restore-backup" disabled>恢复已校验备份</button>
+            <div class="maintenance-rule"><b>缓存清理</b><span>GitHub API 缓存</span><span>来源正文缓存</span></div>
+            <p>缓存删除后随采集自动重建，不影响数据库与产物。</p>
+            <button class="ghost-button" id="clear-cache">清理采集缓存</button>
+          </aside>
+        </details>
       </div>
 
     </section>

@@ -910,7 +910,7 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 
 ### GET /api/system/configuration/catalog
 
-返回统一配置资源目录。资源类型包括 `system`、`model-provider`、`tool`、`collector` 和 `skill`；响应只包含 Schema、配置状态及脱敏值。
+返回统一配置资源目录。资源类型包括 `system`、`model-connection`、`model-provider`、`tool`、`collector` 和 `skill`；模型供应商连接与具体模型分开返回，响应只包含 Schema、配置状态及脱敏值。
 
 ### GET|PUT /api/system/configuration/:type/:id
 
@@ -922,7 +922,15 @@ GET 返回脱敏后的当前运行设置；PUT 更新受支持的 `.env` 字段�
 
 ### POST /api/system/configuration/model-provider
 
-注册新的模型 Provider（添加模型）。入参为创建所需的非敏感字段（`id`、`label`、`baseUrl`、`model`、`contextWindow`、`maxOutputTokens`），写入 `config.local.json` 的 `llm.providers`；密钥等后续字段由统一配置资源的保存流程写入隔离凭据 Profile，不写 `.env`。返回新建 Provider 的统一配置资源条目。
+注册新的模型配置。入参为 `id`、`label`、`connectionId`、`model`、`contextWindow`、`maxOutputTokens`；模型只从 `model-connection` 继承地址、协议和凭据，Token、打标、工具、思考等运行参数按模型单独保存。`connectionId` 创建后不可修改，模型唯一标识为 `供应商 ID/模型名称`。返回新建模型的统一配置资源条目。
+
+### POST /api/system/configuration/model-connection
+
+注册新的模型供应商连接。入参为 `id`、`label` 和 `baseUrl`；API Key 等秘密字段由统一配置资源的保存流程写入隔离凭据 Profile。返回新建供应商连接的统一配置资源条目。
+
+### DELETE /api/system/configuration/model-connection/:id
+
+删除模型供应商连接。仅当没有模型引用该供应商时允许删除；已配置的供应商凭据会一并清除。
 
 ### GET|PUT /api/system/collector-plugins/:id/configuration
 

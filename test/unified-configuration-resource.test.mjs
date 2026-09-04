@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ExtensionConfigurationService } from '../server/platform/extensions/configuration-service.mjs';
 import { buildConfigurationCatalog, findConfigurationResource } from '../server/platform/extensions/configuration-catalog.mjs';
-import { applyModelProviderConfiguration, legacyModelProviderConfiguration, modelProviderManifest } from '../server/platform/extensions/model-provider-configuration.mjs';
+import { applyModelProviderConfiguration, legacyModelProviderConfiguration, modelProviderManifest, modelProviderModelManifest } from '../server/platform/extensions/model-provider-configuration.mjs';
 
 function repository(){const rows=new Map();return {get:(type,id)=>rows.get(`${type}:${id}`)||null,save:(input)=>{const value={...input,value:structuredClone(input.value),updated_at:new Date().toISOString()};rows.set(`${input.extensionType}:${input.extensionId}`,value);return value;}};}
 
@@ -13,6 +13,13 @@ test('统一配置目录包含 system 与 model-provider 一等资源',async()=>
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'configuration-catalog-'));
   try{const items=await buildConfigurationCatalog({root,config:{llm:{providers:{demo:{label:'Demo',baseUrl:'https://example.com/v1',model:'demo-1',contextWindow:8000,maxOutputTokens:1000}}}}});const workbench=findConfigurationResource(items,'system','workbench');assert.ok(workbench);assert.deepEqual(workbench.manifest.configuration.properties.discussionResearchTopK.enum,[5,8,10]);assert.equal(workbench.manifest.configuration.properties.discussionResearchTopK.default,8);assert.ok(findConfigurationResource(items,'model-provider','demo'));}
   finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('模型资源把供应商锁定并使用供应商/模型作为唯一标识',()=>{
+  const manifest=modelProviderModelManifest('fast',{connectionId:'openai',label:'Fast',model:'gpt-4.1',taggingChunkSize:8},[['openai',{label:'OpenAI'}]]);
+  assert.equal(manifest.name,'openai/gpt-4.1');
+  assert.equal(manifest.configuration.properties.connectionId.readOnly,true);
+  for(const field of ['maxTokensField','taggingChunkSize','taggingConcurrency','supportsJsonMode','supportsNativeTools','supportsToolCallStreaming','supportsThinkingToggle','responsesReasoningToggle','thinkingReserveTokens','enabled'])assert.ok(manifest.configuration.properties[field],field);
 });
 
 test('模型供应商 Schema 覆盖运行时高级参数且旧环境变量可回退',()=>{

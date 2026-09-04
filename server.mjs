@@ -41,7 +41,7 @@ import { handleTaskRoutes } from './server/platform/http/routes/task-routes.mjs'
 import { createRouteHelpers, writeUtf8 } from './server/platform/http/route-helpers.mjs';
 import { setToolConfigurationResolver } from './server/platform/tools/index.mjs';
 import { ExtensionConfigurationService } from './server/platform/extensions/configuration-service.mjs';
-import { modelProviderManifest } from './server/platform/extensions/model-provider-configuration.mjs';
+import { modelConnectionManifest, modelProviderModelManifest } from './server/platform/extensions/model-provider-configuration.mjs';
 import { syncModelProvidersToDatabase } from './server/platform/integrations/model-provider-settings.mjs';
 import { seedDemoData } from './server/platform/demo/seed.mjs';
 import { createLocalSecurity } from './server/platform/http/local-security.mjs';
@@ -69,7 +69,14 @@ const recovered = store.recoverInterruptedWork();
 if (Object.values(recovered).some(Number)) console.log(`已恢复上次中断状态：${JSON.stringify(recovered)}`);
 const jobs = new CollectionJobManager(store, config, () => models);
 
-const models = new ModelGateway(config, store,(id,provider)=>extensionConfigurationService.resolve({extensionType:'model-provider',extensionId:id,manifest:modelProviderManifest(id,provider)}));
+const models = new ModelGateway(config, store,(id,provider)=>{
+  const connections=Object.entries(config.llm.connections||{});
+  const modelState=extensionConfigurationService.resolve({extensionType:'model-provider',extensionId:id,manifest:modelProviderModelManifest(id,provider,connections)});
+  const connectionId=modelState.values?.connectionId||provider.connectionId||id;
+  const connection=config.llm.connections?.[connectionId]||provider;
+  const connectionState=extensionConfigurationService.resolve({extensionType:'model-connection',extensionId:connectionId,manifest:modelConnectionManifest(connectionId,connection)});
+  return {...modelState,configured:modelState.configured&&connectionState.configured,values:{...connectionState.values,...modelState.values,apiKey:connectionState.values?.apiKey}};
+});
 const aiJobs = new AiJobManager(store, models, config, {
   batchLevelTypes: BATCH_LEVEL_AI_JOB_TYPES,
   handlers: createAiJobHandlers({ store, gateway: models, config, log: (job, message) => aiJobs.log(job, message), onThinking: (job, delta) => aiJobs.recordThinking(job, delta) }),

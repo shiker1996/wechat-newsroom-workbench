@@ -4,7 +4,7 @@ import { readToolPluginCatalog } from '../tools/package-manager.mjs';
 import { readRemotePluginCatalog } from '../tools/remote-package-manager.mjs';
 import { readCollectorPluginCatalog } from '../collectors/package-manager.mjs';
 import { BUILTIN_COLLECTOR_MANIFESTS } from '../collectors/builtin-registry.mjs';
-import { modelProviderManifest } from './model-provider-configuration.mjs';
+import { modelConnectionManifest, modelIdentifier, modelProviderModelManifest } from './model-provider-configuration.mjs';
 import { MODEL_PROFILE_UI_FIELDS } from '../llm/stage-model-routing.mjs';
 
 const object=(properties,required=[])=>({type:'object',additionalProperties:false,properties,required});
@@ -31,7 +31,12 @@ function systemResources(config){
   ];
 }
 
-function modelResources(config){return Object.entries(config.llm?.providers||{}).map(([id,provider])=>({id,name:provider.label||id,type:'model-provider',kind:'model-provider',manifest:modelProviderManifest(id,provider,config.llm.defaultProvider===id)}));}
+function modelResources(config){
+  const connections=Object.entries(config.llm?.connections||{});
+  const connectionResources=connections.map(([id,connection])=>({id,name:connection.label||id,type:'model-connection',kind:'model-connection',manifest:modelConnectionManifest(id,connection)}));
+  const modelResources=Object.entries(config.llm?.providers||{}).map(([id,provider])=>{const modelKey=modelIdentifier(provider.connectionId||id,provider.model||id);return {id,name:modelKey,modelKey,type:'model-provider',kind:'model-provider',manifest:modelProviderModelManifest(id,provider,connections,config.llm.defaultProvider===id)};});
+  return [...connectionResources,...modelResources];
+}
 
 export async function buildConfigurationCatalog({root,config}){
   const skills=new SkillRegistry({workspaceRoot:root}).list().filter((manifest)=>manifest.configuration).map((manifest)=>({id:manifest.id,name:manifest.name,type:'skill',kind:manifest.kind,manifest}));

@@ -15,7 +15,7 @@ import {
 import { validateWorkbenchBackup } from '../../artifacts/backup-archive.mjs';
 import { getGitHubApiHealth } from '../../connectors/github-client.mjs';
 import { getRuntimeSettings, runPowerShellScript, updateRuntimeSettings } from '../../integrations/runtime-settings.mjs';
-import { createModelProvider, syncModelProviderFromDatabase } from '../../integrations/model-provider-settings.mjs';
+import { createModelConnection, createModelProvider, deleteModelConnection, syncModelConnectionFromDatabase, syncModelProviderFromDatabase } from '../../integrations/model-provider-settings.mjs';
 import { SkillRegistry } from '../../skills/registry.mjs';
 import { BUILTIN_PLUGINS, getToolRegistry, reloadToolRegistry } from '../../tools/index.mjs';
 import { writeToolPluginSetting, writeToolPluginSettings } from '../../tools/settings.mjs';
@@ -231,6 +231,24 @@ export async function handleSystemRoutes(context) {
     }catch(error){json(response,400,{error:error.message});}
     return true;
   }
+  if(request.method==='POST'&&pathname==='/api/system/configuration/model-connection'){
+    try{
+      const input=await body(request);
+      const id=createModelConnection(root,config,input,{repository:extensionSettingRepository});
+      const items=await configurationCatalog();
+      const resource=findConfigurationResource(items,'model-connection',id);
+      json(response,200,{id,item:resource?{...resource,state:describeResource(resource)}:null});
+    }catch(error){json(response,400,{error:error.message});}
+    return true;
+  }
+  const modelConnectionDeleteMatch=pathname.match(/^\/api\/system\/configuration\/model-connection\/([^/]+)$/);
+  if(request.method==='DELETE'&&modelConnectionDeleteMatch){
+    try{
+      const id=deleteModelConnection(root,config,decodeURIComponent(modelConnectionDeleteMatch[1]),{repository:extensionSettingRepository});
+      json(response,200,{deleted:true,id});
+    }catch(error){json(response,400,{error:error.message});}
+    return true;
+  }
   if(unifiedConfigurationMatch&&['GET','PUT'].includes(request.method)){
     const type=decodeURIComponent(unifiedConfigurationMatch[1]),id=decodeURIComponent(unifiedConfigurationMatch[2]);const resource=findConfigurationResource(await configurationCatalog(),type,id);
     if(!resource){json(response,404,{error:'配置资源不存在'});return true;}
@@ -240,10 +258,19 @@ export async function handleSystemRoutes(context) {
         result=describeResource(resource);
       }else{
         const input=await body(request);
+        if(type==='model-provider'){
+          const current=config.llm?.providers?.[id]||{};
+          if(input?.connectionId&&input.connectionId!==current.connectionId)throw new Error('模型所属供应商创建后不可修改，请新增模型');
+          const connectionId=current.connectionId||id;
+          const model=String(input?.model||current.model||'').trim();
+          const duplicate=Object.entries(config.llm?.providers||{}).find(([providerId,provider])=>providerId!==id&&(provider.connectionId||providerId)===connectionId&&String(provider.model||'').trim()===model);
+          if(duplicate)throw new Error(`模型唯一标识 ${connectionId}/${model} 已存在`);
+        }
         const makeDefault=type==='model-provider'?input?.default:undefined;
         if(type==='model-provider'&&input&&'default'in input)delete input.default;
         result=extensionConfiguration.save({extensionType:type,extensionId:id,manifest:resource.manifest,input,fallbackValues:resourceFallback(resource)});
         if(type==='model-provider')syncModelProviderFromDatabase(config,extensionSettingRepository,id);
+        if(type==='model-connection')syncModelConnectionFromDatabase(config,extensionSettingRepository,id);
         // 模型「默认」由运行时状态唯一决定：勾选即切换；取消当前默认则回退到其他启用模型
         if(type==='model-provider'&&config.llm?.providers?.[id]&&(makeDefault===true||(makeDefault===false&&config.llm.defaultProvider===id))){
           if(makeDefault===true){config.llm.defaultProvider=id;}
