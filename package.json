@@ -13,7 +13,7 @@
         "test:fast": "node scripts/build/test-fast.mjs",
         "event-resolution:backfill": "node scripts/migration/backfill-event-resolution.mjs",
         "topic-score:replay": "node scripts/migration/replay-topic-score.mjs",
-        "build": "node scripts/build/build.mjs",
+        "build": "npm run build:styles && node scripts/build/build.mjs",
         "build:styles": "node scripts/build/build-styles.mjs",
         "check:legacy-config-guidance": "node scripts/quality/check-legacy-configuration-guidance.mjs",
         "postinstall": "node scripts/runtime/install-skill-deps.mjs",

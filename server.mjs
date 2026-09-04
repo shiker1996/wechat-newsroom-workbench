@@ -3,6 +3,7 @@ import path from 'node:path';
 import http from 'node:http';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -113,16 +114,36 @@ async function body(request) {
   return text ? JSON.parse(text) : {};
 }
 
-function serveStatic(response, pathname) {
+function serveStatic(request, response, url) {
+  const { pathname, searchParams } = url;
   const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
   const filePath = path.resolve(publicRoot, relative);
   const relativeToPublic = path.relative(publicRoot, filePath);
   if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return false;
-  response.writeHead(200, { 'content-type': mime[path.extname(filePath)] ?? 'application/octet-stream', 'cache-control':'no-store' });
+  const type = mime[path.extname(filePath)] ?? 'application/octet-stream';
+  const versioned = searchParams.has('v');
+  const cacheControl = versioned
+    ? 'public, max-age=31536000, immutable'
+    : pathname === '/' || path.extname(filePath) === '.html'
+      ? 'no-cache'
+      : 'no-store';
+  const compressible = /^(text\/|application\/(?:javascript|json|xml))/.test(type);
+  const acceptEncoding = String(request.headers?.['accept-encoding'] || '');
+  let encoding = '';
+  if (compressible && /\bbr\b/i.test(acceptEncoding)) encoding = 'br';
+  else if (compressible && /\bgzip\b/i.test(acceptEncoding)) encoding = 'gzip';
+  const headers = { 'content-type': type, 'cache-control': cacheControl };
+  if (encoding) {
+    headers['content-encoding'] = encoding;
+    headers.vary = 'Accept-Encoding';
+  }
+  response.writeHead(200, headers);
   const source=fs.createReadStream(filePath);
   source.once('error',(error)=>{console.error(error);if(!response.headersSent)response.writeHead(404);if(!response.writableEnded)response.end();});
   response.once('close',()=>{if(!source.destroyed)source.destroy();});
-  source.pipe(response);
+  if (encoding === 'br') source.pipe(zlib.createBrotliCompress()).pipe(response);
+  else if (encoding === 'gzip') source.pipe(zlib.createGzip()).pipe(response);
+  else source.pipe(response);
   return true;
 }
 
@@ -365,7 +386,7 @@ const server = http.createServer(async (request, response) => {
       if (handled === false) json(response, 404, { error: '接口不存在' });
       return;
     }
-    if (!serveStatic(response, url.pathname)) {
+    if (!serveStatic(request, response, url)) {
       response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
       response.end('Not found');
     }

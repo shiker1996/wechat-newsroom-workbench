@@ -8,6 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const publicDir = path.join(root, "public");
 const cssSourceDir = path.join(publicDir, "styles");
 const cssSources = ["tokens-base.css", "social-card.css", "production.css", "topics-accessibility.css", "editor-themes.css", "system-console.css"];
+const generatedStyleDir = path.join(publicDir, "assets", "styles");
+const generatedStyles = ["common.css", "social.css", "topics.css", "editor.css", "system.css"];
 
 function walk(dir, extensions = new Set([".js", ".mjs"])) {
   const files = [];
@@ -83,6 +85,13 @@ const actualStyles = fs.readFileSync(path.join(publicDir, "styles.css"), "utf8")
 if (actualStyles !== expectedStyles) {
   console.error("  public/styles.css 不是由 public/styles/*.css 当前分片生成，请运行 npm run build:styles");
   ok = false;
+}
+for (const file of generatedStyles) {
+  const filePath = path.join(generatedStyleDir, file);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile() || fs.statSync(filePath).size === 0) {
+    console.error(`  按需样式产物不存在或为空 ${path.relative(root, filePath)}，请运行 npm run build:styles`);
+    ok = false;
+  }
 }
 
 const frontendFiles = walk(path.join(publicDir, "src"), new Set([".js"]));

@@ -22,6 +22,79 @@ const viewModules = {
 // 三个导航入口共用同一视图 DOM：工具图文 / 自定义图文 / 事件图文都落在 #view-social-editor
 const viewSectionAliases = { "social-custom": "view-social-editor", "social-event": "view-social-editor" };
 
+const styleVersion = "20260905-css-split-6";
+const styleModules = {
+  social: "/assets/styles/social.css",
+  topics: "/assets/styles/topics.css",
+  editor: "/assets/styles/editor.css",
+  system: "/assets/styles/system.css",
+};
+const styleOrder = ["social", "topics", "editor", "system"];
+const viewStyles = {
+  overview: ["topics"],
+  topics: ["topics"],
+  "social-topics": ["topics", "social"],
+  "social-editor": ["social", "system"],
+  "social-custom": ["social", "system"],
+  "social-event": ["social", "system"],
+  editorial: ["editor", "system"],
+  daily: ["editor", "system"],
+  tutorial: ["editor", "system"],
+  editor: ["editor", "system"],
+  preview: ["editor", "system"],
+  cover: ["editor", "system"],
+  calendar: ["topics", "editor"],
+  "material-inbox": ["editor"],
+  publication: ["editor"],
+  "wechat-review-prep": ["editor"],
+  "wechat-review": ["editor"],
+  "content-feedback": ["editor"],
+  themes: ["social", "editor", "system"],
+  hotspots: ["topics"],
+  logs: ["topics"],
+  system: ["system"],
+  skills: ["system"],
+  sources: ["system"],
+  models: ["system"],
+};
+const loadedStyles = new Map();
+
+function waitForBaseStyle() {
+  const link = document.querySelector('link[data-base-style="common"]');
+  if (!link || link.sheet) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    link.addEventListener("load", resolve, { once: true });
+    link.addEventListener("error", () => reject(new Error("基础样式加载失败")), { once: true });
+  });
+}
+
+function loadStyle(name) {
+  if (loadedStyles.has(name)) return loadedStyles.get(name);
+  const href = `${styleModules[name]}?v=${styleVersion}`;
+  const promise = new Promise((resolve, reject) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.routeStyle = name;
+    link.addEventListener("load", resolve, { once: true });
+    link.addEventListener("error", () => reject(new Error(`样式加载失败：${name}`)), { once: true });
+    // Preserve the source bundle cascade when views are opened in any order.
+    const currentOrder = styleOrder.indexOf(name);
+    const next = [...document.querySelectorAll("link[data-route-style]")]
+      .find((item) => styleOrder.indexOf(item.dataset.routeStyle) > currentOrder);
+    if (next) document.head.insertBefore(link, next);
+    else document.head.appendChild(link);
+  });
+  loadedStyles.set(name, promise);
+  return promise;
+}
+
+async function loadViewStyles(view) {
+  const names = [...new Set(viewStyles[view] || [])]
+    .sort((a, b) => styleOrder.indexOf(a) - styleOrder.indexOf(b));
+  for (const name of names) await loadStyle(name);
+}
+
 const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
@@ -41,6 +114,12 @@ async function go(route) {
   exitImmersiveChats();
   const view = String(route || "").split("/")[0];
   if (!(view in titles)) return;
+  try {
+    await loadViewStyles(view);
+  } catch (error) {
+    console.error(error);
+    toast("部分视图样式加载失败，请刷新后重试", "error");
+  }
   if(view!=="editor")document.body.classList.remove("editor-focus");
   const previousView = document.querySelector(".nav-item.active,.nav-utility.active")?.dataset.view;
   const isViewChange = previousView !== view;
@@ -214,6 +293,12 @@ async function pollJobNotifications() {
 }
 
 async function onReady() {
+  try {
+    await waitForBaseStyle();
+  } catch (error) {
+    console.error(error);
+    toast("基础样式加载失败，请刷新后重试", "error");
+  }
   await init();
   bindGlobal();
   bindQuickMaterialCapture();

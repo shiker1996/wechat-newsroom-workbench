@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260904-brief-moved-to-writing-1">
+          <link rel="stylesheet" data-base-style="common" href="/assets/styles/common.css?v=20260905-css-split-6">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -162,7 +162,7 @@
       </section>
       <section class="atlas-mode-panel" data-atlas-mode-panel="atlas" hidden>
         <div class="atlas-grid atlas-semantic-grid">
-          <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
+          <section class="panel atlas-coverage-panel"><div class="panel-head"><div><span class="kicker">COVERAGE LEDGER</span><h3>地区与来源覆盖</h3></div><span class="panel-count" id="atlas-filter-count"></span></div><div id="scope-distribution" class="scope-distribution"></div><div id="channel-bars" class="bar-list"></div></section>
           <section class="panel atlas-graph-panel"><div class="panel-head"><div><span class="kicker">EVENT GRAPH</span><h3>事件关系图</h3></div><div class="graph-tools"><div class="graph-lenses" role="tablist" aria-label="关系排序维度"><button class="active" data-graph-lens="who" role="tab" aria-selected="true">主体</button><button data-graph-lens="what" role="tab" aria-selected="false">动作</button><button data-graph-lens="where" role="tab" aria-selected="false">场合</button><button data-graph-lens="relation" role="tab" aria-selected="false">关系</button></div><div class="graph-zoom" aria-label="关系图缩放"><button data-graph-zoom="out" title="缩小" aria-label="缩小事件关系图">−</button><button data-graph-zoom="reset" title="重置缩放" aria-label="重置事件关系图缩放">100%</button><button data-graph-zoom="in" title="放大" aria-label="放大事件关系图">＋</button></div></div></div><div id="event-graph" class="event-graph"></div></section>
         </div>
         <section class="atlas-insight-panel">
@@ -171,7 +171,7 @@
             <button type="button" role="tab" aria-selected="false" aria-controls="atlas-insight-dimensions" data-atlas-insight-tab="dimensions">事件维度分组 <small>EVENT DIMENSION</small></button>
           </div>
           <section id="atlas-insight-relations" class="atlas-insight-content" data-atlas-insight-panel="relations">
-            <section class="panel atlas-relation-panel"><div class="panel-head"><div><span class="kicker">TOPIC RESEARCH</span><h3>事件间研判</h3><p>只展示能继续形成选题的前后变化、回应关系、对比关系和趋势关系；关键词相同但没有讨论意义的事件不会进入这里。</p></div><span id="discussion-relation-count"></span></div><div id="discussion-relation-list" class="discussion-relation-list"></div></section>
+            <section class="panel atlas-relation-panel"><div class="panel-head"><div><span class="kicker">TOPIC RESEARCH</span><h3>事件间研判</h3><p>只展示能继续形成选题的前后变化、回应关系、对比关系和趋势关系；关键词相同但没有讨论意义的事件不会进入这里。</p></div><span class="panel-count" id="discussion-relation-count"></span></div><div id="discussion-relation-list" class="discussion-relation-list"></div></section>
           </section>
           <section id="atlas-insight-dimensions" class="atlas-insight-content" data-atlas-insight-panel="dimensions" hidden>
             <section class="panel atlas-table"><div class="panel-head"><div><span class="kicker">EVENT DIMENSION</span><h3>维度分组 · 选题入口</h3></div><div class="atlas-legend"><span>来源数优先</span><span>报道数其次</span></div></div><div id="coverage-list" class="event-ranking"></div></section>
@@ -184,7 +184,7 @@
       <div class="section-intro"><div><span class="kicker">ARTICLE PITCH DESK</span></div><p>综合事件热度、模型研判、文章化质量与竞争情况，选择值得进入编辑会的文章方向。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
-          <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span id="candidate-count">0 条</span></div>
+          <div class="workspace-head"><div><span class="kicker">ARTICLE SHORTLIST</span><h3>文章候选</h3></div><span class="panel-count" id="candidate-count">0 条</span></div>
           <div class="scope-tabs" id="article-type-tabs" aria-label="文章类型筛选"><button type="button" class="active" data-article-type="all">全部</button><button type="button" data-article-type="hotspot">热点事件</button><button type="button" data-article-type="independent">自主写作</button></div>
           <div class="topic-pool-hint">选题请在「<a href="#overview">热点全景</a>」中操作：每个事件归纳卡片底部有「创建综合选题」按钮，可一键将整个事件簇入池。</div>
           <details class="score-guide"><summary>评分怎么看？</summary><div><span><b>事件热度 T</b>事件热榜的热度、进展、来源扩散和时效</span><span><b>研判价值 J</b>事件内反常/利益冲突/发散，以及事件间前后/回应/对比/趋势关系</span><span><b>文章化质量 A</b>模型判断这个命题能否写成有传播力、有信息增量的文章</span><span><b>竞争扣分 C</b>同题饱和与事件重复造成的扣分</span><span><b>最终选题分 F</b>综合排序依据，低于 55 默认隐藏</span></div><small>当前公式：A = H × 60% + B × 25% + P × 15%；F = A × 55% + T × 25% + J × 20% − C。H/B/P 仅作为 A 的内部拆分。</small></details>
@@ -203,7 +203,7 @@
       <div id="daily-job-history" class="daily-job-history" aria-live="polite"></div>
       <div class="daily-layout">
         <section class="panel daily-picker-panel daily-stage-panel" data-daily-stage-panel="1">
-          <div class="workspace-head"><div><span class="kicker">READING FOCUS</span><h3>选择阅读视角</h3></div><span id="daily-selection-count">未选择</span></div>
+          <div class="workspace-head"><div><span class="kicker">READING FOCUS</span><h3>选择阅读视角</h3></div><span class="panel-count" id="daily-selection-count">未选择</span></div>
           <div class="scope-tabs daily-dimension-tabs" id="daily-dimension-tabs" aria-label="早报关系维度">
             <button type="button" class="active" data-daily-dimension="who">主体</button>
             <button type="button" data-daily-dimension="what">动作</button>
@@ -235,7 +235,7 @@
     <section class="view" id="view-tutorial">
       <div class="section-intro"><div><span class="kicker">INDEPENDENT WRITING</span></div><p>通过 AI 对话完成心得经验或使用教程；保留主观表达与事实边界，成稿后统一进入文章编辑器和公众号排版。</p></div>
       <section class="panel custom-writing-projects">
-        <div class="workspace-head"><div><span class="kicker">CURRENT BATCH</span><h3>当前批次自主文章</h3><small>继续查看、重试或编辑已经创建的文章，不必重复新建。</small></div><span id="custom-writing-project-count">0 篇</span></div>
+        <div class="workspace-head"><div><span class="kicker">CURRENT BATCH</span><h3>当前批次自主文章</h3><small>继续查看、重试或编辑已经创建的文章，不必重复新建。</small></div><span class="panel-count" id="custom-writing-project-count">0 篇</span></div>
         <div id="custom-writing-project-list" class="custom-writing-project-list" aria-live="polite" aria-busy="true"><div class="empty-state">正在读取当前批次自主文章…</div></div>
       </section>
       <form id="tutorial-form" class="panel tutorial-form">
@@ -313,7 +313,7 @@
           <div id="column-list" class="column-list"></div>
         </section>
       </div>
-      <section class="panel material-list-panel"><div class="panel-head"><div><span class="kicker">RAW MATERIALS</span><h3>素材箱</h3><small>先整理，可直接用于自主写作；主线和目标读者由 AI 在写作阶段提议、你来确认</small></div><div class="material-filters"><select id="material-status-filter"><option value="">全部状态</option><option value="inbox">待整理</option><option value="developing">整理中</option><option value="planned">已计划</option><option value="archived">归档</option></select><select id="material-sort-filter" aria-label="素材排序"><option value="latest">最近更新</option><option value="feedback">复盘优先</option></select><span id="material-count"></span></div></div><div class="material-selection-toolbar" id="material-selection-toolbar" hidden><span id="material-selection-count">已选 0 条素材</span><small>进入自主写作后，素材正文会作为【素材】事实带入，仍可在表单和对话中补充、删改。</small><button type="button" class="primary-button" data-material-write-selected>用选中素材写作 →</button><button type="button" class="outline-button" data-material-social-selected>用选中素材做图文 →</button></div><div id="material-list" class="material-list"></div></section>
+      <section class="panel material-list-panel"><div class="panel-head"><div><span class="kicker">RAW MATERIALS</span><h3>素材箱</h3><small>先整理，可直接用于自主写作；主线和目标读者由 AI 在写作阶段提议、你来确认</small></div><div class="material-filters"><select id="material-status-filter"><option value="">全部状态</option><option value="inbox">待整理</option><option value="developing">整理中</option><option value="planned">已计划</option><option value="archived">归档</option></select><select id="material-sort-filter" aria-label="素材排序"><option value="latest">最近更新</option><option value="feedback">复盘优先</option></select><span class="panel-count" id="material-count"></span></div></div><div class="material-selection-toolbar" id="material-selection-toolbar" hidden><span id="material-selection-count">已选 0 条素材</span><small>进入自主写作后，素材正文会作为【素材】事实带入，仍可在表单和对话中补充、删改。</small><button type="button" class="primary-button" data-material-write-selected>用选中素材写作 →</button><button type="button" class="outline-button" data-material-social-selected>用选中素材做图文 →</button></div><div id="material-list" class="material-list"></div></section>
 
       <dialog class="material-dialog" id="material-edit-dialog">
         <form method="dialog" class="material-dialog-shell" id="material-edit-form">
@@ -374,7 +374,7 @@
       <div class="section-intro"><div><span class="kicker">SOCIAL CARD PITCH DESK</span></div><p>承接适合工具卡和社交图文的候选。P0 先完成独立入池与状态管理，事实门禁和图文生成将在后续阶段接入。</p></div>
       <div class="topic-workspace">
         <section class="candidate-board">
-          <div class="workspace-head"><div><span class="kicker">SOCIAL SHORTLIST</span><h3>图文候选</h3></div><span id="social-candidate-count">0 条</span></div>
+          <div class="workspace-head"><div><span class="kicker">SOCIAL SHORTLIST</span><h3>图文候选</h3></div><span class="panel-count" id="social-candidate-count">0 条</span></div>
           <div class="topic-pool-hint">图文候选由独立 Social Fit 研判产生；可从下方 AI 图文预选意见手动补入，不与文章选题池互转。</div>
           <div id="social-candidate-list" class="candidate-list"></div>
         </section>
@@ -1215,7 +1215,7 @@
           <p class="fine-print">测试只发送最小提示词并产生少量模型费用，用于确认端点、密钥和模型名称是否可用。内容生产操作请回到对应批次或编辑室执行。</p>
         </aside>
       </div>
-      <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span id="call-summary"></span></div><div id="model-call-list"></div></section>
+      <section class="panel model-history"><div class="panel-head"><div><span class="kicker">AUDIT LOG</span><h3>模型调用记录</h3></div><span class="panel-count" id="call-summary"></span></div><div id="model-call-list"></div></section>
     </section>
 
     <section class="view" id="view-calendar">
