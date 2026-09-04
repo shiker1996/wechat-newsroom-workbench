@@ -4,7 +4,7 @@ import http from 'node:http';
 import { ModelGateway } from '../server/platform/llm/gateway.mjs';
 import { testConfigurationResolver } from './helpers/gateway-configuration.mjs';
 
-function makeGateway(port) {
+function makeGateway(port, store = { recordModelCall() { return 1; } }) {
   process.env.TEST_EVENT_KEY = 'secret';
   return new ModelGateway({
     llm: {
@@ -16,7 +16,7 @@ function makeGateway(port) {
         },
       },
     },
-  }, { recordModelCall() { return 1; } }, testConfigurationResolver);
+  }, store, testConfigurationResolver);
 }
 
 async function withServer(chunks, fn) {
@@ -114,6 +114,65 @@ test('complete 保留原生工具 schema 与 tool_call 历史，不发送伪 JSO
     assert.deepEqual(requestBody.messages.map((message) => message.role), ['assistant', 'tool']);
     assert.equal(requestBody.messages[1].tool_call_id, 'call_old');
     assert.deepEqual(requestBody.tools, [{ type: 'function', function: { name: 'cap_content_demo_read', parameters: { type: 'object' } } }]);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.TEST_EVENT_KEY;
+  }
+});
+
+test('Chat Completions 将协议无关的 function tool_choice 转为 Chat 格式', async () => {
+  process.env.TEST_EVENT_KEY = 'secret';
+  let requestBody;
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      requestBody = JSON.parse(body);
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: 'resp-choice', choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [{ id: 'call-choice', type: 'function', function: { name: 'decision.quality_gate', arguments: '{"pass":true}' } }] } }], usage: {} }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const model = makeGateway(server.address().port);
+    const result = await model.complete({ purpose: 'connection-test', thinking: false,
+      tools: [{ type: 'function', function: { name: 'decision.quality_gate', parameters: { type: 'object' } } }],
+      toolChoice: { type: 'function', name: 'decision.quality_gate' },
+      messages: [{ role: 'user', content: '检查' }],
+    });
+    assert.equal(result.toolCalls[0].name, 'decision.quality_gate');
+    assert.deepEqual(requestBody.tool_choice, { type: 'function', function: { name: 'decision.quality_gate' } });
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.TEST_EVENT_KEY;
+  }
+});
+
+test('Chat Completions 原生工具参数解析失败时记录 invalid_output', async () => {
+  process.env.TEST_EVENT_KEY = 'secret';
+  const audit = [];
+  const server = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: 'resp-invalid-tool', choices: [{ finish_reason: 'tool_calls', message: {
+        content: null,
+        tool_calls: [{ id: 'call-invalid', type: 'function', function: { name: 'decision.quality_gate', arguments: '{"pass":' } }],
+      } }], usage: {} }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const model = makeGateway(server.address().port, {
+      recordModelCall(input) { audit.push(input); return 1; },
+    });
+    await assert.rejects(
+      model.complete({ purpose: 'connection-test', thinking: false, messages: [{ role: 'user', content: '检查' }] }),
+      /参数不是合法 JSON/,
+    );
+    assert.equal(audit.at(-1).status, 'invalid_output');
   } finally {
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));

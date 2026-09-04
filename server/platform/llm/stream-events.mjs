@@ -51,14 +51,34 @@ export function parseToolArguments(raw) {
   return JSON.parse(text);
 }
 
+// 调用方使用协议无关的 { type:'function', name }；Chat Completions
+// 仍要求把函数名放在 function.name 中。auto/required 和 provider 扩展
+// 选项保持原样透传。
+export function normalizeChatToolChoice(toolChoice) {
+  if (!toolChoice || typeof toolChoice === 'string') return toolChoice || null;
+  if (toolChoice.type !== 'function') return toolChoice;
+  const name = String(toolChoice.name || toolChoice.function?.name || '').trim();
+  if (!name) throw new Error('Chat Completions tool_choice 缺少函数名称');
+  return { type: 'function', function: { name } };
+}
+
 export function normalizeChatToolCalls(toolCalls = []) {
   return (Array.isArray(toolCalls) ? toolCalls : []).map((call, index) => {
     const name = String(call?.function?.name || call?.name || '').trim();
     if (!name) throw new Error(`工具调用 #${index + 1} 缺少名称`);
+    let input;
+    try {
+      input = parseToolArguments(call?.function?.arguments ?? call?.input);
+    } catch (error) {
+      throw Object.assign(new Error(`工具 ${name} 参数不是合法 JSON：${error.message}`), {
+        code: 'INVALID_TOOL_ARGUMENTS',
+        cause: error,
+      });
+    }
     return {
       id: String(call?.id || `call_${index + 1}`),
       name,
-      input: parseToolArguments(call?.function?.arguments ?? call?.input),
+      input,
       providerExecuted: false,
     };
   });

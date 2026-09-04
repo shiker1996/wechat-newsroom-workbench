@@ -64,6 +64,16 @@ export function responsesToolDefinitions(tools = []) {
   });
 }
 
+// 调用方使用协议无关的 { type:'function', name }；Responses API 不使用
+// Chat Completions 风格的 function 包装。auto/required 和内置工具选择保持原样。
+export function normalizeResponsesToolChoice(toolChoice) {
+  if (!toolChoice || typeof toolChoice === 'string') return toolChoice || null;
+  if (toolChoice.type !== 'function') return toolChoice;
+  const name = String(toolChoice.name || toolChoice.function?.name || '').trim();
+  if (!name) throw new Error('Responses tool_choice 缺少函数名称');
+  return { type: 'function', name };
+}
+
 export function responsesReasoningPayload(thinking, provider) {
   if (thinking === false) {
     // DeepSeek Responses 在省略 reasoning 时默认开启思考；必须显式传 effort:none。
@@ -87,7 +97,7 @@ export function responsesPayload({ provider, messages, maxOutputTokens, temperat
   if (stream) payload.stream = true;
   Object.assign(payload, responsesReasoningPayload(thinking, provider));
   if (responseTools.length) payload.tools = responsesToolDefinitions(responseTools);
-  if (toolChoice) payload.tool_choice = toolChoice;
+  if (toolChoice) payload.tool_choice = normalizeResponsesToolChoice(toolChoice);
   if (jsonMode && !responseTools.length) payload.text = { format: { type: 'json_object' } };
   return payload;
 }
@@ -139,10 +149,19 @@ export function normalizeResponsesToolCalls(data) {
     if (item?.type !== 'function_call') return [];
     const name = String(item.name || '').trim();
     if (!name) throw new Error(`工具调用 #${index + 1} 缺少名称`);
+    let input;
+    try {
+      input = parseToolArguments(item.arguments ?? item.input);
+    } catch (error) {
+      throw Object.assign(new Error(`工具 ${name} 参数不是合法 JSON：${error.message}`), {
+        code: 'INVALID_TOOL_ARGUMENTS',
+        cause: error,
+      });
+    }
     return [{
       id: String(item.call_id || item.id || `call_${index + 1}`),
       name,
-      input: parseToolArguments(item.arguments ?? item.input),
+      input,
       providerExecuted: false,
     }];
   });

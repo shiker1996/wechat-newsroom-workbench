@@ -3,7 +3,7 @@ import { webSearch as tavilySearch, formatSearchResults } from './web-search.mjs
 import { outputBudgetFor, TRUNCATION_RETRY_SYSTEM_PROMPT } from './output-budget.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { applyModelProviderConfiguration } from '../extensions/model-provider-configuration.mjs';
-import { chatCompletionsEvents, normalizeChatToolCalls } from './stream-events.mjs';
+import { chatCompletionsEvents, normalizeChatToolCalls, normalizeChatToolChoice } from './stream-events.mjs';
 import { normalizeResponsesResponse, responsesEndpoint, responsesEvents, responsesPayload } from './responses-api.mjs';
 
 // 后台任务 thinking 实时进度：AiJobManager 在 run() 外层注册当前任务的接收器，
@@ -210,7 +210,7 @@ export class ModelGateway {
         payload[provider.maxTokensField || 'max_tokens'] = maxTokens;
         Object.assign(payload, thinkingPayload(thinking, provider));
         if (tools.length) payload.tools = tools;
-        if (toolChoice) payload.tool_choice = toolChoice;
+        if (toolChoice) payload.tool_choice = normalizeChatToolChoice(toolChoice);
         if(useJsonMode && !tools.length)payload.response_format={type:'json_object'};
         if(webSearch && provider.webSearchConfig) { payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue; }
         const response = await fetchWithRetry(endpoint(provider.baseUrl), {
@@ -265,7 +265,7 @@ export class ModelGateway {
         Object.assign(payload, thinkingPayload(thinking, provider));
         payload.stream_options = { include_usage: true };
         if (tools.length) payload.tools = tools;
-        if (toolChoice) payload.tool_choice = toolChoice;
+        if (toolChoice) payload.tool_choice = normalizeChatToolChoice(toolChoice);
         if (useJsonMode && !tools.length) payload.response_format = { type: 'json_object' };
         if (webSearch && provider.webSearchConfig) payload[provider.webSearchConfig.payloadKey] = provider.webSearchConfig.payloadValue;
         const response = await fetchWithRetry(endpoint(provider.baseUrl), {
@@ -317,7 +317,9 @@ export class ModelGateway {
         finishReason = event.reason || finishReason;
         id = event.responseId || id;
       } else if (event.type === 'error' || event.type === 'tool-error') {
-        throw new Error(`${provider.label || providerName} ${event.message || '流式响应失败'}`);
+        throw Object.assign(new Error(`${provider.label || providerName} ${event.message || '流式响应失败'}`), {
+          code: event.code || 'LLM_STREAM_FAILED',
+        });
       }
     }
     if (finishReason === 'content_filter') throw new Error(`${provider.label || providerName} 输出触发内容过滤，未返回内容`);
@@ -474,7 +476,7 @@ export class ModelGateway {
       this.store.recordModelCall({ provider: providerName, model: provider.model, purpose: input.purpose,
         batchId: input.batchId, candidateId: input.candidateId,
         estimatedInputTokens: context?.afterTokens ?? estimateTokens(input.messages), compressed: context?.compressed,
-        latencyMs: Date.now() - started, status: 'failed', error: error.message,
+        latencyMs: Date.now() - started, status: error.code === 'INVALID_TOOL_ARGUMENTS' ? 'invalid_output' : 'failed', error: error.message,
         outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId });
       throw error;
     }
@@ -536,7 +538,7 @@ export class ModelGateway {
         outputBudget:{...outputBudget,used:attempts===2?outputBudget.retry:outputBudget.initial,attempts}};
     } catch(error) {
       this.store.recordModelCall({provider:providerName,model:provider.model,purpose:input.purpose,batchId:input.batchId,candidateId:input.candidateId,
-        estimatedInputTokens:context?.afterTokens??estimateTokens(input.messages),compressed:context?.compressed,latencyMs:Date.now()-started,status:'failed',error:error.message,
+        estimatedInputTokens:context?.afterTokens??estimateTokens(input.messages),compressed:context?.compressed,latencyMs:Date.now()-started,status:error.code==='INVALID_TOOL_ARGUMENTS'?'invalid_output':'failed',error:error.message,
         outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId});throw error;
     }
   }

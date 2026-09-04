@@ -93,6 +93,12 @@ test('Responses 工具定义与 Chat Completions 工具定义保持协议隔离'
   assert.deepEqual(responsesToolDefinitions([{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }]), [
     { type: 'function', name: 'x', description: '', parameters: { type: 'object' } },
   ]);
+  assert.deepEqual(responsesPayload({
+    provider: { protocol: 'responses', model: 'mock', maxOutputTokens: 1000 },
+    messages: [{ role: 'user', content: '检查' }], maxOutputTokens: 1000,
+    tools: [{ type: 'function', function: { name: 'decision.quality_gate', parameters: { type: 'object' } } }],
+    toolChoice: { type: 'function', function: { name: 'decision.quality_gate' } },
+  }).tool_choice, { type: 'function', name: 'decision.quality_gate' });
   assert.deepEqual(wireResponsesInput([{ role: 'tool', tool_call_id: 'c', content: 'ok' }], { nativeTools: false }), [{ role: 'user', content: 'ok' }]);
 });
 

@@ -12,6 +12,8 @@ test('批次早报执行标题、自然化、审阅与 SEO 完整阶段',()=>{
     assert.match(source,new RegExp(artifact.replace('.','\\.')));
   }
   assert.match(source,/03-FINAL\.md/);
+  assert.match(source,/callDecisionTool/);
+  assert.match(source,/decision\.daily_quality_gate/);
 });
 
 test('批次早报按主体关系选择全部关联事实卡事件', () => {

@@ -1,176 +1,447 @@
-# 结构化输出工具化改造方案（JSON 解析 → 原生工具调用）
+# 结构化决策输出工具化改造方案
 
-> 状态：待评审（2026-09-03）
-> 范围：成稿链 / 早报 / 教程门禁、标题生成与风险扫描、主题路由、封面语义、素材采集排序与字段补齐、视觉 Agent
-> 目标：把"模型输出 JSON 文本 + 服务端解析修复"的交互，逐步改为"API 原生 function calling（单轮决策工具）"，在获得 schema 强校验的同时精简掉现有解析、修复与重试链路；按 provider 能力分批切换，保留 JSON 回退。
+> 状态：待评审（2026-09-04）
+> 范围：质量门禁、标题规划、主题路由、封面语义、来源候选排序、视觉 Agent 协议收口
+> 原则：正文生成继续使用文本输出；小型、机器消费、阻塞式的决策结果优先使用原生 function tool；大输出和代码密集型结构继续使用 JSON 文本；所有 provider 保留 JSON 回退。
 
----
+## 1. 结论先行
 
-## 1. 背景与现状
+本次改造不追求把所有 JSON 都改成工具调用。真正有价值的是把以下两类问题分开：
 
-当前所有"程序判断依赖模型输出"的环节都走同一条链路：
+1. **正文输出**：文章、早报、教程正文，以及文章修订、自然化、SEO 优化，继续由模型输出 Markdown 文本，服务端写入文件。
+2. **机器决策输出**：质量门禁、标题规划等小型结果，改为单轮原生 function tool，由服务端消费结构化参数。
 
-`gateway.complete({ jsonMode:true })` → `response_format=json_object`（`gateway.mjs:214/269`，且与 tools 互斥）→ 模型把结构化结果写成**普通文本** → `parseModelJson`/`parseJsonText`（`model-json.mjs`）做围栏剥离、JSON 定位、截断修复 → 各业务 `normalize*` 手工清洗 → 失败则各自兜底重试。
+优先级调整如下：
 
-现状痛点（按上一轮盘点）：
-1. **格式问题几乎全部由调用方承担**：围栏、前缀散文、截断、缺闭合括号等，各流水线长出了不同的重试分支（拆批重试、极简结构重试、format-retry、`parseModelJsonWithRepair` 的反馈修复）。
-2. **schema 约束靠 prompt 而非协议**：`motifKind`、`themeId`、`order` 全排列、`pass:boolean` 这类强约束值，模型返回非法值时只能靠事后 `normalize*` 过滤或整次回退。
-3. **jsonMode 与 tools 互斥**（`gateway.mjs:207`），无法在需要 schema 约束的同时复用工具通道。
-4. **审计错位**：`parseModelJson` 失败会写 `invalid_output` 到模型调用审计，但那是"文本被写出来后"的失败；工具调用的 `arguments` 由 provider 直接给结构化对象，解析层天然消失，需要等价审计路径。
+| 优先级 | 改造内容 | 结论 |
+| --- | --- | --- |
+| P0 | 统一单轮决策调用适配层、协议转换、参数校验、审计和回退 | 必做 |
+| P1 | 文章/早报/教程质量门禁 | 高价值，首批落地 |
+| P1 | 文章/早报/教程标题规划 | 高价值，第二批落地 |
+| P2 | 主题路由、封面语义、来源候选排序 | 有条件再做，不因“统一”而强行改 |
+| P3 | 来源字段补齐 | 低收益，暂缓 |
+| P2 | 视觉 Agent 原生工具路径收口 | 不是重新工具化，而是补齐协议和测试 |
+| P3 | 复盘/反馈调整 patch | 可选 |
+| 保持 JSON | 事件卡、脑暴、研判、深度分析、图表规划、仓库发现 | 不改 |
 
-判定准则（见本方案第 2 节）：**"小 schema、纯机器决策、低正文占比、高阻塞" 的环节转工具";大输出、正文密集、已有健壮归一化的环节保留 JSON**。
+## 2. 当前实现基线
 
----
+当前 gateway 已经同时支持 Chat Completions 和 Responses 两种协议的工具调用，并统一返回 `result.toolCalls`。Chat Completions 的工具定义会在 Responses 路径转换为 Responses 格式，见：
 
-## 2. 转换决策矩阵
+- `server/platform/llm/gateway.mjs`
+- `server/platform/llm/responses-api.mjs`
+- `server/platform/llm/stream-events.mjs`
 
-| 环节 | 位置 | schema 大小 | 阻塞性 | 现失败模式 | 结论 |
-|---|---|---|---|---|---|
-| 文章 QA 门禁（draft/final/research-coverage/publication-safety） | `article-pipeline.mjs:71` | 小 | 高 | 正文混入 JSON、截断 | **转工具** |
-| 早报门禁 | `daily-pipeline.mjs:33` | 小 | 高 | 同上 | **转工具** |
-| 教程门禁 | `tutorial-pipeline.mjs:16,59,85` | 小 | 高 | 专门防"返回正文" | **转工具** |
-| 标题生成 + 风险扫描（article/daily/tutorial） | 三处 `title-generation` | 小 | 中 | `try/catch` 兜底到正则 | **转工具** |
-| 主题路由 | `auto-theme-router.mjs:122` | 小(枚举) | 中 | 幻觉新 themeId | **转工具** |
-| 封面语义 | `cover-semantics.mjs:45` | 小(枚举) | 低 | 字段清洗 | **转工具** |
-| 来源候选排序 | `source-candidate-ranker.mjs:14` | 小 | 低 | 全排列校验失败退回 | **转工具** |
-| 来源字段补齐 | `source-field-enricher.mjs:3` | 中 | 低 | 优雅降级 | **转工具（优先级低）** |
-| 视觉 Agent 信封 | `ai-visual-document-agent.mjs:149` | 中 | 中 | 自研修复循环 | **转工具** |
-| 复盘/反馈调整 planning+patch | `feedback-adjustment.mjs` | 中 | 低(人工确认) | 多层防御已足够 | 可选（批 4） |
-| 事件卡 / 脑暴 / 讨论研判 1A·2A·1B·2B·3 | `event-card-stage.mjs` / `editorial-exploration.mjs` / `discussion-research-stage.mjs` | 大、正文密集 | 低 | 拆批重试已稳 | **留 JSON** |
-| 事件深度分析 / 突发分析 | `event-research-analysis.mjs:87` / `breaking-analysis-pipeline.mjs:47` | 大、正文密集 | 低 | 归一化稳 | **留 JSON** |
-| 图表规划 / 配图规划 | `visual-planner.mjs:16` / `image-workflow.mjs:120` | 大、含代码 | 低 | 事后对账已稳 | **留 JSON** |
-| 仓库发现 | `repo-discovery.mjs:14` | 松散 | 低 | 有回退 | **留 JSON** |
-
----
-
-## 3. 目标架构：单轮决策工具（Single-shot Decision Tool）
-
-### 3.1 概念
-
-与对话 Agent 的多轮工具不同，本方案引入**单轮决策工具**：一次 `complete` 请求携带工具定义 + `tool_choice` 固定指定某工具，模型返回 `toolCalls` 后，调用方**直接消费 `arguments` 结构化对象**，不回喂 tool result 消息。
-
-```
-gateway.complete({
-  tools: [decisionTools.qualityGate.tool],        // JSON Schema parameters
-  toolChoice: { type:'function', function:{ name:'decision.quality_gate' } },
-  jsonMode: false,                                 // tools 与 jsonMode 不再互斥混用
-})
-→ result.toolCalls[0].input   // provider 直接给出结构化对象
-→ validateToolArgs(schema, input)  // 服务端轻量校验（类型/枚举/范围）
-→ execute 决策逻辑（原本 normalize 之后的部分）
-```
-
-### 3.2 统一执行器封装
-
-新增 `server/platform/llm/decision-tools.mjs`：
+当前 `jsonMode` 仅在没有工具时发送 `response_format` 或 Responses `text.format`。这条互斥规则是合理的，不需要改成“tools 与 jsonMode 混用”。决策工具调用时明确使用：
 
 ```js
-// 每个工具 = 定义 + 校验 + 执行 + 审计
 {
-  name: 'decision.quality_gate',
-  description: '评估文章质量门禁，返回 pass 与 issues',
-  parameters: { type:'object', properties:{ pass:{type:'boolean'}, issues:{type:'array', items:{...}} }, required:['pass'] },
-  validate: (args) => normalizeQualityGate(args),  // 仅做结构收窄，不做语义兜底
-  purpose: 'article-quality-gate',
-  maxOutputTokens: 3500,
+  jsonMode: false,
+  tools: [decisionToolDefinition],
+  toolChoice: normalizedToolChoice,
 }
 ```
 
-- `validate` 取代现有 `normalize*` 中的**格式层**清洗（类型、枚举、范围、数组化）；**语义层**校验（如 `old_text` 唯一性、source_id 回绑、风险降级）保留在业务层，不合并。
-- 不放插件注册表，不进入 `conversation-agent` 的工具目录（它们不是 Agent 能力，是流水线内部决策）；仅由流水线自我引用，避免污染对话工具暴露面。
-- 审计等价物：`validate` 失败时调用 `store.updateModelCall(callId, { status:'invalid_output', ... })`，与 `parseModelJson` 现有行为对齐（`model-json.mjs:13`）。
+视觉 Agent 已经存在原生工具路径：
 
-### 3.3 工具命名空间
+- provider 支持原生工具时，读取 `result.toolCalls`；
+- provider 不支持时，继续使用旧 JSON 信封；
+- `filesystem.project.document_write` 已经支持 begin/append/finish 会话。
 
-统一前缀 `decision.`，避免与现有 `cap_*` 冲突（`tool-catalog.mjs:29`）：
+因此视觉 Agent 的工作不是“从零改成工具调用”，而是补齐协议适配、严格工具选择和测试，并确保原生路径不会进入旧 JSON 修复循环。
 
-| 工具名 | 对应环节 | 关键 schema 约束 |
-|---|---|---|
-| `decision.quality_gate` | 文章/早报/教程门禁 | `pass:boolean`；`issues[]:{type,message,stage?}` |
-| `decision.title_plan` | 标题生成 + 风险扫描 | `selectedTitle:string(≤28字)`、`titleCandidates[]`、`coreKeywords[]`、`riskBlocked:boolean` |
-| `decision.theme_route` | 主题路由 | `candidates[]:{themeId ∈ catalog, score:0-100}` |
-| `decision.cover_semantics` | 封面语义 | `motifKind ∈ 枚举`、`highlightTerms[]` |
-| `decision.rank_sources` | 来源候选排序 | `order[]` 必须恰好全排列 |
-| `decision.enrich_fields` | 来源字段补齐 | `summarySelector/authorSelector/dateSelector ∈ 候选 options` |
-| `decision.visual_write` | 视觉 Agent（替代自研信封） | 复用现有 `filesystem.project.document_write` 语义 |
+另外，模型 provider 配置已经迁移到数据库。新增的决策工具总开关和按工具开关不能再设计为 `config.local.json` 字段，建议放入数据库的系统扩展设置或 feature flag 设置中。provider 能力字段也以数据库配置为准。
 
----
+## 3. 转换决策矩阵
 
-## 4. 现有流程可精简的点
+| 环节 | 输出特点 | 阻塞性 | 当前问题 | 建议 |
+| --- | --- | --- | --- | --- |
+| 文章/早报/教程质量门禁 | 小对象，`pass + issues[]` | 高 | JSON 文本解析和格式重试 | **P1 转工具** |
+| 研判贴合度检查 | 中小对象，包含逐点证据 | 高 | JSON 定位和字段归一化 | **P1/P2 转工具**，先与质量门禁适配层共用基础设施 |
+| 发布安全门禁 | 小对象，但叠加确定性扫描 | 高 | AI 门禁和程序扫描结果需要合并 | **P1 转工具**，保留程序扫描和修订重试 |
+| 标题规划 | 中小对象，候选标题和关键词 | 中 | 三条链格式不完全一致 | **P1 转工具**，先统一内部结构 |
+| 主题路由 | 枚举/排序对象 | 中低 | 非法 themeId 已有归一化和标签回退 | **P2 条件转工具** |
+| 封面语义 | 枚举和短文本 | 低 | 失败可规则回退 | **P2 条件转工具** |
+| 来源候选排序 | 全排列约束 | 低 | 失败可确定性排序 | **P2 条件转工具** |
+| 来源字段补齐 | selector 选择 | 低 | 已有白名单、复验和优雅降级 | **P3 暂缓** |
+| 视觉 Agent | HTML/CSS 分块写入 | 中 | 原生路径与旧 JSON 信封并存 | **协议收口，不重新设计** |
+| 事件卡/脑暴/讨论研判 | 大对象、正文密集 | 低 | 拆批重试已稳定 | **保持 JSON** |
+| 深度分析/突发分析 | 正文密集 | 低 | 归一化和文本修订更重要 | **保持 JSON** |
+| 图表/配图规划 | 代码密集，需语义和事实校验 | 低 | 服务端已有复杂度、数字和插入位置校验 | **保持 JSON** |
+| 仓库发现 | 松散结果 | 低 | 已有回退 | **保持 JSON** |
 
-改造后明确可删除/收缩的位置（以批落地后逐条清理）：
+判断标准不是“能否写 schema”，而是：结果是否主要供程序消费、是否阻塞主链、是否能明显减少格式失败、是否已有稳定回退。
 
-1. **`model-json.mjs` 的文本修复链**：`locateJsonValue`/`repairJsonSyntaxOnly`/`stripJsonFence` 在转工具环节不再需要（保留给仍走 JSON 的环节：事件卡/研判/图表等）。
-2. **门禁的"防正文"重试分支**：`tutorial-pipeline.mjs:82` 的 format-retry、`ai-quality-gate` 对返回 BODY 二次调用的兜底。
-3. **拆批/极简重试中对"JSON 截断/闭合"的动机**：`event-card-stage.mjs:99-110`、`editorial-exploration.mjs:134-168` 保留给仍走 JSON 的环节，不为此扩展。
-4. **`normalize*` 的格式层清洗收窄**：`clamp`/`array`/`clean` 对已由 schema 约束的字段可删除；语义清洗保留。
-5. **`gateway.mjs` 的互斥分支**：tools 与 jsonMode 的分流逻辑不再被转工具环节依赖（保留给 JSON 环节）。
-6. **`ai-visual-document-agent.mjs` 的修复循环**：`parseAndValidateVisualEnvelope`/`jsonRecoveryInstruction`/`protocolRecoveryInstruction` 在改原生工具后整段删除（`:140-189`），工具结果回喂走统一 tool 消息协议（`wireMessages:28` 已支持）。
-7. **各 `try/catch` 兜底**：`daily-pipeline.mjs:142`、`tutorial-pipeline.mjs:59` 的标题解析容错，改为 schema 校验失败走确定性回退，逻辑语义不变，分支更少。
+## 4. 目标架构：单轮决策调用
 
-**不会精简**：正文生成阶段（draft/humanize/review/SEO/终稿）保持纯文本直出；事件卡/研判/图表规划等大输出环节保持 JSON + 拆分重试现状。
+### 4.1 不引入通用工具执行器
 
----
+这些工具大多数不是要执行外部动作，而是让模型返回一个机器决策对象。因此不设计“定义 + validate + execute”的插件式注册中心，也不进入 conversation-agent 的工具目录。
 
-## 5. 分批实施计划
+建议新增一个轻量模块：
 
-> 原则：**基础设施先行、低风险独立环节先行、阻塞主链的环节最后上、provider 能力门禁逐批生效、每次一个批可整体回退到 JSON**。
-> 运行期路由：新增 `supportsDecisionTools(gateway, provider)`（复用 `providerSupportsNativeTools`，`tool-catalog.mjs:55`），为 `false` 时该批全部走原 JSON 路径，两套行为并存但不混跑。
+```text
+server/platform/llm/decision-tools.mjs
+```
 
-### 批 0：基础设施（先行）
+它提供：
 
-- 新增 `server/platform/llm/decision-tools.mjs`（3.2 的执行器 + 轻量校验工具，不引入 zod/ajv，首批先用小型手写 validator；如后续工具参数增多再评估引入依赖）。
-- `gateway` 补充：`toolChoice` 已支持（`gateway.mjs:212-213`）；需要为决策工具统一悬挂 `invalid_output` 审计。
-- 新增 `supportsDecisionTools` 与运行期路由 helper；为 `config.local.json`/provider 配置增加 `supportsNativeTools` 标记（已有字段，确认默认值）。
-- 验收：单测覆盖 validator；用 `decision.title_plan` 做过一次端到端可回退演练。
+```js
+await callDecisionTool({
+  gateway,
+  provider,
+  purpose,
+  batchId,
+  candidateId,
+  definition,
+  schema,
+  messages,
+  fallback,
+})
+```
 
-### 批 1：低风险独立环节（不阻塞主链，均有确定性回退）
+调用器统一负责：
 
-- `decision.rank_sources`：替换 `source-candidate-ranker.mjs` 的文本解析；失败仍回退确定性排序。
-- `decision.enrich_fields`：替换 `source-field-enricher.mjs`；`validate()` 复验逻辑不动。
-- `decision.cover_semantics`：替换 `cover-semantics.mjs:45`；规则回退不动。
-- `decision.theme_route`：替换 `auto-theme-router.mjs:122`；标签回退与 `chooseCandidate` 惩罚逻辑不动。
-- 验收：对应 `test/` 用例从"注入假 JSON 文本"改为"注入工具 arguments"；回退路径断言不变。
+1. 判断当前 provider 是否支持决策工具；
+2. 按协议生成正确的工具定义和 `tool_choice`；
+3. 要求恰好返回指定工具的一次调用；
+4. 校验参数类型、必填字段、枚举、长度、范围和数组约束；
+5. 处理只有文本、没有工具、多工具、错误工具名、非法参数等情况；
+6. 对 provider 不支持或工具调用失败走原有 JSON 路径；
+7. 对工具参数校验失败写入等价的 `invalid_output` 审计；
+8. 返回业务层继续使用的内部对象。
 
-### 批 2：成稿链门禁 + 标题（收益最大、需要谨慎）
+业务层仍然负责语义校验和确定性规则，例如：
 
-- `decision.quality_gate`：统一替换 `article-pipeline.mjs` 的 draft-quality-gate / final-quality-gate / research-coverage / publication-safety-gate，以及 `daily-pipeline.mjs`、`tutorial-pipeline.mjs` 的门禁。
-  - `publication-safety-gate` 的确定性补检（`scanPublicationRisk` + `publicationComplianceIssue`）与合规修订重试**不在本批删除**，只在门禁输入侧换协议。
-- `decision.title_plan`：替换 article/daily/tutorial 三处标题生成；`03-title-risk.json` 的确定性风险扫描仍由程序执行，工具只提供标题候选与 `riskBlocked` 提示。
-- 验收：三链各跑一次端到端；`00-stage-executions.json` 与产物结构不变；门禁失败→修订→复核路径用真实用例回归。
+- `themeId` 是否存在于当前主题目录；
+- `order` 是否覆盖全部候选；
+- `afterHeading` 是否存在于正文；
+- 标题是否通过发布风险扫描；
+- 门禁 `pass` 是否受到程序扫描结果影响。
 
-### 批 3：视觉 Agent 信封原生工具化
+### 4.2 协议适配要求
 
-- 将 `ai-visual-document-agent.mjs` 的 JSON 信封改为真实 `filesystem.project.document_write` function tool（沿用现有工具协议，`wireMessages`/`streamEvents` 的 tool-call 事件已支持）；保留 result 回喂与分块校验，删除 `<:140-189>` 信封修复循环。
-- 验收：视觉生成走 `chatCompletionsEvents` 的 tool-call 流式事件；恢复逻辑只在工具**执行失败**时触发，不再为"JSON 语法错误"触发。
+不能把 Chat Completions 的 `tool_choice` 直接透传给 Responses。适配层应统一接受内部形式：
 
-### 批 4（可选）：复盘/反馈调整
+```js
+{ type: 'function', name: 'decision.quality_gate' }
+```
 
-- 评估 `feedback-adjustment.mjs` planning + patch 转 `decision.adjustment_plan` / `decision.adjustment_patch`；因现有白名单/`old_text` 唯一性/hash 防御已足够，仅当批 1-3 稳定后按需推进，不设硬截止。
+再按协议转换：
 
----
+```js
+// Chat Completions
+{ type: 'function', function: { name: 'decision.quality_gate' } }
 
-## 6. 兼容与回退策略
+// Responses
+{ type: 'function', name: 'decision.quality_gate' }
+```
 
-1. **provider 能力门禁**：每批统一封装 `if(!supportsDecisionTools(...)) return legacyJsonPath(...)`；两路共用同一 `validate`/`normalize` 语义实现，保证行为收敛。
-2. **切换开关**：`config.local.json` 增加 `llm.decisionTools.enabled: true|false`（默认 true）与 `llm.decisionTools.toolsOverrides` 按工具粒度开关，支持线上按批灰度与单工具快速回退。
-3. **审计对齐**：工具 `validate` 失败写 `invalid_output`；`gateway.complete` 已在 `recordModelCall` 记录 `toolCalls`（`gateway.mjs:468`），无需额外改动。
-4. **产物契约不变**：`00-stage-executions.json`、`*-gate.json`、`03-titles.md`、`03-title-risk.json`、`10-publication-compliance.json` 等既有产出的文件格式与字段保持稳定，仅在内部协议层变化。
+同时区分以下能力，不把 `supportsNativeTools` 当成全部能力的代名词：
 
----
+- 支持 function tools；
+- 支持强制指定工具；
+- 支持 strict schema；
+- 支持流式工具参数。
 
-## 7. 风险与注意
+首批可以只依赖“支持 function tools + 支持指定工具”的能力。strict schema 作为可选增强，不能替代服务端校验；能力未知时默认走 JSON 回退。
 
-- **provider 差异**：不同模型对 function calling、`strict` schema、流式 tool-call 支持不一致；resonses 协议与 chat_completions 的 tool 归一化已由 `normalizeResponsesToolCalls`/`normalizeChatToolCalls` 处理，决策工具只消费 `result.toolCalls[0].input`，与协议无关。
-- **大输出不适合工具**：`quality_gate` 的 issues 可能较多，需保证 `maxOutputTokens` 预算；门禁语义层仍保留"issue 消息清洗"，避免 schema 膨胀。
-- **不回喂 tool result**：单轮决策工具不需要第二次调用；严禁把决策工具误用成多轮（避免混淆 `wireMessages` 的 tool 消息路径）。
-- **`thinking` 与工具**：机械结构化用途默认 `thinking:false`（`gateway.mjs:49-59` 的 `THINKING_DISABLED_PATTERNS` 已覆盖多数门禁/标题用途），转工具后需在该白名单同步维护。
-- **测试夹具更新**：`test/` 大量用"假 JSON 文本"驱动 `parseModelJson`；批 1-3 需同步改写为"工具 arguments 对象"，避免回归。
+### 4.3 工具调用结果处理
 
----
+决策工具是单轮调用，不执行工具，也不回喂 `tool` result 消息：
 
-## 8. 待评审问题
+```text
+模型请求（工具定义 + tool_choice）
+        ↓
+result.toolCalls[0].input
+        ↓
+服务端参数校验和业务语义校验
+        ↓
+业务流水线继续执行
+```
 
-1. 决策工具是否允许模型在 `arguments` 之外返回正文（加深回退语义），还是严格禁止（`tool_choice` 单工具下 provider 仍可能带 content 前缀）？
-2. `enrich_fields` 这类"低价值但已有优雅降级"的环节，是否值得占用批 1 排期，还是直接推迟到批 3 后统一清理？
-3. provider `supportsNativeTools` 目前在哪些远程配置已开启？需要的默认路由策略是"默认 tools、缺标记走 JSON"还是相反？
+但必须明确以下异常策略：
+
+- 无工具调用：走 JSON 回退或确定性回退；
+- 返回多个工具调用：视为无效，不猜测使用哪个；
+- 工具名不匹配：视为无效；
+- 参数不是合法 JSON：记录 `invalid_output`，随后回退；
+- 工具调用同时带正文：允许记录但不把正文当作决策结果；是否回退由调用器配置，默认忽略正文；
+- provider 返回工具调用但 finish reason 异常：由调用器按结果完整性判断，不只看是否存在 `toolCalls`。
+
+## 5. 首批工具契约
+
+### 5.1 `decision.quality_gate`
+
+适用于文章、早报、教程的 draft/final 门禁，以及发布安全门禁。
+
+```json
+{
+  "pass": true,
+  "issues": [
+    {
+      "type": "fact_support",
+      "message": "……",
+      "stage": "final",
+      "severity": "error"
+    }
+  ]
+}
+```
+
+建议 `type`、`stage`、`severity` 使用有限枚举，`message` 保持短文本。`pass` 仍是模型判断，但最终结果必须经过程序合并：
+
+- 确定性发布风险问题可以强制将 `pass` 置为 false；
+- 字数、标题、结构问题继续由程序判断；
+- `issues` 仍需经过现有业务归一化，不能因为 schema 存在就删除语义过滤。
+
+研判贴合度可以先复用同一调用器，但使用独立 schema，因为它的 `items`、`omitted_points`、`repair_suggestions` 与普通质量门禁不同。
+
+### 5.2 `decision.title_plan`
+
+三条链统一在内部转换为：
+
+```json
+{
+  "selectedTitle": "最终标题",
+  "titleCandidates": [
+    {
+      "title": "候选标题",
+      "reason": "候选理由",
+      "score": 8
+    }
+  ],
+  "coreKeywords": ["关键词"]
+}
+```
+
+约束建议：
+
+- `selectedTitle` 必须是候选之一，或由业务层明确允许；
+- 标题长度、事实边界、敏感表述由程序复验；
+- `score` 是可选排序参考，不是发布资格；
+- 不加入模型自行判定的 `riskBlocked` 字段；风险以 `scanPublicationRisk` 和 `publicationComplianceIssue` 为准；
+- 文章链已有 `{title, reason}` 结构，早报/教程的字符串候选在适配层补成对象。
+
+### 5.3 延后工具契约
+
+以下契约不进入首批：
+
+- `decision.theme_route`：已有 `normalizeThemeCandidates`、主题目录检查和标签回退；
+- `decision.cover_semantics`：失败不阻塞，规则回退足够；
+- `decision.rank_sources`：全排列校验已经很小，只有观察到格式失败或维护成本后再转；
+- `decision.enrich_fields`：已有候选白名单和复验，收益最低。
+
+如果后续启用，仍使用同一个 `callDecisionTool`，不为每个工具单独实现一套 provider 逻辑。
+
+## 6. 可精简与不可精简的内容
+
+### 6.1 可以逐步收缩
+
+在对应流水线确认工具路径稳定后，可以收缩：
+
+1. 质量门禁的“返回正文而不是 JSON”格式重试；
+2. 标题规划的围栏剥离和 JSON 定位；
+3. 转工具调用方的格式层 `array/clean/clamp`；
+4. 只为 JSON 语法错误存在的局部重试分支。
+
+### 6.2 必须保留
+
+1. `model-json.mjs`，因为事件卡、研判、图表规划等仍然使用 JSON 文本；
+2. 业务语义归一化和白名单校验；
+3. 文章正文输出的 Markdown 文本链路；
+4. 发布风险扫描、来源回绑、标题长度和文章结构门禁；
+5. provider 不支持工具时的 JSON 回退；
+6. 文章修订、复核和合规重试；
+7. HTML/CSS 文件写入的 `document_write` 会话协议。
+
+### 6.3 不需要修改 gateway 的互斥逻辑
+
+tools 与 JSON mode 仍保持互斥发送：
+
+- 决策工具请求：发送 tools，不发送 `response_format`；
+- JSON 回退请求：发送 `response_format`，不发送 tools；
+- 正文请求：不发送 tools，也不强制 JSON。
+
+这能减少 provider 对“工具调用 + JSON mode”组合支持不一致的问题。
+
+## 7. 分批实施计划
+
+### 批 0：决策调用基础设施
+
+内容：
+
+- 新增 `decision-tools.mjs`；
+- 增加内部工具定义和协议级 `tool_choice` 转换；
+- 增加 `supportsDecisionTools`，未知能力默认 false；
+- 增加工具名、单调用、参数对象和错误结果校验；
+- 对 malformed tool arguments 补齐 `invalid_output` 审计；
+- 将 feature flag 放入数据库系统设置，不新增 `config.local.json` 模型字段；
+- 通过 mock provider 覆盖 Chat Completions、Responses、JSON 回退三条路径。
+
+验收：
+
+- Chat Completions 能收到正确的 `tool_choice`；
+- Responses 能收到正确的 `tool_choice`；
+- 工具参数错误不会被误记成普通成功；
+- 无工具、多工具、错误工具名都能确定性回退；
+- 原有 JSON 流程测试不受影响。
+
+### 批 1：质量门禁
+
+改造：
+
+- 文章 draft/final/publication-safety 门禁；
+- 早报质量门禁；
+- 教程质量门禁；
+- 视风险和 schema 复杂度，再接入 research coverage。
+
+保留：
+
+- `scanPublicationRisk`；
+- `publicationComplianceIssue`；
+- 字数、结构和来源确定性检查；
+- 失败后的文章修订和复核。
+
+验收：
+
+- provider 支持工具时，流水线消费 `toolCalls[0].input`；
+- provider 不支持时，现有 JSON 路径结果契约不变；
+- `*-quality-gate.json`、`10-publication-compliance.json` 等产物格式不变；
+- 门禁失败 → 修订 → 复核路径完整回归。
+
+### 批 2：标题规划
+
+改造：
+
+- 文章、早报、教程标题生成统一调用 `decision.title_plan`；
+- 适配层输出统一内部候选对象；
+- 继续生成原有 `03-titles.md` 或对应标题产物；
+- 风险扫描完全由程序执行。
+
+验收：
+
+- 三条链选中的标题和候选标题产物结构不变；
+- 候选为空、selectedTitle 不在候选中、标题过长等情况有确定性处理；
+- 标题工具失败时可回退到旧 JSON 或已有默认标题。
+
+### 批 3：低阻塞决策环节（可选）
+
+只有在运行审计显示 JSON 格式失败、重试成本或维护成本确实存在时，才选择其中一项推进：
+
+- 主题路由；
+- 封面语义；
+- 来源候选排序。
+
+不建议为了减少几行 `parseJsonText` 就同时改造全部三个环节。
+
+### 批 4：视觉 Agent 协议收口
+
+这不是重新做原生工具化，而是：
+
+- 为现有 native path 增加 Chat/Responses 协议回归；
+- 统一工具选择和能力判断；
+- native path 下不进入 JSON 信封修复循环；
+- 工具执行失败时仍保留会话级恢复；
+- provider 不支持 native tools 时继续使用 JSON 信封。
+
+HTML/CSS 仍然使用 `filesystem.project.document_write` 分块写入；文章 Markdown 正文仍使用普通文本生成。
+
+### 批 5：反馈调整（可选）
+
+仅当 planning + patch 的格式失败成为真实问题时，才评估 `decision.adjustment_plan`。现有白名单、`old_text` 唯一性和 hash 防御优先保留。
+
+## 8. 兼容、灰度和回退
+
+### 8.1 能力判断
+
+建议将决策工具能力拆成运行时判断：
+
+```text
+decisionToolsEnabled
+  AND provider.supportsNativeTools
+  AND provider supports forced function choice
+  → 使用工具
+否则 → 使用旧 JSON 路径
+```
+
+能力未知时默认回退 JSON，不根据模型名称猜测能力。
+
+### 8.2 开关位置
+
+不在 `config.local.json` 新增模型或决策工具配置。建议使用数据库系统设置，例如：
+
+```json
+{
+  "decisionToolsEnabled": false,
+  "decisionToolOverrides": {
+    "decision.quality_gate": false,
+    "decision.title_plan": false
+  }
+}
+```
+
+实际 key 和 UI 暴露方式在批 0 实施时确定，但必须与当前数据库配置架构一致。
+
+### 8.3 产物和审计
+
+- 现有产物路径和字段不变；
+- 模型调用审计记录 provider、purpose、toolCalls、token 和状态；
+- 参数校验失败记录 `invalid_output`；
+- 工具调用失败、provider HTTP 失败和 JSON 回退分别保留可区分状态；
+- 工具路径与 JSON 路径使用同一个业务语义归一化结果，避免双路行为漂移。
+
+## 9. 风险和验收重点
+
+### provider 差异
+
+“支持原生工具”不代表支持 strict schema、强制工具选择和流式参数。每种协议至少需要请求体测试；真实远程 provider 需要小流量演练。
+
+### schema 不是业务正确性
+
+工具 schema 只能约束结构，不能保证：
+
+- 标题没有新增事实；
+- source_id 能正确回绑；
+- themeId 真正存在；
+- 门禁判断真实可靠；
+- 图表数字来自事实基座。
+
+这些规则继续由服务端业务层执行。
+
+### 成本和延迟
+
+工具调用不会自动减少模型 token，也可能因 schema 和工具描述增加少量输入 token。是否有收益应看：
+
+- 格式失败率；
+- 格式重试次数；
+- 单次流水线平均调用数；
+- 门禁失败后的修订次数；
+- JSON 解析相关代码和故障数量。
+
+### 文章写入边界
+
+Markdown 正文不改为写入工具。模型负责生成正文文本，服务端负责落盘。只有模型需要直接、分块、可恢复地生成 HTML/CSS 文件时，才使用 `document_write`。
+
+## 10. 待评审问题
+
+以下问题本版先给出默认答案，评审时如果不同意再调整：
+
+1. 决策工具是否允许带正文？默认允许 provider 带少量正文，但只消费工具参数，不把正文作为回退输入。
+2. 能力未知时如何路由？默认走 JSON，不根据模型名称推断。
+3. feature flag 放哪里？放数据库系统设置，不放 `config.local.json`。
+4. 是否删除 `model-json.mjs`？不删除，只在单个流水线完成稳定迁移后收缩对应调用方。
+5. 是否首批改来源字段补齐？不改，除非审计证明其格式失败已经造成实际成本。
+6. 是否把视觉 Agent 作为全新批次重做？不做，当前已有 native path，本批只做协议收口和回归。
+
+## 11. 最小可行落地范围
+
+如果希望控制改造风险，首轮只做：
+
+1. `callDecisionTool` 基础设施；
+2. 文章质量门禁；
+3. 早报和教程质量门禁；
+4. 完整 JSON 回退和审计；
+5. Chat Completions/Responses/mock provider 测试。
+
+标题规划放到下一批，主题路由、封面语义、来源处理和反馈 patch 不进入首轮。

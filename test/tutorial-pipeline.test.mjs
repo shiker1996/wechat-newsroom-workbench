@@ -39,6 +39,8 @@ test('自主写作管线按模式选择心得经验或教程技能',()=>{
 test('教程质量门禁使用独立 JSON 提示并在格式错误时重试',()=>{
   const source=fs.readFileSync(new URL('../server/features/articles/llm/tutorial-pipeline.mjs',import.meta.url),'utf8');
   assert.match(source,/只评估，不修改、不续写、不复述文章/);
-  assert.match(source,/quality-gate-\$\{stage\}\$\{attempt\?'\-format-retry'/);
+  assert.match(source,/callDecisionTool/);
+  assert.match(source,/decision\.tutorial_quality_gate/);
+  assert.match(source,/\$\{purpose\}\$\{attempt\?'\-format-retry'/);
   assert.doesNotMatch(source,/content:`\$\{reviewer\.prompt\}\\n\\n只执行\$\{label\}门禁/);
 });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, buildReviewRepairPrompt, buildPublicationComplianceRepairPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
+import { articleLengthStatus, articleStageOutputIssue, authorizedWritingBrief, buildDraftUserPrompt, buildArticleStageSystem, buildReviewRepairPrompt, buildPublicationComplianceRepairPrompt, compositeSourceText, normalizePlanningResult, selectWriterSkill, ARTICLE_LENGTH_RANGE, ARTICLE_STAGE_CONTRACT, ARTICLE_QUALITY_GATE_TOOL, aiQualityGate, sourceCacheIssue, unverifiedFactBaseIssue } from '../server/features/articles/application/article-pipeline.mjs';
 import { inspectArticleQuality } from '../server/features/articles/domain/article-quality.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../server/platform/llm/skill-runtime.mjs';
 
@@ -94,6 +94,25 @@ test('质量门禁只授权 verified 事实并区分观点与亲测', () => {
   assert.doesNotMatch(source,/事实基座可能未穷尽其中数据/);
 });
 
+test('文章质量门禁开关开启时消费 decision tool，且仍保持内部结果契约', async () => {
+  const calls = [];
+  const gateway = {
+    config: { defaultProvider: 'mock', providers: { mock: { supportsNativeTools: true } } },
+    async complete(input) {
+      calls.push(input);
+      return { callId: 42, toolCalls: [{ id: 'call-gate', name: 'decision.article_quality_gate', input: { pass: true, issues: [] }, providerExecuted: false }] };
+    },
+  };
+  const store = { repositories: { extensionSettings: { get() { return { value: { decisionToolsEnabled: true } }; } } } };
+  const result = await aiQualityGate({ gateway, store, provider: 'mock', purpose: 'unused', batchId: 'b1', candidateId: 'c1',
+    article: '# 标题\n\n正文', factBase: { claims: [] }, systemPrompt: '质量门禁', stage: 'draft' });
+  assert.deepEqual(result, { pass: true, issues: [] });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].toolChoice, { type: 'function', name: 'decision.article_quality_gate' });
+  assert.equal(calls[0].jsonMode, false);
+  assert.deepEqual(calls[0].tools, [ARTICLE_QUALITY_GATE_TOOL]);
+});
+
 test('终稿与发布安全门禁失败后都会进入定向合规修订并复检', () => {
   const source=fs.readFileSync(new URL('../server/features/articles/application/article-pipeline.mjs',import.meta.url),'utf8');
   assert.match(source,/purpose: 'article-publication-compliance-repair'/);
@@ -103,6 +122,8 @@ test('终稿与发布安全门禁失败后都会进入定向合规修订并复�
   assert.match(source,/preserveVisuals:true/);
   assert.match(source,/JSON\.stringify\(\{generatedAt:new Date\(\)\.toISOString\(\),scan:publicationScan,gate:publicationQuality\}/);
   assert.match(source,/Step 7\.3 发布合规门禁未通过，执行定向合规修订/);
+  assert.match(source,/decision\.research_coverage/);
+  assert.match(source,/RESEARCH_COVERAGE_TOOL/);
 });
 
 test('爆款结构门禁要求钩子、3-5个章节和来源链接', () => {

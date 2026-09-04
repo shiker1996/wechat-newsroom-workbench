@@ -52,7 +52,7 @@ test('platform/llm 只保留通用基础设施', () => {
   const files = fs.readdirSync(path.join(root, 'server', 'platform', 'llm'))
     .filter((name) => name.endsWith('.mjs')).sort();
   assert.deepEqual(files, [
-    'context-manager.mjs', 'context-safety.mjs', 'events.mjs', 'gateway.mjs', 'model-json-repair.mjs', 'model-json.mjs', 'output-budget.mjs', 'responses-api.mjs',
+    'context-manager.mjs', 'context-safety.mjs', 'decision-tools.mjs', 'events.mjs', 'gateway.mjs', 'model-json-repair.mjs', 'model-json.mjs', 'output-budget.mjs', 'responses-api.mjs',
     'skill-runtime.mjs', 'stream-events.mjs', 'web-search.mjs',
   ]);
 });

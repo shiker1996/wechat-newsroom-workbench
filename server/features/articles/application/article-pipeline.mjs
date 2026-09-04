@@ -14,6 +14,7 @@ import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../plat
 import { batchTopicsDir, candidateArticleDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveArticleLength } from '../../../platform/core/config.mjs';
 import { evaluateArticleFactEligibility } from '../domain/article-fact-eligibility.mjs';
+import { callDecisionTool, DECISION_TITLE_PLAN_TOOL, decisionToolDefinition, normalizeDecisionTitlePlan } from '../../../platform/llm/decision-tools.mjs';
 import {
   buildPublicationClaimRegister, extractArticleTitle, publicationComplianceIssue,
   publicationCompliancePrompt, publicationFactBaseIssues, scanPublicationRisk,
@@ -168,12 +169,81 @@ async function textCall(gateway,input,system,user,maxOutputTokens=5000) {
   return gateway.complete({...input,maxOutputTokens,messages:[{role:'system',content:systemContent,protected:true},{role:'user',content:userContent,protected:true}]});
 }
 
-async function aiQualityGate({gateway,store,provider,batchId,candidateId,article,factBase,sourceText='',researchPoints=[],rejectedAngles=[],publicationClaimRegister=[],publicationScan={},systemPrompt,stage,maxOutputTokens=3500}) {
-  const result=await gateway.complete({provider,purpose:`article-quality-gate-${stage}`,batchId,candidateId,jsonMode:true,maxOutputTokens,messages:[
+export const ARTICLE_QUALITY_GATE_TOOL = decisionToolDefinition({
+  name: 'decision.article_quality_gate',
+  description: '返回文章质量门禁结果，只包含是否通过以及需要修复的问题。',
+  parameters: {
+    type: 'object',
+    required: ['pass', 'issues'],
+    properties: {
+      pass: { type: 'boolean' },
+      issues: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['message'],
+          properties: {
+            message: { type: 'string', minLength: 1, maxLength: 500 },
+            type: { type: 'string', maxLength: 80 },
+            repair: { type: 'string', maxLength: 500 },
+            evidence: { type: 'string', maxLength: 500 },
+          },
+        },
+      },
+    },
+  },
+});
+
+const ARTICLE_QUALITY_GATE_SCHEMA = ARTICLE_QUALITY_GATE_TOOL.function.parameters;
+
+export const RESEARCH_COVERAGE_TOOL = decisionToolDefinition({
+  name: 'decision.research_coverage',
+  description: '检查文章是否兑现已选择的研判拓展点。',
+  parameters: {
+    type: 'object',
+    required: ['status', 'summary', 'items', 'omitted_points', 'contradicted_points', 'rejected_point_leakage', 'repair_suggestions'],
+    properties: {
+      status: { type: 'string', enum: ['pass', 'needs_revision', 'skipped'] },
+      summary: { type: 'string', maxLength: 500 },
+      items: { type: 'array', maxItems: 30, items: { type: 'object', required: ['point_id', 'status', 'coverage', 'explanation', 'article_excerpt'], properties: {
+        point_id: { type: 'string', maxLength: 80 },
+        status: { type: 'string', enum: ['full', 'partial', 'partial_core', 'omitted', 'contradicted'] },
+        coverage: { type: 'string', maxLength: 300 },
+        explanation: { type: 'string', maxLength: 500 },
+        article_excerpt: { type: 'string', maxLength: 160 },
+      } } },
+      omitted_points: { type: 'array', maxItems: 30, items: { type: 'string', maxLength: 120 } },
+      contradicted_points: { type: 'array', maxItems: 30, items: { type: 'string', maxLength: 120 } },
+      rejected_point_leakage: { type: 'array', maxItems: 30, items: { type: 'string', maxLength: 160 } },
+      repair_suggestions: { type: 'array', maxItems: 30, items: { type: 'string', maxLength: 300 } },
+    },
+  },
+});
+
+export async function aiQualityGate({gateway,store,provider,batchId,candidateId,article,factBase,sourceText='',researchPoints=[],rejectedAngles=[],publicationClaimRegister=[],publicationScan={},systemPrompt,stage,maxOutputTokens=3500}) {
+  const purpose=`article-quality-gate-${stage}`;
+  const messages=[
     {role:'system',protected:true,content:systemPrompt},
     {role:'user',protected:true,content:`事实基座：${JSON.stringify(factBase)}\n\n作者采用的研判拓展点：${JSON.stringify(researchPoints)}\n\n作者明确不采用的方向：${JSON.stringify(rejectedAngles)}\n\n判定口径：正文事实只能来自事实基座中的 verified 项；来源标题、URL、模型常识和未进入事实基座的来源原文不能补充授权。第一人称作者判断或阅读动作（如“我看”“我读完后的判断”）不是亲测；只有声称本人测试、部署、使用并得到结果，且没有已确认实践证据时，才按未经核实的亲测处理。文章应保留并兑现作者采用的研判拓展点，但不得把研判假设当成已核实事实，也不得重新写入明确舍弃的方向。\n\n${publicationCompliancePrompt({factBase,claimRegister:publicationClaimRegister,scan:publicationScan})}\n\n待检查文章：\n${article}`},
-  ]});
-  return parseJsonResult(result,store);
+  ];
+  const fallback=async()=>parseJsonResult(await gateway.complete({provider,purpose,batchId,candidateId,jsonMode:true,maxOutputTokens,messages}),store);
+  const toolMessages=[
+    { ...messages[0], content:`${messages[0].content}\n\n如果当前调用提供了 decision.article_quality_gate 工具，必须调用一次该工具；工具参数就是最终门禁结果，不要输出文章正文或工具操作说明。` },
+    messages[1],
+  ];
+  const decision=await callDecisionTool({
+    gateway,
+    provider,
+    repository:store?.repositories?.extensionSettings,
+    purpose,
+    batchId,
+    candidateId,
+    definition:ARTICLE_QUALITY_GATE_TOOL,
+    schema:ARTICLE_QUALITY_GATE_SCHEMA,
+    messages:toolMessages,
+    fallback,
+  });
+  return decision.value;
 }
 
 async function repairArticleForPublicationCompliance({ gateway, orchestratorSkill, reviewerSkill, provider, batchId, candidateId, article, factBase, publicationClaimRegister, publicationScan, issues, researchPoints, rejectedAngles, preserveVisuals = false, maxOutputTokens = 6500 }) {
@@ -393,11 +463,15 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   recordStage('draft-quality-gate',stageSkills['article-reviewer'],['04-draft.md','02-fact-base.json'],'04-quality-gate.json');
   onProgress('Step 4.5 根据初稿正文生成标题');
   const titleGenSystem = buildArticleStageSystem(orchestratorSkill,'title-generation',stageSkills['title-generator']);
-  const titleGenResult=await gateway.complete({provider,purpose:'article-title-generation',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),
-    messages:[{role:'system',content:titleGenSystem,protected:true},{role:'user',content:JSON.stringify({topic:candidate.hotspot_title,
-      distribution_lane:brief.distributionLane,reader_stake:brief.readerStake,draft,factBase,publicationClaimRegister,
-      forbiddenClaims:brief.forbiddenClaims,publicationRiskRules:'高影响财经、名誉和敏感主张必须有已核验事实与明确归因；标题不得把传闻、推断或绝对化判断写成事实。'}),protected:true}]});
-  let titleGen; try { titleGen=parseJsonResult(titleGenResult,store); } catch { titleGen={}; }
+  const titlePurpose='article-title-generation';
+  const titleMessages=[{role:'system',content:titleGenSystem,protected:true},{role:'user',content:JSON.stringify({topic:candidate.hotspot_title,
+    distribution_lane:brief.distributionLane,reader_stake:brief.readerStake,draft,factBase,publicationClaimRegister,
+    forbiddenClaims:brief.forbiddenClaims,publicationRiskRules:'高影响财经、名誉和敏感主张必须有已核验事实与明确归因；标题不得把传闻、推断或绝对化判断写成事实。'}),protected:true}];
+  const titleFallback=async()=>{try{return parseJsonResult(await gateway.complete({provider,purpose:titlePurpose,batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(5000,providerConfig.maxOutputTokens),messages:titleMessages}),store);}catch{return {};}};
+  const titleDecision=await callDecisionTool({gateway,provider,repository:store?.repositories?.extensionSettings,purpose:titlePurpose,batchId,candidateId,
+    definition:DECISION_TITLE_PLAN_TOOL,schema:DECISION_TITLE_PLAN_TOOL.function.parameters,
+    messages:[{...titleMessages[0],content:`${titleMessages[0].content}\n\n如果当前调用提供了 decision.title_plan 工具，必须调用一次该工具；工具参数就是标题规划结果，不要输出解释文字。`},titleMessages[1]],fallback:titleFallback});
+  let titleGen=normalizeDecisionTitlePlan(titleDecision.value,{fallbackTitle:selectedTitle});
   const finalSelectedTitle=String(titleGen.selectedTitle||selectedTitle).trim();
   titleGen=normalizePlanningResult(titleGen);
   const finalTitleCandidates=titleGen.titleCandidates; const finalCoreKeywords=titleGen.coreKeywords.length?titleGen.coreKeywords:plan.coreKeywords;
@@ -497,11 +571,16 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   onProgress('Step 6.4 检查终稿是否兑现作者采用的研判拓展点');
   let researchCoverage;
   if (brief.adoptedResearchPoints.length) {
-    const coverageResult=await gateway.complete({provider,purpose:'article-research-coverage',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(4500,providerConfig.maxOutputTokens),messages:[
+    const coveragePurpose='article-research-coverage';
+    const coverageMessages=[
       {role:'system',protected:true,content:buildArticleStageSystem(orchestratorSkill,'research-coverage',stageSkills['article-reviewer'])},
       {role:'user',protected:true,content:buildResearchCoveragePrompt({article:final,researchPoints:brief.adoptedResearchPoints,rejectedAngles:brief.rejectedAngles})},
-    ]});
-    researchCoverage=normalizeResearchCoverageResult(parseJsonResult(coverageResult,store));
+    ];
+    const coverageFallback=async()=>normalizeResearchCoverageResult(parseJsonResult(await gateway.complete({provider,purpose:coveragePurpose,batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(4500,providerConfig.maxOutputTokens),messages:coverageMessages}),store));
+    const coverageDecision=await callDecisionTool({gateway,provider,repository:store?.repositories?.extensionSettings,purpose:coveragePurpose,batchId,candidateId,
+      definition:RESEARCH_COVERAGE_TOOL,schema:RESEARCH_COVERAGE_TOOL.function.parameters,
+      messages:[{...coverageMessages[0],content:`${coverageMessages[0].content}\n\n如果当前调用提供了 decision.research_coverage 工具，必须调用一次该工具；工具参数就是最终检查结果，不要输出解释文字。`},coverageMessages[1]],fallback:coverageFallback});
+    researchCoverage=normalizeResearchCoverageResult(coverageDecision.value);
   } else {
     researchCoverage={status:'skipped',summary:'未选择研判拓展点，跳过贴合度检查。',items:[],omitted_points:[],contradicted_points:[],repair_suggestions:[]};
   }

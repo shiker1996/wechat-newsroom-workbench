@@ -10,6 +10,7 @@ import { markdownVisibleChars } from '../../../shared/domain/markdown-visible-ch
 import { resolveArticleStageSkills } from '../../../platform/skills/entry-routing.mjs';
 import { illustrateArticle } from '../application/article-illustration.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
+import { callDecisionTool, DECISION_TITLE_PLAN_TOOL, decisionToolDefinition, normalizeDecisionTitlePlan } from '../../../platform/llm/decision-tools.mjs';
 
 function writeFile(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -32,6 +33,22 @@ export function dailyVisibleChars(markdown) {
 function parseJson(result, store) {
   return parseModelJson(result,{store,label:'早报门禁'});
 }
+const DAILY_QUALITY_GATE_TOOL = decisionToolDefinition({
+  name: 'decision.daily_quality_gate',
+  description: '返回早报质量门禁结果，只包含是否通过以及需要修复的问题。',
+  parameters: {
+    type: 'object',
+    required: ['pass', 'issues'],
+    properties: {
+      pass: { type: 'boolean' },
+      issues: { type: 'array', items: { type: 'object', required: ['message'], properties: {
+        message: { type: 'string', minLength: 1, maxLength: 500 },
+        type: { type: 'string', maxLength: 80 },
+        repair: { type: 'string', maxLength: 500 },
+      } } },
+    },
+  },
+});
 function artifact(store, batchId, kind, name, filePath) {
   const stat = fs.statSync(filePath);
   store.upsertArtifact({ batchId, kind, name, path: filePath, size: stat.size, modifiedAt: stat.mtime.toISOString() });
@@ -135,14 +152,20 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
   writeFile(draftPath, draft);
 
   onProgress('早报 3/7 根据完整初稿生成并锁定标题');
-  const titleResult=await gateway.complete({provider,purpose:'daily-title-generation',batchId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
-    {role:'system',protected:true,content:`${titleGenerator.prompt}\n\n根据完整早报生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入事件事实卡没有的事实、数字、人物或结论。`},
+  const titlePurpose='daily-title-generation';
+  const fallbackTitle=draft.match(/^#\s+(.+)$/m)?.[1]||`${batch.batch_date} 大厂早报`;
+  const titleMessages=[
+    {role:'system',protected:true,content:`${titleGenerator.prompt}\n\n根据完整早报生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":[{"title":"候选1","reason":"理由"}],"coreKeywords":["关键词"]}。不得引入事件事实卡没有的事实、数字、人物或结论。`},
     {role:'user',protected:true,content:JSON.stringify({batchDate:batch.batch_date,focus:focusContext,draft})},
-  ]});
-  let titlePlan={};try{titlePlan=parseJson(titleResult,store);}catch{}
-  const selectedTitle=String(titlePlan.selectedTitle||draft.match(/^#\s+(.+)$/m)?.[1]||`${batch.batch_date} 大厂早报`).trim();
-  const titleCandidates=Array.isArray(titlePlan.titleCandidates)?titlePlan.titleCandidates.map(String).filter(Boolean):[selectedTitle];
-  const coreKeywords=Array.isArray(titlePlan.coreKeywords)?titlePlan.coreKeywords.map(String).filter(Boolean).slice(0,6):[];
+  ];
+  const titleFallback=async()=>{try{return parseJson(await gateway.complete({provider,purpose:titlePurpose,batchId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:titleMessages}),store);}catch{return {};}};
+  const titleDecision=await callDecisionTool({gateway,provider,repository:store?.repositories?.extensionSettings,purpose:titlePurpose,batchId,
+    definition:DECISION_TITLE_PLAN_TOOL,schema:DECISION_TITLE_PLAN_TOOL.function.parameters,
+    messages:[{...titleMessages[0],content:`${titleMessages[0].content}\n\n如果当前调用提供了 decision.title_plan 工具，必须调用一次该工具；工具参数就是标题规划结果，不要输出解释文字。`},titleMessages[1]],fallback:titleFallback});
+  const titlePlan=normalizeDecisionTitlePlan(titleDecision.value,{fallbackTitle});
+  const selectedTitle=String(titlePlan.selectedTitle||fallbackTitle).trim();
+  const titleCandidates=titlePlan.titleCandidates.map((item)=>item.title).filter(Boolean);
+  const coreKeywords=titlePlan.coreKeywords;
   const titlePath=path.join(workdir,'02-titles.md');
   writeFile(titlePath,`# 标题候选\n\n${titleCandidates.map((item,index)=>`${index+1}. ${item}`).join('\n')}\n\nSELECTED_TITLE: ${selectedTitle}\n\ncore_keywords: ${coreKeywords.join('、')}`);
 
@@ -163,14 +186,26 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
   let final=applyTitle(cleanMarkdown(seoResult.content),selectedTitle),seoPath=path.join(workdir,'05-seo-optimized.md');
   writeFile(seoPath,final);
 
-  const gate = async (article, stage) => parseJson(await gateway.complete({
-    provider, purpose: `daily-quality-gate-${stage}`, batchId, jsonMode: true,
-    maxOutputTokens: Math.min(3000, providerConfig.maxOutputTokens),
-    messages: [
-      { role: 'system', protected: true, content: `${reviewer.prompt}\n\n你只执行关系维度早报质量门禁，返回 JSON：{"pass":boolean,"issues":[{"message":"..."}]}。检查标题、导语和结构是否兑现全部 focus；是否概括重要事实并正确解释关系；是否有 2–6 个信息段落和可追溯来源链接；事实是否均由 news_items 支持；严肃事件语气是否中性。允许把多个事件合并归纳，不要求每个事件独立成段、独立引用、出现标题或暴露 event_id。不要判断字符数，字符上限由程序确定性检查。` },
+  const gate = async (article, stage) => {
+    const purpose = `daily-quality-gate-${stage}`;
+    const system = `${reviewer.prompt}\n\n你只执行关系维度早报质量门禁，返回 JSON：{"pass":boolean,"issues":[{"message":"..."}]}。检查标题、导语和结构是否兑现全部 focus；是否概括重要事实并正确解释关系；是否有 2–6 个信息段落和可追溯来源链接；事实是否均由 news_items 支持；严肃事件语气是否中性。允许把多个事件合并归纳，不要求每个事件独立成段、独立引用、出现标题或暴露 event_id。不要判断字符数，字符上限由程序确定性检查。`;
+    const messages = [
+      { role: 'system', protected: true, content: system },
       { role: 'user', protected: true, content: `focus:${JSON.stringify(focusContext)}\nnews_items:${JSON.stringify(newsItems)}\n\n待检查早报：\n${article}` },
-    ],
-  }), store);
+    ];
+    const fallback = async () => parseJson(await gateway.complete({
+      provider, purpose, batchId, jsonMode: true,
+      maxOutputTokens: Math.min(3000, providerConfig.maxOutputTokens), messages,
+    }), store);
+    const decision = await callDecisionTool({
+      gateway, provider, repository: store?.repositories?.extensionSettings,
+      purpose, batchId, definition: DAILY_QUALITY_GATE_TOOL,
+      schema: DAILY_QUALITY_GATE_TOOL.function.parameters,
+      messages: [{ ...messages[0], content: `${messages[0].content}\n\n如果当前调用提供了 decision.daily_quality_gate 工具，必须调用一次该工具；工具参数就是最终门禁结果，不要输出文章正文或工具操作说明。` }, messages[1]],
+      fallback,
+    });
+    return decision.value;
+  };
   onProgress('早报 6/7 执行最终质量门禁');
   let quality = normalizeDailyQuality(await gate(final, 'initial'),dailyVisibleChars(final),maxChars);
   for(let attempt=0;(!quality.pass||dailyVisibleChars(final)<minChars||dailyVisibleChars(final)>maxChars)&&attempt<repairAttempts;attempt+=1){

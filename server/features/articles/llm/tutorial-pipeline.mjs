@@ -9,11 +9,22 @@ import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skill
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { resolveArticleStageSkills } from '../../../platform/skills/entry-routing.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
+import { callDecisionTool, DECISION_TITLE_PLAN_TOOL, decisionToolDefinition, normalizeDecisionTitlePlan } from '../../../platform/llm/decision-tools.mjs';
 
 function writeFile(filePath,content){fs.mkdirSync(path.dirname(filePath),{recursive:true});const temp=`${filePath}.tmp`;fs.writeFileSync(temp,`${String(content).trimEnd()}\n`,'utf8');fs.renameSync(temp,filePath);return fs.statSync(filePath);}
 function clean(value){return String(value||'').trim().replace(/^```(?:markdown)?\s*/i,'').replace(/\s*```$/,'');}
 export function tutorialVisibleChars(value){return markdownVisibleChars(value);}
 function parseJson(result,store){return parseModelJson(result,{store,label:'教程门禁'});}
+const TUTORIAL_QUALITY_GATE_TOOL=decisionToolDefinition({
+  name:'decision.tutorial_quality_gate',
+  description:'返回教程或心得经验文章的质量门禁结果，只包含是否通过以及需要修复的问题。',
+  parameters:{type:'object',required:['pass','issues'],properties:{
+    pass:{type:'boolean'},
+    issues:{type:'array',items:{type:'object',required:['message'],properties:{
+      message:{type:'string',minLength:1,maxLength:500},type:{type:'string',maxLength:80},repair:{type:'string',maxLength:500},
+    }}},
+  }},
+});
 function artifact(store,batchId,candidateId,kind,name,filePath){const stat=fs.statSync(filePath);store.upsertArtifact({batchId,candidateId,track:'article',kind,name,path:filePath,size:stat.size,modifiedAt:stat.mtime.toISOString()});}
 async function textCall(gateway,input,system,user,maxOutputTokens){return gateway.complete({...input,maxOutputTokens,messages:[{role:'system',content:system,protected:true},{role:'user',content:user,protected:true}]});}
 function applyTitle(markdown,title){const value=String(markdown||'').trim(),safe=String(title||'').trim();if(!safe)return value;return /^#\s+.+$/m.test(value)?value.replace(/^#\s+.+$/m,`# ${safe}`):`# ${safe}\n\n${value}`;}
@@ -52,14 +63,20 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const draftResult=await textCall(gateway,{provider,purpose:'tutorial-drafting',batchId,candidateId},skill.prompt,`${articleMode==='experience'?'personal_writing_fact_base':'tutorial_fact_base'}:\n${JSON.stringify(fact)}`,maxTokens);
   const draft=clean(draftResult.content),draftPath=path.join(workdir,'04-draft.md');writeFile(draftPath,draft);
   onProgress(`${label} 2/7 根据初稿生成并锁定标题`);
-  const titleResult=await gateway.complete({provider,purpose:'tutorial-title-generation',batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
-    {role:'system',content:`${titleGenerator.prompt}\n\n根据完整初稿生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":["候选1","候选2"],"coreKeywords":["关键词"]}。不得引入初稿没有的事实、数字、人物或结论。`,protected:true},
+  const titlePurpose='tutorial-title-generation';
+  const fallbackTitle=draft.match(/^#\s+(.+)$/m)?.[1]||fact.topic;
+  const titleMessages=[
+    {role:'system',content:`${titleGenerator.prompt}\n\n根据完整初稿生成标题，返回严格 JSON：{"selectedTitle":"最终标题","titleCandidates":[{"title":"候选1","reason":"理由"}],"coreKeywords":["关键词"]}。不得引入初稿没有的事实、数字、人物或结论。`,protected:true},
     {role:'user',content:JSON.stringify({topic:fact.topic,articleMode,draft}),protected:true},
-  ]});
-  let titlePlan={};try{titlePlan=parseJson(titleResult,store);}catch{}
-  const selectedTitle=String(titlePlan.selectedTitle||draft.match(/^#\s+(.+)$/m)?.[1]||fact.topic).trim();
-  const titleCandidates=Array.isArray(titlePlan.titleCandidates)?titlePlan.titleCandidates.map(String).filter(Boolean):[selectedTitle];
-  const coreKeywords=Array.isArray(titlePlan.coreKeywords)?titlePlan.coreKeywords.map(String).filter(Boolean).slice(0,6):[];
+  ];
+  const titleFallback=async()=>{try{return parseJson(await gateway.complete({provider,purpose:titlePurpose,batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:titleMessages}),store);}catch{return {};}};
+  const titleDecision=await callDecisionTool({gateway,provider,repository:store?.repositories?.extensionSettings,purpose:titlePurpose,batchId,candidateId,
+    definition:DECISION_TITLE_PLAN_TOOL,schema:DECISION_TITLE_PLAN_TOOL.function.parameters,
+    messages:[{...titleMessages[0],content:`${titleMessages[0].content}\n\n如果当前调用提供了 decision.title_plan 工具，必须调用一次该工具；工具参数就是标题规划结果，不要输出解释文字。`},titleMessages[1]],fallback:titleFallback});
+  const titlePlan=normalizeDecisionTitlePlan(titleDecision.value,{fallbackTitle});
+  const selectedTitle=String(titlePlan.selectedTitle||fallbackTitle).trim();
+  const titleCandidates=titlePlan.titleCandidates.map((item)=>item.title).filter(Boolean);
+  const coreKeywords=titlePlan.coreKeywords;
   const titlePath=path.join(workdir,'03-titles.md');
   writeFile(titlePath,`# 标题候选\n\n${titleCandidates.map((item,index)=>`${index+1}. ${item}`).join('\n')}\n\nSELECTED_TITLE: ${selectedTitle}\n\ncore_keywords: ${coreKeywords.join('、')}`);
   onProgress(`${label} 3/7 去除模板腔并保持事实不变`);
@@ -77,14 +94,22 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const gate=async(stage)=>{
     const system=`你是文章事实与真实性质量门禁。只评估，不修改、不续写、不复述文章。必须仅返回严格 JSON：{"pass":boolean,"issues":[{"message":"..."}]}。禁止返回 Markdown、标题、代码围栏或 JSON 之外的文字。${articleMode==='experience'?'检查第一人称经历只来自 author_experience，观点未超出作者输入，素材事实保留归属，model_suggestion 未伪装亲历或确定结论。':'检查步骤可复现、环境与前置条件明确、所有确定性步骤和结果由 author_experience 或 user_material 支持、model_suggestion 未伪装实测、来源链接可追溯。'}不要估算字符数，长度由程序检查。`;
     const user=`${articleMode==='experience'?'personal_writing_fact_base':'tutorial_fact_base'}:${JSON.stringify(fact)}\n\n${label}文章:\n${final}`;
-    for(let attempt=0;attempt<2;attempt+=1){
-      const result=await gateway.complete({provider,purpose:`tutorial-quality-gate-${stage}${attempt?'-format-retry':''}`,batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
-        {role:'system',protected:true,content:attempt?`${system}\n上一次返回了文章正文而不是 JSON。本次不得输出任何文章正文。`:system},
-        {role:'user',protected:true,content:user},
-      ]});
-      try{return parseJson(result,store);}catch(error){if(attempt===1)throw error;}
-    }
-    throw new Error('教程门禁未返回结果');
+    const purpose=`tutorial-quality-gate-${stage}`;
+    const messages=[{role:'system',protected:true,content:system},{role:'user',protected:true,content:user}];
+    const fallback=async()=>{
+      for(let attempt=0;attempt<2;attempt+=1){
+        const result=await gateway.complete({provider,purpose:`${purpose}${attempt?'-format-retry':''}`,batchId,candidateId,jsonMode:true,maxOutputTokens:Math.min(3000,providerConfig.maxOutputTokens),messages:[
+          {role:'system',protected:true,content:attempt?`${system}\n上一次返回了文章正文而不是 JSON。本次不得输出任何文章正文。`:system},
+          {role:'user',protected:true,content:user},
+        ]});
+        try{return parseJson(result,store);}catch(error){if(attempt===1)throw error;}
+      }
+      throw new Error('教程门禁未返回结果');
+    };
+    const decision=await callDecisionTool({gateway,provider,repository:store?.repositories?.extensionSettings,purpose,batchId,candidateId,
+      definition:TUTORIAL_QUALITY_GATE_TOOL,schema:TUTORIAL_QUALITY_GATE_TOOL.function.parameters,
+      messages:[{...messages[0],content:`${messages[0].content}\n\n如果当前调用提供了 decision.tutorial_quality_gate 工具，必须调用一次该工具；工具参数就是最终门禁结果，不要输出文章正文或工具操作说明。`},messages[1]],fallback});
+    return decision.value;
   };
   onProgress(`${label} 6/7 执行事实与真实性门禁`);
   let quality=await gate('initial'),count=tutorialVisibleChars(final);
