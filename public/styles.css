@@ -1219,7 +1219,7 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 .material-mainline-badge.candidate{color:#9b6a1d}
 .material-mainline-badge.none{color:var(--muted)}
 .material-card-actions{display:flex;flex-wrap:wrap;gap:8px}
-@media(max-width:760px){{grid-template-columns:1fr}.material-dialog-shell{grid-template-rows:auto auto auto auto}.material-edit-grid{grid-template-columns:1fr}.material-card-actions{gap:6px}}
+@media(max-width:760px){.material-dialog-shell{grid-template-rows:auto auto auto auto}.material-edit-grid{grid-template-columns:1fr}.material-card-actions{gap:6px}}
 .material-edit-dialog{background:transparent}
 .material-dialog{width:min(760px,calc(100vw - 32px));max-width:calc(100vw - 24px);max-height:90vh;padding:0;border:0;background:transparent;color:var(--ink);overflow:hidden;box-shadow:none}
 .material-dialog::backdrop{background:rgba(13,20,18,.68);backdrop-filter:blur(4px)}
