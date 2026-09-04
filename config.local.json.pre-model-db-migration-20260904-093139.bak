@@ -1,0 +1,63 @@
+{
+  "tavily": {
+    "enabled": true
+  },
+  "llm": {
+    "providers": {
+      "minimax": {
+        "enabled": false
+      },
+      "kimi": {
+        "enabled": false
+      },
+      "deepseek": {
+        "label": "DeepSeek",
+        "baseUrl": "https://api.deepseek.com",
+        "protocol": "responses",
+        "model": "deepseek-v4-flash",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "contextWindow": 900000,
+        "maxOutputTokens": 16384,
+        "maxTokensField": "max_tokens",
+        "taggingChunkSize": 6,
+        "taggingConcurrency": 6,
+        "supportsJsonMode": true,
+        "enabled": true,
+        "supportsThinkingToggle": true,
+        "thinkingReserveTokens": 8000,
+        "reasoningEffort": "low",
+        "responsesReasoningToggle": true
+      },
+      "custom-61b5768a": {
+        "label": "qwen",
+        "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen3.6-flash",
+        "apiKeyEnv": "MODEL_PROVIDER_CUSTOM_61B5768A_API_KEY",
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384,
+        "maxTokensField": "max_tokens",
+        "taggingChunkSize": 6,
+        "taggingConcurrency": 4,
+        "supportsJsonMode": true,
+        "enabled": true
+      },
+      "ds-openrouter": {
+        "label": "ds-openrouter",
+        "baseUrl": "https://openrouter.ai",
+        "model": "deepseek/deepseek-v4-flash-0731",
+        "apiKeyEnv": "MODEL_PROVIDER_DS_OPENROUTER_API_KEY",
+        "protocol": "chat_completions",
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384,
+        "maxTokensField": "max_tokens",
+        "taggingChunkSize": 6,
+        "taggingConcurrency": 4,
+        "supportsJsonMode": true,
+        "supportsNativeTools": false,
+        "supportsToolCallStreaming": false,
+        "enabled": true
+      }
+    },
+    "defaultProvider": "custom-61b5768a"
+  }
+}
