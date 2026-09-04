@@ -196,32 +196,38 @@ test('完成和归档批次退出当前工作台但保留历史记录',()=>{
   }
 });
 
-test('工作台今日文章与图文只统计当前活动批次',()=>{
+test('工作台今日文章与图文统计全部今日批次并包含 AI 视觉图文',()=>{
   const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'newsroom-current-batch-counts-'));
   let store;
   try{
     store=new Store(path.join(tempRoot,'test.db'));
-    const oldBatch=store.createBatch({date:'2026-07-25',title:'旧批次'});
+    const now=new Date();
+    const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const yesterdayDate=new Date(now); yesterdayDate.setDate(now.getDate()-1);
+    const yesterday=`${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth()+1).padStart(2,'0')}-${String(yesterdayDate.getDate()).padStart(2,'0')}`;
+    const oldBatch=store.createBatch({date:yesterday,title:'旧批次'});
     store.addHotspots(oldBatch.id,'rsshub',[{title:'旧选题',url:'https://example.com/old'}]);
     const oldCandidate=store.addCandidates(oldBatch.id,[store.getBatch(oldBatch.id).hotspots[0].id],{tracks:['article','social_cards']})[0];
     store.updateCandidateTrack(oldCandidate.id,'article',{status:'drafting'});
     store.updateCandidateTrack(oldCandidate.id,'social_cards',{status:'drafting'});
-    const currentBatch=store.createBatch({date:'2026-07-26',title:'当前批次'});
+    const todayBatch=store.createBatch({date:today,title:'今日批次 A'});
+    store.addHotspots(todayBatch.id,'rsshub',[{title:'今日文章',url:'https://example.com/today-article'}]);
+    const todayArticle=store.addCandidates(todayBatch.id,[store.getBatch(todayBatch.id).hotspots[0].id],{tracks:['article']})[0];
+    store.updateCandidateTrack(todayArticle.id,'article',{status:'review'});
+    const latestBatch=store.createBatch({date:today,title:'今日批次 B'});
+    store.addHotspots(latestBatch.id,'rsshub',[{title:'AI 视觉图文',url:'https://example.com/today-social'}]);
+    store.addCandidates(latestBatch.id,[store.getBatch(latestBatch.id).hotspots[0].id],{tracks:['social_cards']});
+    const todaySocial=store.listCandidates(latestBatch.id,'social_cards')[0];
+    const aiVisualPath=path.join(tempRoot,'ai-beautified.html');
+    store.upsertArtifact({batchId:latestBatch.id,candidateId:todaySocial.id,track:'social_cards',kind:'AI 视觉图文',name:'ai-beautified.html',path:aiVisualPath,size:1,modifiedAt:new Date().toISOString()});
 
     let overview=store.overview();
-    assert.equal(overview.latest.id,currentBatch.id);
-    assert.equal(overview.articleCandidates,1);
-    assert.equal(overview.socialCandidates,1);
-    assert.equal(overview.articleInProgress,0);
-    assert.equal(overview.socialInProgress,0);
-
-    store.addHotspots(currentBatch.id,'rsshub',[{title:'今日选题',url:'https://example.com/today'}]);
-    const currentCandidate=store.addCandidates(currentBatch.id,[store.getBatch(currentBatch.id).hotspots[0].id],{tracks:['article']})[0];
-    store.updateCandidateTrack(currentCandidate.id,'article',{status:'review'});
-    overview=store.overview();
+    assert.equal(overview.latest.id,latestBatch.id);
+    assert.equal(overview.articleInProgress,1);
+    assert.equal(overview.socialInProgress,1);
     assert.equal(overview.articleCandidates,2);
     assert.equal(overview.articleInProgress,1);
-    assert.equal(overview.socialInProgress,0);
+    assert.equal(overview.socialInProgress,1);
   }finally{
     store?.close();
     fs.rmSync(tempRoot,{recursive:true,force:true});

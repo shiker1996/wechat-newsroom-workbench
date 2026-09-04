@@ -266,7 +266,7 @@ async function addModelProvider() {
   editor.innerHTML=`<div class="config-panel-heading"><div><span class="kicker">MODEL PROVIDER</span><h4>添加模型</h4></div><p>注册新的 OpenAI 兼容模型渠道；密钥通过统一配置资源的凭据字段保存，不写入环境文件。</p></div>
   <form class="add-model-provider-form">
     <div class="model-config-grid">
-      <label>配置 ID<input id="mp-id" required pattern="[a-z0-9-]+" placeholder="例如：openai-main" title="小写字母、数字和连字符，创建后不可修改"><small>创建后不可修改，用于任务选型。</small></label>
+      <label>配置 ID<input id="mp-id" readonly placeholder="保存时自动生成"><small>保存时按“供应商-模型”自动生成；同名冲突会追加序号。</small></label>
       <label>配置名称<input id="mp-label" required placeholder="例如：主力模型"></label>
       <label>供应商<select id="mp-connection" required>${connectionOptions}</select><small>地址、密钥和协议继承自供应商；模型能力单独配置。</small></label>
       <label>模型名称<input id="mp-name" required placeholder="gpt-4.1"></label>
@@ -279,7 +279,6 @@ async function addModelProvider() {
   editor.querySelector("form").onsubmit=async(event)=>{
     event.preventDefault();
     const payload={
-      id:editor.querySelector("#mp-id").value.trim().toLowerCase(),
       label:editor.querySelector("#mp-label").value.trim(),
       connectionId:editor.querySelector("#mp-connection").value,
       model:editor.querySelector("#mp-name").value.trim(),

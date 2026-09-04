@@ -11,6 +11,10 @@ function repositoryKey(url, rawJson = '') {
   } catch { return ''; }
 }
 
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export class WorkbenchQueryService {
   constructor(db, collaborators = {}) {
     this.db = db;
@@ -205,6 +209,16 @@ export class WorkbenchQueryService {
       SUM(CASE WHEN track='social_cards' THEN 1 ELSE 0 END) AS social_candidates
       FROM candidate_tracks`).get();
     const latest = this.latestActiveBatch();
+    const today = localDateKey();
+    const todayTrackCounts = this.db.prepare(`SELECT
+      COUNT(DISTINCT CASE WHEN ct.track='article' AND ct.status IN ('locked','drafting','review','preview') THEN c.id END) AS article_in_progress,
+      COUNT(DISTINCT CASE WHEN (ct.track='social_cards' AND ct.status NOT IN ('pooled','published','removed')
+        OR EXISTS (SELECT 1 FROM artifacts av WHERE av.batch_id=c.batch_id AND av.candidate_row_id=c.id
+          AND av.track='social_cards' AND av.name='ai-beautified.html' AND av.status='ready')) THEN c.id END) AS social_in_progress
+      FROM candidates c
+      JOIN batches b ON b.id=c.batch_id
+      LEFT JOIN candidate_tracks ct ON ct.candidate_row_id=c.id
+      WHERE b.batch_date=?`).get(today);
     const currentTrackCounts = latest ? this.db.prepare(`SELECT
       SUM(CASE WHEN ct.track='article' AND ct.status IN ('locked','drafting','review','preview') THEN 1 ELSE 0 END) AS article_in_progress,
       SUM(CASE WHEN ct.track='social_cards' AND ct.status NOT IN ('pooled','published','removed') THEN 1 ELSE 0 END) AS social_in_progress
@@ -278,8 +292,8 @@ export class WorkbenchQueryService {
       artifacts: this.db.prepare('SELECT COUNT(*) AS n FROM artifacts').get().n,
       articleCandidates: Number(globalTrackCounts.article_candidates || 0),
       socialCandidates: Number(globalTrackCounts.social_candidates || 0),
-      articleInProgress: Number(currentTrackCounts.article_in_progress || 0),
-      socialInProgress: Number(currentTrackCounts.social_in_progress || 0),
+      articleInProgress: Number(todayTrackCounts.article_in_progress || 0),
+      socialInProgress: Number(todayTrackCounts.social_in_progress || 0),
       latest,
       current,
       efficiency,
@@ -299,6 +313,24 @@ export class WorkbenchQueryService {
     if (!logType || logType === 'source') queries.push(`SELECT 'source' AS log_type, CAST(id AS TEXT) AS id, batch_id, source AS subtype, source AS provider, status, COALESCE(error,'') AS message, ended_at AS ts, ${nullDetailCols} FROM source_runs`);
     if (!logType || logType === 'model') queries.push(`SELECT 'model' AS log_type, CAST(id AS TEXT) AS id, COALESCE(batch_id,'') AS batch_id, purpose AS subtype, provider, status, COALESCE(error,'') AS message, created_at AS ts, ${modelDetailCols} FROM model_calls`);
     if (!queries.length) return [];
-    return this.db.prepare(`${queries.join(' UNION ALL ')} ORDER BY ts DESC LIMIT ?`).all(limit);
+    const rows=this.db.prepare(`${queries.join(' UNION ALL ')} ORDER BY ts DESC LIMIT ?`).all(limit);
+    if(!rows.some((row)=>row.log_type==='model'))return rows;
+    const connections=new Map();
+    for(const row of this.db.prepare(`SELECT extension_id,value_json FROM extension_settings WHERE extension_type='model-connection' AND scope='workspace'`).all()){
+      try{const value=JSON.parse(row.value_json||'{}');connections.set(row.extension_id,value);}catch{}
+    }
+    const modelProviders=new Map();
+    for(const row of this.db.prepare(`SELECT extension_id,value_json FROM extension_settings WHERE extension_type='model-provider' AND scope='workspace'`).all()){
+      try{
+        const value=JSON.parse(row.value_json||'{}');
+        const connection=connections.get(value.connectionId)||{};
+        modelProviders.set(row.extension_id,String(connection.label||value.connectionId||row.extension_id).trim());
+      }catch{}
+    }
+    return rows.map((row)=>{
+      if(row.log_type!=='model')return row;
+      const supplier=modelProviders.get(row.provider)||row.provider;
+      return {...row,provider_display:[supplier,row.model].filter(Boolean).join(' · ')};
+    });
   }
 }

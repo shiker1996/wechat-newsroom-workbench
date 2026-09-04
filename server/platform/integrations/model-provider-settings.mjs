@@ -63,6 +63,30 @@ function providerId(input, existingId='') {
   return requested||`custom-${crypto.randomUUID().slice(0,8)}`;
 }
 
+function idPart(value, fallback) {
+  const normalized=String(value||'').normalize('NFKC').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  return normalized||fallback;
+}
+
+function boundedModelProviderId(value) {
+  return String(value||'').slice(0,48).replace(/-+$/,'')||'custom-model';
+}
+
+export function modelProviderIdFor({ supplier='', supplierId='', model='', existingIds=[] }={}) {
+  const supplierPart=idPart(supplier,idPart(supplierId,'custom'));
+  const modelPart=idPart(model,'model');
+  const base=boundedModelProviderId(`${supplierPart}-${modelPart}`);
+  const used=new Set((Array.isArray(existingIds)?existingIds:[]).map((value)=>String(value||'').toLowerCase()));
+  if(!used.has(base))return base;
+  for(let suffix=2;suffix<10000;suffix+=1){
+    const tail=`-${suffix}`;
+    const candidate=`${base.slice(0,48-tail.length).replace(/-+$/,'')}${tail}`;
+    if(!used.has(candidate))return candidate;
+  }
+  return boundedModelProviderId(`${base}-${crypto.randomUUID().slice(0,6)}`);
+}
+
 export function normalizeProviderInput(input={},existingId='') {
   const id=providerId(input,existingId);
   const label=String(input.label||'').trim();
@@ -325,7 +349,9 @@ export function createModelConnection(root,config,input={},options={}) {
 export function createModelProvider(root,config,input={},options={}) {
   const requestedConnection=connectionIdFor(input);
   const inherited=requestedConnection&&config.llm?.connections?.[requestedConnection] ? config.llm.connections[requestedConnection] : {};
-  const {id,provider}=normalizeProviderInput({...input,baseUrl:input.baseUrl||inherited.baseUrl,protocol:input.protocol||inherited.protocol});
+  const generatedId=String(input.id||'').trim()
+    ||modelProviderIdFor({supplier:inherited.label||input.supplier||requestedConnection,supplierId:requestedConnection,model:input.model,existingIds:Object.keys(config.llm?.providers||{})});
+  const {id,provider}=normalizeProviderInput({...input,id:generatedId,baseUrl:input.baseUrl||inherited.baseUrl,protocol:input.protocol||inherited.protocol});
   provider.connectionId=requestedConnection||id;
   provider.apiKeyEnv=inherited.apiKeyEnv||apiKeyEnvForProvider(provider.connectionId);
   if(config.llm?.providers?.[id])throw new Error(`模型配置 ${id} 已存在`);

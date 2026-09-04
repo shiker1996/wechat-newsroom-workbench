@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createModelConnection, createModelProvider, deleteModelConnection, deleteModelProvider, normalizeProviderInput, saveModelProvider, syncModelProvidersToDatabase } from '../server/platform/integrations/model-provider-settings.mjs';
+import { createModelConnection, createModelProvider, deleteModelConnection, deleteModelProvider, modelProviderIdFor, normalizeProviderInput, saveModelProvider, syncModelProvidersToDatabase } from '../server/platform/integrations/model-provider-settings.mjs';
 
 test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   const result=normalizeProviderInput({label:'自定义',baseUrl:'https://api.example.com/v1/',model:'model-a'});
@@ -11,6 +11,14 @@ test('OpenAI 兼容模型配置校验并生成独立密钥变量',()=>{
   assert.equal(result.provider.baseUrl,'https://api.example.com/v1');
   assert.match(result.provider.apiKeyEnv,/^MODEL_PROVIDER_CUSTOM_/);
   assert.throws(()=>normalizeProviderInput({label:'',baseUrl:'bad',model:''}),/配置名称/);
+});
+
+test('新模型默认按供应商和模型生成可读配置 ID，并处理冲突与长度',()=>{
+  assert.equal(modelProviderIdFor({supplier:'OpenRouter',model:'deepseek/deepseek-v4-flash-0731'}),'openrouter-deepseek-deepseek-v4-flash-0731');
+  assert.equal(modelProviderIdFor({supplier:'Qwen',model:'qwen3.8-flash',existingIds:['qwen-qwen3-8-flash']}),'qwen-qwen3-8-flash-2');
+  const id=modelProviderIdFor({supplier:'供应商',supplierId:'custom-61b5768a',model:'a-model-with-a-very-long-name-that-must-be-truncated',existingIds:[]});
+  assert.match(id,/^custom-61b5768a-a-model/);
+  assert.ok(id.length<=48);
 });
 
 test('模型配置分别持久化非敏感参数和 API Key，并即时更新运行配置',()=>{
@@ -78,6 +86,23 @@ test('同一供应商的多个模型共享连接配置与凭据',()=>{
     createModelConnection(root,removable,{id:'unused',label:'Unused',baseUrl:'https://unused.example.com'},{repository});
     deleteModelConnection(root,removable,'unused',{repository});
     assert.equal(repository.get('model-connection','unused'),null);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('创建模型未提供 ID 时自动使用供应商-模型命名',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'model-auto-id-'));fs.mkdirSync(path.join(root,'data'));
+  const rows=new Map();
+  const repository={
+    list:(type)=>[...rows.values()].filter((row)=>row.extension_type===type),
+    get:(type,id)=>rows.get(`${type}:${id}`)||null,
+    save:(input)=>{const row={extension_type:input.extensionType,extension_id:input.extensionId,value:structuredClone(input.value),configured:input.configured,status:input.status,updated_at:new Date().toISOString()};rows.set(`${input.extensionType}:${input.extensionId}`,row);return row;},
+  };
+  try{
+    const config={llm:{defaultProvider:'',providers:{},connections:{}}};
+    createModelConnection(root,config,{id:'openrouter',label:'OpenRouter',baseUrl:'https://openrouter.ai/api/v1'},{repository});
+    const id=createModelProvider(root,config,{label:'DeepSeek via OpenRouter',connectionId:'openrouter',model:'deepseek/deepseek-v4-flash-0731'},{repository});
+    assert.equal(id,'openrouter-deepseek-deepseek-v4-flash-0731');
+    assert.equal(config.llm.providers[id].model,'deepseek/deepseek-v4-flash-0731');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

@@ -14,8 +14,10 @@ function workspace(t) {
 
 test('统一日志查询的模型分支返回调用详情字段',t=>{
   const store=workspace(t);
+  store.saveExtensionSetting({extensionType:'model-connection',extensionId:'openrouter',value:{label:'OpenRouter'},configured:true,status:'ready'});
+  store.saveExtensionSetting({extensionType:'model-provider',extensionId:'or-deepseek',value:{connectionId:'openrouter',model:'deepseek/deepseek-v4-flash-0731'},configured:true,status:'ready'});
   store.recordModelCall({
-    provider:'deepseek',model:'deepseek-chat',purpose:'hotspot-tagging',status:'completed',
+    provider:'or-deepseek',model:'deepseek/deepseek-v4-flash-0731',purpose:'hotspot-tagging',status:'completed',
     estimatedInputTokens:120,promptTokens:100,completionTokens:30,reasoningTokens:12,
     latencyMs:456,compressed:true,outputBudget:{maxTokens:8192},
     outputText:'{"items":[]}',reasoningText:'先分析再输出',
@@ -23,7 +25,9 @@ test('统一日志查询的模型分支返回调用详情字段',t=>{
   });
   const [row]=store.listLogs({logType:'model'});
   assert.equal(row.log_type,'model');
-  assert.equal(row.model,'deepseek-chat');
+  assert.equal(row.provider,'or-deepseek');
+  assert.equal(row.provider_display,'OpenRouter · deepseek/deepseek-v4-flash-0731');
+  assert.equal(row.model,'deepseek/deepseek-v4-flash-0731');
   assert.equal(row.output_text,'{"items":[]}');
   assert.equal(row.reasoning_text,'先分析再输出');
   assert.deepEqual(JSON.parse(row.tool_calls_json),[{id:'call-1',name:'cap_filesystem_project_document_write',input:{operation:'append'}}]);
