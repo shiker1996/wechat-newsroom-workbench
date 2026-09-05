@@ -38,7 +38,7 @@
     },
     "dependencies": {
         "@aws-sdk/client-s3": "3.1109.0",
-        "markdown-it": "^14.1.0"
+        "markdown-it": "^15.0.1"
     },
     "devDependencies": {
         "@mermaid-js/mermaid-cli": "^11.16.0"
