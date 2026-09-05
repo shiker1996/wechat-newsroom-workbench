@@ -1,7 +1,8 @@
 import { applyWorkbenchSchema } from './workbench-schema.mjs';
+import { applyAgentHarnessSchema } from './agent-harness-schema.mjs';
 export { applyWorkbenchSchema };
 
-export const WORKBENCH_SCHEMA_VERSION = 37;
+export const WORKBENCH_SCHEMA_VERSION = 43;
 
 export function runDatabaseMigrations(db, migrateSchema) {
   if (!db || typeof db.exec !== 'function') throw new TypeError('数据库连接无效');
@@ -684,6 +685,69 @@ export function runDatabaseMigrations(db, migrateSchema) {
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(37,?)').run(new Date().toISOString());
       db.exec('COMMIT');
     }catch(error){db.exec('ROLLBACK');throw error;}}
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=38').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      applyAgentHarnessSchema(db);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(38,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=39').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec('CREATE TABLE IF NOT EXISTS agent_resume_claims (agent_run_id TEXT PRIMARY KEY, claim_token TEXT NOT NULL, claimed_at TEXT NOT NULL, lease_until TEXT NOT NULL, FOREIGN KEY(agent_run_id) REFERENCES agent_runs(id) ON DELETE CASCADE)');
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(39,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=40').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec('CREATE TABLE IF NOT EXISTS agent_tool_idempotency (idempotency_key TEXT PRIMARY KEY, capability TEXT NOT NULL, plugin TEXT, version TEXT, result_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT); CREATE INDEX IF NOT EXISTS idx_agent_tool_idempotency_capability ON agent_tool_idempotency(capability,created_at)');
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(40,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=41').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const columns=new Set(db.prepare('PRAGMA table_info(model_calls)').all().map((column)=>column.name));
+      if(!columns.has('agent_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN agent_run_id TEXT');
+      if(!columns.has('agent_step'))db.exec('ALTER TABLE model_calls ADD COLUMN agent_step INTEGER');
+      if(!columns.has('workflow_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN workflow_run_id TEXT');
+      if(!columns.has('root_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN root_run_id TEXT');
+      if(!columns.has('stage_id'))db.exec('ALTER TABLE model_calls ADD COLUMN stage_id TEXT');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_model_calls_agent_run ON model_calls(agent_run_id,agent_step,id)');
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(41,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=42').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const addColumns = (table, definitions) => {
+        const columns=new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((column)=>column.name));
+        for (const [name, definition] of definitions) if (!columns.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      };
+      addColumns('agent_runs', [['root_run_id','TEXT'],['workflow_run_id','TEXT'],['stage_id','TEXT'],['parent_run_id','TEXT']]);
+      addColumns('agent_tool_calls', [['root_run_id','TEXT'],['workflow_run_id','TEXT'],['stage_id','TEXT']]);
+      addColumns('tool_executions', [['agent_run_id','TEXT'],['agent_tool_call_id','TEXT'],['workflow_run_id','TEXT'],['root_run_id','TEXT'],['stage_id','TEXT']]);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agent_runs_root ON agent_runs(root_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow ON agent_runs(workflow_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_root ON agent_tool_calls(root_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_tool_executions_agent_run ON tool_executions(agent_run_id,id);');
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(42,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
+  if (arguments.length < 2 && !db.prepare('SELECT 1 FROM schema_migrations WHERE version=43').get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const columns=new Set(db.prepare('PRAGMA table_info(tool_executions)').all().map((column)=>column.name));
+      if(!columns.has('side_effect'))db.exec("ALTER TABLE tool_executions ADD COLUMN side_effect TEXT NOT NULL DEFAULT 'none'");
+      if(!columns.has('replay_policy'))db.exec("ALTER TABLE tool_executions ADD COLUMN replay_policy TEXT NOT NULL DEFAULT 'never'");
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(43,?)').run(new Date().toISOString());
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
   const violations = db.prepare('PRAGMA foreign_key_check').all();
   if (violations.length) throw new Error(`数据库迁移后存在 ${violations.length} 项外键完整性错误`);

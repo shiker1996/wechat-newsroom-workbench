@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -38,7 +39,7 @@ test('主题中心作为独立页面加载，不再附着在系统配置模块',
 });
 
 test('生产编辑器使用与相邻控件等高的紧凑主题按钮', () => {
-  const styles = read('public', 'styles.css');
+  const styles = readStyles();
   const source = read('public', 'src', 'core', 'theme-catalog.js');
   assert.match(styles, /\.social-theme-picker:has\(#social-theme-trigger\)\{align-content:stretch\}/);
   assert.match(styles, /#social-theme-trigger\{width:100%;height:35px\}/);

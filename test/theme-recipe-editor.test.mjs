@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ import { socialThemeDefinition } from '../server/shared/themes/social-theme-comp
 import { validateThemeDefinition } from '../server/shared/themes/theme-validator.mjs';
 
 const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
-const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const styles=readStyles();
 
 test('阶段 4 配方目录为全部文章和图文枚举提供中文元数据及样稿角色',()=>{
   for(const [target,recipes] of Object.entries({article:ARTICLE_THEME_RECIPES,social:SOCIAL_THEME_RECIPES})){

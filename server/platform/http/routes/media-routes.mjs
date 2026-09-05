@@ -2,6 +2,7 @@ import { executeCapability } from '../../tools/capability-runtime.mjs';
 import { createStoreExecutionLogger } from '../../tools/execution-log.mjs';
 import { generateArticleImage, registerGeneratedSlotImage } from '../../../features/articles/index.mjs';
 import { pipeFile } from '../route-helpers.mjs';
+import { createRequestHarnessGateway } from '../../skills/pipeline-runtime.mjs';
 
 // capability-call: cap_diagram_mermaid_render, cap_diagram_echarts_render
 
@@ -139,8 +140,9 @@ export async function handleMediaRoutes(context) {
     const providerConfig = models.config.providers[provider];
     if (!providerConfig) return json(response, 400, { error:'未知模型服务商' });
     const original = fs.readFileSync(finalPath, 'utf8');
-    const content = await planImagePlaceholders({ gateway:models, store, batchId:batch.id, candidateId:candidate.id,
-      provider, markdown:original, maxOutputTokens:Math.min(3000, providerConfig.maxOutputTokens) });
+    const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'article-image-plan',skillId:'article-image-plan',provider,batchId:batch.id,candidateId:candidate.id,stageId:'article-image-plan'});
+    let content; try { content=await planImagePlaceholders({ gateway:harness.gateway, store, batchId:batch.id, candidateId:candidate.id,
+      provider, markdown:original, maxOutputTokens:Math.min(3000, providerConfig.maxOutputTokens) }); harness.finish('completed'); } catch (error) { harness.finish('failed',error.message); throw error; }
     const file = writeUtf8(finalPath, content);
     const existing = store.listDocuments(batch.id).find((item) => item.candidate_row_id === candidate.id && item.kind === 'final');
     store.saveDocument({ batchId:batch.id, candidateId:candidate.id, kind:'final', title:existing?.title || candidate.hotspot_title,
@@ -278,12 +280,13 @@ export async function handleMediaRoutes(context) {
       ? ['01-news-items.json']
       : ['02-fact-base.json', '01-tutorial-fact-base.json', 'article-brief.md'];
     const factBase = factCandidates.map((name) => path.join(workdir, name)).find((file) => fs.existsSync(file));
-    const result = await planArticleVisuals({
-      gateway:models, provider, batchId, candidateId:candidate?.id ?? null, markdown,
+    const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'article-visual-plan',skillId:'article-visual-plan',provider,batchId,candidateId:candidate?.id??null,stageId:'article-visual-plan'});
+    let result; try { result = await planArticleVisuals({
+      gateway:harness.gateway, provider, batchId, candidateId:candidate?.id ?? null, markdown,
       factBase:factBase ? fs.readFileSync(factBase, 'utf8') : '',
       preferences:store.visualDecisionStats(),
       maxOutputTokens:Math.min(5000, providerConfig.maxOutputTokens), workspaceRoot:config.workspaceRoot,
-    });
+    }); harness.finish('completed'); } catch (error) { harness.finish('failed',error.message); throw error; }
     const theme = defaultTypesetTheme(daily ? { category:'📰 综合资讯' } : candidate);
     return json(response, 200, { ...result, theme, themeLabel:TYPESET_THEMES[theme]?.label || theme });
   }

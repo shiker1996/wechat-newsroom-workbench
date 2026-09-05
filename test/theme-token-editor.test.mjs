@@ -1,10 +1,11 @@
+import { readStyles } from "./style-fixture.mjs";
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
 const fields=fs.readFileSync(new URL('../public/src/views/theme-manager-fields.js',import.meta.url),'utf8');
-const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const styles=readStyles();
 
 test('阶段 3 主题中心持续开放完整字体字阶、间距和形状字段',()=>{
   for(const group of ['typography','spacing','shape'])assert.match(fields,new RegExp(`${group}:\\{label:`));

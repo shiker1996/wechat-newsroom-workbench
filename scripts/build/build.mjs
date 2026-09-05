@@ -7,9 +7,15 @@ import { createThemeRegistry } from "../../server/shared/themes/theme-registry.m
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const publicDir = path.join(root, "public");
 const cssSourceDir = path.join(publicDir, "styles");
-const cssSources = ["tokens-base.css", "social-card.css", "production.css", "topics-accessibility.css", "editor-themes.css", "system-console.css"];
 const generatedStyleDir = path.join(publicDir, "assets", "styles");
-const generatedStyles = ["common.css", "social.css", "topics.css", "editor.css", "system.css"];
+const legacyStylePath = path.join(publicDir, "styles.css");
+const generatedStyles = {
+  "common.css": ["tokens-base.css", "chrome.css", "production.css"],
+  "social.css": ["social-card.css"],
+  "topics.css": ["topics-accessibility.css"],
+  "editor.css": ["editor-themes.css"],
+  "system.css": ["system-console.css"],
+};
 
 function walk(dir, extensions = new Set([".js", ".mjs"])) {
   const files = [];
@@ -52,6 +58,10 @@ const sourceFiles = [
   ...walk(path.join(publicDir, "src"), new Set([".js"])),
 ];
 let ok = true;
+if (fs.existsSync(legacyStylePath)) {
+  console.error("  检测到已移除的 public/styles.css；页面只允许使用 public/assets/styles 下的按需分片");
+  ok = false;
+}
 try {
   const themes = createThemeRegistry({ builtinRoot:path.join(root, "themes") });
   console.log(`主题校验完成：${themes.list({ target:"article" }).length} 个文章主题，${themes.list({ target:"social" }).length} 个图文主题，${themes.list({ target:"cover" }).length} 个封面主题`);
@@ -80,16 +90,17 @@ for (const match of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)) {
   }
 }
 
-const expectedStyles = `${cssSources.map((name) => fs.readFileSync(path.join(cssSourceDir, name), "utf8").replace(/\s+$/, "")).join("\n\n")}\n`;
-const actualStyles = fs.readFileSync(path.join(publicDir, "styles.css"), "utf8");
-if (actualStyles !== expectedStyles) {
-  console.error("  public/styles.css 不是由 public/styles/*.css 当前分片生成，请运行 npm run build:styles");
-  ok = false;
-}
-for (const file of generatedStyles) {
+for (const [file, sources] of Object.entries(generatedStyles)) {
   const filePath = path.join(generatedStyleDir, file);
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile() || fs.statSync(filePath).size === 0) {
     console.error(`  按需样式产物不存在或为空 ${path.relative(root, filePath)}，请运行 npm run build:styles`);
+    ok = false;
+    continue;
+  }
+  const expected = `${sources.map((name) => fs.readFileSync(path.join(cssSourceDir, name), "utf8").replace(/\s+$/, "")).join("\n\n")}\n`;
+  const actual = fs.readFileSync(filePath, "utf8");
+  if (actual !== expected) {
+    console.error(`  按需样式产物 ${path.relative(root, filePath)} 不是由当前源分片生成，请运行 npm run build:styles`);
     ok = false;
   }
 }

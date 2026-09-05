@@ -17,6 +17,8 @@
   --mono: ui-monospace, Consolas, "Courier New", monospace;
   --cream: var(--white);
   --paper-soft: rgba(251, 249, 242, .52);
+  /* Elevated paper surfaces used by cards, logs and trace panels. */
+  --bgelevated: rgba(251, 249, 242, .74);
   --soft: var(--paper-deep);
   --accent: var(--red);
   /* 固定侧栏宽度：.rail 与 .shell 的 margin-left 必须保持一致 */
@@ -403,6 +405,9 @@ nav { flex:1;min-height:0;padding-top: 18px; display: grid; align-content:start;
 .skill-tool-option.unavailable em{color:var(--red)}
 .skill-test-panel,.skill-version-panel{margin:16px 22px;border:1px solid var(--line);background:rgba(251,249,242,.55)}
 .skill-test-panel>label{display:block;padding:14px;color:var(--muted);font-size: 11px;font-weight:800}
+.skill-test-result { display:grid;gap:4px;margin-top:10px;padding:10px;border-left:3px solid var(--studio-green);background:var(--paper);font-size:11px; }
+.skill-test-result small { color:var(--muted); }
+.capability-card-actions { display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;justify-content:flex-end; }
 .skill-editor-actions{position:sticky;bottom:0;z-index:var(--z-sticky);display:grid;grid-template-columns:1fr;gap:8px;align-items:center;padding:11px 22px;border-block:1px solid var(--line);background:rgba(238,196,70,.96);box-shadow:0 -5px 15px rgba(23,32,30,.08)}
 .skill-editor-actions .backup-validation{margin:0;background:rgba(255,255,255,.42)}
 .skill-editor-actions .model-config-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}

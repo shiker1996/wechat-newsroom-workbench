@@ -14,7 +14,7 @@ const viewModules = {
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
   system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
   themes: "./views/theme-manager.js",
-  models: "./views/models.js", logs: "./views/logs.js",
+  models: "./views/models.js", logs: "./views/logs.js?v=20260905-runtrace",
   calendar: "./views/calendar.js",
   "material-inbox": "./views/material-inbox.js", "wechat-review-prep": "./views/wechat-review-prep.js", "wechat-review": "./views/wechat-review.js", "content-feedback": "./views/content-feedback.js",
 };
@@ -22,7 +22,7 @@ const viewModules = {
 // 三个导航入口共用同一视图 DOM：工具图文 / 自定义图文 / 事件图文都落在 #view-social-editor
 const viewSectionAliases = { "social-custom": "view-social-editor", "social-event": "view-social-editor" };
 
-const styleVersion = "20260905-css-split-6";
+const styleVersion = "20260905-css-split-8";
 const styleModules = {
   social: "/assets/styles/social.css",
   topics: "/assets/styles/topics.css",
@@ -47,7 +47,7 @@ const viewStyles = {
   "material-inbox": ["editor"],
   publication: ["editor"],
   "wechat-review-prep": ["editor"],
-  "wechat-review": ["editor"],
+  "wechat-review": ["topics", "editor"],
   "content-feedback": ["editor"],
   themes: ["social", "editor", "system"],
   hotspots: ["topics"],

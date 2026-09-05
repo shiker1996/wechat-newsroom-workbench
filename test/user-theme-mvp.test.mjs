@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -43,4 +44,4 @@ test('阶段 6 记录版本级使用统计并给出归档和物理删除影响',
 
 test('阶段 6 管理界面提供 JSON 导入导出、使用统计和归档影响确认',()=>{const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8'),ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');for(const id of ['import-theme-file','export-user-theme','user-theme-usage'])assert.match(html,new RegExp(`id="${id}"`));assert.match(ui,/archive-impact/);assert.match(ui,/\/usage/);});
 
-test('阶段 6 主题中心默认收起已归档主题并显示归档数量',()=>{const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');assert.match(ui,/status!==['"]archived['"]/);assert.match(ui,/user-theme-archived-group/);assert.match(ui,/已归档/);assert.match(ui,/archivedItems\.length/);assert.match(css,/user-theme-archived-group/);});
+test('阶段 6 主题中心默认收起已归档主题并显示归档数量',()=>{const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),css=readStyles();assert.match(ui,/status!==['"]archived['"]/);assert.match(ui,/user-theme-archived-group/);assert.match(ui,/已归档/);assert.match(ui,/archivedItems\.length/);assert.match(css,/user-theme-archived-group/);});

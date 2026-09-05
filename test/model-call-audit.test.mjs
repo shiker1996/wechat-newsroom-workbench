@@ -58,3 +58,13 @@ test('model_calls 保留最近 2000 条，超出后旧行被清理',t=>{
   assert.equal(Math.max(...ids),2100);
   assert.equal(Math.min(...ids),101);
 });
+
+test('模型审计文本默认脱敏并保留 hash 可复核的截断语义', t => {
+  const store = workspace(t);
+  const secret = 'token=super-secret-value';
+  store.recordModelCall({ provider:'test', model:'m', purpose:'governance', status:'completed', outputText:secret, reasoningText:'a'.repeat(13000) });
+  const [row] = store.listModelCalls(1);
+  assert.equal(row.output_text, 'token=[REDACTED]');
+  assert.equal(row.reasoning_text.length, 12001);
+  assert.equal(row.reasoning_text.endsWith('…'), true);
+});

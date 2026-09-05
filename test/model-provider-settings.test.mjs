@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -129,7 +130,7 @@ test('模型旧配置启动时迁移到统一数据库来源并清理旧字段',
 
 test('模型统一接入统一配置资源，模型运行只负责诊断与观测',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-  const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+  const styles=readStyles();
   const modelsView=fs.readFileSync(new URL('../public/src/views/models.js',import.meta.url),'utf8');
   const systemView=fs.readFileSync(new URL('../public/src/views/system.js',import.meta.url),'utf8');
   const modelRoutes=fs.readFileSync(new URL('../server/platform/http/routes/model-routes.mjs',import.meta.url),'utf8');

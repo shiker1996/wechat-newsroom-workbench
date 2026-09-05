@@ -110,6 +110,14 @@ export class AiJobManager {
 
   async run(job, options = {}) {
     await runWithThinkingSink((delta)=>this.recordThinking(job,delta), async () => {
+    const harnessRunId=`job:${job.id}`;
+    const persistHarnessRun=typeof this.store.startAgentRun==='function';
+    if(persistHarnessRun&&!this.store.getAgentRun?.(harnessRunId)){
+      this.store.startAgentRun({id:harnessRunId,entryPoint:`batch-job:${job.type}`,skillId:`batch-${job.type}`,
+        batchId:job.batchId,candidateId:job.candidateId,provider:job.provider,rootRunId:harnessRunId,workflowRunId:harnessRunId,stageId:'job'});
+      this.store.appendAgentRunEvent?.(harnessRunId,{type:'run.started',entryPoint:`batch-job:${job.type}`,stageId:'job'});
+      this.store.saveAgentStep?.({agentRunId:harnessRunId,step:0,phase:'job_started',summary:{type:job.type}});
+    }
     try {
       const batch=this.store.getBatch(job.batchId);
       const maxAgeHours=Number(batch?.max_age_hours)||this.config.rsshub.maxAgeHours;
@@ -118,10 +126,12 @@ export class AiJobManager {
       const result = await handler({ job, batch, maxAgeHours, options });
       job.result=result; job.status='completed'; job.finishedAt=new Date().toISOString();
       this.store.updateAiRun(job.id,{status:'completed',result_json:JSON.stringify(result),progress:job.progress});
+      if(persistHarnessRun){this.store.appendAgentRunEvent?.(harnessRunId,{type:'run.completed',stageId:'job'});this.store.saveAgentStep?.({agentRunId:harnessRunId,step:0,phase:'job_completed',summary:{type:job.type}});this.store.finishAgentRun?.(harnessRunId,{status:'completed',modelSteps:0,toolCalls:0});}
     } catch(error) {
       if (this.onFailure) this.onFailure({ job, error });
       job.status='failed'; job.error=error.message; job.finishedAt=new Date().toISOString(); this.log(job,`失败：${error.message}`);
       this.store.updateAiRun(job.id,{status:'failed',error:error.message});
+      if(persistHarnessRun){this.store.appendAgentRunEvent?.(harnessRunId,{type:'run.failed',stageId:'job',error:error.message});this.store.finishAgentRun?.(harnessRunId,{status:'failed',modelSteps:0,toolCalls:0,error:error.message});}
     }
     });
   }

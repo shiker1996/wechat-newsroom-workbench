@@ -102,7 +102,7 @@ export async function handleArticleRoutes(context) {
     const candidateId=Number(editorialAiMatch[1]); const candidate=store.getCandidate(candidateId);
     if(!candidate)return json(response,404,{error:'候选不存在'});
     if(projectPath&&!localSecurity?.consume(request,'local-project-read'))return json(response,403,{code:'CONFIRMATION_REQUIRED',error:'请先确认允许读取该本地项目'});
-    const result=await runEditorialAgentTurn({gateway:models,store,registry:await getToolRegistry(),candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000),retrieve:await editorialRetrieve(candidate),workspaceRoot:root,projectPath,budget:agentBudget(),suppliedUrls:extractSuppliedUrls(answer),allowedCapabilities:(await resolveSkillToolPolicy({workspaceRoot:root,skillId:'editorial-room-chat'})).allowedCapabilities});
+    const result=await runEditorialAgentTurn({gateway:models,store,registry:await getToolRegistry(),candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000),retrieve:await editorialRetrieve(candidate),workspaceRoot:root,projectPath,budget:agentBudget(),resumeFrom:String(input.resumeFrom||''),suppliedUrls:extractSuppliedUrls(answer),allowedCapabilities:(await resolveSkillToolPolicy({workspaceRoot:root,skillId:'editorial-room-chat'})).allowedCapabilities});
     return json(response,200,result);
   }
   const editorialStreamMatch=pathname.match(/^\/api\/candidates\/(\d+)\/ai\/editorial\/stream$/);
@@ -114,7 +114,7 @@ export async function handleArticleRoutes(context) {
     response.writeHead(200,{'content-type':'application/x-ndjson; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive'});
     const stream=createNdjsonSession(request,response);const send=stream.send;
     try {
-      const result=await runWithThinkingSink((delta)=>send({type:'thinking',text:delta}),async()=>runEditorialAgentTurn({gateway:models,store,registry:await getToolRegistry(),candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000),retrieve:await editorialRetrieve(candidate),workspaceRoot:root,projectPath,budget:agentBudget(),suppliedUrls:extractSuppliedUrls(answer),allowedCapabilities:(await resolveSkillToolPolicy({workspaceRoot:root,skillId:'editorial-room-chat'})).allowedCapabilities,onEvent:send,signal:stream.signal}));
+      const result=await runWithThinkingSink((delta)=>send({type:'thinking',text:delta}),async()=>runEditorialAgentTurn({gateway:models,store,registry:await getToolRegistry(),candidateId,provider:input.provider,answer,events:candidateEventGroups(candidate,12000),retrieve:await editorialRetrieve(candidate),workspaceRoot:root,projectPath,budget:agentBudget(),resumeFrom:String(input.resumeFrom||''),suppliedUrls:extractSuppliedUrls(answer),allowedCapabilities:(await resolveSkillToolPolicy({workspaceRoot:root,skillId:'editorial-room-chat'})).allowedCapabilities,onEvent:send,signal:stream.signal}));
       if(result.reply)send({type:'assistant.delta',text:result.reply});
       send({type:'done',data:{candidate:result.candidate,editorial:result.editorial,usage:result.usage,model:result.model,agentRunId:result.agentRunId,toolCalls:result.toolCalls,ignoredBecauseLocked:Boolean(result.ignoredBecauseLocked)}});
     } catch(error) {

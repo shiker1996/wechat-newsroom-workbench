@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -38,7 +39,7 @@ test('autonomous writing and batch daily expose the same per-run stage skill flo
 
 test('批次早报第二步在宽屏使用覆盖确认与成稿配置双区布局',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-  const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+  const styles=readStyles();
   assert.match(html,/class="daily-production-grid"/);
   assert.match(html,/class="daily-review-column"/);
   assert.match(html,/class="daily-settings-column"/);

@@ -80,6 +80,20 @@ test('AI 美化上下文读取最终故事板和主题契约，而不是只读�
   assert.equal(context.layoutContract.pageWidth, 375);
 });
 
+test('数据库故事板更新后，生成与门禁不沿用磁盘旧页数或建议页数', () => {
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'social-page-count-'));
+  try {
+    for (const [oldCount, newCount] of [[5, 6], [6, 4]]) {
+      fs.writeFileSync(path.join(workdir, 'card-plan.json'), JSON.stringify({ pages: Array.from({ length: oldCount }, () => ({ title: '旧内容' })) }));
+      const pages = Array.from({ length: newCount }, (_, index) => ({ kind: 'content', title: `新内容 ${index}`, content_blocks: [] }));
+      const context = buildBeautifyContext({ workdir, original, candidate: {}, editorial: { recommended_pages: 5, card_plan_json: JSON.stringify(pages) } });
+      assert.equal(context.requiredPageCount, newCount);
+      assert.equal(context.storyboardPageCount, newCount);
+      assert.equal(context.storyboard[0].title, '新内容 0');
+    }
+  } finally { fs.rmSync(workdir, { recursive: true, force: true }); }
+});
+
 test('AI 视觉主题快照不暴露程序化字号、行高和间距 token', () => {
   const snapshot = buildAiVisualThemeSnapshot({
     themeId: 'neon',

@@ -1,8 +1,9 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const css=fs.readFileSync(new URL("../public/styles.css",import.meta.url),"utf8");
+const css=readStyles();
 
 test("中等屏幕全局顶栏允许标题与操作区分行",()=>{
   assert.match(css,/@media \(min-width:761px\) and \(max-width:1280px\)/);

@@ -1,8 +1,9 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const styles=readStyles();
 const calendar=fs.readFileSync(new URL('../public/src/views/calendar.js',import.meta.url),'utf8');
 const materialInbox=fs.readFileSync(new URL('../public/src/views/material-inbox.js',import.meta.url),'utf8');
 const index=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');

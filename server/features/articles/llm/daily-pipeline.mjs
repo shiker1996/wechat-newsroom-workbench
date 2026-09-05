@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ensureBatchEventCards, dimensionSelections } from '../../research/index.mjs';
 import { loadSkillBundle } from '../../../platform/llm/skill-runtime.mjs';
-import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
+import { bindGenerationSnapshot, bindPipelineHarnessGateway, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { batchArticlesDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveArticleLength } from '../../../platform/core/config.mjs';
@@ -101,7 +101,7 @@ async function textCall(gateway, input, system, user, maxOutputTokens) {
   ] });
 }
 
-export async function runDailyPipeline({ gateway, store, batchId, provider, workspaceRoot, snapshotId=null, stageSelections=null, focuses = [], focus = null, articleLength=null, onProgress = () => {} }) {
+export async function runDailyPipeline({ gateway, store, batchId, provider, workspaceRoot, snapshotId=null, stageSelections=null, focuses = [], focus = null, articleLength=null, rootRunId=null, workflowRunId=null, onProgress = () => {} }) {
   const batch = store.getBatch(batchId);
   if (!batch) throw new Error('批次不存在');
   if (batch.batch_type === 'breaking') throw new Error('突发专题不适合生成批次早报');
@@ -136,6 +136,8 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
   const runtime=await prepareSkillRun({gateway,store,batchId,purpose:'daily',bundles:[dailySkill,titleGenerator,humanizer,reviewer,seoOptimizer],provider,snapshotId,
     selection:{requestedSkill:'',selectedSkill:'wechat-mp-daily',selectionSource:'builtin-default',entryPoint:'batch-daily',stages:resolvedStages}});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
+  gateway=bindPipelineHarnessGateway(gateway,{store,batchId,provider,generationSnapshotId:runtime.snapshotId,
+    rootRunId:rootRunId||`batch:${batchId}`,workflowRunId:workflowRunId||`daily:${batchId}`,entryPoint:'daily-pipeline'});
   provider=runtime.provider;const providerConfig=runtime.providerConfig;
   const configuredLength=runtime.config?.gates?.length;
   // 技能覆盖层 > config.local.json articleLength（pipelines.daily 差异覆盖）> 默认 1300–2000

@@ -1,0 +1,35 @@
+sequenceDiagram
+    actor User as 用户
+    participant WF as Workflow/Pipeline
+    participant AD as Agent Adapter
+    participant H as Agent Harness
+    participant S as Skill
+    participant M as LLM Gateway
+    participant B as Tool Broker
+    participant T as Tool Registry/插件
+    participant D as Run Store
+
+    User->>WF: 发起业务任务
+    WF->>AD: 需要 Agent 参与的阶段
+    AD->>H: runSkill(skillId, input, context)
+    H->>S: 解析 Skill Manifest
+    S-->>H: Prompt、输入输出契约、能力需求、预算
+    H->>D: 创建 Agent Run / Snapshot
+    H->>M: 模型步骤 + Skill 指令 + 上下文
+    M-->>H: 文本、思考或 tool_call
+
+    alt 模型需要工具
+        H->>B: 提交 capability + arguments
+        B->>B: Scope、Schema、权限、幂等校验
+        B->>T: 解析并执行工具
+        T-->>B: 工具结果或错误
+        B->>D: 记录 Tool Call / provenance
+        B-->>H: 规范化 tool_result
+        H->>M: 追加工具结果，进入下一模型步骤
+        M-->>H: 下一步响应或最终结果
+    end
+
+    H->>D: 保存 Step、事件和最终结果
+    H-->>AD: 结构化 Agent Result
+    AD->>WF: 更新业务状态并执行业务门禁
+    WF-->>User: 页面事件与最终结果

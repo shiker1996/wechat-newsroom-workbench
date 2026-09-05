@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -5,7 +6,7 @@ import fs from 'node:fs';
 const editor=fs.readFileSync(new URL('../public/src/views/editor.js',import.meta.url),'utf8');
 const documentModel=fs.readFileSync(new URL('../public/src/views/editor-document-model.js',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-const css=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const css=readStyles();
 
 test('编辑器集合查询使用 $$，不把单元素查询结果当数组',()=>{
   assert.doesNotMatch(editor,/(^|[^$])\$\([^)]*\)\.forEach/m);

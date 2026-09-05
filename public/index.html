@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>见字 · 公众号编辑工作台</title>
-          <link rel="stylesheet" data-base-style="common" href="/assets/styles/common.css?v=20260905-css-split-6">
+          <link rel="stylesheet" data-base-style="common" href="/assets/styles/common.css?v=20260905-css-split-7">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主内容</a>
@@ -932,6 +932,12 @@
             <div class="panel-head skill-editor-head"><div><span class="kicker">BUILT-IN SKILL · READ ONLY</span><h3 id="skill-config-title">技能说明</h3><small id="skill-config-meta">选择技能后读取 SKILL.md</small></div><span class="status-pill ok">只读</span></div>
             <p id="skill-runtime-policy-note" class="skill-runtime-policy-note"></p>
             <div id="skill-package-actions" class="runtime-actions" hidden></div>
+            <section class="skill-test-panel" id="skill-test-panel">
+              <div class="skill-config-section-head"><div><b>受控测试运行</b><small>只检查契约和必需能力，不写入正式文章或业务产物。</small></div><span>TEST</span></div>
+              <label>测试输入（JSON，可留空）<textarea id="skill-test-input" rows="3" spellcheck="false" placeholder='{"query":"示例"}'></textarea></label>
+              <div class="runtime-actions"><button type="button" class="outline-button" id="skill-test-run">测试运行</button><span id="skill-test-status" class="muted" aria-live="polite">test run · 不改变生产配置</span></div>
+              <div id="skill-test-result" class="skill-test-result" hidden></div>
+            </section>
             <section class="skill-readonly-source">
               <div><b>来源文件</b><code id="skill-source-path">—</code></div>
               <div><b>内容哈希</b><code id="skill-prompt-hash">—</code></div>
@@ -1242,9 +1248,12 @@
           <button data-log-type="source" role="tab" aria-selected="false">数据采集</button>
           <button data-log-type="model" role="tab" aria-selected="false">模型调用</button>
         </div>
+        <label class="log-search"><span>⌕</span><input id="log-query" type="search" placeholder="搜索运行 ID、阶段或消息" autocomplete="off"></label>
+        <label class="log-status-filter"><span>状态</span><select id="log-status"><option value="">全部</option><option value="running">运行中</option><option value="completed">已完成</option><option value="failed">失败</option><option value="error">错误</select></label>
         <span class="muted" id="log-count"></span>
         <button type="button" class="ghost-button" id="log-refresh">刷新</button>
       </div>
+      <details class="log-governance-panel"><summary><span><b>日志留存与治理</b><small>模型调用和工具审计按类型保留，可立即清理过期记录</small></span><em>管理</em></summary><div class="log-governance-fields"><label>模型调用条数上限<input id="log-governance-model-limit" type="number" min="100" max="10000" step="100"></label><label>模型调用留存天数<input id="log-governance-model-days" type="number" min="1" max="3650"></label><label>工具审计留存天数<input id="log-governance-tool-days" type="number" min="1" max="3650"></label><label class="log-governance-archive"><input id="log-governance-archive" type="checkbox" checked>过期记录压缩归档</label><button type="button" class="outline-button" id="log-governance-save">保存并清理</button><span id="log-governance-status" class="muted" aria-live="polite"></span></div></details>
       <div id="log-list" class="log-list"></div>
     </section>
   </main>
@@ -1277,6 +1286,7 @@
     <p class="fine-print" id="production-job-note">可以关闭窗口，任务仍会在后台继续。</p>
   </dialog>
   <dialog id="artifact-dialog" class="preview-modal"><button class="close-button preview-close" aria-label="关闭产物预览">×</button><a class="ghost-button artifact-open-original" id="artifact-open-original" href="#" target="_blank" rel="noreferrer">打开原始文件</a><div class="preview-status" hidden>正在加载预览…</div><iframe title="产物预览" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe></dialog>
+  <dialog id="run-trace-dialog" class="modal run-trace-dialog"><div class="run-trace-shell"><div class="modal-head"><div class="run-trace-heading"><div class="run-trace-brand"><span class="run-trace-mark">RT</span><span>RUNTRACE</span><small>LOCAL SESSION</small></div><div class="run-trace-heading-copy"><span class="kicker">RUN TRACE</span><h2 id="run-trace-title">运行详情</h2><p id="run-trace-subtitle" class="modal-form-intro">加载 Workflow、Stage、Model 和 Tool 链路。</p></div></div><button type="button" class="close-button" id="close-run-trace" aria-label="关闭运行详情">×</button></div><div class="run-trace-tabs" role="tablist" aria-label="Run Trace 视图"><span class="run-trace-tab active" role="tab" aria-selected="true">轨迹</span><span class="run-trace-tab" role="tab" aria-selected="false">摘要</span><span class="run-trace-tab-spacer"></span><span class="run-trace-live"><i></i> LIVE CAPTURE</span></div><div id="run-trace-overview" class="run-trace-overview"></div><div id="run-trace-summary" class="run-trace-summary"></div><div id="run-trace-actions" class="run-trace-actions"></div><div id="run-trace-content" class="run-trace-content"><div class="empty-state">选择一条运行记录查看详情。</div></div></div></dialog>
   <dialog id="confirm-dialog" class="modal"><div class="confirm-body"><h2>确认操作</h2><p class="confirm-message"></p><div class="modal-actions"><button type="button" class="ghost-button" data-confirm-cancel>取消</button><button type="button" class="ink-button" data-confirm-ok>确认执行</button></div></div></dialog>
   <dialog id="event-detail-dialog" class="drawer event-detail-dialog"><div class="drawer-inner"><div class="drawer-head"><div><span class="kicker">EVENT EVIDENCE</span><h2 id="event-detail-title">事件详情</h2></div><button type="button" class="close-button" data-close-event-detail aria-label="关闭事件详情">×</button></div><div id="event-detail-content"></div></div></dialog>
   <dialog id="candidate-research-dialog" class="drawer candidate-research-dialog"><div class="drawer-inner"><div class="drawer-head"><div><span class="kicker">TOPIC RESEARCH</span><h2 id="candidate-research-title">选题研判</h2></div><button type="button" class="close-button" data-close-candidate-research aria-label="关闭选题研判">×</button></div><div id="candidate-research-content"></div></div></dialog>
@@ -1290,6 +1300,6 @@
   <dialog id="theme-picker-dialog" class="theme-picker-dialog"><div class="theme-picker-shell"><div class="theme-picker-head"><div><span class="kicker">VISUAL THEME</span><h2 id="theme-picker-title">选择主题</h2><p>颜色只是第一眼，版式语气与内容类型同样重要。</p></div><button type="button" class="close-button" id="close-theme-picker" aria-label="关闭主题选择">×</button></div><div class="theme-picker-tabs" role="tablist"><button type="button" class="active" data-theme-filter="all">全部</button><button type="button" data-theme-filter="builtin">内置主题</button><button type="button" data-theme-filter="user">我的主题</button><select id="theme-picker-scene" aria-label="按内容场景筛选"><option value="all">全部场景</option></select></div><div id="theme-picker-grid" class="theme-picker-grid"></div><div class="theme-picker-foot"><span id="theme-picker-selection">请选择一个主题</span><button type="button" class="primary-button" id="confirm-theme-picker">使用此主题</button></div></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="/vendor/markdown-it.min.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/main.js?v=20260905-runtrace"></script>
 </body>
 </html>

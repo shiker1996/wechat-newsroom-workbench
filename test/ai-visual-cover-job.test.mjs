@@ -5,9 +5,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store } from '../server/platform/core/store.mjs';
+import { getBuiltinThemeRegistry } from '../server/shared/themes/theme-registry.mjs';
 import { runAiVisualCoverJob } from '../server/features/articles/application/ai-visual-cover-generator.mjs';
 
-test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', async () => {
+for (const custom of [false, true]) {
+test(`AI 封面 Pipeline 冻结输入、直接截图并登记交付产物（${custom ? '自定义' : '内置'}主题）`, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-cover-job-'));
   const store = new Store(path.join(root, 'cover.db'));
   const replies = [
@@ -18,6 +20,11 @@ test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', asyn
   const batch = store.createBatch({ date: '2026-08-30', title: '封面测试批次' });
   let candidateId;
   try {
+    if (custom) {
+      const definition = { ...structuredClone(getBuiltinThemeRegistry().require('cover-navy-gold')), id: 'custom-cold-cover', label: '冷白庄重', source: 'user' };
+      delete definition.file;
+      store.getUserTheme = (id) => id === definition.id ? { status: 'published', active_version_id: 1, active_definition_json: JSON.stringify(definition) } : null;
+    }
     const hotspot = store.addManualHotspot(batch.id, { title: '封面测试热点' });
     candidateId = store.addCandidates(batch.id, [hotspot.id], { tracks: ['article'] })[0].id;
     const gateway = {
@@ -39,7 +46,7 @@ test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', asyn
       title: '测试标题',
       summary: '这是用于验证封面直出流程的测试摘要。',
       brand: '测试号 · 2026.08',
-      themeId: 'cover-navy-gold',
+      themeId: custom ? 'custom-cold-cover' : 'cover-navy-gold',
       renderExecute: async ({ outputDir }) => {
         const image = path.join(outputDir, 'page-01.png');
         fs.writeFileSync(image, Buffer.from('fake-png'));
@@ -56,6 +63,7 @@ test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', asyn
     assert.equal(fs.existsSync(path.join(imageDir, 'cover-visual-input.json')), true);
     assert.equal(fs.existsSync(path.join(imageDir, 'cover-theme-snapshot.json')), true);
     assert.equal(fs.existsSync(path.join(imageDir, 'cover-theme-design-spec.md')), true);
+    if (custom) assert.match(fs.readFileSync(path.join(imageDir, 'cover-theme-design-spec.md'), 'utf8'), /冷白庄重/);
     assert.equal(JSON.parse(fs.readFileSync(path.join(imageDir, 'cover-ai-delivery-gate.json'), 'utf8')).status, 'passed');
     assert.match(fs.readFileSync(path.join(imageDir, 'cover.html'), 'utf8'), /模型直接生成的标题/);
     assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(imageDir, 'cover-ai-delivery-gate.json'), 'utf8')).checks), ['image']);
@@ -65,3 +73,4 @@ test('AI 封面 Pipeline 冻结输入、直接截图并登记交付产物', asyn
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+}

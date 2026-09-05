@@ -9,7 +9,7 @@ import { evaluateEditorialReadiness } from '../domain/editorial-readiness.mjs';
 import { normalizeResearchPoints, normalizeRejectedAngles } from '../domain/research-selection.mjs';
 import { normalizeResearchCoverageResult, researchCoverageNeedsRevision } from '../domain/research-coverage.mjs';
 import { loadArticleSkillBundle, loadSkillBundle } from '../../../platform/llm/skill-runtime.mjs';
-import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
+import { bindGenerationSnapshot, bindPipelineHarnessGateway, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { batchTopicsDir, candidateArticleDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveArticleLength } from '../../../platform/core/config.mjs';
@@ -299,7 +299,7 @@ ${current}`,maxOutputTokens);
   return articleLengthStatus(current,range).valid?current:best;
 }
 
-export async function runArticlePipeline({gateway,store,batchId,candidateId,provider,workspaceRoot,snapshotId=null,skillSelection=null,stageSelections=null,articleLength=null,onProgress=()=>{}}) {
+export async function runArticlePipeline({gateway,store,batchId,candidateId,provider,workspaceRoot,snapshotId=null,skillSelection=null,stageSelections=null,articleLength=null,rootRunId=null,workflowRunId=null,onProgress=()=>{}}) {
   const candidate=store.getCandidate(candidateId); if(!candidate||candidate.batch_id!==batchId)throw new Error('候选不存在或不属于当前批次');
   const parseSnapshot = (value, fallback) => { try { const parsed = JSON.parse(value || ''); return parsed && typeof parsed === 'object' ? parsed : fallback; } catch { return fallback; } };
   const classification = { content_class: candidate.content_class || 'news_event', status: candidate.classification_status || 'needs_review', confidence: candidate.classification_confidence,
@@ -369,6 +369,8 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   const runtime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:'article',bundles:[writerSkillBundle,orchestratorSkill,...Object.values(stageSkills)],provider,snapshotId,
     selection:(skillSelection||stageSelections)?{...(skillSelection||{requestedSkill:'',selectedSkill:chosenWriterSkill,selectionSource:'builtin-recommendation'}),entryPoint:'hotspot-article',stages:stageSelections||{}}:null});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
+  gateway=bindPipelineHarnessGateway(gateway,{store,batchId,candidateId,provider,
+    generationSnapshotId:runtime.snapshotId,rootRunId:rootRunId||`batch:${batchId}`,workflowRunId:workflowRunId||`article:${batchId}:${candidateId??'batch'}`,entryPoint:'article-pipeline'});
   provider=runtime.provider;providerConfig=runtime.providerConfig;
   const configuredLength=writerSkillBundle.config?.gates?.length;
   // 优先级：技能覆盖层 gates.length > config.local.json articleLength（含 pipelines.article 差异覆盖）> 默认 1300–2000

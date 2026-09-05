@@ -474,7 +474,7 @@ server/shared/rendering/social-card-plan.mjs
 server/features/social-cards/application/social-card-pipeline.mjs
 server/platform/http/routes/social-card-routes.mjs
 public/src/views/social-editor.js
-public/styles.css
+public/styles/social-card.css
 ```
 
 ### 9.3 不修改模块

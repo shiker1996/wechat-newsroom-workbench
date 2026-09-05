@@ -19,6 +19,16 @@ function currentThinkingSink() {
   return thinkingSinkStore.getStore();
 }
 
+function traceFields(input = {}) {
+  return {
+    agentRunId: input.agentRunId ?? null,
+    agentStep: input.agentStep ?? null,
+    workflowRunId: input.workflowRunId ?? null,
+    rootRunId: input.rootRunId ?? null,
+    stageId: input.stageId ?? null,
+  };
+}
+
 function endpoint(baseUrl) {
   const value=String(baseUrl).replace(/\/+$/, '');
   return /\/chat\/completions$/i.test(value)?value:`${value}/chat/completions`;
@@ -513,7 +523,7 @@ export class ModelGateway {
         outputText: String(result.content ?? '').slice(0, 20000),
         reasoningText: typeof result.reasoning === 'string' && result.reasoning ? result.reasoning.slice(0, 20000) : null,
         toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
-        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId });
+        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId,...traceFields(input) });
       return { ...result, callId, usage: { ...result.usage, compression: compressionUsage },
         provider: providerName, model: provider.model, context,
         outputBudget: { ...outputBudget, used: attempts === 2 ? outputBudget.retry : outputBudget.initial, attempts } };
@@ -522,7 +532,7 @@ export class ModelGateway {
         batchId: input.batchId, candidateId: input.candidateId,
         estimatedInputTokens: context?.afterTokens ?? estimateTokens(input.messages), compressed: context?.compressed,
         latencyMs: Date.now() - started, status: error.code === 'INVALID_TOOL_ARGUMENTS' ? 'invalid_output' : 'failed', error: error.message,
-        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId });
+        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId,...traceFields(input) });
       throw error;
     }
   }
@@ -578,13 +588,13 @@ export class ModelGateway {
         completionTokens:Number(result.usage.completion_tokens||0)+Number(firstAttemptUsage?.completion_tokens||0)+compressionUsage.completion_tokens,reasoningTokens:reasoningTokens||null,compressed:context.compressed,
         latencyMs:Date.now()-started,status:'completed',outputText:String(result.content??'').slice(0,20000),
         reasoningText:typeof result.reasoning==='string'&&result.reasoning?result.reasoning.slice(0,20000):null,toolCalls:Array.isArray(result.toolCalls)?result.toolCalls:[],
-        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId});
+        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId,...traceFields(input)});
       return {...result,callId,provider:providerName,model:provider.model,context,usage:{...result.usage,compression:compressionUsage},
         outputBudget:{...outputBudget,used:attempts===2?outputBudget.retry:outputBudget.initial,attempts}};
     } catch(error) {
       this.store.recordModelCall({provider:providerName,model:provider.model,purpose:input.purpose,batchId:input.batchId,candidateId:input.candidateId,
         estimatedInputTokens:context?.afterTokens??estimateTokens(input.messages),compressed:context?.compressed,latencyMs:Date.now()-started,status:error.code==='INVALID_TOOL_ARGUMENTS'?'invalid_output':'failed',error:error.message,
-        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId});throw error;
+        outputBudget:budgetAudit(input,provider,outputBudget,thinking,thinkingReserve),generationSnapshotId:input.generationSnapshotId,...traceFields(input)});throw error;
     }
   }
 }

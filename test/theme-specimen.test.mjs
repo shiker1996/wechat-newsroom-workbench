@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -5,7 +6,7 @@ import fs from 'node:fs';
 const catalog=fs.readFileSync(new URL('../public/src/core/theme-catalog.js',import.meta.url),'utf8');
 const manager=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8');
 const fields=fs.readFileSync(new URL('../public/src/views/theme-manager-fields.js',import.meta.url),'utf8');
-const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const styles=readStyles();
 
 test('主题中心样稿覆盖边线、反白文字和代码表现',()=>{
   for(const token of ['sample-rule','sample-inverse','<code>'])assert.match(catalog,new RegExp(token));

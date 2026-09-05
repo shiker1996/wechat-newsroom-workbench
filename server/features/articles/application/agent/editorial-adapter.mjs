@@ -1,4 +1,4 @@
-import { runConversationAgent } from '../../../../platform/agent/conversation-agent.mjs';
+import { runSkill } from '../../../../platform/agent/harness.mjs';
 import { buildConversationToolCatalog, buildNativeToolDefinitions, providerSupportsNativeTools, providerSupportsToolCallStreaming } from '../../../../platform/agent/tool-catalog.mjs';
 import { deriveAgentEntryCapabilities } from '../../../../platform/agent/entry-capabilities.mjs';
 import { finalizeEditorialResult, buildEditorialMessages, buildEditorialResearchPointOptions } from '../../llm/editorial-room.mjs';
@@ -84,7 +84,7 @@ function persistEditorialFormState(store, candidateId, state) {
   if (Object.keys(editorialFields).length) store.saveEditorial(candidateId, editorialFields);
 }
 
-export async function runEditorialAgentTurn({ gateway, store, registry, candidateId, provider, answer = '', events = [], retrieve = null, workspaceRoot, projectPath = '', onEvent = () => {}, budget = {}, suppliedUrls = [], allowedCapabilities = null, signal = null }) {
+export async function runEditorialAgentTurn({ gateway, store, registry, candidateId, provider, answer = '', events = [], retrieve = null, workspaceRoot, projectPath = '', onEvent = () => {}, budget = {}, suppliedUrls = [], allowedCapabilities = null, signal = null, resumeFrom = '' }) {
   const candidate = store.getCandidate(candidateId); if (!candidate) throw new Error('候选不存在'); if (candidate.editorial.brief_status === 'LOCKED') throw new Error('简报已经锁定；如需改方向，请先建立新候选'); if (answer.trim()) store.addEditorialMessage(candidateId, 'user', answer.trim());
   const current = store.getCandidate(candidateId), providerConfig = gateway.config.providers[provider || gateway.config.defaultProvider], researchContext = readDiscussionResearchContext({ workspaceRoot, batchId: current.batch_id, candidate: current, events }), baseMessages = await buildEditorialMessages(current, answer, events, retrieve, workspaceRoot, researchContext);
   const adaptation = buildAdaptation({ adaptation: requireAgentAdaptation(workspaceRoot, 'agent.editorial'), inputs: { events, suppliedUrls, projectPath }, workspaceRoot, store, batchId: candidate.batch_id, consumerId: 'agent.editorial', searchMaxResults: false });
@@ -102,13 +102,13 @@ export async function runEditorialAgentTurn({ gateway, store, registry, candidat
   const toolInstruction = `${ENVELOPE_INSTRUCTION}\n所有工具调用必须通过 API 原生 function tool 完成；不要在文本中伪造 tool_requests JSON。`;
   const messages = [...baseMessages, { role: 'system', protected: true, content: `${toolInstruction}\n本地项目读取结果属于【素材】，只有用户明确说明本人实际安装、运行或使用后，相关陈述才能记入【体验】。\n当前业务资源：${JSON.stringify({ ...resourceSummary(events, resources), project: projectPath ? 'project:current' : null })}` }];
   let lastModelResult = null;
-  const agent = await runConversationAgent({ entryPoint: 'editorial', registry, catalog, messages, store, budget, signal, toolContext: { batchId: candidate.batch_id, candidateId, skillId: 'editorial-room-chat', provider: provider || gateway.config.defaultProvider, workspaceRoot, allowedRoots: buildAllowedRoots(workspaceRoot, projectPath), allowedCapabilities: catalog.map((item) => item.capability), toolHandlers: { 'cap_editorial_research_select': (input) => selectEditorialResearchPoints({ store, candidateId, researchContext, input }), [FORM_UPDATE_CAPABILITY]: formUpdateHandler, [CONVERSATION_FINISH_CAPABILITY]: finishHandler } }, onEvent, resolveArguments: adaptation.resolveArguments,
+  const agent = await runSkill({ gateway, entryPoint: 'editorial', registry, catalog, messages, store, budget, signal, ...(resumeFrom ? { resumeFrom } : {}), toolContext: { batchId: candidate.batch_id, candidateId, skillId: 'editorial-room-chat', provider: provider || gateway.config.defaultProvider, workspaceRoot, allowedRoots: buildAllowedRoots(workspaceRoot, projectPath), allowedCapabilities: catalog.map((item) => item.capability), toolHandlers: { 'cap_editorial_research_select': (input) => selectEditorialResearchPoints({ store, candidateId, researchContext, input }), [FORM_UPDATE_CAPABILITY]: formUpdateHandler, [CONVERSATION_FINISH_CAPABILITY]: finishHandler } }, onEvent, resolveArguments: adaptation.resolveArguments,
     cacheLookup: (request) => { if (request.capability !== 'cap_content_url_fetch') return null; const resource = resources.get(String(request.arguments?.resourceId || '')), content = String(resource?.content || ''); if (!content) return null; return { status: 'ok', data: { url: resource.url || '', final_url: resource.url || '', title: resource.title || '', content, content_chars: content.length, cached: true }, artifacts: [], warnings: [], provenance: { plugin: 'hotspot-source-cache', requestedUrl: resource.url || '', finalUrl: resource.url || '' } }; },
     sanitizeToolResult: adaptation.sanitizeToolResult,
-    modelStep: async ({ messages: history, step, signal: modelSignal, emit }) => {
+    modelStep: async ({ gateway: runGateway, messages: history, step, signal: modelSignal, emit }) => {
       if (step === 0) { const first = deterministicProjectReadRequest({ resources, note: '正在读取用户明确指定的本地项目材料', reason: '核对作者提供的实际使用材料' }); if (first) return first; }
       const input = { provider, purpose: 'editorial-room', batchId: candidate.batch_id, candidateId, maxOutputTokens: Math.min(3500, providerConfig.maxOutputTokens), jsonMode: false, tools: nativeToolDefinitions, nativeTools: true, webSearch: false, signal: modelSignal, messages: history };
-      lastModelResult = nativeTools && providerSupportsToolCallStreaming(gateway, provider) && typeof gateway.streamComplete === 'function' ? await gateway.streamComplete(input, () => {}, (text) => emit('assistant.thinking', { text })) : await gateway.complete(input);
+      lastModelResult = nativeTools && providerSupportsToolCallStreaming(gateway, provider) && typeof gateway.streamComplete === 'function' ? await runGateway.streamComplete(input, () => {}, (text) => emit('assistant.thinking', { text })) : await runGateway.complete(input);
       return { nativeTools: true, content: lastModelResult.content || '', toolCalls: lastModelResult.toolCalls };
     } });
   if (agent.type !== 'final') return { ...agent, reply: '本轮已达到资料读取上限，请继续对话以完成编辑决策。', limited: true };

@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -318,7 +319,7 @@ test('封面利用率 90% 到 96% 只提示密度偏高，不阻断布局审计'
 test('图文编辑室可以独立选择版式和视觉主题',()=>{
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
-  const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');
+  const styles=readStyles(root);
   assert.match(html,/id="social-layout-style"[\s\S]*智能混排[\s\S]*海报大字[\s\S]*杂志分栏[\s\S]*数据报告[\s\S]*卡片清单[\s\S]*教程步骤[\s\S]*极简留白/);
   assert.match(html,/id="social-storyboard-theme-status"/);
   assert.match(html,/id="inspect-repository"[\s\S]*分析仓库/);
@@ -448,7 +449,7 @@ test('图文编辑室包含画廊、证据预览、下载和任务完成恢复',
 test('AI 视觉失败时编辑室展示阶段诊断而不是隐藏整个交付区', () => {
   const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
   const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');
-  const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');
+  const styles=readStyles(root);
   const route=fs.readFileSync(path.join(root,'server','platform','http','routes','social-card-routes.mjs'),'utf8');
   assert.match(html,/social-gallery-empty/);
   assert.match(html,/social-delivery-status/);
@@ -463,7 +464,7 @@ test('AI 视觉失败时编辑室展示阶段诊断而不是隐藏整个交付�
 });
 
 test('图文候选使用顶部滚动 Tab 与两端箭头', () => {
-  const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');const styles=fs.readFileSync(path.join(root,'public','styles.css'),'utf8');const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');assert.match(html,/social-candidate-tab-strip[\s\S]*social-tabs-previous[\s\S]*social-editor-candidates[\s\S]*social-tabs-next/);assert.match(styles,/\.social-editor-layout \{ display:grid; grid-template-columns:minmax\(0,1fr\)/);assert.match(styles,/\.social-editor-candidates \{[^}]*display:flex[^}]*overflow-x:auto/);assert.match(source,/setupSocialTabNavigation/);assert.match(source,/scrollBy/);
+  const html=fs.readFileSync(path.join(root,'public','index.html'),'utf8');const styles=readStyles(root);const source=fs.readFileSync(path.join(root,'public','src','views','social-editor.js'),'utf8');assert.match(html,/social-candidate-tab-strip[\s\S]*social-tabs-previous[\s\S]*social-editor-candidates[\s\S]*social-tabs-next/);assert.match(styles,/\.social-editor-layout \{ display:grid; grid-template-columns:minmax\(0,1fr\)/);assert.match(styles,/\.social-editor-candidates \{[^}]*display:flex[^}]*overflow-x:auto/);assert.match(source,/setupSocialTabNavigation/);assert.match(source,/scrollBy/);
 });
 
 test('智能构图按页面语义推断角色并规范化最小 DSL',()=>{

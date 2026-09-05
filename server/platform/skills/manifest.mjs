@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateConfigurationSchema } from '../extensions/configuration-schema.mjs';
+import { SKILL_RUN_KINDS } from './runtime-definition.mjs';
 
 export const SKILL_KINDS=Object.freeze([
   'writer','storyboard','reviewer','title','humanizer','seo','image-planner','typesetter','stage',
@@ -29,7 +30,8 @@ export function validateSkillManifest(input, { expectedId = '' } = {}) {
     return [{field:'manifest',level:'error',message:'skill.json 必须是对象'}];
   }
   const allowedFields=new Set(['schemaVersion','id','name','version','kind','entryPoints','contentTypes',
-    'inputContract','outputContract','requiredCapabilities','optionalCapabilities','compatibleApp','source','configuration']);
+    'inputContract','outputContract','requiredCapabilities','optionalCapabilities','compatibleApp','source','configuration',
+    'runtimeKind','agentEntryPoints','budget','gates','agentGates']);
   const unknownFields=Object.keys(input).filter((field)=>!allowedFields.has(field));
   if(unknownFields.length)issues.push({field:'manifest',level:'error',message:`skill.json 包含未知字段：${unknownFields.join('、')}`});
   if(input.schemaVersion!==1)issues.push({field:'schemaVersion',level:'error',message:'schemaVersion 必须为 1'});
@@ -38,6 +40,9 @@ export function validateSkillManifest(input, { expectedId = '' } = {}) {
   if(typeof input.name!=='string'||!input.name.trim())issues.push({field:'name',level:'error',message:'技能名称不能为空'});
   if(!VERSION_PATTERN.test(input.version||''))issues.push({field:'version',level:'error',message:'技能版本必须使用 SemVer'});
   if(!SKILL_KINDS.includes(input.kind))issues.push({field:'kind',level:'error',message:`未知技能角色：${input.kind||''}`});
+  if(input.runtimeKind!==undefined&&!SKILL_RUN_KINDS.includes(input.runtimeKind))issues.push({field:'runtimeKind',level:'error',message:'未知技能运行类型'});
+  for(const field of ['agentEntryPoints','gates','agentGates'])if(input[field]!==undefined&&!stringArray(input[field]))issues.push({field,level:'error',message:`${field} 必须是无重复字符串数组`});
+  if(input.budget!==undefined&&(!input.budget||typeof input.budget!=='object'||Array.isArray(input.budget)||Object.values(input.budget).some((value)=>!Number.isFinite(value)||value<=0)))issues.push({field:'budget',level:'error',message:'budget 必须包含正数预算'});
   if(!stringArray(input.entryPoints)||input.entryPoints.some((item)=>!SKILL_ENTRY_POINTS.includes(item))){
     issues.push({field:'entryPoints',level:'error',message:'技能入口包含未知值或重复值'});
   }

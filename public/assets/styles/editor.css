@@ -298,3 +298,14 @@ body.editor-focus #editor-focus-mode{border-color:var(--red);background:var(--re
 .material-dialog-body{min-height:0}
 .material-dialog-foot{min-width:0;flex-wrap:wrap}
 @media(max-width:760px){.material-dialog{width:calc(100vw - 20px);max-height:calc(100vh - 20px)}.material-dialog-shell{max-height:calc(100vh - 20px)}.material-dialog-head{padding:16px 16px 13px}.material-dialog-head h3{font-size:23px}.material-dialog-body{padding-inline:14px}.material-dialog-foot{padding:12px 14px}.material-dialog-foot .muted{flex-basis:100%;margin-right:0}}
+
+/* Review preparation: explicit controls and readable copy disclosure. */
+.wechat-copy-preview{margin-top:12px;font:12px/1.6 var(--body)}
+.wechat-copy-preview>summary{display:list-item;list-style-position:inside;width:fit-content;cursor:pointer;padding:7px 11px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-weight:700}
+.wechat-copy-preview>summary:hover,.wechat-copy-preview[open]>summary{background:var(--paper-deep);border-color:var(--ink)}
+.wechat-copy-preview>summary:focus-visible,.wechat-content-actions .text-button:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+.wechat-copy-preview>pre{margin:10px 0 0;padding:12px 14px;border:1px solid var(--line);background:var(--paper);white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.8 var(--body);max-height:360px;overflow:auto}
+.wechat-content-actions{flex-wrap:wrap}
+.wechat-content-actions .text-button{padding:7px 11px;min-height:34px;border:1px solid var(--line);background:var(--paper);font:700 12px/1.5 var(--body)}
+.wechat-content-actions .text-button:hover{border-color:var(--red);background:var(--paper-deep)}
+.wechat-content-actions .text-button:disabled{opacity:.55;cursor:wait}

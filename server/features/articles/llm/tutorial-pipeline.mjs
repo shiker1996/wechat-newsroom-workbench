@@ -5,7 +5,7 @@ import { illustrateArticle } from '../application/article-illustration.mjs';
 import { candidateArticleDir } from '../../../platform/core/workspace-paths.mjs';
 import { resolveArticleLength } from '../../../platform/core/config.mjs';
 import { markdownVisibleChars } from '../../../shared/domain/markdown-visible-chars.mjs';
-import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
+import { bindGenerationSnapshot, bindPipelineHarnessGateway, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { resolveArticleStageSkills } from '../../../platform/skills/entry-routing.mjs';
 import { parseModelJson } from '../../../platform/llm/model-json.mjs';
@@ -29,7 +29,7 @@ function artifact(store,batchId,candidateId,kind,name,filePath){const stat=fs.st
 async function textCall(gateway,input,system,user,maxOutputTokens){return gateway.complete({...input,maxOutputTokens,messages:[{role:'system',content:system,protected:true},{role:'user',content:user,protected:true}]});}
 function applyTitle(markdown,title){const value=String(markdown||'').trim(),safe=String(title||'').trim();if(!safe)return value;return /^#\s+.+$/m.test(value)?value.replace(/^#\s+.+$/m,`# ${safe}`):`# ${safe}\n\n${value}`;}
 
-export async function runTutorialPipeline({gateway,store,batchId,candidateId,provider,workspaceRoot,snapshotId=null,skillSelection=null,stageSelections=null,articleLength=null,onProgress=()=>{}}){
+export async function runTutorialPipeline({gateway,store,batchId,candidateId,provider,workspaceRoot,snapshotId=null,skillSelection=null,stageSelections=null,articleLength=null,rootRunId=null,workflowRunId=null,onProgress=()=>{}}){
   const candidate=store.getCandidate(candidateId);if(!candidate||candidate.batch_id!==batchId)throw new Error('教程项目不存在或不属于当前批次');
   const batch=store.getBatch(batchId),workdir=candidateArticleDir(workspaceRoot,batch,candidate);
   const factPath=path.join(workdir,'01-tutorial-fact-base.json');
@@ -52,6 +52,8 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const runtime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:articleMode==='experience'?'personal-writing':'tutorial',bundles:[skill,titleGenerator,humanizer,reviewer,seoOptimizer],provider,snapshotId,
     selection:{...(skillSelection||{requestedSkill:'',selectedSkill:skill.skillName,selectionSource:'builtin-recommendation'}),entryPoint:'independent-writing',contentType:articleMode,stages:resolvedStages}});
   gateway=bindGenerationSnapshot(gateway,runtime.snapshotId);
+  gateway=bindPipelineHarnessGateway(gateway,{store,batchId,candidateId,provider,generationSnapshotId:runtime.snapshotId,
+    rootRunId:rootRunId||`batch:${batchId}`,workflowRunId:workflowRunId||`tutorial:${batchId}:${candidateId??'batch'}`,entryPoint:'tutorial-pipeline'});
   provider=runtime.provider;const providerConfig=runtime.providerConfig,maxTokens=Math.min(6500,providerConfig.maxOutputTokens);
   const configuredLength=runtime.config?.gates?.length;
   // 技能覆盖层 > config.local.json articleLength（pipelines.tutorial 差异覆盖）> 默认 1300–2000

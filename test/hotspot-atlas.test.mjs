@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,7 +46,7 @@ test('热点全景按事件覆盖聚合且报道数守恒', () => {
 test('事件关系图使用固定视窗、缩放平移和确定性维度排序', () => {
   const ui = fs.readFileSync(new URL('../public/src/views/atlas.js', import.meta.url), 'utf8');
   const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
-  const css = fs.readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const css = readStyles();
   assert.match(ui, /viewportHeight = 500/);
   assert.match(ui, /zoomGraph/);
   assert.match(ui, /pointermove/);

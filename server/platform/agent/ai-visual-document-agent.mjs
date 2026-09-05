@@ -1,4 +1,4 @@
-import { runConversationAgent } from './conversation-agent.mjs';
+import { runSkill } from './harness.mjs';
 import { AgentContractError, normalizeAgentEnvelope, normalizeToolRequest, validateAgentEnvelope } from './tool-protocol.mjs';
 import { parseModelJsonWithRepair } from '../llm/model-json.mjs';
 import { buildNativeToolDefinitions, capabilityForToolName, providerSupportsNativeTools, providerSupportsToolCallStreaming } from './tool-catalog.mjs';
@@ -108,6 +108,7 @@ export async function runAiVisualDocumentAgent({
   let lastModelResult = null;
   let planningThinkingUsed = false;
 
+  let modelGateway = gateway;
   const complete = async ({ history, step, signal, instruction, outputMaxTokens = AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS, thinking = false, emit = () => {}, native = false }) => {
     const input = {
       provider,
@@ -125,9 +126,9 @@ export async function runAiVisualDocumentAgent({
       messages: [...history, { role: 'user', protected: true, content: instruction }],
     };
     if (native && nativeToolStreaming && typeof gateway.streamComplete === 'function') {
-      return gateway.streamComplete(input, () => {}, (text) => emit('assistant.thinking', { text }));
+      return modelGateway.streamComplete(input, () => {}, (text) => emit('assistant.thinking', { text }));
     }
-    return gateway.complete(input);
+    return modelGateway.complete(input);
   };
 
   const describeModelResponseError = (error) => {
@@ -189,7 +190,9 @@ export async function runAiVisualDocumentAgent({
   };
 
   onPhaseChange('generation');
-  const agent = await runConversationAgent({
+  const agent = await runSkill({
+    gateway,
+    gateHandlers: { 'visual-document-finished': { version: '1', phase: 'output', check: () => documentFinished } },
     entryPoint,
     registry,
     catalog: generationCatalog,
@@ -220,7 +223,8 @@ export async function runAiVisualDocumentAgent({
       }
       onEvent(event);
     },
-    modelStep: async ({ messages: history, step, signal, emit }) => {
+    modelStep: async ({ gateway: preparedGateway, messages: history, step, signal, emit }) => {
+      modelGateway = preparedGateway || gateway;
       if (!sourceRead) return validateAgentEnvelope(readRequest(`tr_visual_read_${step + 1}`, pageFiles), { maxRequests: 1 });
       if (!documentStarted) {
         pendingOperation = 'begin';

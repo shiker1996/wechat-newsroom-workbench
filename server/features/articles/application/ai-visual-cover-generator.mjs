@@ -117,14 +117,14 @@ async function renderCover({ workspaceRoot, htmlPath, imageDir, execute: provide
   }
 }
 
-export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, workdir, title, summary = '', brand = '', themeId = '', renderExecute = null, onProgress = () => {}, onEvent = () => {} } = {}) {
+export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, workdir, title, summary = '', brand = '', themeId = '', rootRunId = null, workflowRunId = null, renderExecute = null, onProgress = () => {}, onEvent = () => {} } = {}) {
   if (!workdir) throw new TypeError('AI 封面生成缺少文章工作目录');
   const imageDir = path.join(workdir, 'images');
   fs.mkdirSync(imageDir, { recursive: true });
   const { theme, themeRouting } = await resolveCoverTheme({ store, gateway, provider, batchId, candidateId, themeId, title, summary, log: onProgress });
   const semantics = await analyzeCoverSemantics({ gateway, provider, batchId, candidateId, title, summary, store, log: onProgress });
   const spec = loadCoverAiDesignSpec({ workspaceRoot, theme, allowFallback: true });
-  if (spec.fallback) {
+  if (spec.fallback && theme.source !== 'user') {
     const error = new Error(`封面主题缺少 AI_DESIGN_SPEC.md：${theme.id}`);
     error.code = 'AI_VISUAL_COVER_SPEC_MISSING';
     throw error;
@@ -208,7 +208,7 @@ export async function runAiVisualCoverJob({ gateway, store, batchId, candidateId
       documentWriteSessionId: sessionId,
       resolveArguments,
       sanitizeToolResult: (toolResult, request) => sanitizeCapabilityResult(toolResult, request),
-      toolContext: { batchId, candidateId, skillId: AI_VISUAL_COVER_SKILL, provider: providerId, workspaceRoot, allowedRoots: [imageDir], allowedCapabilities: [AI_VISUAL_PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE] },
+      toolContext: { batchId, candidateId, rootRunId, workflowRunId, stageId: 'article-cover-ai-visual-generation', skillId: AI_VISUAL_COVER_SKILL, provider: providerId, workspaceRoot, allowedRoots: [imageDir], allowedCapabilities: [AI_VISUAL_PROJECT_READ, AI_VISUAL_DOCUMENT_WRITE] },
       maxOutputTokens: providerMaxOutputTokens,
       onProgress,
       onEvent,

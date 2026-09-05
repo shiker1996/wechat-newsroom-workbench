@@ -1,0 +1,47 @@
+flowchart TB
+    UI[页面 / API / NDJSON]
+
+    subgraph FEATURE[业务 Feature]
+        WF[Workflow / Pipeline<br/>确定性顺序、业务状态、业务门禁]
+        AD[Agent Adapter<br/>业务上下文、表单状态、结果解释]
+    end
+
+    subgraph HARNESS[Agent Harness]
+        RUN[Agent Run Engine<br/>模型循环、生命周期、取消、预算]
+        SK[Skill<br/>Prompt、方法、输入输出契约、运行策略]
+        CTX[Context / Budget / Policy<br/>上下文、预算、授权 Scope]
+        BROKER[Tool Broker<br/>Schema、权限、确认、幂等、事件]
+    end
+
+    subgraph INFRA[平台基础设施]
+        LLM[LLM Gateway<br/>文本、思考、原生 tool call]
+        REG[Tool Registry<br/>插件与 Capability 实现]
+        STORE[Run Store<br/>Run、Step、Tool Call、Checkpoint、Trace]
+    end
+
+    UI --> WF
+    UI --> AD
+    WF -->|调用确定性阶段| SK
+    WF -->|需要多轮推理时| AD
+    AD -->|run Skill with input| RUN
+    RUN -->|解析并加载| SK
+    SK -.->|声明所需能力| CTX
+    CTX --> RUN
+    RUN -->|模型步骤| LLM
+    LLM -->|文本 / 思考 / tool_call| RUN
+    RUN -->|请求工具| BROKER
+    BROKER -->|校验、授权、解析实现| REG
+    REG -->|结果| BROKER
+    BROKER -->|规范化 tool_result| RUN
+    RUN -->|持久化事件与状态| STORE
+    RUN -->|结构化结果| AD
+    AD -->|业务状态与门禁| WF
+    WF --> UI
+    AD --> UI
+
+    classDef feature fill:#e8f1ff,stroke:#4f7cac,color:#172b4d;
+    classDef harness fill:#fff3d6,stroke:#c58a00,color:#4a3500;
+    classDef infra fill:#e8f7ed,stroke:#3c8d5a,color:#173b24;
+    class UI,WF,AD feature;
+    class RUN,SK,CTX,BROKER harness;
+    class LLM,REG,STORE infra;

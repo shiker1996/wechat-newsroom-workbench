@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { loadSkillBundle } from '../llm/skill-runtime.mjs';
 import { ownsRuntimePolicy } from './roles.mjs';
 import { readSkillManifest } from './manifest.mjs';
+import { normalizeSkillDefinition } from './runtime-definition.mjs';
 import { auditSkillCapabilityReferences } from '../tools/dependency-baseline.mjs';
 import { readSkillPackageCatalog, installedSkillsRoot } from './package-manager.mjs';
 
@@ -49,6 +50,7 @@ export class SkillRegistry {
           version:bundle.config?.version ? String(bundle.config.version) : meta.version,
           packageVersion:manifest?.version || 'legacy',
           kind:manifest?.kind || 'stage',
+          runtimeKind:manifest?.runtimeKind || 'stage-skill',
           entryPoints:manifest?.entryPoints || [],
           contentTypes:manifest?.contentTypes || [],
           inputContract:manifest?.inputContract || '',
@@ -86,6 +88,7 @@ export function createGenerationSnapshot({ skillBundles, tools = [], provider, m
     extensionConfiguration:bundle.extensionConfiguration?.snapshot || null,
     packageVersion:bundle.manifest?.version || 'legacy',
     kind:bundle.manifest?.kind || 'stage',
+    definition:bundle.definition ? structuredClone(bundle.definition) : normalizeSkillDefinition(bundle.manifest || {}, { id:bundle.skillName || bundle.writerSkill }),
     source:bundle.manifest?.source || {type:'builtin',url:''},
     files:(bundle.files || []).map((file) => String(file).replaceAll('\\', '/')),
     fallback:Boolean(bundle.fallback),

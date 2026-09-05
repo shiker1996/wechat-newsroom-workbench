@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    { "entryPoint": "editorial", "skillId": "editorial-room-chat" },
+    { "entryPoint": "independent-writing", "skillId": "wechat-mp-tutorial" },
+    { "entryPoint": "independent-writing", "skillId": "wechat-mp-personal-writing" },
+    { "entryPoint": "custom-social", "skillId": "custom-card-storyboard" },
+    { "entryPoint": "ai-visual-document-generation", "skillId": "ai-visual-document-generator" },
+    { "entryPoint": "article-cover-ai-visual-generation", "skillId": "article-cover-ai-visual-generator" },
+    { "entryPoint": "social-card-ai-visual-generation", "skillId": "social-card-ai-visual-generator" }
+  ],
+  "turns": [
+    { "type": "tool_requests", "assistant_note": "读取资料", "requests": [{ "requestId": "tr_fixture", "capability": "cap_fixture_read", "arguments": { "query": "资料" }, "reason": "核验" }] },
+    { "type": "final", "assistantReply": "已完成", "output": { "ready": true, "missing": [], "formUpdates": { "title": "测试标题" } } }
+  ],
+  "toolResult": { "status": "ok", "data": { "text": "固定资料" }, "provenance": { "provider": "fixture", "version": "1.0.0" } },
+  "events": ["tool.requested", "tool.running", "tool.completed", "done"]
+}

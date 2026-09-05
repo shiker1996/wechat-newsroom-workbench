@@ -307,9 +307,10 @@ export class WorkbenchQueryService {
   listLogs({ limit = 100, logType } = {}) {
     const queries = [];
     // 统一日志各分支列数需保持一致：模型调用的详情字段在其他类型下以 NULL 占位
-    const modelDetailCols = 'model, output_text, reasoning_text, tool_calls_json, prompt_tokens, completion_tokens, reasoning_tokens, estimated_input_tokens, latency_ms, compressed, output_budget_json, generation_snapshot_id';
+    const runDetailCols = 'root_run_id, workflow_run_id, agent_run_id, stage_id';
+    const modelDetailCols = `${runDetailCols}, model, output_text, reasoning_text, tool_calls_json, prompt_tokens, completion_tokens, reasoning_tokens, estimated_input_tokens, latency_ms, compressed, output_budget_json, generation_snapshot_id`;
     const nullDetailCols = modelDetailCols.split(', ').map((col) => `NULL AS ${col}`).join(', ');
-    if (!logType || logType === 'ai') queries.push(`SELECT 'ai' AS log_type, CAST(id AS TEXT) AS id, batch_id, type AS subtype, provider, status, COALESCE(error,progress) AS message, created_at AS ts, ${nullDetailCols} FROM ai_runs`);
+    if (!logType || logType === 'ai') queries.push(`SELECT 'ai' AS log_type, CAST(ai_runs.id AS TEXT) AS id, ai_runs.batch_id, ai_runs.type AS subtype, ai_runs.provider, ai_runs.status, COALESCE(ai_runs.error,ai_runs.progress) AS message, ai_runs.created_at AS ts, ar.root_run_id, ar.workflow_run_id, ar.id AS agent_run_id, ar.stage_id, ${nullDetailCols.split(', ').slice(4).join(', ')} FROM ai_runs LEFT JOIN agent_runs ar ON ar.id='job:' || CAST(ai_runs.id AS TEXT)`);
     if (!logType || logType === 'source') queries.push(`SELECT 'source' AS log_type, CAST(id AS TEXT) AS id, batch_id, source AS subtype, source AS provider, status, COALESCE(error,'') AS message, ended_at AS ts, ${nullDetailCols} FROM source_runs`);
     if (!logType || logType === 'model') queries.push(`SELECT 'model' AS log_type, CAST(id AS TEXT) AS id, COALESCE(batch_id,'') AS batch_id, purpose AS subtype, provider, status, COALESCE(error,'') AS message, created_at AS ts, ${modelDetailCols} FROM model_calls`);
     if (!queries.length) return [];

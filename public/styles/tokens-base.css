@@ -17,6 +17,8 @@
   --mono: ui-monospace, Consolas, "Courier New", monospace;
   --cream: var(--white);
   --paper-soft: rgba(251, 249, 242, .52);
+  /* Elevated paper surfaces used by cards, logs and trace panels. */
+  --bgelevated: rgba(251, 249, 242, .74);
   --soft: var(--paper-deep);
   --accent: var(--red);
   /* 固定侧栏宽度：.rail 与 .shell 的 margin-left 必须保持一致 */

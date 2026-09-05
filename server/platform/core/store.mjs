@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { openWorkbenchDatabase } from '../persistence/database.mjs';
 import { AiRunRepository } from '../persistence/repositories/ai-run-repository.mjs';
 import { BatchRepository } from '../persistence/repositories/batch-repository.mjs';
@@ -39,7 +40,7 @@ export class Store {
       aiRuns: new AiRunRepository(this.db),
       batches: new BatchRepository(this.db),
       content: new ContentRepository(this.db),
-      runtimeAudit: new RuntimeAuditRepository(this.db),
+      runtimeAudit: new RuntimeAuditRepository(this.db, { archiveDir: path.join(path.dirname(dbPath), 'audit-archive') }),
       sourceRuns: new SourceRunRepository(this.db),
       hotspots: new HotspotRepository(this.db),
       candidates: new CandidateRepository(this.db),
@@ -59,6 +60,8 @@ export class Store {
       contentPlanning: new ContentPlanningRepository(this.db),
       articleArtifacts: new ArticleArtifactRepository(this.db),
     });
+    const auditGovernance = this.repositories.extensionSettings.get('system', 'audit-governance')?.value;
+    this.repositories.runtimeAudit.setGovernance(auditGovernance || {});
     this.queries = Object.freeze({
       batches: new BatchQueryService(this.db),
       candidates: new CandidateQueryService(this.db, this.repositories),
@@ -87,8 +90,27 @@ export class Store {
   startAgentRun(input) { return this.repositories.agentRuns.start(input); }
   finishAgentRun(id,fields) { return this.repositories.agentRuns.finish(id,fields); }
   getAgentRun(id) { return this.repositories.agentRuns.get(id); }
+  appendAgentRunEvent(id,event) { return this.repositories.agentRuns.appendEvent(id,event); }
+  listAgentRunEvents(id,options) { return this.repositories.agentRuns.listEvents(id,options); }
+  saveAgentStep(input) { return this.repositories.agentRuns.saveStep(input); }
+  listAgentSteps(id) { return this.repositories.agentRuns.listSteps(id); }
+  saveAgentCheckpoint(id,state) { return this.repositories.agentRuns.saveCheckpoint(id,state); }
+  getLatestAgentCheckpoint(id) { return this.repositories.agentRuns.latestCheckpoint(id); }
+  getAgentRunTrace(id, options = {}) { return this.repositories.agentRuns.trace(id, { ...options, runtimeAudit: this.repositories.runtimeAudit }); }
+  getWorkflowRunTrace(rootRunId, options = {}) { return this.repositories.agentRuns.workflowTrace(rootRunId, { ...options, runtimeAudit: this.repositories.runtimeAudit }); }
+  claimAgentResume(id, token, leaseMs) { return this.repositories.agentRuns.claimResume(id, token, leaseMs); }
+  releaseAgentResume(id, token) { return this.repositories.agentRuns.releaseResume(id, token); }
+  getAgentIdempotentResult(input) { return this.repositories.agentRuns.getIdempotentResult(input); }
+  saveAgentIdempotentResult(input) { return this.repositories.agentRuns.saveIdempotentResult(input); }
   listAgentRuns(limit=100) { return this.repositories.agentRuns.list(limit); }
   getAgentOperationsOverview(limit=100) { return this.repositories.agentRuns.overview(limit); }
+  getAuditGovernance() { return this.repositories.runtimeAudit.getGovernance(); }
+  saveAuditGovernance(config = {}) {
+    const governance = this.repositories.runtimeAudit.setGovernance(config);
+    this.repositories.extensionSettings.save({ extensionType: 'system', extensionId: 'audit-governance', value: governance, configured: true, status: 'ready' });
+    return governance;
+  }
+  cleanupAuditLogs() { return this.repositories.runtimeAudit.cleanupGovernedLogs(); }
   startAgentToolCall(input) { return this.repositories.agentRuns.startToolCall(input); }
   finishAgentToolCall(input) { return this.repositories.agentRuns.finishToolCall(input); }
   listAgentToolCalls(agentRunId) { return this.repositories.agentRuns.listToolCalls(agentRunId); }
@@ -442,8 +464,10 @@ export class Store {
     return this.repositories.runtimeAudit.findLatestSnapshot({ batchId, candidateId, purposes });
   }
 
-  saveToolExecution({ batchId = null, candidateId = null, generationSnapshotId = null, skillId = null, record }) {
-    return this.repositories.runtimeAudit.saveToolExecution({ batchId, candidateId, generationSnapshotId, skillId, record });
+  saveToolExecution({ batchId = null, candidateId = null, generationSnapshotId = null, skillId = null, agentRunId = null, agentToolCallId = null, workflowRunId = null, rootRunId = null, stageId = null, record }) {
+    return this.repositories.runtimeAudit.saveToolExecution({ batchId, candidateId, generationSnapshotId, skillId,
+      record: { ...record, agentRunId: record?.agentRunId ?? agentRunId, agentToolCallId: record?.agentToolCallId ?? agentToolCallId,
+        workflowRunId: record?.workflowRunId ?? workflowRunId, rootRunId: record?.rootRunId ?? rootRunId, stageId: record?.stageId ?? stageId } });
   }
 
   listToolExecutions({ batchId = null, candidateId = null, capability = null, plugin = null, limit = 100 } = {}) {

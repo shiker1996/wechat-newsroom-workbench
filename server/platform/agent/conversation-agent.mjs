@@ -1,3 +1,4 @@
+import { normalizeModelTurn, toHarnessEvent } from './model-events.mjs';
 import { CONVERSATION_AGENT_BUDGET_DEFAULTS, CONVERSATION_AGENT_BUDGET_LIMITS } from './contracts.mjs';
 import { compactAgentHistory, compactToolResult, toolCallFingerprint } from './context.mjs';
 import { agentEvent } from './events.mjs';
@@ -5,6 +6,7 @@ import { AgentContractError, normalizeAgentEnvelope, validateAgentEnvelope, tool
 import { executeConversationTool } from './tool-executor.mjs';
 import { capabilityForToolName } from './tool-catalog.mjs';
 import { CONVERSATION_FINISH_CAPABILITY } from './conversation-finish-tool.mjs';
+import { registerAgentRun, unregisterAgentRun } from './run-control.mjs';
 
 function budgets(input={}){const out={};for(const [key,value] of Object.entries(CONVERSATION_AGENT_BUDGET_DEFAULTS))out[key]=Math.min(CONVERSATION_AGENT_BUDGET_LIMITS[key],Math.max(1,Number(input[key])||value));return Object.freeze(out);}
 function runId(){return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;}
@@ -33,18 +35,39 @@ function nativeHistory(modelTurn,results,callByRequestId){
   ];
 }
 
-export async function runConversationAgent({entryPoint,modelStep,messages=[],registry,catalog,toolContext={},resolveArguments,sanitizeToolResult=(result)=>result,cacheLookup=null,onEvent=()=>{},store=null,budget={},signal=null}={}){
+export async function runConversationAgent({entryPoint,modelStep,messages=[],registry,catalog,toolContext={},resolveArguments,sanitizeToolResult=(result)=>result,cacheLookup=null,onEvent=()=>{},onInternalEvent=()=>{},validateFinal=async()=>{},checkpointing=false,resumeState=null,store=null,budget={},signal=null}={}){
   if(typeof modelStep!=='function')throw new TypeError('modelStep 必须是函数');
-  const limits=budgets(budget),id=runId(),started=Date.now(),history=[...messages],seen=new Map();let toolCalls=0,totalResultChars=0;
-  store?.startAgentRun?.({id,entryPoint,...toolContext});
-  const emit=(type,payload={})=>onEvent(agentEvent(type,{agentRunId:id,...payload}));
+  const limits=budgets(resumeState?.limits || budget),id=runId(),started=Date.now(),history=[...(resumeState?.history || messages)],seen=new Map(resumeState?.seen || []);let toolCalls=Number(resumeState?.toolCalls)||0,totalResultChars=Number(resumeState?.totalResultChars)||0,modelSteps=Number(resumeState?.modelSteps)||0;
+  // Every run belongs to a stable trace tree. A standalone run is its own
+  // root/workflow; resumed runs inherit the checkpoint association.
+  const traceContext = Object.freeze({
+    rootRunId: toolContext.rootRunId || resumeState?.rootRunId || id,
+    workflowRunId: toolContext.workflowRunId || resumeState?.workflowRunId || toolContext.rootRunId || resumeState?.rootRunId || id,
+    stageId: toolContext.stageId || resumeState?.stageId || entryPoint,
+    parentRunId: toolContext.parentRunId || resumeState?.parentRunId || null,
+  });
+  const runContext = { ...toolContext, ...traceContext };
+  store?.startAgentRun?.({id,entryPoint,...runContext});
+  const runController = new AbortController();
+  const relayAbort = () => runController.abort(signal?.reason || Object.assign(new Error('Agent 已取消'), { code: 'AGENT_ABORTED' }));
+  if (signal?.aborted) relayAbort(); else signal?.addEventListener('abort', relayAbort, { once: true });
+  const runSignal = runController.signal;
+  registerAgentRun(id, runController);
+  const emit=(type,payload={})=>{const event=agentEvent(type,{agentRunId:id,...payload});const internal=toHarnessEvent(event);store?.appendAgentRunEvent?.(id,internal);onInternalEvent(internal);onEvent(event);};
+  const checkpoint=(phase,step,extra={})=>{
+    store?.saveAgentStep?.({agentRunId:id,step,phase,summary:{toolCalls,totalResultChars,elapsedMs:Date.now()-started}});
+    if(checkpointing)store?.saveAgentCheckpoint?.(id,{schemaVersion:1,phase,step,nextStep:['tools_completed','waiting_confirmation'].includes(phase)?step+1:step,entryPoint,skillId:runContext.skillId,generationSnapshotId:runContext.generationSnapshotId,...traceContext,limits,history,seen:[...seen],toolCalls,totalResultChars,elapsedMs:Date.now()-started,resumable:['tools_completed','waiting_confirmation'].includes(phase),...extra});
+  };
+  const completeCheckpoint=async(result)=>{await validateFinal(result);checkpoint('completed',result.modelSteps-1,{result});};
   try{
-    for(let step=0;step<limits.maxModelSteps;step+=1){
-      if(signal?.aborted)throw new AgentContractError('AGENT_ABORTED','Agent 已取消');
+    for(let step=Number(resumeState?.nextStep)||0;step<limits.maxModelSteps;step+=1){
+      if(runSignal.aborted)throw new AgentContractError('AGENT_ABORTED','Agent 已取消');
       if(Date.now()-started>limits.timeoutMs)throw new AgentContractError('AGENT_BUDGET_EXCEEDED',`Agent 已超过总耗时预算（${limits.timeoutMs}ms）`);
       const remaining=Math.max(1,limits.timeoutMs-(Date.now()-started));
       const modelHistory=compactAgentHistory(history,limits.maxHistoryChars);
-      const modelEnvelope=await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal,emit}),remaining);
+      const modelEnvelope=normalizeModelTurn(await withTimeout(modelStep({entryPoint,messages:modelHistory,catalog,step,signal:runSignal,emit,agentRunId:id,...traceContext}),remaining));
+      modelSteps=step+1;
+      checkpoint('model_completed',step,{modelTurn:modelEnvelope});
       const native = nativeToolEnvelope(modelEnvelope,catalog,limits.maxParallelToolCalls);
       // 对话 Agent 可以在没有业务工具需求时直接返回普通文本。
       // 普通文本只作为本轮回复，不再回退到旧 JSON 信封解析；若模型主动调用
@@ -52,6 +75,7 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       if (modelEnvelope?.nativeTools === true && !native) {
         const assistantReply = String(modelEnvelope.content || '').trim();
         if (assistantReply) {
+          await completeCheckpoint({agentRunId:id,type:'final',assistantReply,output:{},modelSteps:step+1,toolCalls});
           store?.finishAgentRun?.(id, { status: 'completed', modelSteps: step + 1, toolCalls });
           emit('done', { status: 'completed' });
           return { agentRunId: id, type: 'final', assistantReply, output: {}, modelSteps: step + 1, toolCalls };
@@ -60,6 +84,7 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       }
       const envelope=native?.envelope||validateAgentEnvelope(normalizeAgentEnvelope(modelEnvelope),{maxRequests:limits.maxParallelToolCalls});
       if(envelope.type==='final'){
+        await completeCheckpoint({agentRunId:id,...envelope,modelSteps:step+1,toolCalls});
         store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
         emit('done',{status:'completed'});return {agentRunId:id,...envelope,modelSteps:step+1,toolCalls};
       }
@@ -69,11 +94,12 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
         const groupResults=await Promise.all(group.map(async(request)=>{
           emit('tool.requested',{requestId:request.requestId,capability:request.capability,reason:request.reason});
           const fingerprint=toolCallFingerprint(request),count=seen.get(fingerprint)||0;seen.set(fingerprint,count+1);
-          store?.startAgentToolCall?.({agentRunId:id,request});let result;
-          if(count>=limits.maxDuplicateCalls)result=toolError(request,'AGENT_BUDGET_EXCEEDED','相同工具与参数在本轮中不得重复调用',false);
+          const confirmedRetry=Array.isArray(runContext.confirmedCapabilities)&&runContext.confirmedCapabilities.includes(request.capability);
+          store?.startAgentToolCall?.({agentRunId:id,request,...traceContext});let result;
+          if(count>=limits.maxDuplicateCalls&&!confirmedRetry)result=toolError(request,'AGENT_BUDGET_EXCEEDED','相同工具与参数在本轮中不得重复调用',false);
           else if(!(catalog||[]).some((item)=>item.capability===request.capability))result=toolError(request,'CAPABILITY_NOT_VISIBLE',`当前对话未授权能力：${request.capability}`,false);
           else if(toolCalls>=limits.maxToolCalls)result=toolError(request,'AGENT_BUDGET_EXCEEDED','已达到工具调用预算',false);
-          else {toolCalls+=1;result=await executeConversationTool(request,{registry,catalog,context:{...toolContext,store,signal},resolveArguments,cacheLookup,onEvent:(type,payload)=>emit(type,payload)});result=await sanitizeToolResult(result,request,{agentRunId:id});}
+          else {toolCalls+=1;result=await executeConversationTool(request,{registry,catalog,context:{...runContext,store,signal:runSignal,agentRunId:id,agentToolCallId:`${id}:${request.requestId}`,idempotencyKey:toolCallFingerprint(request),timeoutMs:Math.max(1,limits.timeoutMs-(Date.now()-started))},resolveArguments,cacheLookup,onEvent:(type,payload)=>emit(type,payload)});result=await sanitizeToolResult(result,request,{agentRunId:id});}
           result=compactToolResult(result,Math.min(limits.maxToolResultChars,Math.max(256,limits.maxTotalToolResultChars-totalResultChars)));totalResultChars+=JSON.stringify(result).length;store?.finishAgentToolCall?.({agentRunId:id,request,result});
           emit(result.status==='ok'?'tool.completed':'tool.failed',{requestId:request.requestId,capability:request.capability,status:result.status,error:result.error,...(result.status==='ok'?completedEvent(result):{})});return result;
         }));
@@ -85,8 +111,10 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
           .filter(({ request }) => request.capability === CONVERSATION_FINISH_CAPABILITY);
         const successfulFinish = finishEntries.find(({ result }) => result?.status === 'ok');
         if (successfulFinish) {
+          checkpoint('tools_completed',step,{modelTurn:modelEnvelope,results});
           const assistantReply = String(successfulFinish.result.data?.assistantReply || '').trim();
           if (!assistantReply) throw new AgentContractError('INVALID_AGENT_ENVELOPE', '结束工具未返回有效 assistantReply');
+          await completeCheckpoint({agentRunId:id,type:'final',assistantReply,output:{},modelSteps:step+1,toolCalls});
           store?.finishAgentRun?.(id,{status:'completed',modelSteps:step+1,toolCalls});
           emit('done',{status:'completed'});
           return {agentRunId:id,type:'final',assistantReply,output:{},modelSteps:step+1,toolCalls};
@@ -94,9 +122,12 @@ export async function runConversationAgent({entryPoint,modelStep,messages=[],reg
       }
       if(native) history.push(...nativeHistory(modelEnvelope,results,native.callByRequestId));
       else history.push({role:'assistant',content:JSON.stringify(envelope),protected:true},{role:'tool',content:JSON.stringify(results),protected:true});
+      const waitingConfirmation=results.some((result)=>result.error?.code==='TOOL_CONFIRMATION_REQUIRED');
+      checkpoint(waitingConfirmation?'waiting_confirmation':'tools_completed',step,{nextStep:step+1});
       if(totalResultChars>=limits.maxTotalToolResultChars){store?.finishAgentRun?.(id,{status:'limit',modelSteps:step+1,toolCalls,error:'达到工具结果字符预算'});emit('agent.limit',{reason:'达到工具结果字符预算'});return {agentRunId:id,type:'limit',modelSteps:step+1,toolCalls,messages:history};}
     }
     store?.finishAgentRun?.(id,{status:'limit',modelSteps:limits.maxModelSteps,toolCalls,error:'达到模型步骤预算'});emit('agent.limit',{reason:'达到模型步骤预算'});
     return {agentRunId:id,type:'limit',modelSteps:limits.maxModelSteps,toolCalls,messages:history};
-  }catch(error){store?.finishAgentRun?.(id,{status:error.code==='AGENT_ABORTED'?'aborted':'failed',toolCalls,error:error.message});emit('error',{code:error.code||'INVALID_AGENT_ENVELOPE',message:error.message});throw error;}
+  }catch(error){store?.finishAgentRun?.(id,{status:error.code==='AGENT_ABORTED'?'aborted':'failed',modelSteps,toolCalls,error:error.message});emit('error',{code:error.code||'INVALID_AGENT_ENVELOPE',message:error.message});throw error;}
+  finally { unregisterAgentRun(id); signal?.removeEventListener('abort', relayAbort); }
 }

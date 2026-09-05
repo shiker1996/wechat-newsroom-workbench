@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { loadSocialAiDesignSpec } from '../../../shared/themes/social-ai-spec.mjs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -198,9 +199,9 @@ function compactStoryboardPage(page, index) {
   };
 }
 
-function compactThemeContract(themeSnapshot, original) {
+function compactThemeContract(themeSnapshot, original, store) {
   const themeId = String(themeSnapshot?.id || themeSnapshot?.themeId || bodyData(original, 'visual-style') || 'ice-blue');
-  const definition = socialThemeDefinition(themeId, { fallback: true });
+  const definition = resolveWorkspaceTheme(store, themeId, 'social') || socialThemeDefinition(themeId, { fallback: true });
   const compiled = definition ? compileSocialTheme(definition) : null;
   const capacity = themeSnapshot?.capacityProfile || {};
   const roles = capacity.roles && typeof capacity.roles === 'object'
@@ -228,13 +229,15 @@ function compactThemeContract(themeSnapshot, original) {
   };
 }
 
-export function buildBeautifyContext({ workdir, original, candidate, editorial }) {
+export function buildBeautifyContext({ workdir, original, candidate, editorial, store }) {
   const planEnvelope = readJsonFile(path.join(workdir, 'card-plan.json'), null);
   let editorialPlan = [];
   try { editorialPlan = JSON.parse(editorial?.card_plan_json || '[]'); } catch {}
-  const pages = Array.isArray(planEnvelope?.pages) && planEnvelope.pages.length
-    ? planEnvelope.pages
-    : Array.isArray(editorialPlan) ? editorialPlan : [];
+  // The database storyboard is frozen for this run and later written to disk.
+  // An older render's card-plan.json must not determine the generation gate.
+  const pages = Array.isArray(editorialPlan) && editorialPlan.length
+    ? editorialPlan
+    : Array.isArray(planEnvelope?.pages) ? planEnvelope.pages : [];
   const themeSnapshot = readJsonFile(path.join(workdir, 'social-theme-snapshot.json'), {});
   const effectiveThemeSnapshot = editorial?.visual_style && editorial.visual_style !== 'auto'
     ? { ...themeSnapshot, id: String(editorial.visual_style) }
@@ -259,7 +262,7 @@ export function buildBeautifyContext({ workdir, original, candidate, editorial }
     requiredPageCount,
     storyboardPageCount: pages.length,
     storyboard: pages.map(compactStoryboardPage),
-    theme: compactThemeContract(effectiveThemeSnapshot, original),
+    theme: compactThemeContract(effectiveThemeSnapshot, original, store),
     sourceUrls: collectSourceUrls(pages).length ? collectSourceUrls(pages) : sourceUrls(original),
     layoutContract: {
       pageWidth: 375,
@@ -610,7 +613,7 @@ function aiVisualDocumentWriteCatalogItem(registry) {
   };
 }
 
-export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, onProgress = () => {}, onEvent = () => {}, styleBrief = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
+export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, rootRunId = null, workflowRunId = null, onProgress = () => {}, onEvent = () => {}, styleBrief = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
   const aiVisualScreenshotsEnabled = enableAiVisualScreenshots === true;
   const aiVisualDeliveryGateEnabled = enableAiVisualDeliveryGate === true;
   const batch = store.getBatch(batchId);
@@ -621,7 +624,7 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
   const originalHtml = fs.existsSync(originalPath) ? fs.readFileSync(originalPath, 'utf8') : '';
   const editorial = store.getCardEditorial?.(candidateId) || {};
   syncAiThemeSnapshot({ workdir, store, editorial, candidate });
-  const context = buildBeautifyContext({ workdir, original: originalHtml, candidate, editorial });
+  const context = buildBeautifyContext({ workdir, original: originalHtml, candidate, editorial, store });
   if (!context.storyboardPageCount) throw new Error('请先生成故事板，再使用 AI 视觉生成');
 
   const baseline = writeSocialCardAiVisualBaseline({
@@ -672,10 +675,9 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
   const aiVisualPlanPath = path.join(workdir, 'ai-visual-card-plan.json');
   const aiVisualPlan = buildAiVisualCardPlan(sourcePlan);
   writeFile(aiVisualPlanPath, JSON.stringify(aiVisualPlan, null, 2));
-  const themeSpecSource = path.join(workspaceRoot, 'themes', 'social', context.theme.id, 'AI_DESIGN_SPEC.md');
+  const themeSpec = loadSocialAiDesignSpec({ workspaceRoot, theme: resolveWorkspaceTheme(store, context.theme.id, 'social') || context.theme });
   const themeSpecCandidatePath = path.join(workdir, 'social-theme-design-spec.md');
-  if (!fs.existsSync(themeSpecSource)) throw new Error(`AI 视觉生成缺少主题设计规范：${context.theme.id}/AI_DESIGN_SPEC.md`);
-  writeFile(themeSpecCandidatePath, fs.readFileSync(themeSpecSource, 'utf8'));
+  writeFile(themeSpecCandidatePath, themeSpec.text);
   const htmlPath = path.join(workdir, SOCIAL_CARD_BEAUTIFY_HTML);
   const outputDir = path.join(workdir, SOCIAL_CARD_BEAUTIFY_OUTPUT);
   // 新一轮 AI 视觉生成开始前清理旧 PNG 和旧运行报告，避免人工看到上一轮残留结果。
@@ -811,7 +813,7 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
       documentWriteSessionId,
       resolveArguments: resolveAiArguments,
       sanitizeToolResult: (toolResult, request) => sanitizeCapabilityResult(toolResult, request),
-      toolContext: { batchId, candidateId, skillId: AI_VISUAL_SKILL_NAME, provider: providerId, workspaceRoot, allowedRoots: [workdir], allowedCapabilities: [SOCIAL_CARD_PROJECT_READ_CAPABILITY, AI_VISUAL_DOCUMENT_WRITE] },
+      toolContext: { batchId, candidateId, rootRunId, workflowRunId, stageId: 'social-card-ai-visual-generation', skillId: AI_VISUAL_SKILL_NAME, provider: providerId, workspaceRoot, allowedRoots: [workdir], allowedCapabilities: [SOCIAL_CARD_PROJECT_READ_CAPABILITY, AI_VISUAL_DOCUMENT_WRITE] },
       maxOutputTokens: providerMaxOutputTokens,
       onProgress,
       onEvent,

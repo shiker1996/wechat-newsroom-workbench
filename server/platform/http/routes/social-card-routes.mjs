@@ -1,4 +1,4 @@
-import { bindGenerationSnapshot, prepareSkillRun, resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
+import { bindGenerationSnapshot, createRequestHarnessGateway, prepareSkillRun, resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
 import { buildSocialCardFactEnvelope, buildSocialCardStoryboardSystemPrompt, enrichEventAnalysis, eventGroupsForCandidate, socialStoryboardSkillForContentClass, toLegacySocialCardPromptInput } from '../../../features/social-cards/index.mjs';
 import { listSocialCardStageSkillSlots, resolveSocialCardStageSkills } from '../../skills/entry-routing.mjs';
 import { requestGitHubJson } from '../../plugin-sdk/github-client.mjs';
@@ -139,24 +139,25 @@ export async function handleSocialCardRoutes(context) {
     const templateContext=socialTemplateContext(store,current,channelMode,contentType);
     const rolloutProfile=getSocialCardPlanRolloutProfile(templateContext.capabilities.templatePack.id);
     let layoutPage=null;
+    let harness=null;
     try{
       const entryPoint=SOCIAL_CARD_ENTRY_POINTS[contentType];
       const routingContentType=contentType==='custom'?String(facts?.data?.content_type||''):contentType;
       const recommendedSkillId=contentType==='event'?socialStoryboardSkillForContentClass(candidate.content_class):'';
       const stageSelections=await resolveSocialCardStageSkills({workspaceRoot:root,entryPoint,contentType:routingContentType,recommendedSkillId,requested:input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{}});
-      const storyboardSelection=stageSelections.storyboard;const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
+      const storyboardSelection=stageSelections.storyboard;harness=createRequestHarnessGateway({gateway:models,store,entryPoint:`social-card-page-regeneration-${contentType}`,skillId:storyboardSelection.selectedSkill||'social-card-page-regeneration',provider:input.provider||models?.config?.defaultProvider,batchId:candidate.batch_id,candidateId:candidate.id,stageId:'social-card-page-regeneration'});const harnessGateway=harness.gateway;const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
       if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
       const storyboardSystem=buildSocialCardStoryboardSystemPrompt({workspaceRoot:root,skillId:storyboardSelection.selectedSkill,skillPrompt:socialSkill.prompt,contentType,channelMode,templateCapabilities:templateContext.capabilities});
-      const skillRuntime=await prepareSkillRun({gateway:models,store,batchId:candidate.batch_id,candidateId:candidate.id,purpose:`social-card-page-regeneration-${contentType}`,bundles:[{...socialSkill,prompt:storyboardSystem,hash:''}],provider:input.provider,selection:{requestedSkill:storyboardSelection.requestedSkill,selectedSkill:storyboardSelection.selectedSkill,selectionSource:storyboardSelection.selectionSource,entryPoint,contentType:routingContentType,stages:stageSelections}});
+      const skillRuntime=await prepareSkillRun({gateway:harnessGateway,store,batchId:candidate.batch_id,candidateId:candidate.id,purpose:`social-card-page-regeneration-${contentType}`,bundles:[{...socialSkill,prompt:storyboardSystem,hash:''}],provider:input.provider,selection:{requestedSkill:storyboardSelection.requestedSkill,selectedSkill:storyboardSelection.selectedSkill,selectionSource:storyboardSelection.selectionSource,entryPoint,contentType:routingContentType,stages:stageSelections}});
       const workspace=socialCardFiles(store.getBatch(candidate.batch_id),candidate);
       try{const report=JSON.parse(fs.readFileSync(path.join(workspace.dir,'layout-report.json'),'utf8'));layoutPage=(report.pages||[])[pageIndex]||null;}catch{}
       const factEnvelope=buildSocialCardFactEnvelope({contentType,channelMode,topic:candidate.hotspot_title,facts:facts?.data,eventAnalysis:eventAnalysis?.analysis,outputMode:current.output_mode});
       const editMode=input.mode;
-      if(!['expand','compress','restructure'].includes(editMode))return json(response,400,{error:'请先根据布局审计选择扩写、缩写或结构拆页'});
+      if(!['expand','compress','restructure'].includes(editMode)){harness.finish('failed','无效的单页重生成模式');return json(response,400,{error:'请先根据布局审计选择扩写、缩写或结构拆页'});}
       const targetTemplate=templateContext.capabilities.roles[previousPage.role]||templateContext.capabilities.roles.concept;
       const targetTemplateContext={pack:templateContext.capabilities.templatePack,source:templateContext.capabilities.source,fallback:templateContext.capabilities.fallback,role:previousPage.role||'concept',templateId:targetTemplate?.template||'',supportedBlocks:targetTemplate?.supportedBlocks||[],maxBlocks:targetTemplate?.maxBlocks||3,maxItems:targetTemplate?.maxItems||9};
       if(editMode==='restructure'){
-        const result=await bindGenerationSnapshot(models,skillRuntime.snapshotId).complete({provider:skillRuntime.provider,purpose:'social-card-page-restructure',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(5000,skillRuntime.providerConfig.maxOutputTokens),messages:[
+        const result=await bindGenerationSnapshot(harnessGateway,skillRuntime.snapshotId).complete({provider:skillRuntime.provider,purpose:'social-card-page-restructure',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(5000,skillRuntime.providerConfig.maxOutputTokens),messages:[
           {role:'system',protected:true,content:`${storyboardSystem}\n\n当前是单页结构修复阶段。页面 P${pageIndex+1} 存在结构性布局问题。只输出 JSON，不要输出完整 card_plan、HTML、CSS 或解释。允许的唯一操作是 split_page，按完整列表项、步骤、时间线节点或对比表行拆分；封面和结尾页不可拆；禁止删除、改写、合并事实。格式：{"operations":[{"op":"split_page","page":${pageIndex+1},"groups":[{"blocks":[{"block":0,"items":[0,1]}]},{"blocks":[{"block":0,"items":[2,3]}]}]}]}。必须覆盖被拆内容块的全部条目，不能重复或遗漏。`},
           {role:'system',protected:true,content:`模板不可变上下文：${JSON.stringify(targetTemplateContext)}。`},
           {role:'user',protected:true,content:JSON.stringify({facts:toLegacySocialCardPromptInput(factEnvelope),full_card_plan:cardPlan,target_page_number:pageIndex+1,target_page:previousPage,target_template:targetTemplateContext,layout_report_for_target_page:layoutPage})},
@@ -184,12 +185,12 @@ export async function handleSocialCardRoutes(context) {
         const pageMetric=summarizeSocialTemplateRun({requestedTemplate:{...templateContext.capabilities.templatePack,source:templateContext.capabilities.source},renderedTemplate:{...templateCompatibility.templatePack,source:templateCompatibility.source},channelMode,contentType,themeId:templateContext.themeDefinition.id,report:layoutPage?{valid:false,pages:[layoutPage]}:null,fallback:templateContext.capabilities.fallback,operation:'page-regeneration',success:true,editMode,targetPage:pageIndex+1,pageRoleStats:summarizeSocialCardPageRoles(applied.pages,{valid:false,pages:applied.pages.map((item,index)=>index===pageIndex?layoutPage||{}:{valid:true,issues:[]})}),pagesAdded:applied.pages.length-beforePlan.length,structuralReflowAttempted:true,structuralReflowSuccess:false,rolloutProfile});
         store.recordSocialTemplateMetric?.({...pageMetric,batchId:candidate.batch_id,candidateId:candidate.id});
         const preview=buildSocialCardReflowPreview({beforePlan,afterPlan:applied.pages,operations});
-        return json(response,200,{editorial,cardPlan:applied.pages,page:applied.pages[pageIndex]||applied.pages.find((item)=>item.continuation_of===pageIndex+1),template:{...templateCompatibility,target:templateCompatibility.pages?.[pageIndex]||null,context:targetTemplateContext},templateMetrics:pageMetric,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(applied.pages,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),reasoning:typeof result.reasoning==='string'?result.reasoning:'',restructure:{operations,preview},renderState:{status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false}});
+        harness.finish('completed'); return json(response,200,{editorial,cardPlan:applied.pages,page:applied.pages[pageIndex]||applied.pages.find((item)=>item.continuation_of===pageIndex+1),template:{...templateCompatibility,target:templateCompatibility.pages?.[pageIndex]||null,context:targetTemplateContext},templateMetrics:pageMetric,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(applied.pages,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),reasoning:typeof result.reasoning==='string'?result.reasoning:'',restructure:{operations,preview},renderState:{status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false}});
       }
       const modeInstruction=editMode==='expand'
         ? '当前模式：AI 扩写本页。仅在原始素材支持的范围内补充具体事实、机制、步骤、边界或合适的结构化内容，提升信息密度；不要用空泛形容词填充。'
         : '当前模式：AI 缩写本页。保留页面结论、关键事实和必要边界，合并重复表达，缩短标题、正文和列表，优先移除次要内容，解决页面过满或溢出。';
-      const result=await bindGenerationSnapshot(models,skillRuntime.snapshotId).complete({provider:skillRuntime.provider,purpose:'social-card-page-regeneration',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(3000,skillRuntime.providerConfig.maxOutputTokens),messages:[
+      const result=await bindGenerationSnapshot(harnessGateway,skillRuntime.snapshotId).complete({provider:skillRuntime.provider,purpose:'social-card-page-regeneration',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(3000,skillRuntime.providerConfig.maxOutputTokens),messages:[
         {role:'system',protected:true,content:`${storyboardSystem}\n\n## 当前运行阶段：单页故事板 AI 改写\n只重生成指定的一个 page。${modeInstruction} 必须充分使用完整事实基座与原始 README/素材，不得编造。其他页面不可改动；当前页的 kind、role、goal、evidence 和 layout_style 必须保持不变。根据布局报告关注 underfilled、overfilled、overflow、clipped 等问题，可重写标题和内容块，但内容块最多 3 个、列表合计最多 9 项。只输出 JSON：{"page":{...}}。`},
         {role:'system',protected:true,content:`模板不可变上下文：${JSON.stringify(targetTemplateContext)}。保持当前页 role、layout_style、事实边界和尺寸不变；只使用模板支持的内容块，最多 ${Math.min(3,targetTemplateContext.maxBlocks)} 个块、${Math.min(9,targetTemplateContext.maxItems)} 个条目。`},
         {role:'user',protected:true,content:JSON.stringify({facts:toLegacySocialCardPromptInput(factEnvelope),full_card_plan:cardPlan,target_page_number:pageIndex+1,target_page:previousPage,target_template:targetTemplateContext,layout_report_for_target_page:layoutPage})},
@@ -204,8 +205,9 @@ export async function handleSocialCardRoutes(context) {
       const editorial=store.saveCardEditorial(candidate.id,{...current,card_plan_json:JSON.stringify(cardPlan),status:'AI_READY'});
       const pageMetric=summarizeSocialTemplateRun({requestedTemplate:{...templateContext.capabilities.templatePack,source:templateContext.capabilities.source},renderedTemplate:{...templateCompatibility.templatePack,source:templateCompatibility.source},channelMode,contentType,themeId:templateContext.themeDefinition.id,report:layoutPage?{valid:!Array.isArray(layoutPage.issues)||!layoutPage.issues.length,pages:[layoutPage]}:null,fallback:templateContext.capabilities.fallback,operation:'page-regeneration',success:true,editMode,targetPage:pageIndex+1,pageRoleStats:summarizeSocialCardPageRoles(cardPlan,{valid:true,pages:cardPlan.map((item,index)=>index===pageIndex?layoutPage||{valid:true,issues:[]}:{valid:true,issues:[]})}),textRepairCount:1,rolloutProfile});
       store.recordSocialTemplateMetric?.({...pageMetric,batchId:candidate.batch_id,candidateId:candidate.id});
-      return json(response,200,{editorial,cardPlan,page:cardPlan[pageIndex],template:{...templateCompatibility,target:templateCompatibility.pages?.[pageIndex]||null,context:targetTemplateContext},templateMetrics:pageMetric,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),reasoning:typeof result.reasoning==='string'?result.reasoning:'',renderState:{status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false}});
+      harness.finish('completed'); return json(response,200,{editorial,cardPlan,page:cardPlan[pageIndex],template:{...templateCompatibility,target:templateCompatibility.pages?.[pageIndex]||null,context:targetTemplateContext},templateMetrics:pageMetric,gate:socialCardGate(candidate,contentType,facts,editorial,eventAnalysis),layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),reasoning:typeof result.reasoning==='string'?result.reasoning:'',renderState:{status:'storyboard-updated',pendingRender:true,htmlUpdated:false,pngUpdated:false}});
     }catch(error){
+      harness?.finish('failed',error.message);
       const failedMetric=summarizeSocialTemplateRun({requestedTemplate:{...templateContext.capabilities.templatePack,source:templateContext.capabilities.source},renderedTemplate:{...templateContext.capabilities.templatePack,source:templateContext.capabilities.source},channelMode,contentType,themeId:templateContext.themeDefinition.id,report:layoutPage?{valid:!Array.isArray(layoutPage.issues)||!layoutPage.issues.length,pages:[layoutPage]}:null,fallback:templateContext.capabilities.fallback,operation:'page-regeneration',success:false,editMode:input.mode,targetPage:pageIndex+1,hardGateFailure:true,rolloutProfile});
       store.recordSocialTemplateMetric?.({...failedMetric,batchId:candidate.batch_id,candidateId:candidate.id});
       return json(response,502,{error:`单页故事板重生成失败：${error.message}`});
@@ -305,8 +307,9 @@ export async function handleSocialCardRoutes(context) {
       }
     }
     if(contentType==='custom'&&facts?.data?.kind!=='custom')return json(response,409,{error:'请先填写自定义事实基座'});
-    const input=await body(request); const current=store.getCardEditorial(candidate.id);
-    try {
+      const input=await body(request); const current=store.getCardEditorial(candidate.id);
+      let harness=null;
+      try {
       const entryPoint=SOCIAL_CARD_ENTRY_POINTS[contentType];
       const routingContentType=contentType==='custom'?String(facts?.data?.content_type||''):contentType;
       const requestedStages=input.stageSkills&&typeof input.stageSkills==='object'?input.stageSkills:{};
@@ -315,6 +318,8 @@ export async function handleSocialCardRoutes(context) {
         workspaceRoot:root,entryPoint,contentType:routingContentType,recommendedSkillId,requested:requestedStages,
       });
       const storyboardSelection=stageSelections.storyboard;
+      harness=createRequestHarnessGateway({gateway:models,store,entryPoint:`social-card-editorial-${contentType}`,skillId:storyboardSelection.selectedSkill||'social-card-editorial',provider:input.provider||models?.config?.defaultProvider,batchId:candidate.batch_id,candidateId:candidate.id,stageId:'social-card-editorial'});
+      const harnessGateway=harness.gateway;
       const socialSkill=loadSkillBundle({workspaceRoot:root,skillName:storyboardSelection.selectedSkill});
       if(socialSkill.fallback)throw new Error('项目图文生成技能缺失');
       const eventAnalysisSkill=contentType==='event'?loadSkillBundle({workspaceRoot:root,skillName:'event-research-analyzer'}):null;
@@ -322,7 +327,7 @@ export async function handleSocialCardRoutes(context) {
       const channelMode=socialChannelMode(candidate);
       const themeRouting=current.visual_style==='auto'
         ? await resolveAutoTheme({
-          gateway:models, provider:input.provider, store, batchId:candidate.batch_id, candidateId:candidate.id, target:'social',
+          gateway:harnessGateway, provider:input.provider, store, batchId:candidate.batch_id, candidateId:candidate.id, target:'social',
           context:buildSocialThemeRoutingContext({candidate,contentType,channelMode,facts}),
         })
         : null;
@@ -333,7 +338,7 @@ export async function handleSocialCardRoutes(context) {
       });
       const storyboardBundle={...socialSkill,prompt:storyboardSystem,hash:''};
       const skillRuntime=await prepareSkillRun({
-        gateway:models,store,batchId:candidate.batch_id,candidateId:candidate.id,
+        gateway:harnessGateway,store,batchId:candidate.batch_id,candidateId:candidate.id,
         purpose:`social-card-editorial-${contentType}`,bundles:[storyboardBundle,...(eventAnalysisSkill?[eventAnalysisSkill]:[])],provider:input.provider,
         selection:{
           requestedSkill:storyboardSelection.requestedSkill,
@@ -345,13 +350,13 @@ export async function handleSocialCardRoutes(context) {
       const selectedProvider=skillRuntime.provider,providerConfig=skillRuntime.providerConfig;
       if(contentType==='event'&&eventAnalysis?.analysis){
         const groups=eventGroupsForCandidate({store,workspaceRoot:root,candidate,contentLimit:9000});
-        eventAnalysis=await enrichEventAnalysis({gateway:bindGenerationSnapshot(models,skillRuntime.snapshotId),store,batchId:candidate.batch_id,candidateId:candidate.id,provider:selectedProvider,workspaceRoot:root,baseRecord:eventAnalysis,groups,skillBundle:eventAnalysisSkill,cachePath:path.join(socialCardFiles(store.getBatch(candidate.batch_id),candidate).dir,'event-analysis.json')});
+        eventAnalysis=await enrichEventAnalysis({gateway:bindGenerationSnapshot(harnessGateway,skillRuntime.snapshotId),store,batchId:candidate.batch_id,candidateId:candidate.id,provider:selectedProvider,workspaceRoot:root,baseRecord:eventAnalysis,groups,skillBundle:eventAnalysisSkill,cachePath:path.join(socialCardFiles(store.getBatch(candidate.batch_id),candidate).dir,'event-analysis.json')});
       }
       const factEnvelope=buildSocialCardFactEnvelope({
         contentType,channelMode,topic:candidate.hotspot_title,facts:facts?.data,
         eventAnalysis:eventAnalysis?.analysis,outputMode:current.output_mode,
       });
-      const result=await bindGenerationSnapshot(models,skillRuntime.snapshotId).complete({provider:selectedProvider,purpose:'social-card-editorial',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(6000,providerConfig.maxOutputTokens),messages:[
+      const result=await bindGenerationSnapshot(harnessGateway,skillRuntime.snapshotId).complete({provider:selectedProvider,purpose:'social-card-editorial',batchId:candidate.batch_id,candidateId:candidate.id,jsonMode:true,maxOutputTokens:Math.min(6000,providerConfig.maxOutputTokens),messages:[
         {role:'system',protected:true,content:storyboardSystem},
         {role:'user',protected:true,content:JSON.stringify(toLegacySocialCardPromptInput(factEnvelope))}
       ]});
@@ -359,7 +364,7 @@ export async function handleSocialCardRoutes(context) {
        const pageBudget=socialCardPageBudget(contentType);
        const rawCardPlan=Array.isArray(parsed.card_plan)?parsed.card_plan:[];
        const pageBudgetError=socialCardPageBudgetMessage(rawCardPlan.length,contentType);
-       if(pageBudgetError)return json(response,502,{error:`AI 故事板生成失败：${pageBudgetError}`});
+       if(pageBudgetError){harness.finish('failed',pageBudgetError);return json(response,502,{error:`AI 故事板生成失败：${pageBudgetError}`});}
        const cardPlan = rawCardPlan.map((page,pageIndex) => {
         const instructionPatterns = [/^让读者(?:一眼)?知道/,/^让读者/,/^读者(?:能|会|可以|理解|了解|知道)/,/^本页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^这一页(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本卡(?:旨在|希望|要|应该|目的(?:是|为))?/,/^本章节(?:旨在|希望|要|应该|目的(?:是|为))?/,/^请/];
         const clean = (text) => { if(typeof text!=='string')return text; let s=text.trim(); for(const re of instructionPatterns)s=s.replace(re,'').trim(); return s.replace(/^[，。；、:：\s]+/,'').trim(); };
@@ -383,10 +388,11 @@ export async function handleSocialCardRoutes(context) {
       } catch {}
       const gate=socialCardGate(candidate,contentType,facts,editorial,eventAnalysis);
       const themeState=resolveSocialCardStoryboardThemeState({editorial,themeDefinition:templateContext.themeDefinition,channelMode,contentType});
-       return json(response,200,{editorial,gate,themeState,cardPlan,contentType,eventAnalysis,pageBudget,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),
+        harness.finish('completed');
+        return json(response,200,{editorial,gate,themeState,cardPlan,contentType,eventAnalysis,pageBudget,layoutDecisions:describeCardLayouts(cardPlan,{layoutStyle:editorial.layout_style,compositionMode:editorial.composition_mode,channelMode}),
         template:templateCompatibility,
         reasoning:typeof result.reasoning==='string'&&result.reasoning?result.reasoning:''});
-    } catch(error) { return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
+      } catch(error) { harness?.finish('failed',error.message); return json(response,502,{error:`AI 图文决策失败：${error.message}`}); }
   }
   const repositoryInspectMatch = pathname.match(/^\/api\/candidates\/(\d+)\/repository\/inspect$/);
   if (repositoryInspectMatch && request.method === 'POST') {

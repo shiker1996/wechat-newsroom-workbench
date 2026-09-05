@@ -1,4 +1,4 @@
-export function createExecutionRecord({ capability, plugin, version, input, result, startedAt, finishedAt, authorizedExternalWrite = false, configurationSnapshot = null, resolutionId = null, attempt = 1, fallbackFrom = null, consumerId = null }) {
+export function createExecutionRecord({ capability, plugin, version, input, result, startedAt, finishedAt, authorizedExternalWrite = false, configurationSnapshot = null, resolutionId = null, attempt = 1, fallbackFrom = null, consumerId = null, agentRunId = null, agentToolCallId = null, workflowRunId = null, rootRunId = null, stageId = null, sideEffect = 'none', replayPolicy = 'never' }) {
   return Object.freeze({
     capability,
     plugin,
@@ -11,7 +11,7 @@ export function createExecutionRecord({ capability, plugin, version, input, resu
     durationMs:new Date(finishedAt).getTime() - new Date(startedAt).getTime(),
     authorizedExternalWrite:Boolean(authorizedExternalWrite),
     configurationSnapshot:configurationSnapshot ? structuredClone(configurationSnapshot) : null,
-    resolutionId,attempt,fallbackFrom,consumerId,
+    resolutionId,attempt,fallbackFrom,consumerId,agentRunId,agentToolCallId,workflowRunId,rootRunId,stageId,sideEffect,replayPolicy,
   });
 }
 
@@ -22,6 +22,13 @@ export function createStoreExecutionLogger(store, metadata = {}) {
     candidateId:metadata.candidateId || null,
     generationSnapshotId:metadata.generationSnapshotId || null,
     skillId:metadata.skillId || null,
+    agentRunId:metadata.agentRunId || null,
+    agentToolCallId:metadata.agentToolCallId || null,
+    workflowRunId:metadata.workflowRunId || null,
+    rootRunId:metadata.rootRunId || null,
+    stageId:metadata.stageId || null,
+    sideEffect:metadata.sideEffect || null,
+    replayPolicy:metadata.replayPolicy || null,
     record,
   });
 }

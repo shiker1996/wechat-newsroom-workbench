@@ -1,27 +1,67 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { governModelAuditText } from '../../agent/audit-governance.mjs';
+
 export class RuntimeAuditRepository {
-  constructor(db) { this.db = db; }
+  constructor(db, { archiveDir = null } = {}) { this.db = db; this.archiveDir = archiveDir; this.governance = { modelCallsLimit: 2000, toolExecutionsDays: 90, modelCallsDays: 90, archiveEnabled: true }; }
+
+  setGovernance(config = {}) {
+    this.governance = {
+      modelCallsLimit: Math.min(10000, Math.max(100, Number(config.modelCallsLimit) || 2000)),
+      toolExecutionsDays: Math.min(3650, Math.max(1, Number(config.toolExecutionsDays) || 90)),
+      modelCallsDays: Math.min(3650, Math.max(1, Number(config.modelCallsDays) || 90)),
+      archiveEnabled: config.archiveEnabled !== false,
+    };
+    return { ...this.governance };
+  }
+
+  getGovernance() { return { ...this.governance }; }
+
+  cleanupGovernedLogs(now = new Date()) {
+    const modelCutoff = new Date(now.getTime() - this.governance.modelCallsDays * 86400000).toISOString();
+    const toolCutoff = new Date(now.getTime() - this.governance.toolExecutionsDays * 86400000).toISOString();
+    const oldModels = this.db.prepare('SELECT * FROM model_calls WHERE created_at < ? ORDER BY id').all(modelCutoff);
+    const oldTools = this.db.prepare('SELECT * FROM tool_executions WHERE started_at < ? ORDER BY id').all(toolCutoff);
+    let archivePath = null;
+    if (this.governance.archiveEnabled && this.archiveDir && (oldModels.length || oldTools.length)) {
+      fs.mkdirSync(this.archiveDir, { recursive: true });
+      archivePath = path.join(this.archiveDir, `audit-${now.toISOString().replace(/[:.]/g, '-')}.jsonl.gz`);
+      const lines = [...oldModels.map((item) => JSON.stringify({ type: 'model_call', ...item })), ...oldTools.map((item) => JSON.stringify({ type: 'tool_execution', ...item }))].join('\n') + '\n';
+      fs.writeFileSync(archivePath, zlib.gzipSync(lines, { level: 9 }));
+    }
+    const model = this.db.prepare('DELETE FROM model_calls WHERE created_at < ?').run(modelCutoff).changes;
+    const tools = this.db.prepare('DELETE FROM tool_executions WHERE started_at < ?').run(toolCutoff).changes;
+    const cap = this.db.prepare(`DELETE FROM model_calls WHERE id < (
+      SELECT MIN(id) FROM (SELECT id FROM model_calls ORDER BY id DESC LIMIT ?))`).run(this.governance.modelCallsLimit).changes;
+    return { modelCalls: model + cap, toolExecutions: tools, modelCutoff, toolCutoff, archivePath, archived: oldModels.length + oldTools.length };
+  }
 
   recordModelCall(input) {
+    const governedText = governModelAuditText({ output: input.outputText, reasoning: input.reasoningText });
     const snapshotId = input.generationSnapshotId ?? (input.batchId ? this.db.prepare(`SELECT id FROM generation_snapshots
       WHERE batch_id=? AND ((? IS NULL AND candidate_row_id IS NULL) OR candidate_row_id=?)
       ORDER BY id DESC LIMIT 1`).get(input.batchId, input.candidateId ?? null, input.candidateId ?? null)?.id : null);
     const result = this.db.prepare(`INSERT INTO model_calls
       (provider,model,purpose,batch_id,candidate_row_id,estimated_input_tokens,prompt_tokens,
-       completion_tokens,reasoning_tokens,compressed,latency_ms,status,error,generation_snapshot_id,output_budget_json,output_text,reasoning_text,tool_calls_json,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+       completion_tokens,reasoning_tokens,compressed,latency_ms,status,error,generation_snapshot_id,
+       agent_run_id,agent_step,workflow_run_id,root_run_id,stage_id,output_budget_json,output_text,reasoning_text,tool_calls_json,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       input.provider, input.model, input.purpose || 'unknown', input.batchId ?? null, input.candidateId ?? null,
       input.estimatedInputTokens ?? 0, input.promptTokens ?? null, input.completionTokens ?? null,
       input.reasoningTokens ?? null, input.compressed ? 1 : 0, input.latencyMs ?? 0, input.status,
-      input.error ?? null, snapshotId ?? null, input.outputBudget ? JSON.stringify(input.outputBudget) : null,
-      input.outputText ?? null, input.reasoningText ?? null,
+      input.error ?? null, snapshotId ?? null, input.agentRunId ?? null, input.agentStep ?? null,
+      input.workflowRunId ?? null, input.rootRunId ?? null, input.stageId ?? null,
+      input.outputBudget ? JSON.stringify(input.outputBudget) : null,
+      governedText.output.text || null, governedText.reasoning.text || null,
       Array.isArray(input.toolCalls) && input.toolCalls.length ? JSON.stringify(input.toolCalls) : null,
       new Date().toISOString());
     const id = Number(result.lastInsertRowid);
-    // 保留策略：model_calls 只保留最近 2000 条。每插入 100 条触发一次清理，
+    // 保留策略：model_calls 按治理配置保留最近 N 条。每插入 100 条触发一次清理，
     // 避免每条插入都做删除扫描。
     if (id % 100 === 0) {
       this.db.prepare(`DELETE FROM model_calls WHERE id < (
-        SELECT MIN(id) FROM (SELECT id FROM model_calls ORDER BY id DESC LIMIT 2000))`).run();
+        SELECT MIN(id) FROM (SELECT id FROM model_calls ORDER BY id DESC LIMIT ?))`).run(this.governance.modelCallsLimit);
     }
     return id;
   }
@@ -34,6 +74,14 @@ export class RuntimeAuditRepository {
   }
 
   listModelCalls(limit = 100) { return this.db.prepare('SELECT * FROM model_calls ORDER BY id DESC LIMIT ?').all(limit); }
+  listModelCallsForAgentRun(agentRunId, limit = 100) {
+    return this.db.prepare('SELECT * FROM model_calls WHERE agent_run_id=? ORDER BY id ASC LIMIT ?')
+      .all(String(agentRunId), Math.min(500, Math.max(1, Number(limit) || 100)));
+  }
+  listModelCallsByRoot(rootRunId, limit = 500) {
+    return this.db.prepare('SELECT * FROM model_calls WHERE root_run_id=? OR workflow_run_id=? ORDER BY id ASC LIMIT ?')
+      .all(String(rootRunId), String(rootRunId), Math.min(2000, Math.max(1, Number(limit) || 500)));
+  }
 
   saveSnapshot({ batchId = null, candidateId = null, purpose, snapshot }) {
     const now = new Date().toISOString();
@@ -68,9 +116,9 @@ export class RuntimeAuditRepository {
 
   saveToolExecution({ batchId = null, candidateId = null, generationSnapshotId = null, skillId = null, record }) {
     const result = this.db.prepare(`INSERT INTO tool_executions
-      (batch_id,candidate_row_id,generation_snapshot_id,skill_id,capability,plugin,plugin_version,status,error_code,
-       input_keys_json,authorized_external_write,started_at,finished_at,duration_ms,configuration_snapshot_json,resolution_id,attempt,fallback_from,consumer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(batchId, candidateId, generationSnapshotId, skillId, record.capability, record.plugin, record.version,
+      (batch_id,candidate_row_id,generation_snapshot_id,skill_id,agent_run_id,agent_tool_call_id,workflow_run_id,root_run_id,stage_id,side_effect,replay_policy,capability,plugin,plugin_version,status,error_code,
+       input_keys_json,authorized_external_write,started_at,finished_at,duration_ms,configuration_snapshot_json,resolution_id,attempt,fallback_from,consumer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(batchId, candidateId, generationSnapshotId, skillId, record.agentRunId ?? null, record.agentToolCallId ?? null, record.workflowRunId ?? null, record.rootRunId ?? null, record.stageId ?? null, record.sideEffect ?? 'none', record.replayPolicy ?? 'never', record.capability, record.plugin, record.version,
         record.status, record.errorCode, JSON.stringify(record.inputKeys || []), record.authorizedExternalWrite ? 1 : 0,
         record.startedAt, record.finishedAt, Number(record.durationMs) || 0,record.configurationSnapshot?JSON.stringify(record.configurationSnapshot):null,record.resolutionId||null,Number(record.attempt)||1,record.fallbackFrom||null,record.consumerId||null);
     return { id: Number(result.lastInsertRowid), batchId, candidateId, generationSnapshotId, skillId, ...record };
@@ -88,6 +136,19 @@ export class RuntimeAuditRepository {
     return this.db.prepare(`SELECT * FROM tool_executions ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`)
       .all(...values).map((row) => ({ ...row, input_keys: JSON.parse(row.input_keys_json), authorized_external_write: Boolean(row.authorized_external_write),
         configuration_snapshot:row.configuration_snapshot_json?JSON.parse(row.configuration_snapshot_json):null }));
+  }
+
+  listToolExecutionsForAgentRun(agentRunId, limit = 100) {
+    return this.db.prepare('SELECT * FROM tool_executions WHERE agent_run_id=? ORDER BY id ASC LIMIT ?')
+      .all(String(agentRunId), Math.min(500, Math.max(1, Number(limit) || 100)))
+      .map((row) => ({ ...row, input_keys: JSON.parse(row.input_keys_json || '[]'), authorized_external_write: Boolean(row.authorized_external_write),
+        configuration_snapshot: row.configuration_snapshot_json ? JSON.parse(row.configuration_snapshot_json) : null }));
+  }
+  listToolExecutionsByRoot(rootRunId, limit = 500) {
+    return this.db.prepare('SELECT * FROM tool_executions WHERE root_run_id=? OR workflow_run_id=? ORDER BY id ASC LIMIT ?')
+      .all(String(rootRunId), String(rootRunId), Math.min(2000, Math.max(1, Number(limit) || 500)))
+      .map((row) => ({ ...row, input_keys: JSON.parse(row.input_keys_json || '[]'), authorized_external_write: Boolean(row.authorized_external_write),
+        configuration_snapshot: row.configuration_snapshot_json ? JSON.parse(row.configuration_snapshot_json) : null }));
   }
 
   saveSkillVersion({ skillId, config, configHash, publish = false }) {

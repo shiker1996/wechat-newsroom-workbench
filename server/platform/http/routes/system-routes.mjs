@@ -52,7 +52,10 @@ import { CollectionSourceService, sourceInputForPlugin, assistStaticPage } from 
 import { createCollectorRuntime, listCollectorPluginStates } from '../../collectors/runtime-registry.mjs';
 import { confirmCollectorPluginFirstRun, installCollectorPlugin, listCollectorPluginEvents, listCollectorPluginVersions, readCollectorPluginCatalog, rollbackCollectorPlugin, setCollectorPluginStatus, uninstallCollectorPlugin, validateCollectorPluginDirectory } from '../../collectors/package-manager.mjs';
 import { boundedLimit } from '../route-helpers.mjs';
+import { cancelAgentRun, isAgentRunActive } from '../../agent/run-control.mjs';
 import { stageSkillPackageRestore, stageWritingSkillRestore } from './system-restore-transactions.mjs';
+import { buildReplayFixture, buildRunMetrics, compareRunTraces } from '../../agent/replay.mjs';
+import { createRequestHarnessGateway } from '../../skills/pipeline-runtime.mjs';
 
 function skillsUsingCapabilities(root, capabilities) {
   const expected=new Set(capabilities);
@@ -155,8 +158,82 @@ export async function handleSystemRoutes(context) {
     });
     return true;
   }
+  if (request.method === 'POST' && ['/api/runs/compare', '/api/system/runs/compare'].includes(pathname)) {
+    const input = await body(request);
+    const ids = Array.isArray(input.rootRunIds) ? input.rootRunIds.map(String).filter(Boolean).slice(0, 2) : [];
+    if (ids.length !== 2) { json(response, 400, { error: 'rootRunIds 需要恰好包含两个运行 ID' }); return true; }
+    const traces = ids.map((id) => store.getWorkflowRunTrace?.(id));
+    if (traces.some((trace) => !trace)) { json(response, 404, { error: '运行不存在' }); return true; }
+    json(response, 200, { leftRootRunId: ids[0], rightRootRunId: ids[1], comparison: compareRunTraces(traces[0], traces[1]) });
+    return true;
+  }
+  const runTraceMatch = pathname.match(/^\/api\/runs\/([^/]+)\/(trace|metrics|replay|events|stages|model-calls|tool-calls|artifacts)$/);
+  const runTraceRootMatch = pathname.match(/^\/api\/runs\/([^/]+)$/);
+  const systemRunTraceMatch = pathname.match(/^\/api\/system\/runs\/([^/]+)\/(trace|metrics|replay|events|stages|model-calls|tool-calls|artifacts)$/);
+  const systemRunTraceRootMatch = pathname.match(/^\/api\/system\/runs\/([^/]+)$/);
+  if (request.method === 'GET' && (runTraceMatch || runTraceRootMatch || systemRunTraceMatch || systemRunTraceRootMatch)) {
+    const matchedRunTrace = runTraceMatch || runTraceRootMatch || systemRunTraceMatch || systemRunTraceRootMatch;
+    const rootRunId = decodeURIComponent(matchedRunTrace[1]);
+    const trace = store.getWorkflowRunTrace?.(rootRunId, { eventLimit: boundedLimit(searchParams, 1000, 5000), modelCallLimit: boundedLimit(searchParams, 500, 2000), toolLimit: boundedLimit(searchParams, 500, 2000) });
+    if (!trace) { json(response, 404, { error: '运行不存在' }); return true; }
+    const view = matchedRunTrace[2] || 'trace';
+    if (view === 'metrics') { json(response, 200, buildRunMetrics(trace)); return true; }
+    if (view === 'replay') {
+      const snapshots = [...new Set((trace.runs || []).map((run) => run.generation_snapshot_id).filter(Boolean))]
+        .map((id) => store.getGenerationSnapshot?.(id)).filter(Boolean);
+      json(response, 200, buildReplayFixture(trace, { snapshots })); return true;
+    }
+    if (view === 'events') { json(response, 200, { schemaVersion: trace.schemaVersion, rootRunId, items: trace.events || [] }); return true; }
+    if (view === 'stages') { json(response, 200, { schemaVersion: trace.schemaVersion, rootRunId, runs: trace.runs || [], items: trace.steps || [] }); return true; }
+    if (view === 'model-calls') { json(response, 200, { schemaVersion: trace.schemaVersion, rootRunId, items: trace.modelCalls || [] }); return true; }
+    if (view === 'tool-calls') { json(response, 200, { schemaVersion: trace.schemaVersion, rootRunId, items: [...(trace.toolCalls || []), ...(trace.toolExecutions || [])] }); return true; }
+    if (view === 'artifacts') { json(response, 200, { schemaVersion: trace.schemaVersion, rootRunId, items: trace.artifacts || [] }); return true; }
+    json(response, 200, trace); return true;
+  }
+  const runActionMatch = pathname.match(/^\/api\/runs\/([^/]+)\/(cancel|resume|retry)$/);
+  if (request.method === 'POST' && runActionMatch) {
+    const rootRunId = decodeURIComponent(runActionMatch[1]);
+    const action = runActionMatch[2];
+    const trace = store.getWorkflowRunTrace?.(rootRunId, { eventLimit: 1000, modelCallLimit: 500, toolLimit: 500 });
+    if (!trace) { json(response, 404, { error: '运行不存在' }); return true; }
+    if (action === 'cancel') {
+      const activeRuns = (trace.runs || []).filter((run) => isAgentRunActive(run.id));
+      activeRuns.forEach((run) => cancelAgentRun(run.id));
+      json(response, activeRuns.length ? 202 : 409, { rootRunId, action, cancelled: activeRuns.length, status: activeRuns.length ? 'cancelling' : 'not-active' });
+      return true;
+    }
+    const candidates = (trace.runs || []).filter((run) => run.status !== 'completed');
+    const target = action === 'resume'
+      ? candidates.find((run) => (trace.checkpoints || []).some((checkpoint) => checkpoint.agent_run_id === run.id && checkpoint.state?.resumable))
+      : candidates.find((run) => run.status === 'failed' || run.status === 'aborted' || run.status === 'limit');
+    if (!target) { json(response, 409, { error: action === 'resume' ? '没有可恢复的 checkpoint' : '没有可重试的失败阶段', code: action === 'resume' ? 'RESUME_NOT_AVAILABLE' : 'RETRY_NOT_AVAILABLE' }); return true; }
+    const required = target.allowedCapabilities || [];
+    const graph = await capabilityGraph();
+    const blockedCapabilities = required.filter((capability) => {
+      const item = graph.capabilities.find((entry) => entry.id === capability || entry.capability === capability);
+      return !item || !item.implementations?.some((implementation) => implementation.available);
+    });
+    if (blockedCapabilities.length) { json(response, 409, { error: '当前能力授权或实现状态不允许继续运行', code: 'RUN_CAPABILITY_REVALIDATION_FAILED', blockedCapabilities, targetRunId: target.id }); return true; }
+    // 这里只做安全预检，实际继续运行必须由原业务入口补齐输入、历史和业务恢复回调。
+    json(response, 409, { error: '请从原业务入口提交恢复请求，以保留输入上下文', code: 'RUN_ENTRY_CONTEXT_REQUIRED', action, rootRunId, targetRunId: target.id, entryPoint: target.entry_point, resumeFrom: target.id, snapshotId: target.generation_snapshot_id || null });
+    return true;
+  }
   if(request.method==='GET'&&pathname==='/api/system/conversation-agent-runs'){
     json(response,200,store.getAgentOperationsOverview(boundedLimit(searchParams,100,500)));return true;
+  }
+  const agentRunTraceMatch=pathname.match(/^\/api\/system\/conversation-agent-runs\/([^/]+)\/trace$/);
+  if(request.method==='GET'&&agentRunTraceMatch){
+    const trace=store.getAgentRunTrace?.(decodeURIComponent(agentRunTraceMatch[1]),{afterSequence:Math.max(0,Number(searchParams.get('afterSequence'))||0),eventLimit:boundedLimit(searchParams,500,2000)});
+    if(!trace){json(response,404,{error:'Agent Run 不存在'});return true;}
+    json(response,200,trace);return true;
+  }
+  const agentRunCancelMatch=pathname.match(/^\/api\/system\/conversation-agent-runs\/([^/]+)\/cancel$/);
+  if(request.method==='POST'&&agentRunCancelMatch){
+    const runId=decodeURIComponent(agentRunCancelMatch[1]);
+    const run=store.getAgentRun?.(runId);
+    if(!run){json(response,404,{error:'AGENT_RUN_NOT_FOUND',message:'Agent Run 不存在'});return true;}
+    if(!isAgentRunActive(runId)){json(response,409,{error:'AGENT_RUN_NOT_ACTIVE',message:'Agent Run 当前不在执行中'});return true;}
+    cancelAgentRun(runId);json(response,202,{agentRunId:runId,status:'cancelling'});return true;
   }
   if(request.method==='GET'&&pathname==='/api/system/extension-configurations'){
     const skills=new SkillRegistry({workspaceRoot:root}).list().filter((manifest)=>manifest.configuration).map((manifest)=>({id:manifest.id,name:manifest.name,type:'skill',kind:manifest.kind,state:extensionConfiguration.describe({extensionType:'skill',extensionId:manifest.id,manifest})}));
@@ -175,6 +252,23 @@ export async function handleSystemRoutes(context) {
   }
   if(request.method==='GET'&&pathname==='/api/system/capability-graph'){
     json(response,200,await capabilityGraph());return true;
+  }
+  const capabilityTestMatch=pathname.match(/^\/api\/system\/capabilities\/([^/]+)\/test$/);
+  if(request.method==='POST'&&capabilityTestMatch){
+    const capability=decodeURIComponent(capabilityTestMatch[1]);
+    const graph=await capabilityGraph();
+    const item=graph.capabilities.find((entry)=>entry.id===capability||entry.capability===capability);
+    if(!item){json(response,404,{error:'能力不存在'});return true;}
+    requirePluginAdmin(request);
+    const implementations=(item.implementations||[]).map((implementation)=>({
+      id:implementation.id,name:implementation.name,type:implementation.type,
+      enabled:implementation.enabled!==false,available:implementation.available===true,
+      status:implementation.available===true?'ready':implementation.enabled===false?'disabled':'unavailable',
+    }));
+    const pass=implementations.some((implementation)=>implementation.available);
+    json(response,200,{testRun:true,scope:'capability',capability,pass,status:pass?'completed':'blocked',
+      checks:{registered:item.registered!==false,implementations},formalArtifactWritten:false,
+      message:pass?'至少存在一个可用实现，可进入受控运行。':'没有可用实现，测试被阻断。'});return true;
   }
   // 阶段 3 只读接口（设计文档 §8）：消费者—能力可用状态，页面与运行时共用 capability-graph 的同一份计算
   if(request.method==='GET'&&pathname==='/api/system/capability-consumers'){
@@ -582,6 +676,36 @@ export async function handleSystemRoutes(context) {
     return true;
   }
   const skillMatch = pathname.match(/^\/api\/system\/skills\/([^/]+)$/);
+  const skillTestRunMatch = pathname.match(/^\/api\/system\/skills\/([^/]+)\/test-run$/);
+  if(request.method==='POST'&&skillTestRunMatch){
+    const skillId=decodeURIComponent(skillTestRunMatch[1]);
+    const manifest=new SkillRegistry({workspaceRoot:root}).get(skillId);
+    if(!manifest){json(response,404,{error:'技能不存在'});return true;}
+    requirePluginAdmin(request);
+    const input=await body(request);
+    const graph=await capabilityGraph();
+    const required=[...(manifest.requiredCapabilities||[])];
+    const optional=[...(manifest.optionalCapabilities||[])];
+    const checks=required.map((capability)=>{
+      const item=graph.capabilities.find((entry)=>entry.id===capability||entry.capability===capability);
+      const implementations=(item?.implementations||[]).map((implementation)=>({id:implementation.id,available:implementation.available===true,enabled:implementation.enabled!==false}));
+      return {capability,declared:Boolean(item),available:implementations.some((implementation)=>implementation.available),implementations};
+    });
+    const contractPass=manifest.manifestStatus!=='invalid'&&Boolean(manifest.inputContract||manifest.outputContract||manifest.kind);
+    const pass=contractPass&&checks.every((check)=>check.available);
+    const suffix=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    const runId=`test-${skillId}-${suffix}`;
+    const entryPoint=manifest.entryPoints?.[0]||'test-run';
+    store.startAgentRun?.({id:runId,entryPoint,batchId:null,candidateId:null,skillId,provider:'test',allowedCapabilities:[...required,...optional],rootRunId:runId,workflowRunId:runId,stageId:'test-run'});
+    store.appendAgentRunEvent?.(runId,{type:'test.started',skillId,entryPoint,inputKeys:Object.keys(input&&typeof input==='object'?input:{})});
+    store.saveAgentStep?.({agentRunId:runId,step:0,phase:'test_completed',summary:{contractPass,requiredCapabilities:required.length,availableCapabilities:checks.filter((check)=>check.available).length}});
+    store.appendAgentRunEvent?.(runId,{type:pass?'test.completed':'test.blocked',skillId,checks});
+    store.finishAgentRun?.(runId,{status:pass?'completed':'failed',modelSteps:0,toolCalls:0,error:pass?null:'测试前置检查未通过'});
+    json(response,200,{testRun:true,scope:'skill',skillId,entryPoint,rootRunId:runId,agentRunId:runId,
+      status:pass?'completed':'blocked',pass,checks:{contract:{pass,manifestStatus:manifest.manifestStatus||'unknown',inputContract:manifest.inputContract||null,outputContract:manifest.outputContract||null},capabilities:checks},
+      inputSummary:{keys:Object.keys(input&&typeof input==='object'?input:{})},formalArtifactWritten:false,
+      message:pass?'技能契约与必需能力检查通过。':'技能无法进入受控运行，请先处理契约或能力阻断。'});return true;
+  }
   if(request.method==='DELETE'&&skillMatch){
     try{requirePluginAdmin(request);json(response,200,uninstallSkillPackage(root,decodeURIComponent(skillMatch[1])));}
     catch(error){json(response,400,{error:error.message});}
@@ -679,6 +803,18 @@ export async function handleSystemRoutes(context) {
     }) });
     return true;
   }
+  if (request.method === 'GET' && pathname === '/api/system/log-governance') {
+    json(response, 200, { schemaVersion: 1, governance: store.getAuditGovernance?.() || { modelCallsLimit: 2000, modelCallsDays: 90, toolExecutionsDays: 90 } });
+    return true;
+  }
+  if (request.method === 'PUT' && pathname === '/api/system/log-governance') {
+    requirePluginAdmin(request);
+    const input = await body(request);
+    const governance = store.saveAuditGovernance?.(input || {});
+    const cleanup = input?.cleanup === true ? store.cleanupAuditLogs?.() : null;
+    json(response, 200, { schemaVersion: 1, governance, cleanup });
+    return true;
+  }
   if (request.method === 'PUT' && pathname === '/api/system/settings') {
     json(response, 200, updateRuntimeSettings(root, config, await body(request)));
     return true;
@@ -764,7 +900,7 @@ export async function handleSystemRoutes(context) {
     catch(error){json(response,400,{error:error.message});}return true;
   }
   if(request.method==='POST'&&pathname==='/api/collection-sources/assist'){
-    try{json(response,200,await assistStaticPage(await body(request),{root,gateway:models}));}
+    try{const input=await body(request),harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'collection-source-assist',skillId:'collection-source-assist',provider:input.provider||models?.config?.defaultProvider,stageId:'collection-source-assist'});try{json(response,200,await assistStaticPage(input,{root,gateway:harness.gateway}));harness.finish('completed');}catch(error){harness.finish('failed',error.message);throw error;}}
     catch(error){json(response,400,{error:error.message,code:error.code||'ASSIST_FAILED'});}return true;
   }
   if (request.method === 'GET' && pathname === '/api/system/backup') {

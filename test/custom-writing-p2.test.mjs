@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ const tutorial=fs.readFileSync(new URL('../public/src/views/tutorial.js',import.
 const materialInbox=fs.readFileSync(new URL('../public/src/views/material-inbox.js',import.meta.url),'utf8');
 const editorial=fs.readFileSync(new URL('../public/src/views/editorial.js',import.meta.url),'utf8');
 const topicsSource=fs.readFileSync(new URL('../public/src/views/topics.js',import.meta.url),'utf8');
-const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const styles=readStyles();
 
 test('自主写作项目统一输出四种可恢复状态',()=>{
   assert.match(server,/draft_ready/);

@@ -1,7 +1,10 @@
+import crypto from 'node:crypto';
 import { createGenerationSnapshot } from './registry.mjs';
+import { normalizeSkillDefinition } from './runtime-definition.mjs';
 import { getToolRegistry } from '../tools/index.mjs';
 import { readActiveSkillConfig } from './configuration.mjs';
 import { resolveStageModelsSnapshot } from '../llm/stage-model-routing.mjs';
+import { runSkill } from '../agent/harness.mjs';
 
 export function bindGenerationSnapshot(gateway, generationSnapshotId) {
   if (!generationSnapshotId) return gateway;
@@ -13,6 +16,96 @@ export function bindGenerationSnapshot(gateway, generationSnapshotId) {
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
+}
+
+/**
+ * Execute one deterministic Pipeline model call through the Harness.
+ *
+ * The surrounding Workflow still owns stage ordering and domain validation;
+ * this adapter only moves the model invocation and Run lifecycle behind the
+ * stage-skill Facade.  The Gateway response is returned unchanged.
+ */
+export async function runPipelineStage({ gateway, store, batchId = null, candidateId = null, provider = null,
+  purpose, skillId = purpose, entryPoint = 'pipeline', stageId = purpose, input = null, messages = [],
+  maxOutputTokens, jsonMode = false, thinking = undefined, temperature = undefined, rootRunId = null, workflowRunId = null, parentRunId = null,
+  generationSnapshotId = null, signal = null, definition = null, onRunCreated = null }) {
+  if (!purpose || typeof gateway?.complete !== 'function') throw new Error('Pipeline stage 缺少 purpose 或 LLM Gateway');
+  const stageDefinition = definition || { id: String(skillId), kind: 'stage-skill', entryPoints: [entryPoint] };
+  return runSkill({
+    skillId: String(skillId), entryPoint, input,
+    definition: stageDefinition,
+    signal,
+    persistRun: true,
+    onRunCreated,
+    context: {
+      store,
+      signal,
+      provider,
+      gateway,
+      toolContext: { batchId, candidateId, provider, generationSnapshotId, rootRunId, workflowRunId, stageId, parentRunId },
+      executeStage: async ({ agentRunId, signal: stageSignal, context }) => gateway.complete({
+        provider, purpose, batchId, candidateId, jsonMode, thinking, temperature, maxOutputTokens, messages,
+        agentRunId, agentStep: 0, rootRunId: context.toolContext.rootRunId, workflowRunId: context.toolContext.workflowRunId,
+        stageId: context.toolContext.stageId, generationSnapshotId: context.toolContext.generationSnapshotId,
+        signal: stageSignal || signal,
+      }),
+    },
+  });
+}
+
+/**
+ * Wrap a Pipeline Gateway so every `complete` call becomes a persisted
+ * stage-skill Run.  Existing Pipeline code can keep its model input shape.
+ */
+export function bindPipelineHarnessGateway(gateway, options = {}) {
+  if (!gateway) return gateway;
+  return new Proxy(gateway, {
+    get(target, property, receiver) {
+      if (property === 'complete') return (input = {}) => {
+        const { messages = [], ...modelInput } = input || {};
+        const purpose = modelInput.purpose || options.purpose || 'pipeline-stage';
+        return runPipelineStage({ ...options, ...modelInput, purpose, messages, gateway: target,
+          skillId: modelInput.skillId || purpose, entryPoint: modelInput.entryPoint || options.entryPoint || 'pipeline',
+          stageId: modelInput.stageId || purpose, generationSnapshotId: options.generationSnapshotId || modelInput.generationSnapshotId });
+      };
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+/**
+ * Bind a short lived HTTP/application operation to a persisted Harness root.
+ * One-shot routes use this instead of passing the infrastructure Gateway
+ * directly into a business service. Nested complete calls become stage runs
+ * and inherit the same root/workflow identifiers.
+ */
+export function createRequestHarnessGateway({ gateway, store = null, entryPoint = 'http', skillId = entryPoint,
+  batchId = null, candidateId = null, provider = null, stageId = entryPoint } = {}) {
+  if (!gateway) return { gateway, rootRunId: null, workflowRunId: null, finish: () => {} };
+  const rootRunId = `request:${crypto.randomUUID()}`;
+  const workflowRunId = rootRunId;
+  const persist = typeof store?.startAgentRun === 'function';
+  if (persist) {
+    store.startAgentRun({ id: rootRunId, entryPoint, skillId, batchId, candidateId,
+      provider: provider || gateway.config?.defaultProvider || null,
+      rootRunId, workflowRunId, stageId });
+    store.appendAgentRunEvent?.(rootRunId, { type: 'run.started', entryPoint, stageId });
+    store.saveAgentStep?.({ agentRunId: rootRunId, step: 0, phase: 'request_started', summary: { entryPoint, skillId } });
+  }
+  const scoped = bindPipelineHarnessGateway(gateway, {
+    store, batchId, candidateId, provider, rootRunId, workflowRunId, entryPoint, stageId,
+  });
+  let finished = false;
+  const finish = (status = 'completed', error = null) => {
+    if (finished) return;
+    finished = true;
+    if (!persist) return;
+    store.appendAgentRunEvent?.(rootRunId, { type: status === 'completed' ? 'run.completed' : 'run.failed', stageId, ...(error ? { error } : {}) });
+    store.saveAgentStep?.({ agentRunId: rootRunId, step: 0, phase: status === 'completed' ? 'request_completed' : 'request_failed', summary: { entryPoint, skillId, ...(error ? { error } : {}) } });
+    store.finishAgentRun?.(rootRunId, { status, modelSteps: 0, toolCalls: 0, ...(error ? { error } : {}) });
+  };
+  return { gateway: scoped, rootRunId, workflowRunId, finish };
 }
 
 export async function resolveSkillToolPolicy({ workspaceRoot, skillId, snapshot = null }) {
@@ -51,6 +144,7 @@ export async function prepareSkillRun({ gateway, store, batchId, candidateId = n
         ? {...frozen.config,version:frozen.version,configHash:frozen.configHash}
         : null;
       Object.assign(bundle,{prompt:frozen.prompt,hash:String(frozen.promptHash||'').replace(/^sha256:/,''),config:frozenConfig});
+      if(frozen.definition)bundle.definition=structuredClone(frozen.definition);
       return bundle;
     });
     if(bundles[0])bundles[0].config={...(bundles[0].config||{}),...(historical.snapshot.skillConfig||{})};
@@ -86,6 +180,12 @@ export async function prepareSkillRun({ gateway, store, batchId, candidateId = n
     }
   }
   if(!historical&&hasWhitelist&&allowed.length!==tools.length)throw new Error('技能工具白名单包含已禁用或不存在的能力');
+  for(const bundle of bundles){
+    const definition=bundle.definition || normalizeSkillDefinition(bundle.manifest || {}, {id:bundle.skillName || bundle.writerSkill});
+    const missing=(definition.requiredCapabilities || []).filter((capability)=>!tools.some((tool)=>tool.capability===capability));
+    if(missing.length)throw new Error(`技能 ${definition.id} 缺少必需能力：${missing.join('、')}`);
+    bundle.definition=definition;
+  }
   const stageModels = historical
     ? (historical.snapshot?.stageModels || {})
     : (gateway.stageModelConfig?.() || {});

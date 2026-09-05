@@ -8,7 +8,7 @@ import { evaluateCardGate, evaluateClassifiedCardGate, evaluateEventCardGate, ev
 import { customFactMarkdown } from './custom-fact-service.mjs';
 import { candidateSocialCardDir } from '../../../platform/core/workspace-paths.mjs';
 import { enrichEventAnalysis, eventGroupsForCandidate, resolveEventAnalysis } from '../../research/index.mjs';
-import { bindGenerationSnapshot, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
+import { bindGenerationSnapshot, bindPipelineHarnessGateway, prepareSkillRun } from '../../../platform/skills/pipeline-runtime.mjs';
 import { configuredRepairAttempts, evaluateConfiguredGates } from '../../../platform/skills/configuration.mjs';
 import { compileSocialTheme, socialThemeDefinition } from '../../../shared/themes/social-theme-compiler.mjs';
 import { resolveWorkspaceTheme } from '../../../platform/application/themes/user-theme-service.mjs';
@@ -234,7 +234,7 @@ function eventFactMarkdown(analysis) {
   return lines.join('\n').trim()+'\n';
 }
 
-export async function runSocialCardPipeline({ gateway, store, batchId, candidateId, provider, workspaceRoot, snapshotId=null, onProgress=()=>{} }) {
+export async function runSocialCardPipeline({ gateway, store, batchId, candidateId, provider, workspaceRoot, snapshotId=null, rootRunId=null, workflowRunId=null, onProgress=()=>{} }) {
   const candidate = store.getCandidate(candidateId);
   if (!candidate || candidate.batch_id !== batchId) throw new Error('候选不存在或不属于当前批次');
   const outputMode=candidate.tracks?.find((item)=>item.track==='social_cards')?.output_mode||'';
@@ -271,6 +271,8 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   if (eventAnalysisSkill?.fallback) throw new Error('事件深度分析技能缺失');
   const skillRuntime=await prepareSkillRun({gateway,store,batchId,candidateId,purpose:`social-cards-${contentType}`,bundles:[generator,screenshotSkill,...(eventAnalysisSkill?[eventAnalysisSkill]:[])],provider,snapshotId});
   gateway=bindGenerationSnapshot(gateway,skillRuntime.snapshotId);
+  gateway=bindPipelineHarnessGateway(gateway,{store,batchId,candidateId,provider,generationSnapshotId:skillRuntime.snapshotId,
+    rootRunId:rootRunId||`batch:${batchId}`,workflowRunId:workflowRunId||`social-card:${batchId}:${candidateId??'batch'}`,entryPoint:'social-card-pipeline'});
   provider=skillRuntime.provider;
   const maxLayoutAttempts=configuredRepairAttempts(skillRuntime.config,4)+1;
   if(contentType==='event'&&eventAnalysisRecord?.analysis){

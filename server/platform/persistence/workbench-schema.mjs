@@ -1,3 +1,4 @@
+import { applyAgentHarnessSchema } from './agent-harness-schema.mjs';
 // Declarative schema creation kept separate from version progression.
 export function applyWorkbenchSchema(db) {
     const candidateTracksExisted = Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='candidate_tracks'").get());
@@ -356,6 +357,11 @@ export function applyWorkbenchSchema(db) {
         status TEXT NOT NULL,
         error TEXT,
         generation_snapshot_id INTEGER,
+        agent_run_id TEXT,
+        agent_step INTEGER,
+        workflow_run_id TEXT,
+        root_run_id TEXT,
+        stage_id TEXT,
         output_budget_json TEXT,
         output_text TEXT,
         tool_calls_json TEXT,
@@ -390,6 +396,13 @@ export function applyWorkbenchSchema(db) {
         candidate_row_id INTEGER,
         generation_snapshot_id INTEGER,
         skill_id TEXT,
+        agent_run_id TEXT,
+        agent_tool_call_id TEXT,
+        workflow_run_id TEXT,
+        root_run_id TEXT,
+        stage_id TEXT,
+        side_effect TEXT NOT NULL DEFAULT 'none',
+        replay_policy TEXT NOT NULL DEFAULT 'never',
         capability TEXT NOT NULL,
         plugin TEXT,
         plugin_version TEXT,
@@ -418,6 +431,10 @@ export function applyWorkbenchSchema(db) {
         started_at TEXT NOT NULL,
         finished_at TEXT,
         error TEXT,
+        root_run_id TEXT,
+        workflow_run_id TEXT,
+        stage_id TEXT,
+        parent_run_id TEXT,
         FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE SET NULL,
         FOREIGN KEY(candidate_row_id) REFERENCES candidates(id) ON DELETE SET NULL
       );
@@ -434,11 +451,17 @@ export function applyWorkbenchSchema(db) {
         error_code TEXT,
         started_at TEXT NOT NULL,
         finished_at TEXT,
+        root_run_id TEXT,
+        workflow_run_id TEXT,
+        stage_id TEXT,
         UNIQUE(agent_run_id,request_id),
         FOREIGN KEY(agent_run_id) REFERENCES agent_runs(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_agent_runs_entry_started ON agent_runs(entry_point,started_at);
+      CREATE INDEX IF NOT EXISTS idx_agent_runs_root ON agent_runs(root_run_id,started_at);
+      CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow ON agent_runs(workflow_run_id,started_at);
       CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_run ON agent_tool_calls(agent_run_id,started_at);
+      CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_root ON agent_tool_calls(root_run_id,started_at);
       CREATE TABLE IF NOT EXISTS extension_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         extension_type TEXT NOT NULL CHECK(extension_type IN ('skill','tool','collector','model-provider','model-connection','system')),
@@ -662,6 +685,7 @@ export function applyWorkbenchSchema(db) {
       CREATE INDEX IF NOT EXISTS idx_generation_snapshots_batch ON generation_snapshots(batch_id, candidate_row_id, id);
       CREATE INDEX IF NOT EXISTS idx_tool_executions_task ON tool_executions(batch_id, candidate_row_id, id);
       CREATE INDEX IF NOT EXISTS idx_tool_executions_capability ON tool_executions(capability, id);
+      CREATE INDEX IF NOT EXISTS idx_tool_executions_agent_run ON tool_executions(agent_run_id, id);
       CREATE INDEX IF NOT EXISTS idx_extension_settings_type ON extension_settings(extension_type,extension_id);
       CREATE INDEX IF NOT EXISTS idx_collection_sources_plugin ON collection_sources(plugin_id,enabled,source_type);
       CREATE INDEX IF NOT EXISTS idx_ai_runs_batch ON ai_runs(batch_id, created_at);
@@ -733,6 +757,11 @@ export function applyWorkbenchSchema(db) {
     if(!batchColumns.has('batch_type'))db.exec("ALTER TABLE batches ADD COLUMN batch_type TEXT NOT NULL DEFAULT 'regular'");
     const modelCallColumns=new Set(db.prepare('PRAGMA table_info(model_calls)').all().map((column)=>column.name));
     if(!modelCallColumns.has('generation_snapshot_id'))db.exec('ALTER TABLE model_calls ADD COLUMN generation_snapshot_id INTEGER');
+    if(!modelCallColumns.has('agent_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN agent_run_id TEXT');
+    if(!modelCallColumns.has('agent_step'))db.exec('ALTER TABLE model_calls ADD COLUMN agent_step INTEGER');
+    if(!modelCallColumns.has('workflow_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN workflow_run_id TEXT');
+    if(!modelCallColumns.has('root_run_id'))db.exec('ALTER TABLE model_calls ADD COLUMN root_run_id TEXT');
+    if(!modelCallColumns.has('stage_id'))db.exec('ALTER TABLE model_calls ADD COLUMN stage_id TEXT');
     if(!modelCallColumns.has('reasoning_tokens'))db.exec('ALTER TABLE model_calls ADD COLUMN reasoning_tokens INTEGER');
     if(!modelCallColumns.has('output_budget_json'))db.exec('ALTER TABLE model_calls ADD COLUMN output_budget_json TEXT');
     if(!modelCallColumns.has('output_text'))db.exec('ALTER TABLE model_calls ADD COLUMN output_text TEXT');
@@ -966,4 +995,23 @@ export function applyWorkbenchSchema(db) {
       FOREIGN KEY(agent_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS idx_conversation_fact_lookup ON conversation_fact_attachments(batch_id,entry_point,capability,fingerprint);`);
+    const traceToolExecutionColumns=new Set(db.prepare('PRAGMA table_info(tool_executions)').all().map((column)=>column.name));
+    if(!traceToolExecutionColumns.has('agent_run_id'))db.exec('ALTER TABLE tool_executions ADD COLUMN agent_run_id TEXT');
+    if(!traceToolExecutionColumns.has('agent_tool_call_id'))db.exec('ALTER TABLE tool_executions ADD COLUMN agent_tool_call_id TEXT');
+    if(!traceToolExecutionColumns.has('workflow_run_id'))db.exec('ALTER TABLE tool_executions ADD COLUMN workflow_run_id TEXT');
+    if(!traceToolExecutionColumns.has('root_run_id'))db.exec('ALTER TABLE tool_executions ADD COLUMN root_run_id TEXT');
+    if(!traceToolExecutionColumns.has('stage_id'))db.exec('ALTER TABLE tool_executions ADD COLUMN stage_id TEXT');
+    if(!traceToolExecutionColumns.has('side_effect'))db.exec("ALTER TABLE tool_executions ADD COLUMN side_effect TEXT NOT NULL DEFAULT 'none'");
+    if(!traceToolExecutionColumns.has('replay_policy'))db.exec("ALTER TABLE tool_executions ADD COLUMN replay_policy TEXT NOT NULL DEFAULT 'never'");
+    const traceAgentRunColumns=new Set(db.prepare('PRAGMA table_info(agent_runs)').all().map((column)=>column.name));
+    if(!traceAgentRunColumns.has('root_run_id'))db.exec('ALTER TABLE agent_runs ADD COLUMN root_run_id TEXT');
+    if(!traceAgentRunColumns.has('workflow_run_id'))db.exec('ALTER TABLE agent_runs ADD COLUMN workflow_run_id TEXT');
+    if(!traceAgentRunColumns.has('stage_id'))db.exec('ALTER TABLE agent_runs ADD COLUMN stage_id TEXT');
+    if(!traceAgentRunColumns.has('parent_run_id'))db.exec('ALTER TABLE agent_runs ADD COLUMN parent_run_id TEXT');
+    const traceAgentToolCallColumns=new Set(db.prepare('PRAGMA table_info(agent_tool_calls)').all().map((column)=>column.name));
+    if(!traceAgentToolCallColumns.has('root_run_id'))db.exec('ALTER TABLE agent_tool_calls ADD COLUMN root_run_id TEXT');
+    if(!traceAgentToolCallColumns.has('workflow_run_id'))db.exec('ALTER TABLE agent_tool_calls ADD COLUMN workflow_run_id TEXT');
+    if(!traceAgentToolCallColumns.has('stage_id'))db.exec('ALTER TABLE agent_tool_calls ADD COLUMN stage_id TEXT');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_agent_runs_root ON agent_runs(root_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow ON agent_runs(workflow_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_root ON agent_tool_calls(root_run_id,started_at); CREATE INDEX IF NOT EXISTS idx_tool_executions_agent_run ON tool_executions(agent_run_id,id);');
+    applyAgentHarnessSchema(db);
 }

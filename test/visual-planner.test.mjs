@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { analyzeVisualComplexity, normalizeVisualPlan, planArticleVisuals } from '../server/features/articles/llm/visual-planner.mjs';
@@ -61,7 +62,7 @@ test('visual plan does not retain a positive summary when every suggestion is re
 });
 
 test('visual results use a full-width second row instead of squeezing the AI rewrite panel',()=>{
-  const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+  const styles=readStyles();
   assert.match(styles,/\.editor-assist-grid\{display:block/);
   assert.match(styles,/\.ai-writing-bar\{[^}]*grid-template-columns:190px minmax\(0,1fr\)/);
   assert.doesNotMatch(styles,/:has\(\.visual-planner\.has-results\)/);

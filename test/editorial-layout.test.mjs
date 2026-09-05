@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,7 +11,7 @@ const source = fs.readFileSync(path.join(root, "public/src/views/editorial.js"),
 const topicsSource = fs.readFileSync(path.join(root, "public/src/views/topics.js"), "utf8");
 const streamSource = fs.readFileSync(path.join(root, "public/src/core/stream-chat.js"), "utf8");
 const agentEventsSource = fs.readFileSync(path.join(root, "public/src/core/agent-events.js"), "utf8");
-const styles = fs.readFileSync(path.join(root, "public/styles.css"), "utf8");
+const styles = readStyles(root);
 
 test("编辑室以对话和成稿门禁为主视图，详细决策字段默认折叠", () => {
   assert.match(html, /class="editorial-focus-grid"[\s\S]*class="editorial-chat"[\s\S]*id="editorial-production-gate"/);

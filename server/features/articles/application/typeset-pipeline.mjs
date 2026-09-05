@@ -91,7 +91,7 @@ async function runScript(script, args, cwd) {
   }
 }
 
-export async function runTypesetPipeline({ gateway, store, batchId, candidateId, documentKind = null, provider, workspaceRoot, skillsWorkspaceRoot = workspaceRoot, snapshotId=null, draftMode = 'deterministic', theme = 'auto', autoUploadGeneratedImages = true, onProgress = () => {}, generateArticleImageFn = generateArticleImage, uploadImageToCdnFn = uploadImageToCdn }) {
+export async function runTypesetPipeline({ gateway, store, batchId, candidateId, documentKind = null, provider, workspaceRoot, skillsWorkspaceRoot = workspaceRoot, snapshotId=null, draftMode = 'deterministic', theme = 'auto', autoUploadGeneratedImages = true, rootRunId = null, workflowRunId = null, stageId = 'typeset', onProgress = () => {}, generateArticleImageFn = generateArticleImage, uploadImageToCdnFn = uploadImageToCdn }) {
   const candidate = candidateId==null?null:store.getCandidate(candidateId);
   const daily=documentKind==='daily-final';
   if ((!daily&&(!candidate||candidate.batch_id!==batchId))||(daily&&candidate)) throw new Error('待排版文稿不存在或不属于当前批次');
@@ -179,7 +179,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
     let chartReport = null;
     const toolResult = await executeCapability({consumerId:'feature.wechat-typeset',capability,input:{
       inputPath:chartReadyPath, outputPath:chartPath, imageDir:path.join(workdir, 'images'), tokensPath:chartTokensPath,
-    },context:{allowedRoots:[workdir],allowedCapabilities:typesetRuntime.allowedCapabilities,cwd:workdir,timeoutMs:180000,executionLog:createStoreExecutionLogger(store,{batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset'})}});
+    },context:{allowedRoots:[workdir],allowedCapabilities:typesetRuntime.allowedCapabilities,cwd:workdir,timeoutMs:180000,executionLog:createStoreExecutionLogger(store,{batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset',rootRunId,workflowRunId,stageId})}});
     if (toolResult.status === 'error') {
       const detail = toolResult.error.message;
       record('images', 'wechat-article-typeset', '', 'blocked', `${label} 渲染失败：${detail}`);
@@ -194,7 +194,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
     for (const item of autoUploadGeneratedImages ? pendingUploads : []) {
       onProgress(`排版 3/6：${label} 图片已更新，正在上传 CDN`);
       await uploadImageToCdn(workdir, item.id, { authorizedExternalWrite:true, allowedCapabilities:typesetRuntime.allowedCapabilities,
-        store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset' });
+        store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset',rootRunId,workflowRunId,stageId });
     }
     addArtifact(store, batchId, `${label} 转图文章`, path.basename(chartPath), chartPath);
     chartNotes.push(`${label} ${chartReport.converted} 张${pendingUploads.length ? '（已重新上传 CDN）' : '（内容未变，复用 CDN）'}`);
@@ -214,7 +214,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
       if (autoUploadGeneratedImages) {
         onProgress(`排版 3/6：${label}「${item.content}」图片已更新，正在上传 CDN`);
         await uploadImageToCdnFn(workdir, item.id, { authorizedExternalWrite:true, allowedCapabilities:typesetRuntime.allowedCapabilities,
-          store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset' });
+        store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset',rootRunId,workflowRunId,stageId });
       }
       chartNotes.push(`${label} 1 张（按 ${theme} 主题生成${autoUploadGeneratedImages ? '并已上传 CDN' : ''}）`);
     } catch (error) {

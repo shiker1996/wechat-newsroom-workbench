@@ -1,9 +1,10 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const ui = fs.readFileSync(new URL('../public/src/views/theme-manager.js', import.meta.url), 'utf8');
-const styles = fs.readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+const styles = readStyles();
 const plan = fs.readFileSync(new URL('../docs/design/social-card-template-authoring-ai-assist-plan.md', import.meta.url), 'utf8');
 
 test('Phase 1 Social 主题编辑器展示匹配置信度与低置信度原因', () => {

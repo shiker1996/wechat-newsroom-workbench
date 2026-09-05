@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -6,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
-const styles = fs.readFileSync(path.join(root, "public/styles.css"), "utf8");
+const styles = readStyles(root);
 const drawer = fs.readFileSync(path.join(root, "public/src/views/batch-drawer.js"), "utf8");
 const subscriptions = fs.readFileSync(path.join(root, "public/src/views/subscriptions.js"), "utf8");
 const atlas = fs.readFileSync(path.join(root, "public/src/views/atlas.js"), "utf8");

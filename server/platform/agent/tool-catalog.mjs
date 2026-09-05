@@ -1,3 +1,4 @@
+import { toolRuntimeMetadata } from './tool-definition.mjs';
 const READ_ONLY_RISKS=new Set(['read-only','network-read']);
 
 export function buildConversationToolCatalog({registry,entryCapabilities=[],allowedCapabilities=null,applicationTools=[]}={}){
@@ -7,6 +8,7 @@ export function buildConversationToolCatalog({registry,entryCapabilities=[],allo
   const capabilities=[...new Set(implementations.map((item)=>item.capability))].sort();
   const catalog=capabilities.map((capability)=>{const manifest=registry.resolve(capability)?.manifest||{};return {
     capability,name:manifest.name||capability,description:manifest.description||'',inputSchema:structuredClone(manifest.inputSchema||{type:'object'}),
+    ...toolRuntimeMetadata(manifest),outputSchema:structuredClone(manifest.outputSchema||{type:'object'}),
     implementations:implementations.filter((item)=>item.capability===capability).map((item)=>Object.freeze({plugin:item.plugin,version:item.version,riskLevel:item.riskLevel})),
   };});
   // 业务型 Agent 工具不经过插件注册表，但仍复用同一套目录、原生 function tool、
@@ -16,6 +18,7 @@ export function buildConversationToolCatalog({registry,entryCapabilities=[],allo
     if(catalog.some((item)=>item.capability===tool.capability))throw new Error(`Agent 业务工具能力冲突：${tool.capability}`);
     catalog.push({
       capability:String(tool.capability),name:String(tool.name||tool.capability),description:String(tool.description||''),
+      ...toolRuntimeMetadata(tool,'local-write'),outputSchema:structuredClone(tool.outputSchema||{type:'object'}),
       inputSchema:structuredClone(tool.inputSchema||{type:'object'}),implementations:[Object.freeze({plugin:String(tool.plugin||'application'),version:String(tool.version||'1.0.0'),riskLevel:String(tool.riskLevel||'local-write')})],
     });
   }

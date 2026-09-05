@@ -80,7 +80,7 @@ function firstParagraph(markdown) {
 
 // AI 任务出口：解析候选上下文 → 生成 → 落 artifacts（kind=封面图）
 // candidateId 为 null 时是批次早报：终稿取批次级 daily-final 文档，产物落 articles/<批次>/daily/images/
-export async function runCoverImageJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, theme = '', mode = 'standard', onProgress = () => {}, onEvent = () => {} }) {
+export async function runCoverImageJob({ gateway, store, batchId, candidateId, provider, workspaceRoot, theme = '', mode = 'standard', rootRunId = null, workflowRunId = null, onProgress = () => {}, onEvent = () => {} }) {
   const batch = store.getBatch(batchId);
   if (!batch) throw new Error('批次不存在');
   const daily = candidateId == null;
@@ -100,7 +100,7 @@ export async function runCoverImageJob({ gateway, store, batchId, candidateId, p
   let result;
   if (mode === 'ai-visual') {
     result = await runAiVisualCoverJob({ workspaceRoot, workdir, gateway, store, batchId, candidateId, title, summary, brand,
-      themeId: theme === 'auto' ? '' : theme, provider, onProgress, onEvent });
+      themeId: theme === 'auto' ? '' : theme, provider, rootRunId, workflowRunId, onProgress, onEvent });
   } else if (mode !== 'standard') {
     throw new Error('封面生成模式必须是 standard 或 ai-visual');
   } else {

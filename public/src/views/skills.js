@@ -1,5 +1,6 @@
 import { request } from "../core/http.js";
 import { escapeHtml, toast, confirmAction, debounce } from "../core/ui.js";
+import { openRunTrace } from "./logs.js?v=20260905-runtrace";
 
 let bound = false;
 let skillRegistryData = null;
@@ -31,6 +32,7 @@ function bindSkills() {
     const item = event.target.closest("[data-skill-edit]");
     if (item) openSkillConfig(item.dataset.skillEdit).catch((error) => toast(error.message, "error"));
   });
+  document.getElementById("skill-test-run")?.addEventListener("click", () => runSkillTest().catch((error) => toast(error.message, "error")));
   document.getElementById("tool-capability-list")?.addEventListener("click", (event) => {
     const testButton = event.target.closest("[data-tool-test]");
     const historyButton = event.target.closest("[data-tool-history]");
@@ -71,6 +73,7 @@ function bindSkills() {
     document.getElementById("tool-execution-panel").hidden = true;
   });
   document.getElementById("load-agent-run-history")?.addEventListener("click",()=>loadAgentRunHistory().catch((error)=>toast(error.message, "error")));
+  document.getElementById("agent-run-history-list")?.addEventListener("click",(event)=>{const button=event.target.closest("[data-open-run-trace]");if(button)openRunTrace(button.dataset.openRunTrace);});
   document.getElementById("agent-run-history-close")?.addEventListener("click",()=>{document.getElementById("agent-run-history-panel").hidden=true;});
   document.getElementById("capability-impact-close")?.addEventListener("click",()=>{document.getElementById("capability-impact-panel").hidden=true;});
   document.getElementById("consumer-access-list")?.addEventListener("click",(event)=>{
@@ -82,6 +85,10 @@ function bindSkills() {
       jumpToCapability(capabilityLink.dataset.consumerCapability);
       return;
     }
+  });
+  document.getElementById("information-slot-list")?.addEventListener("click", (event) => {
+    const test = event.target.closest("[data-capability-test]");
+    if (test) testCapability(test.dataset.capabilityTest, test).catch((error) => toast(error.message, "error"));
   });
   document.getElementById("consumer-access-list")?.addEventListener("change",(event)=>{
     const toggle=event.target.closest("[data-consumer-auth]");
@@ -220,7 +227,7 @@ function renderCapabilityGraph(){
   const items=capabilityGraphData.capabilities.filter((item)=>(status==='all'||item.status===status)&&(!query||`${item.id} ${item.name||''} ${item.description||''} ${item.category||''} ${item.consumers.map((x)=>`${x.consumerName} ${x.consumerId}`).join(' ')} ${item.implementations.map((x)=>`${x.name} ${x.id}`).join(' ')}`.toLowerCase().includes(query)));
   const summary=document.getElementById('information-slot-summary');if(summary)summary.innerHTML=`<b>${capabilityGraphData.summary.ready}</b><span>就绪 · ${capabilityGraphData.summary.degraded} 降级 · ${capabilityGraphData.summary.blocked} 阻断${capabilityGraphData.summary.unregistered?` · ${capabilityGraphData.summary.unregistered} 未登记`:''}</span>`;
   // R2/R4：未登记（registered:false）能力单独分区，标注「未登记 · 仅调试」
-  const card=(item)=>`<article class="capability-chain-card status-${item.status}${item.registered===false?' unregistered':''}"><header><div><span>${escapeHtml(item.category||'扩展能力')} · ${item.id.startsWith('collect.')?'采集能力':'工具能力'}</span><b>${escapeHtml(item.name||item.id)}</b><small>${escapeHtml(item.id)}</small><p>${escapeHtml(item.description||'暂无能力说明')}</p></div>${item.registered===false?'<em class="capability-unregistered-badge">未登记 · 仅调试</em>':`<em>${CAPABILITY_STATUS[item.status]||item.status}</em>`}</header><section><small>消费者 · ${item.consumers.length}</small><div class="capability-consumer-list">${item.consumers.length?item.consumers.map((consumer)=>`<button type="button" class="capability-consumer-chip ${consumer.requirement}${consumer.enabled===false?' disabled':''}" data-goto-consumer="${escapeHtml(consumer.consumerId)}" title="查看该消费者的接入详情"><b>${escapeHtml(consumer.consumerName)}</b><i>${escapeHtml(consumer.consumerType)} · ${escapeHtml(consumer.requirement)}</i></button>`).join(''):'<span class="empty">当前没有消费者</span>'}</div></section><section>${capabilityRouteControl(item)}<small>候选工具链 · ${item.implementations.length}</small><ol class="capability-fallback-chain">${item.implementations.length?item.implementations.map((implementation,index)=>`<li class="${implementation.available?'available':'missing'}"><b>${index+1}</b><span>${escapeHtml(implementation.name)}<small>${escapeHtml(implementation.type)} · ${escapeHtml(implementation.id)} · 优先级 ${implementation.priority}</small></span><em>${implementation.available?'可用':implementation.enabled?'配置未就绪':'已停用'}</em></li>`).join(''):'<li class="missing"><span>没有实现该能力的工具</span></li>'}</ol></section></article>`;
+  const card=(item)=>`<article class="capability-chain-card status-${item.status}${item.registered===false?' unregistered':''}"><header><div><span>${escapeHtml(item.category||'扩展能力')} · ${item.id.startsWith('collect.')?'采集能力':'工具能力'}</span><b>${escapeHtml(item.name||item.id)}</b><small>${escapeHtml(item.id)}</small><p>${escapeHtml(item.description||'暂无能力说明')}</p></div><div class="capability-card-actions">${item.registered===false?'<em class="capability-unregistered-badge">未登记 · 仅调试</em>':`<em>${CAPABILITY_STATUS[item.status]||item.status}</em>`}<button type="button" class="text-button" data-capability-test="${escapeHtml(item.id)}">受控测试</button></div></header><section><small>消费者 · ${item.consumers.length}</small><div class="capability-consumer-list">${item.consumers.length?item.consumers.map((consumer)=>`<button type="button" class="capability-consumer-chip ${consumer.requirement}${consumer.enabled===false?' disabled':''}" data-goto-consumer="${escapeHtml(consumer.consumerId)}" title="查看该消费者的接入详情"><b>${escapeHtml(consumer.consumerName)}</b><i>${escapeHtml(consumer.consumerType)} · ${escapeHtml(consumer.requirement)}</i></button>`).join(''):'<span class="empty">当前没有消费者</span>'}</div></section><section>${capabilityRouteControl(item)}<small>候选工具链 · ${item.implementations.length}</small><ol class="capability-fallback-chain">${item.implementations.length?item.implementations.map((implementation,index)=>`<li class="${implementation.available?'available':'missing'}"><b>${index+1}</b><span>${escapeHtml(implementation.name)}<small>${escapeHtml(implementation.type)} · ${escapeHtml(implementation.id)} · 优先级 ${implementation.priority}</small></span><em>${implementation.available?'可用':implementation.enabled?'配置未就绪':'已停用'}</em></li>`).join(''):'<li class="missing"><span>没有实现该能力的工具</span></li>'}</ol></section></article>`;
   const registeredItems=items.filter((item)=>item.registered!==false),unregisteredItems=items.filter((item)=>item.registered===false);
   node.innerHTML=(registeredItems.map(card).join('')+(unregisteredItems.length?`<div class="capability-unregistered-head"><b>未登记 · 仅调试</b><small>以下能力由扩展插件声明，尚未加入能力目录；其实现不得启用、不得设为路由首选。远程来源可在扩展工作室生成目录条目草案，确认入库后转正式。</small></div>${unregisteredItems.map(card).join('')}`:''))||'<div class="kv-empty">没有匹配的能力。</div>';
 }
@@ -682,7 +689,7 @@ async function loadAgentRunHistory(){
   const result=await request('/api/system/conversation-agent-runs?limit=100'),panel=document.getElementById('agent-run-history-panel'),summary=document.getElementById('agent-run-summary'),list=document.getElementById('agent-run-history-list');
   const labels={editorial:'热点编辑室','independent-writing':'自主写作','custom-social':'自定义图文'};
   summary.innerHTML=`<span>运行 ${result.summary.runs}</span><span>成功率 ${result.summary.successRate}%</span><span>工具调用 ${result.summary.toolCalls}</span><span>工具失败 ${result.summary.toolFailures}</span><span>平均耗时 ${result.summary.averageDurationMs} ms</span><span>费用 ${result.summary.estimatedCost==null?'供应商未提供':'¥'+result.summary.estimatedCost}</span>`;
-  list.innerHTML=result.runs.length?result.runs.map((run)=>`<article class="runtime-model-item"><b>${escapeHtml(labels[run.entry_point]||run.entry_point)} · ${escapeHtml(run.status)}</b><small>${new Date(run.started_at).toLocaleString('zh-CN')} · ${run.duration_ms??'进行中'} ms · ${escapeHtml(run.id)}</small><small>模型步骤 ${run.model_steps} · 工具调用 ${run.tool_calls} · ${escapeHtml(run.provider||'默认供应商')}</small>${run.error?`<small>${escapeHtml(run.error)}</small>`:''}<div class="tool-provided-capabilities">${run.toolCalls.length?run.toolCalls.map((call)=>`<code>${escapeHtml(call.capability)} · ${escapeHtml(call.status)} · ${call.duration_ms??'—'} ms${call.error_code?` · ${escapeHtml(call.error_code)}`:''}</code>`).join(''):'<small>本轮未调用工具</small>'}</div></article>`).join(''):'<div class="kv-empty">尚无对话 Agent 运行记录。</div>';
+  list.innerHTML=result.runs.length?result.runs.map((run)=>`<article class="runtime-model-item"><b>${escapeHtml(labels[run.entry_point]||run.entry_point)} · ${escapeHtml(run.status)}</b><small>${new Date(run.started_at).toLocaleString('zh-CN')} · ${run.duration_ms??'进行中'} ms · ${escapeHtml(run.id)}</small><small>模型步骤 ${run.model_steps} · 工具调用 ${run.tool_calls} · ${escapeHtml(run.provider||'默认供应商')}</small>${run.error?`<small>${escapeHtml(run.error)}</small>`:''}<div class="tool-provided-capabilities">${run.toolCalls.length?run.toolCalls.map((call)=>`<code>${escapeHtml(call.capability)} · ${escapeHtml(call.status)} · ${call.duration_ms??'—'} ms${call.error_code?` · ${escapeHtml(call.error_code)}`:''}</code>`).join(''):'<small>本轮未调用工具</small>'}</div><button type="button" class="inline-button log-trace-button" data-open-run-trace="${escapeHtml(run.rootRunId||run.root_run_id||run.id)}">查看 Run Trace</button></article>`).join(''):'<div class="kv-empty">尚无对话 Agent 运行记录。</div>';
   panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -778,6 +785,43 @@ async function openSkillConfig(id) {
     <b>${index === 0 ? "主契约" : "关联规则"}</b><code>${escapeHtml(file)}</code>
   </article>`).join("") || '<div class="kv-empty">没有关联规则文件。</div>';
   await openExtensionConfig("skill",id,data.extensionConfiguration);
+}
+
+async function runSkillTest() {
+  if (!selectedSkillId) { toast("请先选择一项技能", "error"); return; }
+  const status = document.getElementById("skill-test-status");
+  const resultNode = document.getElementById("skill-test-result");
+  const button = document.getElementById("skill-test-run");
+  let input = {};
+  const raw = String(document.getElementById("skill-test-input")?.value || "").trim();
+  if (raw) {
+    try { input = JSON.parse(raw); } catch { throw new Error("测试输入必须是合法 JSON"); }
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("测试输入必须是 JSON 对象");
+  }
+  button.disabled = true;
+  status.textContent = "test run · 正在检查契约和能力…";
+  try {
+    const result = await request(`/api/system/skills/${encodeURIComponent(selectedSkillId)}/test-run`, { method: "POST", confirmation: "plugin-admin", body: JSON.stringify(input) });
+    status.textContent = result.pass ? "test run · 检查通过" : "test run · 被阻断";
+    resultNode.hidden = false;
+    resultNode.innerHTML = `<b>${escapeHtml(result.message || (result.pass ? "测试通过" : "测试未通过"))}</b><small>运行 ID：${escapeHtml(result.rootRunId || "—")} · 正式产物：${result.formalArtifactWritten ? "已写入" : "未写入"}</small><small>契约：${result.checks?.contract?.pass ? "通过" : "失败"} · 必需能力：${(result.checks?.capabilities || []).filter((item) => item.available).length}/${(result.checks?.capabilities || []).length} 可用</small>${result.rootRunId ? `<button type="button" class="inline-button log-trace-button" data-test-open-trace="${escapeHtml(result.rootRunId)}">查看测试 Trace</button>` : ""}`;
+    resultNode.querySelector("[data-test-open-trace]")?.addEventListener("click", () => openRunTrace(result.rootRunId));
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function testCapability(capability, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "测试中…";
+  try {
+    const result = await request(`/api/system/capabilities/${encodeURIComponent(capability)}/test`, { method: "POST", confirmation: "plugin-admin", body: "{}" });
+    toast(result.pass ? `${capability}：至少一个实现可用` : `${capability}：测试被阻断`, result.pass ? "success" : "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
 export default async function loadSkillsView() {

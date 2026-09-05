@@ -15,6 +15,7 @@ import { generateSocialTemplateProposal, SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES } 
 import { SocialTemplateProposalStore, SocialTemplateProposalRateLimiter } from '../../../shared/themes/social-template-proposal-store.mjs';
 import { compileSocialTemplateProposal, compileSocialTemplateProposalPack, compileSocialTemplateProposalCss } from '../../application/themes/social-template-proposal-compiler.mjs';
 import { themeMetadataSummary } from '../../../shared/themes/theme-metadata.mjs';
+import { createRequestHarnessGateway } from '../../skills/pipeline-runtime.mjs';
 
 const TARGETS=new Set(['article','social','cover']);
 const SCENE_TAGS=['深度观点','技术教程','快讯','数据对比','事件图文'];
@@ -87,7 +88,7 @@ export async function handleThemeRoutes({request,response,pathname,searchParams,
       if(baseThemeId&&!baseTheme)throw Object.assign(new Error('基础 Social 主题不存在'),{code:SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.INPUT_INVALID,issues:[{field:'baseThemeId',code:'NOT_FOUND',message:'请选择存在的 Social 主题'}]});
       if(baseThemeId&&(!baseTheme.targets?.includes('social')))throw Object.assign(new Error('基础主题不是 Social 主题'),{code:SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.INPUT_INVALID,issues:[{field:'baseThemeId',code:'TARGET_MISMATCH',message:'模板提案只能基于 Social 主题'}]});
       const baseTemplatePack=input.baseTemplatePack||baseTheme?.social?.templatePack?.id||'standard-v1',requestInput={...input,baseTemplatePack,baseThemeId:baseThemeId||undefined};
-      const controller=new AbortController();request.once?.('aborted',()=>controller.abort());const candidate=await generateSocialTemplateProposal({gateway:models,request:requestInput,candidateStore:socialTemplateProposals,basePack:getSocialCardTemplatePack(baseTemplatePack),baseTheme,signal:controller.signal});
+      const controller=new AbortController();request.once?.('aborted',()=>controller.abort());const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'theme-social-template-proposal',skillId:'social-template-proposal',provider:requestInput.provider||models?.config?.defaultProvider,stageId:'social-template-proposal'});let candidate;try{candidate=await generateSocialTemplateProposal({gateway:harness.gateway,request:requestInput,candidateStore:socialTemplateProposals,basePack:getSocialCardTemplatePack(baseTemplatePack),baseTheme,signal:controller.signal});harness.finish('completed');}catch(error){harness.finish('failed',error.message);throw error;}
       recordSocialTemplateProposalMetric(store,{operation:'generated',proposalId:candidate.proposal?.proposalId,candidateId:candidate.id,templatePackId:candidate.proposal?.baseTemplatePack||baseTemplatePack,themeId:baseThemeId});
       const {id,...value}=candidate;json(response,200,{proposalId:value.proposal?.proposalId||id,candidateId:id,...value});
     }catch(error){const status=error.code===SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.RATE_LIMITED?429:error.code===SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.MODEL_UNAVAILABLE?503:error.code===SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.EXPIRED?410:400;json(response,status,{error:error.message,code:error.code||SOCIAL_TEMPLATE_PROPOSAL_ERROR_CODES.OUTPUT_INVALID,issues:error.issues||[]});}
@@ -140,7 +141,7 @@ export async function handleThemeRoutes({request,response,pathname,searchParams,
   if(request.method==='POST'&&pathname==='/api/themes/ai/generate'){
     try{
       rateLimiter.assert('workspace');const input=await body(request);if(Buffer.byteLength(JSON.stringify(input),'utf8')>16*1024)throw Object.assign(new Error('AI 主题生成请求不能超过 16KB'),{code:AI_THEME_ERROR_CODES.INPUT_INVALID,issues:[{field:'request',code:'TOO_LARGE',message:'请求不能超过 16KB'}]});
-      const controller=new AbortController();request.once?.('aborted',()=>controller.abort());const referenceThemes=(store.listUserThemes?.({includeArchived:true})||[]).map((row)=>userThemeFromRow(row,{draft:true})).filter(Boolean),candidate=await generateAiThemeCandidate({gateway:models,input,candidateStore,signal:controller.signal,referenceThemes});
+      const controller=new AbortController();request.once?.('aborted',()=>controller.abort());const referenceThemes=(store.listUserThemes?.({includeArchived:true})||[]).map((row)=>userThemeFromRow(row,{draft:true})).filter(Boolean),harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'theme-ai-generate',skillId:'theme-create',provider:input.provider||models?.config?.defaultProvider,stageId:'theme-create'});let candidate;try{candidate=await generateAiThemeCandidate({gateway:harness.gateway,input,candidateStore,signal:controller.signal,referenceThemes});harness.finish('completed');}catch(error){harness.finish('failed',error.message);throw error;}
       const {id,...value}=candidate;json(response,200,{candidateId:id,...value});
     }catch(error){const status=error.code===AI_THEME_ERROR_CODES.RATE_LIMITED?429:error.code===AI_THEME_ERROR_CODES.MODEL_UNAVAILABLE?503:400;json(response,status,{error:error.message,code:error.code||AI_THEME_ERROR_CODES.MODEL_OUTPUT_INVALID,issues:error.issues||[]});}return true;
   }

@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ test('阶段 5 旧结构主题只生成兼容报告而不迁移定义',()=>{
 });
 
 test('阶段 5 主题中心提供只读兼容报告并将发布错误定位到字段',()=>{
-  const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+  const ui=fs.readFileSync(new URL('../public/src/views/theme-manager.js',import.meta.url),'utf8'),styles=readStyles();
   assert.match(ui,/editorMode==='read-only'/);assert.match(ui,/旧主题只读兼容报告/);assert.match(ui,/该草稿不会被原地迁移/);assert.match(ui,/control\?\.closest\('details'\)/);assert.match(ui,/control\?\.focus\(\)/);assert.match(styles,/\.theme-compat-report\.legacy/);
 });
 

@@ -17,6 +17,7 @@ import { buildSocialFeedbackAdjustmentDraft, buildSocialFeedbackAdjustmentPatchM
 import { parseModelJson } from '../../llm/model-json.mjs';
 import { materialBriefReadiness } from '../../../features/content-planning/material-brief-service.mjs';
 import { getAccountContext } from '../../../shared/domain/account-context.mjs';
+import { createRequestHarnessGateway } from '../../skills/pipeline-runtime.mjs';
 
 const ARTIFACT_PREVIEW_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'";
 
@@ -205,13 +206,14 @@ const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
         ? models.resolveForInput({ purpose: 'material-brief' })?.provider
         : null;
       const providerConfig = models.config?.providers?.[routedProvider || models.config.defaultProvider] || {};
-      const result = await models.complete({
+      const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'material-brief-generate',skillId:'material-brief',provider:routedProvider||models.config.defaultProvider,stageId:'material-brief'});
+      let result; try { result = await harness.gateway.complete({
         purpose: 'material-brief', batchId: null, jsonMode: true, maxOutputTokens: Math.min(4000, providerConfig.maxOutputTokens || 4000),
         messages: [
           { role: 'system', protected: true, content: '你是素材主编。基于给定素材产出一份可被作者确认的写作主线简报。约束：事实摘要只能归纳素材原文，不得新增事实；冲突/反差/未解决问题必须有素材依据；主线候选 2-4 个，每个包含 id（mainline-1）、title 主线名称、question 围绕什么问题展开、thesis 候选核心观点（可被读者同意或反对）、argument 论据方向数组、counter_argument 反方或限制、evidence_refs 引用 fact_summary 中给出的事实 id；不把模型生成的观点伪装成作者经历。返回严格 JSON：{"fact_summary":[{"id":"material-fact-1","text":"已确认事实","source":"material","confidence":"confirmed"}],"context":"背景","tension":"冲突反差","why_it_matters":"对目标读者的影响","mainline_candidates":[{"id":"mainline-1","title":"主线名称","question":"问题","thesis":"核心观点","argument":["论据"],"counter_argument":"反方","evidence_refs":["material-fact-1"]}],"discussion_question":"读者可能争论的问题","missing_evidence":["仍需补充或核验的内容"],"recommended_formats":["article-experience","social-opinion"]}' },
           { role: 'user', protected: true, content: `请提炼以下素材的写作主线：\n\n${context}` },
         ],
-      });
+      }); harness.finish('completed'); } catch (error) { harness.finish('failed',error.message); throw error; }
       const parsed = parseModelJson(result, { label: '素材简报主线' });
       const factSummary = (Array.isArray(parsed.fact_summary) ? parsed.fact_summary : []).map((item, index) => ({
         id: String(item.id || `material-fact-${index + 1}`),
@@ -319,11 +321,13 @@ const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
   if (request.method === 'POST' && pathname === '/api/wechat/feedback/adjustments/generate') {
     const streamProgress = typeof response?.writeHead === 'function' && typeof response?.write === 'function' && typeof response?.end === 'function';
     const emitProgress = (event) => { if (streamProgress && !response.writableEnded) response.write(`${JSON.stringify(event)}\n`); };
+    let harness = null;
     try {
       if (!models?.complete) throw new Error('模型服务尚未配置，无法生成调整草案');
       if (streamProgress) response.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
       emitProgress({ type: 'progress', stage: 'snapshot', message: '正在检查并刷新反馈快照…' });
       const input = await body(request);
+      harness = createRequestHarnessGateway({ gateway: models, store, entryPoint: 'content-feedback-adjustments', skillId: 'content-feedback-adjustments', provider: input.provider || models.config?.defaultProvider, stageId: 'content-feedback-adjustments' });
       let feedback = input.feedbackSnapshotId
         ? store.listContentFeedbackSnapshots({ limit: 100 }).find((item) => Number(item.id) === Number(input.feedbackSnapshotId))
         : store.getLatestContentFeedbackSnapshot();
@@ -354,17 +358,17 @@ const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
         }).filter(([, files]) => Object.keys(files).length));
         emitProgress({ type: 'progress', stage: 'planning', message: '第一阶段：AI 正在判断图文故事板与文案技能调整目标（thinking）…' });
         const planningMessages = buildSocialFeedbackAdjustmentPlanningMessages({ feedback: socialFeedback, targets: socialTarget.targets });
-        const planningResult = await models.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
+        const planningResult = await harness.gateway.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
         const planning = parseModelJson(planningResult, { store, label: '图文复盘调整目标判断' });
         emitProgress({ type: 'progress', stage: 'patch', message: '第二阶段：AI 正在生成图文技能的精确 diff（thinking）…' });
         const patchMessages = buildSocialFeedbackAdjustmentPatchMessages({ feedback: socialFeedback, plan: planning, skills: socialSkills });
-        const patchResult = await models.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
+        const patchResult = await harness.gateway.complete({ provider: input.provider, purpose: 'social-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
         const patchOutput = parseModelJson(patchResult, { store, label: '图文复盘调整精确修改' });
         emitProgress({ type: 'progress', stage: 'validate', message: '正在校验图文技能原文定位并保存草案…' });
         const draft = buildSocialFeedbackAdjustmentDraft({ workspaceRoot: root, feedback: socialFeedback, targets: socialTarget.targets, targetEvidence: socialTarget.evidence, modelResult: { planning, patch: patchOutput }, provider: patchResult.provider || planningResult.provider || input.provider || '', model: patchResult.model || planningResult.model || '' });
         if (!draft.changes.length) {
           const result = { ...draft, status: 'no_change', saved: false, message: '未发现可安全融合到图文技能包的规则修改，不创建草案。' };
-          if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
+          harness.finish('completed'); if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
           else json(response, 200, result);
           return true;
         }
@@ -380,7 +384,7 @@ const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
       const strategy = buildWechatStrategyRecommendations({ snapshots: store.listContentFeedbackSnapshots({ limit: 100 }), columnPerformance: store.listColumnPerformance(), review: enrichWechatReview(store.getWechatReview()), accountContext });
       emitProgress({ type: 'progress', stage: 'planning', message: '第一阶段：AI 正在判断调整目标（thinking）…' });
       const planningMessages = buildFeedbackAdjustmentMessages({ feedback, strategy, accountContext, titleSkillId: titleSkillTarget.skillId, titleSkillEvidence: titleSkillTarget.evidence, writerSkillId: writerSkillHint, writerSkillCatalog });
-      const planningResult = await models.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
+      const planningResult = await harness.gateway.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-plan', jsonMode: true, thinking: true, maxOutputTokens: 5000, messages: [{ role: 'system', protected: true, content: planningMessages.system }, { role: 'user', protected: true, content: planningMessages.user }] });
       const planning = parseModelJson(planningResult, { store, label: '复盘调整目标判断' });
       const planningWriterSkillId = String(planning.selected_writer_skill_id || '');
       const hasInferenceEvidence = Number(feedback.linked_article_count || 0) >= 3 && Array.isArray(feedback.body_signals) && feedback.body_signals.length > 0;
@@ -391,20 +395,21 @@ const planMatch = pathname.match(/^\/api\/writing-material-plans\/(\d+)$/);
       const writerPath = selectedWriterSkillId ? (writerSkillCatalog.find((item) => item.id === selectedWriterSkillId)?.sourcePath || '') : '';
       emitProgress({ type: 'progress', stage: 'patch', message: '第二阶段：AI 正在生成原有规则的精确 diff（thinking）…' });
       const patchMessages = buildFeedbackAdjustmentPatchMessages({ feedback, strategy, accountContext, plan: planning, titleSkillId: titleSkillTarget.skillId, titleSkill: read(resolvedTitlePath), writerSkill: read(writerPath) });
-      const patchResult = await models.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
+      const patchResult = await harness.gateway.complete({ provider: input.provider, purpose: 'content-feedback-adjustment-patch', jsonMode: true, thinking: true, maxOutputTokens: 8000, messages: [{ role: 'system', protected: true, content: patchMessages.system }, { role: 'user', protected: true, content: patchMessages.user }] });
       const patchOutput = parseModelJson(patchResult, { store, label: '复盘调整精确修改' });
       emitProgress({ type: 'progress', stage: 'validate', message: '正在校验原文定位并保存草案…' });
       const draft = buildAdjustmentDraft({ workspaceRoot: root, feedback, strategy, accountContext, modelResult: { planning, patch: patchOutput }, titleSkillId: titleSkillTarget.skillId, titleSkillEvidence: titleSkillTarget.evidence, writerSkillId: writerSkillHint, provider: patchResult.provider || planningResult.provider || input.provider || '', model: patchResult.model || planningResult.model || '' });
       if (!draft.changes.length) {
         const result = { ...draft, status: 'no_change', saved: false, message: '未发现可安全融合到现有配置或技能的规则修改，不创建草案。' };
-        if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
+        harness.finish('completed'); if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: result.message, draft: result }); response.end(); }
         else json(response, 200, result);
         return true;
       }
       const saved = store.saveContentFeedbackAdjustmentDraft(draft);
-      if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: '草案已生成，请检查 diff。', draft: saved }); response.end(); }
+      harness.finish('completed'); if (streamProgress) { emitProgress({ type: 'complete', stage: 'complete', message: '草案已生成，请检查 diff。', draft: saved }); response.end(); }
       else json(response, 201, saved);
     } catch (error) {
+      harness?.finish('failed',error.message);
       if (streamProgress && response.headersSent) { emitProgress({ type: 'error', error: error.message, code: error.code || 'FEEDBACK_ADJUSTMENT_FAILED' }); response.end(); }
       else json(response, error.code === 'MODEL_JSON_INVALID' ? 422 : 400, { error: error.message, code: error.code || 'FEEDBACK_ADJUSTMENT_FAILED' });
     }

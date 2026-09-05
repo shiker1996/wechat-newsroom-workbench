@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
@@ -121,7 +122,7 @@ test('统一采集源服务规范化 Reddit 配置并支持启停与更新',t=>{
 });
 
 test('采集源页面保留旧入口并接入 Reddit、动态表单和统一 API',()=>{
-  const html=fs.readFileSync(path.resolve('public/index.html'),'utf8');const view=fs.readFileSync(path.resolve('public/src/views/subscriptions.js'),'utf8');const css=fs.readFileSync(path.resolve('public/styles.css'),'utf8');
+  const html=fs.readFileSync(path.resolve('public/index.html'),'utf8');const view=fs.readFileSync(path.resolve('public/src/views/subscriptions.js'),'utf8');const css=readStyles();
   assert.match(html,/option value="reddit"/);assert.match(html,/id="source-plugin-fields"/);assert.match(html,/id="source-status-filter"/);
   assert.match(css,/\.source-plugin-fields\{[^}]*background:#1f2927;[^}]*color:#edf2ef/);
   assert.match(css,/\.source-compose \.source-plugin-fields input[^}]*color:#edf2ef;[^}]*background:#26312f/);

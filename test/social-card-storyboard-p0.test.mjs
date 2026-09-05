@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -253,7 +254,7 @@ test('新增开源技术与趋势故事板复用事件图文输出契约',()=>{
 
 test('图文创作页以事实、故事板和交付三阶段组织主路径',()=>{
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-  const styles=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+  const styles=readStyles();
   assert.match(html,/class="social-flow-indicator"/);
   assert.match(html,/核对事实/);
   assert.match(html,/规划故事板/);

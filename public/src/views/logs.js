@@ -6,6 +6,8 @@ import { escapeHtml, formatDate, toast } from "../core/ui.js";
 
 let bound = false;
 let currentLogType;
+let currentLogQuery = "";
+let currentLogStatus = "";
 let logsPoller = null;
 function bindLogs() {
   if (bound) return;
@@ -23,6 +25,151 @@ function bindLogs() {
   document.getElementById("log-refresh").addEventListener("click", () => {
     loadLogs(currentLogType).then(() => toast("日志已刷新")).catch((error) => toast(error.message, "error"));
   });
+  document.getElementById("log-query")?.addEventListener("input", (event) => {
+    currentLogQuery = String(event.target.value || "").trim().toLowerCase();
+    loadLogs(currentLogType).catch((error) => toast(error.message, "error"));
+  });
+  document.getElementById("log-status")?.addEventListener("change", (event) => {
+    currentLogStatus = String(event.target.value || "");
+    loadLogs(currentLogType).catch((error) => toast(error.message, "error"));
+  });
+  document.getElementById("log-governance-save")?.addEventListener("click", () => saveLogGovernance().catch((error) => toast(error.message, "error")));
+  document.getElementById("log-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-run-trace]");
+    if (!button) return;
+    event.preventDefault();
+    openRunTrace(button.dataset.openRunTrace);
+  });
+  document.getElementById("close-run-trace")?.addEventListener("click", () => document.getElementById("run-trace-dialog")?.close());
+  document.getElementById("run-trace-dialog")?.addEventListener("close", () => document.getElementById("run-trace-actions")?.replaceChildren());
+}
+
+async function loadLogGovernance() {
+  const result = await request("/api/system/log-governance");
+  const config = result.governance || {};
+  const values = [["log-governance-model-limit", config.modelCallsLimit], ["log-governance-model-days", config.modelCallsDays], ["log-governance-tool-days", config.toolExecutionsDays]];
+  values.forEach(([id, value]) => { const input = document.getElementById(id); if (input && value != null) input.value = value; });
+  const archive = document.getElementById("log-governance-archive");
+  if (archive && config.archiveEnabled != null) archive.checked = config.archiveEnabled !== false;
+}
+
+async function saveLogGovernance() {
+  const read = (id) => Number(document.getElementById(id)?.value || 0);
+  const status = document.getElementById("log-governance-status");
+  const button = document.getElementById("log-governance-save");
+  button.disabled = true;
+  if (status) status.textContent = "正在保存并清理…";
+  try {
+    const result = await request("/api/system/log-governance", { method: "PUT", confirmation: "plugin-admin", body: JSON.stringify({ modelCallsLimit: read("log-governance-model-limit"), modelCallsDays: read("log-governance-model-days"), toolExecutionsDays: read("log-governance-tool-days"), archiveEnabled: Boolean(document.getElementById("log-governance-archive")?.checked), cleanup: true }) });
+    if (status) status.textContent = `已保存；清理模型 ${result.cleanup?.modelCalls ?? 0} 条、工具 ${result.cleanup?.toolExecutions ?? 0} 条${result.cleanup?.archived ? `，归档 ${result.cleanup.archived} 条` : ""}`;
+    toast("日志治理配置已保存");
+  } finally { button.disabled = false; }
+}
+
+function traceRows(items, render, empty = "暂无记录") {
+  if (!Array.isArray(items) || !items.length) return `<div class="run-trace-empty">${empty}</div>`;
+  return items.map(render).join("");
+}
+
+function renderTraceOverview(trace, metrics, runs) {
+  const overview = document.getElementById("run-trace-overview");
+  if (!overview) return;
+  const parts = [
+    ["system", "运行", runs.length],
+    ["context", "事件", trace.events?.length || 0],
+    ["model", "模型", trace.modelCalls?.length || 0],
+    ["tool", "工具", (trace.toolCalls?.length || 0) + (trace.toolExecutions?.length || 0)],
+    ["checkpoint", "检查点", trace.checkpoints?.length || 0],
+  ];
+  const total = Math.max(1, parts.reduce((sum, [, , count]) => sum + count, 0));
+  const segments = parts.map(([kind, label, count]) => `<span class="run-trace-segment ${kind}" style="--segment:${Math.max(3, Math.round(count / total * 100))}%" title="${escapeHtml(label)} ${escapeHtml(String(count))}"></span>`).join("");
+  const firstRun = runs[0] || {};
+  const status = String(firstRun.status || trace.status || "idle");
+  const statusLabel = status === "completed" ? "COMPLETED" : status === "running" || status === "testing" ? "RUNNING" : status.toUpperCase();
+  overview.innerHTML = `<div class="run-trace-overview-labels"><span>输入<br><b>TRACE</b></span><span>时间轴<br><b>${escapeHtml(statusLabel)}</b></span><span>输出<br><b>${escapeHtml(String(metrics.durationMs ?? 0))} ms</b></span></div><div class="run-trace-overview-main"><div class="run-trace-overview-bar">${segments}</div><div class="run-trace-overview-scale"><span>0 ms</span><span>${escapeHtml(String(metrics.durationMs ?? 0))} ms</span></div></div><div class="run-trace-overview-legend">${parts.map(([kind, label, count]) => `<span><i class="${kind}"></i>${escapeHtml(label)} ${escapeHtml(String(count))}</span>`).join("")}</div>`;
+}
+
+function renderRunTrace(trace, metrics, rootRunId) {
+  const summary = document.getElementById("run-trace-summary");
+  const content = document.getElementById("run-trace-content");
+  const runs = trace.runs || (trace.run ? [trace.run] : []);
+  renderTraceOverview(trace, metrics, runs);
+  const metricItems = [
+    ["Runs", metrics.runCount ?? runs.length], ["成功率", `${metrics.successRate ?? 0}%`],
+    ["耗时", `${metrics.durationMs ?? 0} ms`], ["模型调用", metrics.modelCalls ?? trace.modelCalls?.length ?? 0],
+    ["工具调用", metrics.toolCalls ?? trace.toolCalls?.length ?? 0], ["重试", `${metrics.retryRate ?? 0}%`],
+    ["门禁失败", metrics.gateFailures ?? 0],
+  ];
+  summary.innerHTML = metricItems.map(([label, value]) => `<span><b>${escapeHtml(String(value))}</b><small>${escapeHtml(label)}</small></span>`).join("");
+  document.getElementById("run-trace-title").textContent = `运行详情 · ${rootRunId}`;
+  document.getElementById("run-trace-subtitle").textContent = "按 Workflow → Stage → Skill → Model / Tool 展开持久化链路。";
+  const runSection = `<section class="run-trace-section trace-kind-system"><h3><i>SYS</i> Workflow / Agent Run <small>${runs.length}</small></h3><div class="run-trace-list">${traceRows(runs, (run) => `<article class="trace-row"><span class="trace-row-marker">SYS</span><div><b>${escapeHtml(run.entry_point || run.entryPoint || run.skill_id || run.skillId || run.id || "运行")}</b><span>${escapeHtml(run.status || "未知")} · ${escapeHtml(run.stage_id || run.stageId || "未分阶段")}</span></div><small>${escapeHtml(run.started_at || run.startedAt || "")}${run.finished_at ? ` → ${escapeHtml(run.finished_at)}` : ""}</small></article>`)}</div></section>`;
+  const eventSection = `<section class="run-trace-section trace-kind-context"><h3><i>CTX</i> 阶段事件 <small>${trace.events?.length || 0}</small></h3><div class="run-trace-list">${traceRows(trace.events, (item) => { const event = item.event || item; return `<article class="trace-row"><span class="trace-row-marker">CTX</span><div><b>${escapeHtml(event.type || "event")}</b><span>${escapeHtml(event.stageId || event.stage_id || "")}</span><small>${escapeHtml(event.message || event.error || item.created_at || "")}</small></div><time>${escapeHtml(item.created_at || event.created_at || "")}</time></article>`; })}</div></section>`;
+  const modelSection = `<section class="run-trace-section trace-kind-model"><h3><i>LLM</i> Model Call <small>${trace.modelCalls?.length || 0}</small></h3><div class="run-trace-list">${traceRows(trace.modelCalls, (call) => `<article class="trace-row"><span class="trace-row-marker">LLM</span><div><b>${escapeHtml(call.purpose || call.model || "模型调用")}</b><span>${escapeHtml([call.provider, call.model].filter(Boolean).join(" · "))} · ${escapeHtml(call.status || "")}</span><small>${call.latency_ms ?? 0} ms · prompt ${call.prompt_tokens ?? "—"} · completion ${call.completion_tokens ?? "—"}</small></div><time>${escapeHtml(call.created_at || "")}</time></article>`)}</div></section>`;
+  const toolSection = `<section class="run-trace-section trace-kind-tool"><h3><i>TOOL</i> Tool Call / Audit <small>${(trace.toolCalls?.length || 0) + (trace.toolExecutions?.length || 0)}</small></h3><div class="run-trace-list">${traceRows([...(trace.toolCalls || []), ...(trace.toolExecutions || [])], (call) => `<article class="trace-row"><span class="trace-row-marker">TOOL</span><div><b>${escapeHtml(call.capability || "工具调用")}</b><span>${escapeHtml(call.status || "")} · ${escapeHtml(call.plugin || call.plugin_version || "")}</span><small>${escapeHtml(call.side_effect || call.sideEffect || "none")} · ${escapeHtml(call.replay_policy || call.replayPolicy || "never")}</small></div><time>${escapeHtml(call.created_at || "")}</time></article>`)}</div></section>`;
+  const checkpointSection = `<section class="run-trace-section trace-kind-checkpoint"><h3><i>CKPT</i> Checkpoint <small>${trace.checkpoints?.length || 0}</small></h3><div class="run-trace-list">${traceRows(trace.checkpoints, (checkpoint) => `<article class="trace-row"><span class="trace-row-marker">SAVE</span><div><b>序号 ${escapeHtml(String(checkpoint.sequence ?? "—"))}</b><span>${checkpoint.state?.resumable ? "可恢复" : "不可恢复"}</span></div><time>${escapeHtml(checkpoint.created_at || "")}</time></article>`)}</div></section>`;
+  content.innerHTML = `${runSection}${eventSection}${modelSection}${toolSection}${checkpointSection}`;
+  const actions = document.getElementById("run-trace-actions");
+  if (actions) {
+    const active = (trace.runs || []).some((run) => ["running", "testing"].includes(run.status));
+    const resumable = Boolean(trace.resumable);
+    actions.innerHTML = `${active ? `<button type="button" class="ghost-button" data-run-action="cancel" data-run-id="${escapeHtml(rootRunId)}">取消运行</button>` : ""}${resumable ? `<button type="button" class="outline-button" data-run-action="resume" data-run-id="${escapeHtml(rootRunId)}">从 checkpoint 恢复</button>` : ""}${(trace.runs || []).some((run) => ["failed", "aborted", "limit"].includes(run.status)) ? `<button type="button" class="outline-button" data-run-action="retry" data-run-id="${escapeHtml(rootRunId)}">重试失败阶段</button>` : ""}<button type="button" class="text-button" data-trace-extra="replay" data-run-id="${escapeHtml(rootRunId)}">查看 Replay</button><button type="button" class="text-button" data-trace-extra="compare" data-run-id="${escapeHtml(rootRunId)}">对比另一次运行</button><span class="run-trace-action-note">恢复和重试会再次校验能力、权限与快照。</span>`;
+    actions.querySelectorAll("[data-run-action]").forEach((button) => button.addEventListener("click", () => runTraceAction(button.dataset.runAction, button.dataset.runId).catch((error) => toast(error.message, "error"))));
+    actions.querySelectorAll("[data-trace-extra]").forEach((button) => button.addEventListener("click", () => runTraceExtra(button.dataset.traceExtra, button.dataset.runId).catch((error) => toast(error.message, "error"))));
+  }
+}
+
+async function runTraceExtra(action, rootRunId) {
+  if (action === "replay") {
+    const fixture = await request(`/api/runs/${encodeURIComponent(rootRunId)}/replay`);
+    const section = document.createElement("section");
+    section.className = "run-trace-section run-trace-extra";
+    section.innerHTML = `<h3>Replay Fixture</h3><pre class="log-output">${escapeHtml(JSON.stringify(fixture, null, 2))}</pre>`;
+    document.getElementById("run-trace-content")?.prepend(section);
+    return;
+  }
+  const other = String(window.prompt("输入要对比的另一个 root Run ID", "") || "").trim();
+  if (!other) return;
+  const result = await request("/api/runs/compare", { method: "POST", body: JSON.stringify({ rootRunIds: [rootRunId, other] }) });
+  const comparison = result.comparison || {};
+  const section = document.createElement("section");
+  section.className = "run-trace-section run-trace-extra";
+  section.innerHTML = `<h3>运行对比 <small>${escapeHtml(other)}</small></h3><pre class="log-output">${escapeHtml(JSON.stringify(comparison, null, 2))}</pre>`;
+  document.getElementById("run-trace-content")?.prepend(section);
+}
+
+async function runTraceAction(action, rootRunId) {
+  if (action === "cancel" && !window.confirm("确认取消当前运行？已完成的步骤不会回滚。")) return;
+  const actions = document.getElementById("run-trace-actions");
+  actions?.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+  try {
+    const result = await request(`/api/runs/${encodeURIComponent(rootRunId)}/${action}`, { method: "POST", body: "{}" });
+    if (result?.code === "RUN_ENTRY_CONTEXT_REQUIRED") toast(`请从「${result.entryPoint || "原业务入口"}」提交恢复请求（resumeFrom=${result.resumeFrom}）`, "error");
+    else { toast(action === "cancel" ? "取消请求已提交" : `${action === "resume" ? "恢复" : "重试"}预检完成`); await openRunTrace(rootRunId); }
+  } catch (error) {
+    if (error.data?.code === "RUN_ENTRY_CONTEXT_REQUIRED") toast(`请从「${error.data.entryPoint || "原业务入口"}」提交恢复请求（resumeFrom=${error.data.resumeFrom}）`, "error");
+    else throw error;
+  } finally { actions?.querySelectorAll("button").forEach((button) => { button.disabled = false; }); }
+}
+
+async function openRunTrace(rootRunId) {
+  const id = String(rootRunId || "").trim();
+  if (!id) return;
+  const dialog = document.getElementById("run-trace-dialog");
+  document.getElementById("run-trace-title").textContent = `运行详情 · ${id}`;
+  document.getElementById("run-trace-subtitle").textContent = "正在加载持久化 Trace…";
+  document.getElementById("run-trace-overview")?.replaceChildren();
+  document.getElementById("run-trace-summary").replaceChildren();
+  document.getElementById("run-trace-actions")?.replaceChildren();
+  document.getElementById("run-trace-content").innerHTML = '<div class="empty-state">正在加载运行链路…</div>';
+  if (!dialog.open) dialog.showModal();
+  try {
+    const encoded = encodeURIComponent(id);
+    const [trace, metrics] = await Promise.all([request(`/api/runs/${encoded}`), request(`/api/runs/${encoded}/metrics`)]);
+    renderRunTrace(trace, metrics, id);
+  } catch (error) {
+    document.getElementById("run-trace-content").innerHTML = `<div class="empty-state">运行 Trace 加载失败：${escapeHtml(error.message || String(error))}</div>`;
+  }
 }
 
 function discussionOutputForDisplay(item) {
@@ -81,11 +228,16 @@ function renderModelDetail(item, logKey) {
 async function loadLogs(logType) {
   const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=${LOG_LIST_LIMIT}` : `?limit=${LOG_LIST_LIMIT}`;
   const logs = await request("/api/logs" + qs);
-  document.getElementById("log-count").textContent = logs.length + " 条";
+  const filteredLogs = logs.filter((item) => {
+    if (currentLogStatus && String(item.status || "") !== currentLogStatus) return false;
+    if (!currentLogQuery) return true;
+    return `${item.id || ""} ${item.root_run_id || ""} ${item.workflow_run_id || ""} ${item.stage_id || ""} ${item.subtype || ""} ${item.message || ""}`.toLowerCase().includes(currentLogQuery);
+  });
+  document.getElementById("log-count").textContent = filteredLogs.length === logs.length ? `${logs.length} 条` : `${filteredLogs.length} / ${logs.length} 条`;
   const list = document.getElementById("log-list");
   const expandedDetails = new Set([...list.querySelectorAll("details[data-log-detail][open]")].map((detail) => detail.dataset.logDetail));
-  list.innerHTML = logs.length
-    ? logs.map((item) => {
+  list.innerHTML = filteredLogs.length
+    ? filteredLogs.map((item) => {
         const ts = formatDate(item.ts, { year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false });
         const sc =
           item.status === "completed" || item.status === "ok" || item.status === "success" ? "ok"
@@ -99,9 +251,10 @@ async function loadLogs(logType) {
           : `<span>${escapeHtml(message)}</span>`;
         const logKey = `${item.log_type}:${item.id}`;
         const providerDisplay=item.log_type === "model" ? (item.provider_display || [item.provider,item.model].filter(Boolean).join(" · ")) : item.provider;
-        return `<article class="log-entry ${sc}"><div class="log-head"><span class="log-type-badge">${tl}</span><time>${escapeHtml(ts)}</time>${item.batch_id ? `<span class="log-batch">${escapeHtml(item.batch_id)}</span>` : ""}<span class="log-status status-pill ${sc}">${escapeHtml(item.status)}</span></div><div class="log-body"><code>${escapeHtml(item.subtype || "")}</code>${body}</div>${providerDisplay ? `<div class="log-meta"><span>${item.log_type === "model" ? "供应商 / 模型" : "服务商"}：${escapeHtml(providerDisplay)}</span></div>` : ""}${item.log_type === "model" ? renderModelDetail(item, logKey) : ""}</article>`;
+        const traceButton = item.root_run_id ? `<button type="button" class="inline-button log-trace-button" data-open-run-trace="${escapeHtml(item.root_run_id)}">查看 Run Trace</button>` : "";
+        return `<article class="log-entry ${sc}"><div class="log-head"><span class="log-type-badge">${tl}</span><time>${escapeHtml(ts)}</time>${item.batch_id ? `<span class="log-batch">${escapeHtml(item.batch_id)}</span>` : ""}<span class="log-status status-pill ${sc}">${escapeHtml(item.status)}</span></div><div class="log-body"><code>${escapeHtml(item.subtype || "")}</code>${body}</div>${providerDisplay ? `<div class="log-meta"><span>${item.log_type === "model" ? "供应商 / 模型" : "服务商"}：${escapeHtml(providerDisplay)}</span></div>` : ""}${traceButton ? `<div class="log-actions">${traceButton}</div>` : ""}${item.log_type === "model" ? renderModelDetail(item, logKey) : ""}</article>`;
       }).join("")
-    : '<div class="empty-state">暂无日志记录。</div>';
+    : `<div class="empty-state">${logs.length ? "没有符合当前筛选条件的日志。" : "暂无日志记录。"}</div>`;
   list.querySelectorAll("details[data-log-detail]").forEach((detail) => {
     detail.open = expandedDetails.has(detail.dataset.logDetail);
   });
@@ -120,5 +273,8 @@ function startLogsAutoRefresh() {
 export default async function loadLogsView() {
   bindLogs();
   startLogsAutoRefresh();
+  loadLogGovernance().catch(() => {});
   return loadLogs(currentLogType);
 }
+
+export { openRunTrace };

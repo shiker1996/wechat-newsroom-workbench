@@ -4,6 +4,8 @@
 
 - `GET /api/security/session`：建立当前进程内的本地会话并返回随机 CSRF token。
 - `POST /api/security/confirmation`：在 CSRF 校验通过后签发 60 秒、一次性、绑定操作类型的敏感操作确认 token。
+- `GET /api/system/log-governance`：读取模型调用和工具审计的留存配置。
+- `PUT /api/system/log-governance`：保存留存配置；可附带 `cleanup:true` 立即清理过期记录并将其压缩归档到 `data/audit-archive/`（需管理员确认）。字段为 `modelCallsLimit`、`modelCallsDays`、`toolExecutionsDays`、`archiveEnabled`。
 
 > 当前版本：0.5.x。本文是本地 REST/NDJSON 接口的完整路由参考，并由 `test/api-docs-routes.test.mjs` 与代码双向校验。面向用户的操作流程见 [详细使用手册](./docs/user-guide.md)，扩展契约见 [插件开发指南](./docs/plugin-development.md)。
 
@@ -13,6 +15,21 @@
 - `GET /api/system/capability-consumers`：返回全部消费者的清单及可用/降级/阻断关系统计（Agent / 技能 / 流水线功能三类；页面按类型分组，Agent 归属的运行时技能不单列）；feature 消费者携带 `purpose` 用途说明。
 - `GET /api/system/capability-consumers/:consumerId`：返回单个消费者的完整能力链路（声明、适配、技能授权、实现状态、不可用原因、已知缺口），只读且不含本地路径、allowedRoots 或凭据。技能消费者的 `runtimeSkillIds` 视为其自身，`skillAuthorizations` 返回自身的授权描述（editable/locked/whitelist/version）；feature 消费者的 `skillAuthorizations` 恒为空数组（无授权开关），详情顶层携带 `purpose` 用途说明，各行携带 `requirement`/`failurePolicy`/`triggerPolicy`/`resultPolicy`。
 - `GET /api/system/conversation-agent-runs?limit=100`：返回三类对话 Agent 的统一运行历史、关联工具调用，以及按入口和能力聚合的成功率、失败数和平均耗时；`estimatedCost` 在供应商未提供可审计费用时为 `null`。
+- `GET /api/system/conversation-agent-runs/:runId/trace?afterSequence=0&limit=500`：只读返回单次 Agent Run 的运行快照、持久化事件、步骤、模型调用、工具调用、Tool Audit、最近 checkpoint 和是否可恢复；Run、Model Audit、Tool Call 与 Tool Audit 共享 `rootRunId/workflowRunId/stageId` 关联字段，`afterSequence` 用于增量读取事件。
+- `POST /api/system/conversation-agent-runs/:runId/cancel`：取消当前仍在执行的 Agent Run；服务端通过活动运行控制器中止模型/工具信号，并将 Run 收束为 `aborted`。
+- `POST /api/system/skills/:id/test-run`：以 `test run` Scope 执行技能契约和必需能力前置检查，记录临时 Run/Trace；不改变生产配置、不授予未声明能力、不写入正式产物。
+- `POST /api/system/capabilities/:id/test`：对单项能力的登记状态和实现健康状态执行受控检查，不写入业务产物。
+- `GET /api/runs/:rootRunId` 或 `GET /api/system/runs/:rootRunId`：按根 Run 聚合 Workflow、Stage、Agent Run、事件、模型调用、工具调用和 checkpoint。
+- `GET /api/system/runs/:rootRunId/trace`：按系统路由别名返回同一份根 Run Trace。
+- `GET /api/runs/:rootRunId/events`、`/stages`、`/model-calls`、`/tool-calls`、`/artifacts`：按需读取根 Run 的单类 Trace 子资源；`/system/runs/:rootRunId/<resource>` 提供兼容别名。
+- `GET /api/runs/:rootRunId/metrics`：返回运行成功率、耗时、模型 token/延迟、工具成功率和阶段摘要。
+- `GET /api/runs/:rootRunId/replay`：生成脱敏的固定模型响应、工具结果摘要和 Skill Snapshot 引用，可用于离线回放；外部副作用不会被标记为可重放。
+- `POST /api/runs/compare`：正文 `{ "rootRunIds": ["left", "right"] }`，比较两次运行的输出 hash、耗时、token、模型/工具调用和成功率差异。
+- `POST /api/system/runs/compare`：比较接口的系统路由别名，正文与返回结构同上。
+- `POST /api/runs/:rootRunId/cancel`：取消根 Run 下仍在执行的 Agent Run。
+- `POST /api/runs/:rootRunId/resume`：恢复前重新校验 checkpoint、能力和快照；实际恢复需由原业务入口补齐输入上下文。
+- `POST /api/runs/:rootRunId/retry`：重试前重新校验失败阶段、能力和快照；实际重试需由原业务入口提交。
+- 三个对话恢复接口（编辑会、教程/经验、自定义图文）的请求体均可带 `resumeFrom`；服务端从该 Run 的最新可恢复 checkpoint 启动新 Run，并继承原 `generationSnapshotId` 与运行关联。
 - `GET /api/system/tools/:id/status-impact`：模拟停用普通工具后的能力阻断、降级和剩余候选。
 - `GET /api/system/collectors/:id/status-impact`：模拟停用采集器后的采集源影响。
 

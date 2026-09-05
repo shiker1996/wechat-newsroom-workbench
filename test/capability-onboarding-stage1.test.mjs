@@ -1,3 +1,4 @@
+import { readStyles } from "./style-fixture.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -97,7 +98,7 @@ test('R4：实现声明目录外能力时门禁输出 warning（不阻断）',(t
 test('页面：能力页签未登记分区与扩展工作室草案交互已接线',()=>{
   const skills=fs.readFileSync(path.join(projectRoot,'public','src','views','skills.js'),'utf8');
   const html=fs.readFileSync(path.join(projectRoot,'public','index.html'),'utf8');
-  const styles=fs.readFileSync(path.join(projectRoot,'public','styles.css'),'utf8');
+  const styles=readStyles(projectRoot);
   assert.match(skills,/capability-unregistered-head/);
   assert.match(skills,/未登记 · 仅调试/);
   assert.match(skills,/registered===false/);
