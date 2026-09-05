@@ -1,1 +1,29 @@
-{"schemaVersion":1,"id":"event-research-analyzer","name":"事件深度分析","version":"1.0.0","kind":"stage","entryPoints":["social-event"],"contentTypes":["event"],"inputContract":"event_fact_base_with_source_content","outputContract":"deep_event_fact_base","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "event-research-analyzer",
+  "name": "事件深度分析",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": [
+    "social-event"
+  ],
+  "contentTypes": [
+    "event"
+  ],
+  "inputContract": "event_fact_base_with_source_content",
+  "outputContract": "deep_event_fact_base",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

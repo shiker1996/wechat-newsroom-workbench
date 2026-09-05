@@ -1,1 +1,35 @@
-{"schemaVersion":1,"id":"xiaohongshu-article-generator","name":"图文生成与交付","version":"1.2.0","kind":"stage","entryPoints":["social-tool","social-custom","social-event"],"contentTypes":["repository","event","tutorial","list","opinion"],"inputContract":"social_card_storyboard","outputContract":"social_card_delivery","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "xiaohongshu-article-generator",
+  "name": "图文生成与交付",
+  "version": "1.2.0",
+  "kind": "stage",
+  "entryPoints": [
+    "social-tool",
+    "social-custom",
+    "social-event"
+  ],
+  "contentTypes": [
+    "repository",
+    "event",
+    "tutorial",
+    "list",
+    "opinion"
+  ],
+  "inputContract": "social_card_storyboard",
+  "outputContract": "social_card_delivery",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

@@ -8,6 +8,7 @@ import { dailyFocusOptions } from '../../../features/articles/index.mjs';
 import { isResearchEligibleHotspot } from '../../../features/research/index.mjs';
 import { respond, boundedLimit } from '../route-helpers.mjs';
 import { skipPipelineFailure, reopenPipelineFailure } from '../../../features/batches/index.mjs';
+import { createRequestHarnessGateway } from '../../skills/pipeline-runtime.mjs';
 
 export async function handleTaskRoutes({ request, response, pathname, searchParams, store, body, json, aiJobs, jobs, models, root, config,
   batchWorkdir, batchMaxAgeHours }) {
@@ -38,12 +39,16 @@ export async function handleTaskRoutes({ request, response, pathname, searchPara
     const input = await body(request); const batchId = decodeURIComponent(tagMatch[1]);
     const blocked=pipelineFailureGate(batchId,['collect'],'打标');if(blocked)return respond(json,response,409,blocked);
     if (input.background === true) return respond(json, response, 202, aiJobs.start({ batchId, provider: input.provider, type: input.force ? 'retag' : 'tag', force: Boolean(input.force) }));
-    const result = await tagBatch({ gateway: models, store, batchId, provider: input.provider, limit: input.limit, force: Boolean(input.force), maxAgeHours: batchMaxAgeHours(store.getBatch(batchId)), workspaceRoot: config.workspaceRoot });
+    const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'batch-tag-sync',skillId:'hotspot-tagging',provider:input.provider||models.config.defaultProvider,batchId,stageId:'tag'});
     try {
-      const cardResult = await ensureBatchEventCards({ gateway: models, store, batchId, provider: input.provider, workspaceRoot: config.workspaceRoot, maxAgeHours: batchMaxAgeHours(store.getBatch(batchId)), regenerate: Boolean(input.force) });
-      result.eventCards = { total: cardResult.total, generated: cardResult.generated, cached: cardResult.cached, failed: cardResult.failed.length };
-    } catch (error) { result.eventCards = { error: error.message }; }
-    return respond(json, response, 200, result);
+      const result = await tagBatch({ gateway: harness.gateway, store, batchId, provider: input.provider, limit: input.limit, force: Boolean(input.force), maxAgeHours: batchMaxAgeHours(store.getBatch(batchId)), workspaceRoot: config.workspaceRoot });
+      try {
+        const cardResult = await ensureBatchEventCards({ gateway: harness.gateway, store, batchId, provider: input.provider, workspaceRoot: config.workspaceRoot, maxAgeHours: batchMaxAgeHours(store.getBatch(batchId)), regenerate: Boolean(input.force) });
+        result.eventCards = { total: cardResult.total, generated: cardResult.generated, cached: cardResult.cached, failed: cardResult.failed.length };
+      } catch (error) { result.eventCards = { error: error.message }; }
+      harness.finish('completed');
+      return respond(json, response, 200, result);
+    } catch(error){ harness.finish('failed',error.message); throw error; }
   }
   const researchMatch = pathname.match(/^\/api\/batches\/([^/]+)\/ai\/research$/);
   if (researchMatch && request.method === 'POST') {

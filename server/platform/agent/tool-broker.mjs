@@ -26,10 +26,18 @@ async function bounded(operation, timeoutMs, signal) {
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
 }
 
-export async function executeBrokerTool(request, { registry, catalog, context = {}, resolveArguments = (value) => value, cacheLookup = null, onEvent = () => {} } = {}) {
+export async function executeBrokerTool(request, { registry, catalog, context = {}, preferences = {}, resolveArguments = (value) => value, cacheLookup = null, onEvent = () => {} } = {}) {
   const tool = catalog?.find((item) => item.capability === request.capability);
   if (!tool || (Array.isArray(context.allowedCapabilities) && !context.allowedCapabilities.includes(request.capability))) {
-    return toolError(request, 'CAPABILITY_NOT_VISIBLE', `当前对话未授权能力：${request.capability}`, false);
+    const result = toolError(request, 'CAPABILITY_NOT_VISIBLE', `当前对话未授权能力：${request.capability}`, false);
+    const executionLog = context.executionLog || createStoreExecutionLogger(context.store, context);
+    executionLog?.(createExecutionRecord({ capability: request.capability, plugin: null, version: null,
+      input: request.arguments, result: { ...result, error: { ...result.error, code: 'PERMISSION_DENIED' } },
+      startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), consumerId: context.consumerId || context.skillId || null,
+      agentRunId: context.agentRunId || null, agentToolCallId: context.agentToolCallId || null,
+      workflowRunId: context.workflowRunId || null, rootRunId: context.rootRunId || null, stageId: context.stageId || null,
+      sideEffect: 'none', replayPolicy: 'never' }));
+    return result;
   }
   const metadata = toolRuntimeMetadata(tool);
   const confirmed = Array.isArray(context.confirmedCapabilities) && context.confirmedCapabilities.includes(request.capability);
@@ -91,7 +99,7 @@ export async function executeBrokerTool(request, { registry, catalog, context = 
         else {
           if (typeof registry?.execute !== 'function') return toolError(request, 'TOOL_DEPENDENCY_MISSING', '缺少工具注册表', false);
           registryStarted = true;
-          raw = await registry.execute(request.capability, args, executionContext);
+          raw = await registry.execute(request.capability, args, executionContext, preferences);
         }
       }
       if (raw?.status !== 'ok') return raw?.status === 'error' ? normalizeError(request, raw.error) : toolError(request, 'TOOL_OUTPUT_INVALID', '工具未返回标准状态', false);

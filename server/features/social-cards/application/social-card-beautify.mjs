@@ -131,6 +131,19 @@ function canonicalAiVisualWorkspaceFiles(factFile) {
   return ['card-plan.json', 'ai-visual-card-plan.json', factFile, 'social-theme-snapshot.json', 'social-theme-design-spec.md', 'copy.txt'];
 }
 
+function findActiveDocumentWriteSessionId(targetPath) {
+  const stateDir = path.join(path.dirname(targetPath), '.ai-visual-document-writer');
+  if (!fs.existsSync(stateDir)) return '';
+  const states = fs.readdirSync(stateDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+    .map((entry) => {
+      try { return JSON.parse(fs.readFileSync(path.join(stateDir, entry.name), 'utf8')); } catch { return null; }
+    })
+    .filter((state) => state?.status === 'active' && state.targetPath === targetPath && state.sessionId);
+  states.sort((left, right) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')));
+  return String(states[0]?.sessionId || '');
+}
+
 export function buildAiVisualThemeSnapshot(snapshot = {}) {
   const output = structuredClone(snapshot && typeof snapshot === 'object' ? snapshot : {});
   const themeMetrics = output?.capacityProfile?.theme;
@@ -613,7 +626,7 @@ function aiVisualDocumentWriteCatalogItem(registry) {
   };
 }
 
-export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, rootRunId = null, workflowRunId = null, onProgress = () => {}, onEvent = () => {}, styleBrief = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
+export async function runSocialCardBeautify({ gateway, store, batchId, candidateId, provider, workspaceRoot, rootRunId = null, workflowRunId = null, onProgress = () => {}, onEvent = () => {}, styleBrief = '', resumeFrom = '', enableAiVisualScreenshots = ENABLE_AI_VISUAL_SCREENSHOTS, enableAiVisualDeliveryGate = ENABLE_AI_VISUAL_DELIVERY_GATE }) {
   const aiVisualScreenshotsEnabled = enableAiVisualScreenshots === true;
   const aiVisualDeliveryGateEnabled = enableAiVisualDeliveryGate === true;
   const batch = store.getBatch(batchId);
@@ -680,12 +693,16 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
   writeFile(themeSpecCandidatePath, themeSpec.text);
   const htmlPath = path.join(workdir, SOCIAL_CARD_BEAUTIFY_HTML);
   const outputDir = path.join(workdir, SOCIAL_CARD_BEAUTIFY_OUTPUT);
-  // 新一轮 AI 视觉生成开始前清理旧 PNG 和旧运行报告，避免人工看到上一轮残留结果。
-  fs.rmSync(outputDir, { recursive: true, force: true });
-  for (const staleReport of [path.join(workdir, SOCIAL_CARD_BEAUTIFY_REPORT)]) {
-    fs.rmSync(staleReport, { force: true });
+  // 重试是新一轮生成，需要清理旧产物；恢复必须保留文档写入会话和已有
+  // HTML，才能从 checkpoint 的下一步继续追加。
+  const resuming = Boolean(String(resumeFrom || '').trim());
+  if (!resuming) {
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    for (const staleReport of [path.join(workdir, SOCIAL_CARD_BEAUTIFY_REPORT)]) {
+      fs.rmSync(staleReport, { force: true });
+    }
+    writeFile(htmlPath, aiHtmlScaffold(context));
   }
-  writeFile(htmlPath, aiHtmlScaffold(context));
 
   const resources = new Map();
   registerProjectResource(resources, workdir);
@@ -795,7 +812,11 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
     metadata: { agentEntryPoint: 'social-card-ai-visual-generation', auditToolsVisible: false },
   });
   let generationAgent;
-  const documentWriteSessionId = createAiVisualDocumentWriteSessionId(batchId, candidateId);
+  const existingSessionId = resuming ? findActiveDocumentWriteSessionId(htmlPath) : '';
+  if (resuming && !existingSessionId && fs.existsSync(htmlPath) && fs.statSync(htmlPath).size > 0) {
+    throw new Error('AI 视觉恢复找不到原有文档写入会话，无法安全继续；请使用重试重新生成');
+  }
+  const documentWriteSessionId = existingSessionId || createAiVisualDocumentWriteSessionId(batchId, candidateId);
   try {
     generationAgent = await runSocialCardAiVisualGenerationAgent({
       gateway,
@@ -811,6 +832,7 @@ export async function runSocialCardBeautify({ gateway, store, batchId, candidate
       requiredPageCount: context.requiredPageCount,
       getPageCount: () => htmlPageCount(fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : ''),
       documentWriteSessionId,
+      resumeFrom: resuming ? String(resumeFrom) : '',
       resolveArguments: resolveAiArguments,
       sanitizeToolResult: (toolResult, request) => sanitizeCapabilityResult(toolResult, request),
       toolContext: { batchId, candidateId, rootRunId, workflowRunId, stageId: 'social-card-ai-visual-generation', skillId: AI_VISUAL_SKILL_NAME, provider: providerId, workspaceRoot, allowedRoots: [workdir], allowedCapabilities: [SOCIAL_CARD_PROJECT_READ_CAPABILITY, AI_VISUAL_DOCUMENT_WRITE] },

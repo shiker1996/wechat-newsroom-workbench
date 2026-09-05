@@ -75,7 +75,7 @@ function requirePluginAdmin(request){
 export async function handleSystemRoutes(context) {
   const {
     request, response, pathname, searchParams, root, config, store,
-    json, body, binaryBody, createWorkbenchBackup, models,
+    json, body, binaryBody, createWorkbenchBackup, models, aiJobs,
   } = context;
   const extensionSettingRepository=store?.repositories?.extensionSettings||{
     get:()=>null,save:()=>{throw new Error('扩展配置仓储不可用');},list:()=>[],
@@ -205,8 +205,41 @@ export async function handleSystemRoutes(context) {
     const candidates = (trace.runs || []).filter((run) => run.status !== 'completed');
     const target = action === 'resume'
       ? candidates.find((run) => (trace.checkpoints || []).some((checkpoint) => checkpoint.agent_run_id === run.id && checkpoint.state?.resumable))
-      : candidates.find((run) => run.status === 'failed' || run.status === 'aborted' || run.status === 'limit');
+      : candidates.find((run) => run.status === 'failed' || run.status === 'aborted' || run.status === 'interrupted' || run.status === 'limit');
     if (!target) { json(response, 409, { error: action === 'resume' ? '没有可恢复的 checkpoint' : '没有可重试的失败阶段', code: action === 'resume' ? 'RESUME_NOT_AVAILABLE' : 'RETRY_NOT_AVAILABLE' }); return true; }
+    // Job 根 Run 保留了原批次/候选和任务类型，可以安全地重新入队。
+    // 恢复时把选中的 Agent Run 作为 resumeFrom 传回原任务处理器；重试则
+    // 不带 checkpoint，从任务入口重新执行。其它业务入口仍必须带回原始
+    // 输入和副作用回调，不能由通用路由猜测。
+    const batchRoot = (trace.runs || []).find((run) => String(run.id) === rootRunId);
+    if (aiJobs && batchRoot && String(batchRoot.entry_point || '').startsWith('batch-job:')) {
+      const type = String(batchRoot.entry_point).slice('batch-job:'.length);
+      const previous = aiJobs.get?.(rootRunId.replace(/^job:/, ''));
+      const options = previous?.runOptions || {};
+      try {
+        const restarted = aiJobs.start({
+          batchId: batchRoot.batch_id,
+          candidateId: batchRoot.candidate_row_id ?? options.candidateId ?? null,
+          provider: previous?.requestedProvider || previous?.provider || batchRoot.provider || null,
+          type,
+          force: Boolean(options.force),
+          documentKind: options.documentKind ?? null,
+          theme: previous?.theme,
+          mode: previous?.mode || options.mode || 'standard',
+          focus: options.focus ?? null,
+          focuses: Array.isArray(options.focuses) ? options.focuses : [],
+          snapshotId: previous?.snapshotId || null,
+          skillSelection: previous?.skillSelection || null,
+          stageSelections: previous?.stageSelections || null,
+          styleBrief: options.styleBrief || '',
+          ...(action === 'resume' ? { resumeFrom: target.id } : {}),
+        });
+        json(response, 202, { ...restarted, action, sourceRunId: rootRunId, newRootRunId: `job:${restarted.id}`, ...(action === 'resume' ? { resumedFrom: target.id, resumed: true } : {}), requeued: true });
+      } catch (error) {
+        json(response, 409, { error: `任务重新入队失败：${error.message}`, code: 'RUN_REQUEUE_FAILED', action, rootRunId, targetRunId: target.id });
+      }
+      return true;
+    }
     const required = target.allowedCapabilities || [];
     const graph = await capabilityGraph();
     const blockedCapabilities = required.filter((capability) => {

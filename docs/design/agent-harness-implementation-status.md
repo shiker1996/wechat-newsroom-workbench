@@ -146,3 +146,25 @@ Run Trace 增加取消、恢复预检和失败阶段重试入口。恢复与重�
 
 随后推进 P1：根 Run Trace 增加 events、stages、model-calls、tool-calls、artifacts 独立查询，并按 Run 的批次/候选关联产物；
 Trace 弹窗接入 Replay Fixture、两次 Run Compare 和治理操作；日志页增加模型调用条数、模型留存天数、工具审计留存天数配置及立即清理入口。
+
+## 第六次交付：P0 边界收口与 P1 产物关联
+
+同步批次打标、文章草稿入口和 pipeline-failure-retry 已统一通过 Harness Gateway 执行；确定性信息、图表、仓库和本地项目能力也经 Tool Broker 统一完成授权、超时、输出校验与审计。新增能力边界静态检查覆盖同步入口、文章入口和失败重试入口，避免业务层重新直接持有原始 Gateway。
+
+全部内置技能清单现在显式声明 `runtimeKind`、正数 `budget` 和 `gates`；具备会话 Agent 入口的技能同时声明 Agent 预算。文章、日报、教程、排版和社交卡生产管线写入产物时携带 `rootRunId`、`workflowRunId` 和阶段标识，Run Trace 可按批次/候选或运行关联字段聚合这些产物。数据库保持 v43 兼容，存量库启动时幂等补齐产物关联列。
+
+Run Trace 详情页补齐事件标签、时间线和模型调用详情的样式覆盖，模型调用页支持搜索、状态筛选和详情展开。全量回归：`npm test` 1675 项通过，0 失败、0 取消。
+
+## 第七次交付：Workflow 阶段 checkpoint 恢复
+
+`stage-skill` 阶段现在在开始、完成、失败和中断时写入 checkpoint。失败或中断阶段标记为
+`resumable`，调用方可将该阶段 Run ID 作为 `resumeFrom` 传回 `runPipelineStage`；Harness
+会重新校验快照、能力和恢复租约，创建新的子 Run，从该阶段重新执行，并继承
+`rootRunId/workflowRunId`，保留原失败 Run 供审计。成功 checkpoint 不可重复恢复，恢复租约
+在成功、失败和状态恢复异常时都会释放。
+
+日志页的恢复/重试按钮会先执行安全预检。对于保留批次、候选和任务类型的 `batch-job:*` 根 Run，
+重试和恢复都可以直接重新入队原 AI Job；恢复会把选中的 Agent Run ID 作为 `resumeFrom` 传入，
+前端收到新的根 Run ID 后在当前 Trace 对话框中自动切换。其它业务入口由于无法凭 Run ID 重建文章、日报或图文等
+业务输入及副作用回调，仍返回原业务入口、`resumeFrom` 和快照 ID，由调用方提交这些上下文。
+对话 Agent 入口已经支持请求体 `resumeFrom`，Pipeline 调用方可直接传入该参数。

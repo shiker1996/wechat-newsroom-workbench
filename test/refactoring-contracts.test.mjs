@@ -87,7 +87,7 @@ test('refactoring baseline: extracted route handlers keep the HTTP delegation co
     data: {
       providers: [],
       defaultProvider: 'test',
-      calls: [{ limit: 50 }],
+      calls: [{ limit: 150 }],
     },
   }]);
 

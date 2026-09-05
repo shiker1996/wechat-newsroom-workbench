@@ -1,1 +1,29 @@
-{"schemaVersion":1,"id":"open-source-trend-storyboard","name":"开源趋势图文故事板","version":"1.2.0","kind":"storyboard","entryPoints":["social-event"],"contentTypes":["event"],"inputContract":"social_card_fact_base","outputContract":"social_card_storyboard","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "open-source-trend-storyboard",
+  "name": "开源趋势图文故事板",
+  "version": "1.2.0",
+  "kind": "storyboard",
+  "entryPoints": [
+    "social-event"
+  ],
+  "contentTypes": [
+    "event"
+  ],
+  "inputContract": "social_card_fact_base",
+  "outputContract": "social_card_storyboard",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

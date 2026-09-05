@@ -31,9 +31,9 @@ function writeFile(filePath, content) {
   return fs.statSync(filePath);
 }
 
-function addArtifact(store, batchId, kind, name, filePath) {
+function addArtifact(store, batchId, kind, name, filePath, trace = {}) {
   const stat = fs.statSync(filePath);
-  store.upsertArtifact({ batchId, kind, name, path: filePath, size: stat.size, modifiedAt: stat.mtime.toISOString() });
+  store.upsertArtifact({ batchId, kind, name, path: filePath, size: stat.size, modifiedAt: stat.mtime.toISOString(), rootRunId: trace.rootRunId ?? null, workflowRunId: trace.workflowRunId ?? null, stageId: trace.stageId ?? null });
 }
 
 function parseJson(result, store) {
@@ -136,7 +136,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   await runScript(skillScript(skills['wechat-md-render'], 'scripts', 'md-render.js'), [finalPath, renderedPath], workdir);
   if (!fs.readFileSync(renderedPath, 'utf8').trim()) throw new Error('预渲染结果为空');
   record('rendered', 'wechat-md-render', renderedPath);
-  addArtifact(store, batchId, '预渲染文章', path.basename(renderedPath), renderedPath);
+  addArtifact(store, batchId, '预渲染文章', path.basename(renderedPath), renderedPath, { rootRunId, workflowRunId, stageId: 'rendered' });
 
   const providerConfig = typesetRuntime.providerConfig;
   onProgress('排版 2/6：按总契约执行 magazine-design-advisor');
@@ -159,9 +159,9 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   const articleRenderTokens={...compiledTheme.tokens,...htmlTokens,colors:{...(htmlTokens.colors||{}),...themeColors},theme,themeDefinition};
   writeFile(chartTokensPath, JSON.stringify({ ...htmlTokens, colors:{ ...(htmlTokens.colors || {}), ...chartThemeColors }, theme, themeVersion:themeDefinition.version, themeHash:themeDefinition.hash }, null, 2));
   record('design', 'magazine-design-advisor', `${schemePath};${tokensPath}`);
-  addArtifact(store, batchId, '杂志设计方案', path.basename(schemePath), schemePath);
-  addArtifact(store, batchId, '杂志设计 Tokens', path.basename(tokensPath), tokensPath);
-  addArtifact(store, batchId, '文章主题快照', path.basename(themeSnapshotPath), themeSnapshotPath);
+  addArtifact(store, batchId, '杂志设计方案', path.basename(schemePath), schemePath, { rootRunId, workflowRunId, stageId: 'design' });
+  addArtifact(store, batchId, '杂志设计 Tokens', path.basename(tokensPath), tokensPath, { rootRunId, workflowRunId, stageId: 'design' });
+  addArtifact(store, batchId, '文章主题快照', path.basename(themeSnapshotPath), themeSnapshotPath, { rootRunId, workflowRunId, stageId: 'design' });
 
   const rendered = fs.readFileSync(renderedPath, 'utf8');
   onProgress('排版 3/6：按总契约处理图片和显式视觉模块');
@@ -196,7 +196,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
       await uploadImageToCdn(workdir, item.id, { authorizedExternalWrite:true, allowedCapabilities:typesetRuntime.allowedCapabilities,
         store,batchId,candidateId,generationSnapshotId:typesetRuntime.snapshotId,skillId:'wechat-article-typeset',rootRunId,workflowRunId,stageId });
     }
-    addArtifact(store, batchId, `${label} 转图文章`, path.basename(chartPath), chartPath);
+    addArtifact(store, batchId, `${label} 转图文章`, path.basename(chartPath), chartPath, { rootRunId, workflowRunId, stageId: 'images' });
     chartNotes.push(`${label} ${chartReport.converted} 张${pendingUploads.length ? '（已重新上传 CDN）' : '（内容未变，复用 CDN）'}`);
   }
   // 统计卡/时间线与 Mermaid/ECharts 走同一条排版期生成链：每次排版都按当前主题
@@ -226,9 +226,9 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   if (imageResult.unresolved.length) throw new Error(`配图尚未就绪：${imageResult.unresolved.join('、')}，请先提供图片并上传 CDN`);
   const imagesPath = path.join(workdir, '09-FINAL.images.md');
   writeFile(imagesPath, imageResult.content);
-  addArtifact(store, batchId, '图片就绪文章', path.basename(imagesPath), imagesPath);
+  addArtifact(store, batchId, '图片就绪文章', path.basename(imagesPath), imagesPath, { rootRunId, workflowRunId, stageId: 'images' });
   const manifestPath = imageManifestFile(workdir);
-  if (fs.existsSync(manifestPath)) addArtifact(store, batchId, '配图资产清单', path.basename(manifestPath), manifestPath);
+  if (fs.existsSync(manifestPath)) addArtifact(store, batchId, '配图资产清单', path.basename(manifestPath), manifestPath, { rootRunId, workflowRunId, stageId: 'images' });
   record('images', 'wechat-article-typeset', imagesPath, 'completed', chartNotes.length ? `显式视觉模块已转图并使用 CDN 地址：${chartNotes.join('、')}` : '最终 HTML 图片均已取得可公开访问的 HTTPS 地址');
 
   onProgress('排版 4/6：按总契约执行 wechat-md-to-draft');
@@ -260,7 +260,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   }
   if (!htmlPreservesStructure(imageResult.content, fs.readFileSync(draftHtml, 'utf8'))) throw new Error('HTML 初稿未完整保留标题、章节、链接或图片');
   record('draft', 'wechat-md-to-draft', draftHtml, 'completed', draftDetail);
-  addArtifact(store, batchId, 'HTML 初稿', path.basename(draftHtml), draftHtml);
+  addArtifact(store, batchId, 'HTML 初稿', path.basename(draftHtml), draftHtml, { rootRunId, workflowRunId, stageId: 'draft' });
 
   onProgress('排版 5/6：按总契约执行 wechat-html-normalizer');
   const finalHtml = path.join(workdir, 'article.ai.html');
@@ -280,7 +280,7 @@ export async function runTypesetPipeline({ gateway, store, batchId, candidateId,
   try { gateResult = JSON.parse(gate.stdout.trim().split(/\r?\n/).at(-1)); } catch { throw new Error(`无法解析排版门禁结果：${gate.stdout}`); }
   if (!gateResult.valid) throw new Error(`排版门禁未通过：${(gateResult.issues || []).join('、')}`);
   record('gate', 'wechat-html-check-no-div', finalHtml, 'completed', JSON.stringify(gateResult));
-  addArtifact(store, batchId, '门禁后 HTML', path.basename(finalHtml), finalHtml);
+  addArtifact(store, batchId, '门禁后 HTML', path.basename(finalHtml), finalHtml, { rootRunId, workflowRunId, stageId: 'gate' });
 
   if (stages.length !== TYPESET_STAGE_CONTRACT.length) throw new Error('排版契约未完整执行');
   onProgress('排版完成：article.ai.html 已生成并通过门禁');

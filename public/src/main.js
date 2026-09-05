@@ -14,7 +14,7 @@ const viewModules = {
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
   system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
   themes: "./views/theme-manager.js",
-  models: "./views/models.js", logs: "./views/logs.js?v=20260905-runtrace",
+  models: "./views/models.js?v=20260905-model-calls8", logs: "./views/logs.js?v=20260905-runtrace-models23",
   calendar: "./views/calendar.js",
   "material-inbox": "./views/material-inbox.js", "wechat-review-prep": "./views/wechat-review-prep.js", "wechat-review": "./views/wechat-review.js", "content-feedback": "./views/content-feedback.js",
 };
@@ -22,7 +22,7 @@ const viewModules = {
 // 三个导航入口共用同一视图 DOM：工具图文 / 自定义图文 / 事件图文都落在 #view-social-editor
 const viewSectionAliases = { "social-custom": "view-social-editor", "social-event": "view-social-editor" };
 
-const styleVersion = "20260905-css-split-8";
+const styleVersion = "20260905-css-split-20";
 const styleModules = {
   social: "/assets/styles/social.css",
   topics: "/assets/styles/topics.css",
@@ -99,7 +99,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260831-wechat-feedback-page-1";
+const moduleVersion = "20260905-runtrace-models23";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",

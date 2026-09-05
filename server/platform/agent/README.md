@@ -37,7 +37,8 @@ definition.requiredCapabilities 不满足时在模型执行前失败。
 
 指定 snapshotId 默认从 Store 读取并验证任务、候选、技能及入口归属；
 仍支持 context.resolveSnapshot 注入已解析快照。复用快照会创建新的 Run，
-不会从 checkpoint 继续执行。历史模型、工具或门禁版本不可用时拒绝替换。
+历史模型、工具或门禁版本不可用时拒绝替换。checkpoint 是另一条恢复路径：
+会话 Agent 从工具组完成后的步骤继续，Workflow 的 stage-skill 从失败或中断的阶段重新执行。
 
 ## Tool Broker 与 Skill 定义
 
@@ -91,6 +92,9 @@ checkpoint 包含本次消息、待处理模型响应、预算计数和调用指
 `stage-skill` Facade 执行，Workflow 仍控制阶段顺序和领域门禁。每次阶段模型调用会创建
 独立 Agent Run，并携带 `rootRunId/workflowRunId/stageId/generationSnapshotId` 写入模型审计。
 `AiJobManager` 同时为每个批次 Job 建立 `batch-job:<type>` Run，页面继续读取兼容的 `ai_runs`。
+stage-skill 在开始、成功和失败/中断时保存阶段 checkpoint；调用方可将失败阶段 Run ID
+作为 `resumeFrom` 传回 `runPipelineStage`，恢复会继承原 Run 的快照和关联，并以新的子 Run
+执行阶段，避免覆盖原始失败记录。
 
 模型审计写入前经过 `audit-governance.mjs` 的敏感字段脱敏和长度截断；实时事件仍走 NDJSON，
 数据库只保留可排查的文本摘要，避免把凭据、超长 reasoning 或完整工具 payload 扩散到日志查询。

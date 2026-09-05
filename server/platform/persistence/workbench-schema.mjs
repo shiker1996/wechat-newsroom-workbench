@@ -151,6 +151,10 @@ export function applyWorkbenchSchema(db) {
         size INTEGER NOT NULL DEFAULT 0,
         modified_at TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'ready',
+        agent_run_id TEXT,
+        root_run_id TEXT,
+        workflow_run_id TEXT,
+        stage_id TEXT,
         FOREIGN KEY(batch_id) REFERENCES batches(id) ON DELETE SET NULL
       );
       CREATE TABLE IF NOT EXISTS candidates (

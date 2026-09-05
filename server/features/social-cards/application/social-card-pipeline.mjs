@@ -74,9 +74,9 @@ function writeFile(filePath, content) {
   return fs.statSync(filePath);
 }
 
-function addArtifact(store, batchId, candidateId, kind, filePath) {
+function addArtifact(store, batchId, candidateId, kind, filePath, trace = {}) {
   const stat = fs.statSync(filePath);
-  store.upsertArtifact({ batchId, candidateId, track:'social_cards', kind, name:path.basename(filePath), path:filePath, size:stat.size, modifiedAt:stat.mtime.toISOString() });
+  store.upsertArtifact({ batchId, candidateId, track:'social_cards', kind, name:path.basename(filePath), path:filePath, size:stat.size, modifiedAt:stat.mtime.toISOString(), rootRunId: trace.rootRunId ?? null, workflowRunId: trace.workflowRunId ?? null, stageId: trace.stageId ?? null });
 }
 
 export async function runAudit(script, htmlPath, reportPath, cwd, { page = null } = {}) {
@@ -612,14 +612,14 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
     writeFile(failureReportPath, JSON.stringify(failurePayload, null, 2));
     persistPlanBaseline();
     persistTemplateMetrics();
-    addArtifact(store,batchId,candidateId,'图文模板初始布局审计',initialReportPath);
-    addArtifact(store,batchId,candidateId,'图文布局审计',reportPath);
-    addArtifact(store,batchId,candidateId,'图文内容原子快照',contentAtomsPath);
-    addArtifact(store,batchId,candidateId,'图文内容计划调整记录',contentPlanAdjustmentsPath);
-    addArtifact(store,batchId,candidateId,'图文内容计划基线',planBaselinePath);
-    addArtifact(store,batchId,candidateId,'图文联合装箱审计',jointPackingAuditPath);
-    addArtifact(store,batchId,candidateId,'图文模板指标',templateMetricsPath);
-    addArtifact(store,batchId,candidateId,'图文模板严格失败报告',failureReportPath);
+    addArtifact(store,batchId,candidateId,'图文模板初始布局审计',initialReportPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文布局审计',reportPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文内容原子快照',contentAtomsPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文内容计划调整记录',contentPlanAdjustmentsPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文内容计划基线',planBaselinePath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文联合装箱审计',jointPackingAuditPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文模板指标',templateMetricsPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+    addArtifact(store,batchId,candidateId,'图文模板严格失败报告',failureReportPath,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
     throw new Error(message);
   };
   // 阶段 0：先落一份不含正文的计划基线，后续每次审计/修复都会覆盖更新。
@@ -1173,8 +1173,8 @@ export async function runSocialCardPipeline({ gateway, store, batchId, candidate
   if (!delivery.valid) throw new Error(`图文交付门禁未通过：${delivery.issues.join('；')}`);
   record('delivery-gate', 'fixed-program', deliveryPath);
 
-  for (const [kind, file] of [['图文事实清单',factPath],['图文事实候选索引',factIndexPath],['图文原始卡片规划',originalPlanPath],['图文卡片重排记录',reflowPath],['图文内容原子快照',contentAtomsPath],['图文内容计划调整记录',contentPlanAdjustmentsPath],['图文内容计划基线',planBaselinePath],['图文联合装箱审计',jointPackingAuditPath],['图文卡片规划',planPath],['图文配套文案',copyPath],['图文设计 HTML',htmlPath],['图文初始布局审计',initialReportPath],['图文布局审计',reportPath],['图文交付报告',deliveryPath],['图文主题快照',themeSnapshotPath],['图文模板指标',templateMetricsPath]]) addArtifact(store,batchId,candidateId,kind,file);
-  for (const image of images) addArtifact(store,batchId,candidateId,'图文卡片 PNG',image);
+  for (const [kind, file] of [['图文事实清单',factPath],['图文事实候选索引',factIndexPath],['图文原始卡片规划',originalPlanPath],['图文卡片重排记录',reflowPath],['图文内容原子快照',contentAtomsPath],['图文内容计划调整记录',contentPlanAdjustmentsPath],['图文内容计划基线',planBaselinePath],['图文联合装箱审计',jointPackingAuditPath],['图文卡片规划',planPath],['图文配套文案',copyPath],['图文设计 HTML',htmlPath],['图文初始布局审计',initialReportPath],['图文布局审计',reportPath],['图文交付报告',deliveryPath],['图文主题快照',themeSnapshotPath],['图文模板指标',templateMetricsPath]]) addArtifact(store,batchId,candidateId,kind,file,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
+  for (const image of images) addArtifact(store,batchId,candidateId,'图文卡片 PNG',image,{rootRunId,workflowRunId,stageId:'social-card-pipeline'});
   store.updateCandidateTrack(candidateId, 'social_cards', { status:'completed' });
   onProgress(`图文 6/6：完成，共生成 ${images.length} 张卡片`);
   return { workdir, copy:copyPath, html:htmlPath, layoutReport:reportPath, deliveryReport:deliveryPath, templateMetrics:templateMetricsPath, contentPlanAdjustments:contentPlanAdjustmentsPath, jointPackingAudit:jointPackingAuditPath, theme:{id:themeDefinition.id,version:themeDefinition.version,hash:themeDefinition.hash}, themeRouting, template:{pack:templateCompatibility.templatePack,source:templateCompatibility.source,fallback:templateCompatibility.fallback,warnings:templateCompatibility.warnings,capacityProfileVersion:templateCapabilities.capacityProfileVersion,capacityProfile:templateCapabilities.capacityProfile,rolloutProfile}, pageBudget, themeSnapshot:themeSnapshotPath, images, pageCount:images.length };

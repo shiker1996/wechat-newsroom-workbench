@@ -28,13 +28,14 @@ export function bindGenerationSnapshot(gateway, generationSnapshotId) {
 export async function runPipelineStage({ gateway, store, batchId = null, candidateId = null, provider = null,
   purpose, skillId = purpose, entryPoint = 'pipeline', stageId = purpose, input = null, messages = [],
   maxOutputTokens, jsonMode = false, thinking = undefined, temperature = undefined, rootRunId = null, workflowRunId = null, parentRunId = null,
-  generationSnapshotId = null, signal = null, definition = null, onRunCreated = null }) {
+  generationSnapshotId = null, signal = null, definition = null, onRunCreated = null, resumeFrom = null, resumeLeaseMs = null }) {
   if (!purpose || typeof gateway?.complete !== 'function') throw new Error('Pipeline stage 缺少 purpose 或 LLM Gateway');
   const stageDefinition = definition || { id: String(skillId), kind: 'stage-skill', entryPoints: [entryPoint] };
   return runSkill({
     skillId: String(skillId), entryPoint, input,
     definition: stageDefinition,
     signal,
+    ...(resumeFrom ? { resumeFrom: String(resumeFrom), ...(resumeLeaseMs ? { resumeLeaseMs } : {}) } : {}),
     persistRun: true,
     onRunCreated,
     context: {

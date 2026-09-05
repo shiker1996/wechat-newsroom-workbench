@@ -1,1 +1,29 @@
-{"schemaVersion":1,"id":"seo-keyword-scoring","name":"SEO 关键词评分","version":"1.0.0","kind":"seo","entryPoints":["hotspot-article"],"contentTypes":["article"],"inputContract":"article_fact_base","outputContract":"keyword_scores","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "seo-keyword-scoring",
+  "name": "SEO 关键词评分",
+  "version": "1.0.0",
+  "kind": "seo",
+  "entryPoints": [
+    "hotspot-article"
+  ],
+  "contentTypes": [
+    "article"
+  ],
+  "inputContract": "article_fact_base",
+  "outputContract": "keyword_scores",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

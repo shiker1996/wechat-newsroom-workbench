@@ -71,7 +71,7 @@ export async function runSkill(request = {}) {
       ...(runtime.toolContext?.rootRunId == null && checkpoint.state.rootRunId != null ? { rootRunId: checkpoint.state.rootRunId } : {}),
       ...(runtime.toolContext?.workflowRunId == null && checkpoint.state.workflowRunId != null ? { workflowRunId: checkpoint.state.workflowRunId } : {}),
       ...(runtime.toolContext?.stageId == null && checkpoint.state.stageId != null ? { stageId: checkpoint.state.stageId } : {}),
-      ...(runtime.toolContext?.parentRunId == null && checkpoint.state.parentRunId != null ? { parentRunId: checkpoint.state.parentRunId } : {}),
+      ...(runtime.toolContext?.parentRunId == null ? { parentRunId: checkpoint.state.parentRunId || String(request.resumeFrom) } : {}),
     };
     request = { ...request, snapshotId: request.snapshotId ?? checkpoint.state.generationSnapshotId };
     if (typeof runtime.restoreState === 'function') {
@@ -158,6 +158,11 @@ export async function runSkill(request = {}) {
         generationSnapshotId: request.snapshotId || toolContext.generationSnapshotId, ...traceContext });
       runtime.store.appendAgentRunEvent?.(stageRunId, { type: 'run.started', entryPoint, skillId, stageId: traceContext.stageId });
       runtime.store.saveAgentStep?.({ agentRunId: stageRunId, step: 0, phase: 'stage_started', summary: { entryPoint, skillId } });
+      runtime.store.saveAgentCheckpoint?.(stageRunId, {
+        schemaVersion: 1, phase: 'stage_started', step: 0, nextStep: 0, resumable: false,
+        entryPoint, skillId, generationSnapshotId: request.snapshotId || toolContext.generationSnapshotId,
+        ...traceContext, input: request.input == null ? null : { type: typeof request.input, keys: Object.keys(request.input || {}).sort() },
+      });
       runtime.onRunCreated?.(stageRunId);
     }
     try {
@@ -168,15 +173,27 @@ export async function runSkill(request = {}) {
       if (persist) {
         runtime.store.saveAgentStep?.({ agentRunId: stageRunId, step: 0, phase: 'stage_completed', summary: { outputType: typeof result } });
         runtime.store.appendAgentRunEvent?.(stageRunId, { type: 'run.completed', stageId: traceContext.stageId });
+        runtime.store.saveAgentCheckpoint?.(stageRunId, {
+          schemaVersion: 1, phase: 'stage_completed', step: 0, nextStep: 1, resumable: false,
+          entryPoint, skillId, generationSnapshotId: request.snapshotId || toolContext.generationSnapshotId,
+          ...traceContext, result: { type: typeof result },
+        });
         runtime.store.finishAgentRun(stageRunId, { status: 'completed', modelSteps: 1, toolCalls: 0 });
       }
+      releaseResume();
       return result;
     } catch (error) {
       if (persist) {
         const cancelled = error?.name === 'AbortError' || runtime.signal?.aborted;
         runtime.store.appendAgentRunEvent?.(stageRunId, { type: cancelled ? 'run.cancelled' : 'run.failed', error: error?.message || String(error), stageId: traceContext.stageId });
+        runtime.store.saveAgentCheckpoint?.(stageRunId, {
+          schemaVersion: 1, phase: cancelled ? 'stage_cancelled' : 'stage_failed', step: 0, nextStep: 0, resumable: true,
+          entryPoint, skillId, generationSnapshotId: request.snapshotId || toolContext.generationSnapshotId,
+          ...traceContext, error: error?.message || String(error), errorCode: error?.code || null,
+        });
         runtime.store.finishAgentRun(stageRunId, { status: cancelled ? 'cancelled' : 'failed', modelSteps: 1, toolCalls: 0, error: error?.message || String(error) });
       }
+      releaseResume();
       throw error;
     }
   }

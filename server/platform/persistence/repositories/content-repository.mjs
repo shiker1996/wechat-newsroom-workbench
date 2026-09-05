@@ -64,13 +64,16 @@ export class ContentRepository {
 
   upsertArtifact(artifact) {
     this.db.prepare(`INSERT INTO artifacts
-      (batch_id, kind, name, file_path, size, modified_at, status, candidate_row_id, track)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (batch_id, kind, name, file_path, size, modified_at, status, candidate_row_id, track, agent_run_id, root_run_id, workflow_run_id, stage_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(file_path) DO UPDATE SET batch_id=excluded.batch_id, kind=excluded.kind,
         name=excluded.name, size=excluded.size, modified_at=excluded.modified_at, status=excluded.status,
-        candidate_row_id=COALESCE(excluded.candidate_row_id,artifacts.candidate_row_id),track=CASE WHEN excluded.track='' THEN artifacts.track ELSE excluded.track END`)
+        candidate_row_id=COALESCE(excluded.candidate_row_id,artifacts.candidate_row_id),track=CASE WHEN excluded.track='' THEN artifacts.track ELSE excluded.track END,
+        agent_run_id=COALESCE(excluded.agent_run_id,artifacts.agent_run_id),root_run_id=COALESCE(excluded.root_run_id,artifacts.root_run_id),
+        workflow_run_id=COALESCE(excluded.workflow_run_id,artifacts.workflow_run_id),stage_id=COALESCE(excluded.stage_id,artifacts.stage_id)`)
       .run(artifact.batchId ?? null, artifact.kind, artifact.name, artifact.path, artifact.size, artifact.modifiedAt,
-        artifact.status ?? 'ready', artifact.candidateId ?? null, artifact.track ?? '');
+        artifact.status ?? 'ready', artifact.candidateId ?? null, artifact.track ?? '', artifact.agentRunId ?? null,
+        artifact.rootRunId ?? null, artifact.workflowRunId ?? null, artifact.stageId ?? null);
   }
 
   listArtifacts({ limit = 300, batchId } = {}) {

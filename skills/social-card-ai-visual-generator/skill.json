@@ -1,1 +1,39 @@
-{"schemaVersion":1,"id":"social-card-ai-visual-generator","name":"社交卡 AI 视觉生成","version":"1.0.0","kind":"stage","entryPoints":["social-tool"],"contentTypes":["social_cards"],"inputContract":"social_card_storyboard","outputContract":"social_card_delivery","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""},"agentEntryPoints":["social-card-ai-visual-generation"],"runtimeKind":"agent-skill","agentGates":["assistant-reply","visual-document-finished"]}
+{
+  "schemaVersion": 1,
+  "id": "social-card-ai-visual-generator",
+  "name": "社交卡 AI 视觉生成",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": [
+    "social-tool"
+  ],
+  "contentTypes": [
+    "social_cards"
+  ],
+  "inputContract": "social_card_storyboard",
+  "outputContract": "social_card_delivery",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "agentEntryPoints": [
+    "social-card-ai-visual-generation"
+  ],
+  "runtimeKind": "agent-skill",
+  "agentGates": [
+    "assistant-reply",
+    "visual-document-finished"
+  ],
+  "budget": {
+    "maxModelSteps": 3,
+    "maxToolCalls": 5,
+    "maxParallelToolCalls": 3,
+    "timeoutMs": 120000,
+    "maxToolResultChars": 4000,
+    "maxTotalToolResultChars": 12000
+  },
+  "gates": []
+}

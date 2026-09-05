@@ -1,1 +1,31 @@
-{"schemaVersion":1,"id":"wechat-mp-gossip-chill","name":"轻松职场趣闻","version":"1.0.0","kind":"writer","entryPoints":["hotspot-article"],"contentTypes":["gossip"],"inputContract":"article_fact_base","outputContract":"wechat_markdown","requiredCapabilities":[],"optionalCapabilities":["cap_content_url_fetch"],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "wechat-mp-gossip-chill",
+  "name": "轻松职场趣闻",
+  "version": "1.0.0",
+  "kind": "writer",
+  "entryPoints": [
+    "hotspot-article"
+  ],
+  "contentTypes": [
+    "gossip"
+  ],
+  "inputContract": "article_fact_base",
+  "outputContract": "wechat_markdown",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [
+    "cap_content_url_fetch"
+  ],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

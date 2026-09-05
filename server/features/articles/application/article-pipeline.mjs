@@ -88,7 +88,7 @@ ${String(review || '').trim()}
 请依据以上实际内容完成定向修订。对 IPO、上市、估值、融资、违法、造假、压榨、骚扰、事故伤亡以及公司/个人负面主张，若事实基座没有直接可靠证据，必须删除、降格并明确归因；不要用免责声明掩盖标题中的强断言。直接输出修订后的完整 Markdown 文章，不要要求读取文件，不要输出审阅过程或文件缺失说明；在文末保留唯一 REVIEW 注释，并返回 result: pass 或 result: needs-revision。`;
 }
 
-function artifact(store,batchId,kind,name,filePath) { const stat=fs.statSync(filePath); store.upsertArtifact({batchId,kind,name,path:filePath,size:stat.size,modifiedAt:stat.mtime.toISOString()}); }
+function artifact(store,batchId,kind,name,filePath,trace={}) { const stat=fs.statSync(filePath); store.upsertArtifact({batchId,kind,name,path:filePath,size:stat.size,modifiedAt:stat.mtime.toISOString(),rootRunId:trace.rootRunId??null,workflowRunId:trace.workflowRunId??null,stageId:trace.stageId??null}); }
 function writerSkill(candidate) {
   return selectWriterSkill(candidate).skill;
 }
@@ -589,7 +589,7 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   const researchCoveragePath=path.join(workdir,'research-coverage-review.json');
   writeFile(researchCoveragePath,JSON.stringify(researchCoverage,null,2));
   // 贴合度门禁失败时流水线会提前退出，先登记产物，确保编辑室仍能查看返工依据。
-  artifact(store,batchId,'研判贴合度检查','research-coverage-review.json',researchCoveragePath);
+  artifact(store,batchId,'研判贴合度检查','research-coverage-review.json',researchCoveragePath,{rootRunId,workflowRunId,stageId:'research-coverage'});
   recordStage('research-coverage',stageSkills['article-reviewer'],['08-seo-optimized.md','editorial-research-selection.json'],'research-coverage-review.json',researchCoverage.status);
   if (researchCoverageNeedsRevision(researchCoverage)) {
     throw new Error(`研判贴合度门禁未通过：${researchCoverage.summary || '终稿未充分兑现作者采用的研判拓展点'}${researchCoverage.repair_suggestions?.length ? `；${researchCoverage.repair_suggestions.join('；')}` : ''}`);
@@ -633,7 +633,7 @@ export async function runArticlePipeline({gateway,store,batchId,candidateId,prov
   const finalTitle=extractArticleTitle(final)||finalSelectedTitle;
   store.saveDocument({batchId,candidateId,kind:'draft',title:draftTitle,content:draft,filePath:p04,status:'draft'});
   store.saveDocument({batchId,candidateId,kind:'final',title:finalTitle,content:final,filePath:p09,status:'finalized'});
-  for(const [kind,name,file] of [['技能清单','00-skill-manifest.json',skillManifestPath],['阶段执行清单','00-stage-executions.json',stageManifestPath],['锁定简报','00-article-brief.md',briefPath],['研判采用清单','editorial-research-selection.json',researchSelectionPath],['事实基座','02-fact-base.json',factBasePath],['发布主张登记','02-publication-claim-register.json',publicationClaimRegisterPath],['作者素材','01-personal-materials.md',p01],['文章大纲','02-outline.md',p02],['标题候选','03-titles.md',p03],['标题风险扫描','03-title-risk.json',selectedTitleRiskPath],['文章初稿','04-draft.md',p04],['初稿AI门禁','04-quality-gate.json',draftGatePath],['去AI稿','05-humanized.md',p05],['审稿门禁原始响应','06-review-gate.md',reviewLogPath],['审稿稿','06-reviewed.md',p06],['SEO关键词','07-seo-keywords.md',p07],['SEO优化稿','08-seo-optimized.md',p08],['终稿AI门禁','08-quality-gate.json',finalGatePath],['研判贴合度检查','research-coverage-review.json',researchCoveragePath],['图表规划','09-visual-plan.json',visualPlanPath],['文章终稿','09-FINAL.md',p09],['发布合规门禁','10-publication-compliance.json',publicationCompliancePath]])artifact(store,batchId,kind,name,file);
+  for(const [kind,name,file] of [['技能清单','00-skill-manifest.json',skillManifestPath],['阶段执行清单','00-stage-executions.json',stageManifestPath],['锁定简报','00-article-brief.md',briefPath],['研判采用清单','editorial-research-selection.json',researchSelectionPath],['事实基座','02-fact-base.json',factBasePath],['发布主张登记','02-publication-claim-register.json',publicationClaimRegisterPath],['作者素材','01-personal-materials.md',p01],['文章大纲','02-outline.md',p02],['标题候选','03-titles.md',p03],['标题风险扫描','03-title-risk.json',selectedTitleRiskPath],['文章初稿','04-draft.md',p04],['初稿AI门禁','04-quality-gate.json',draftGatePath],['去AI稿','05-humanized.md',p05],['审稿门禁原始响应','06-review-gate.md',reviewLogPath],['审稿稿','06-reviewed.md',p06],['SEO关键词','07-seo-keywords.md',p07],['SEO优化稿','08-seo-optimized.md',p08],['终稿AI门禁','08-quality-gate.json',finalGatePath],['研判贴合度检查','research-coverage-review.json',researchCoveragePath],['图表规划','09-visual-plan.json',visualPlanPath],['文章终稿','09-FINAL.md',p09],['发布合规门禁','10-publication-compliance.json',publicationCompliancePath]])artifact(store,batchId,kind,name,file,{rootRunId,workflowRunId,stageId:'article-pipeline'});
   store.updateBatch(batchId,{stage:'typeset',status:'review'}); onProgress(`成稿完成:${visibleChars(final)} 个可见字符`);
   return {workdir,finalPath:p09,visibleChars:visibleChars(final),writerSkill:chosenWriterSkill,skillHash:skillBundle.hash,skillFallback:skillBundle.fallback,title:finalTitle};
 }

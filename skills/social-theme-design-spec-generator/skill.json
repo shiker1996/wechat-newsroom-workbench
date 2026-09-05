@@ -1,1 +1,29 @@
-{"schemaVersion":1,"id":"social-theme-design-spec-generator","name":"Social 主题设计规范生成","version":"1.0.0","kind":"stage","entryPoints":["social-tool"],"contentTypes":["social_cards"],"inputContract":"social_theme_definition","outputContract":"social_theme_design_spec","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "social-theme-design-spec-generator",
+  "name": "Social 主题设计规范生成",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": [
+    "social-tool"
+  ],
+  "contentTypes": [
+    "social_cards"
+  ],
+  "inputContract": "social_theme_definition",
+  "outputContract": "social_theme_design_spec",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

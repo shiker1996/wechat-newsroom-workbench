@@ -1,1 +1,32 @@
-{"schemaVersion":1,"id":"tutorial-chat","name":"自主写作策划对话","version":"1.0.0","kind":"stage","entryPoints":[],"contentTypes":[],"inputContract":"independent_writing_draft","outputContract":"brief_updates","requiredCapabilities":[],"optionalCapabilities":["cap_filesystem_project_read","cap_content_url_fetch","cap_content_web_search","cap_content_news_search","cap_content_document_search","cap_content_passage_retrieve"],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "tutorial-chat",
+  "name": "自主写作策划对话",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": [],
+  "contentTypes": [],
+  "inputContract": "independent_writing_draft",
+  "outputContract": "brief_updates",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [
+    "cap_filesystem_project_read",
+    "cap_content_url_fetch",
+    "cap_content_web_search",
+    "cap_content_news_search",
+    "cap_content_document_search",
+    "cap_content_passage_retrieve"
+  ],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

@@ -58,7 +58,13 @@ export class AgentRunRepository{
     const artifactValues = [];
     if (batchIds.length) { artifactWhere.push(`batch_id IN (${batchIds.map(() => '?').join(',')})`); artifactValues.push(...batchIds); }
     if (candidateIds.length) { artifactWhere.push(`candidate_row_id IN (${candidateIds.map(() => '?').join(',')})`); artifactValues.push(...candidateIds); }
-    const artifacts = artifactWhere.length ? this.db.prepare(`SELECT id,batch_id,candidate_row_id,kind,name,file_path,size,modified_at,status,track FROM artifacts WHERE ${artifactWhere.join(' OR ')} ORDER BY modified_at DESC,id DESC LIMIT ?`).all(...artifactValues, Math.min(2000, Math.max(1, Number(eventLimit) || 1000))) : [];
+    const artifactColumns='id,batch_id,candidate_row_id,kind,name,file_path,size,modified_at,status,track,agent_run_id,root_run_id,workflow_run_id,stage_id';
+    const artifacts = artifactWhere.length ? this.db.prepare(`SELECT ${artifactColumns} FROM artifacts WHERE ${artifactWhere.join(' OR ')} ORDER BY modified_at DESC,id DESC LIMIT ?`).all(...artifactValues, Math.min(2000, Math.max(1, Number(eventLimit) || 1000))) : [];
+    const runArtifactWhere = [`root_run_id=?`, `workflow_run_id=?`, `agent_run_id IN (${placeholders})`];
+    const runArtifactValues = [String(rootRunId), String(rootRunId), ...ids];
+    const linkedArtifacts = this.db.prepare(`SELECT ${artifactColumns} FROM artifacts WHERE ${runArtifactWhere.join(' OR ')} ORDER BY modified_at DESC,id DESC LIMIT ?`).all(...runArtifactValues, Math.min(2000, Math.max(1, Number(eventLimit) || 1000)));
+    const knownArtifactIds = new Set(artifacts.map((item) => item.id));
+    for (const artifact of linkedArtifacts) if (!knownArtifactIds.has(artifact.id)) artifacts.push(artifact);
     return { schemaVersion: 2, rootRunId: String(rootRunId), runs, events, steps, modelCalls, toolCalls, toolExecutions, checkpoints, artifacts,
       resumable: runs.some((run) => run.status !== 'completed' && checkpoints.some((checkpoint) => checkpoint.agent_run_id === run.id && checkpoint.state?.resumable)) };
   }

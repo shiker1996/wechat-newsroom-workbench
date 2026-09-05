@@ -1,1 +1,29 @@
-{"schemaVersion":1,"id":"wechat-md-to-draft","name":"公众号 HTML 初稿","version":"1.0.0","kind":"stage","entryPoints":["wechat-typeset"],"contentTypes":["wechat_article"],"inputContract":"rendered_markdown","outputContract":"wechat_html","requiredCapabilities":[],"optionalCapabilities":[],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""}}
+{
+  "schemaVersion": 1,
+  "id": "wechat-md-to-draft",
+  "name": "公众号 HTML 初稿",
+  "version": "1.0.0",
+  "kind": "stage",
+  "entryPoints": [
+    "wechat-typeset"
+  ],
+  "contentTypes": [
+    "wechat_article"
+  ],
+  "inputContract": "rendered_markdown",
+  "outputContract": "wechat_html",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "runtimeKind": "stage-skill",
+  "budget": {
+    "maxModelSteps": 1,
+    "maxToolCalls": 1,
+    "timeoutMs": 120000
+  },
+  "gates": []
+}

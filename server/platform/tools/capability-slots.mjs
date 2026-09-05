@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getToolRegistry } from './index.mjs';
+import { executeCapability } from './capability-runtime.mjs';
 import { migrateLegacyCapabilityRoutes, preferredImplementation, readCapabilityRoutes, setCapabilityRoute } from './capability-routes.mjs';
 
 // 固定元数据的写作信息槽位：名称/说明/环节仅用于展示，不再是槽位全集。
@@ -87,12 +88,18 @@ export function preferredPluginForCapability(workspaceRoot,capability){
 
 export async function executeInformationCapabilitySlot(slotId,input={},context={}){
   const slot=getInformationSlot(slotId);if(!slot)throw new Error('未知信息能力槽位');
-  const registry=await getToolRegistry(),preferred=readSettings(context.workspaceRoot||process.cwd())[slotId]||'';
-  return registry.execute(slot.capability,input,context,preferred?{plugin:preferred}:{});
+  const preferred=readSettings(context.workspaceRoot||process.cwd())[slotId]||'';
+  const result = await executeCapability({consumerId:context.consumerId||`capability-slot:${slotId}`,capability:slot.capability,input,context,preferences:preferred?{plugin:preferred}:{}});
+  // Deterministic integrations historically exposed PERMISSION_DENIED; retain
+  // that stable error code while the Agent-facing Broker uses its protocol code.
+  if (result?.status === 'error' && result.error?.code === 'CAPABILITY_NOT_VISIBLE') {
+    return { ...result, error: { ...result.error, code: 'PERMISSION_DENIED' } };
+  }
+  return result;
 }
 
 // 任意能力的偏好执行：所有不走固定槽位的调用方（如编辑室摘录检索）统一走这里。
 export async function executeCapabilityWithPreference(workspaceRoot,capability,input={},context={}){
-  const registry=await getToolRegistry(),preferred=preferredPluginForCapability(workspaceRoot,capability);
-  return registry.execute(capability,input,context,preferred?{plugin:preferred}:{});
+  const preferred=preferredPluginForCapability(workspaceRoot,capability);
+  return executeCapability({consumerId:context.consumerId||`capability:${capability}`,capability,input,context,preferences:preferred?{plugin:preferred}:{}});
 }

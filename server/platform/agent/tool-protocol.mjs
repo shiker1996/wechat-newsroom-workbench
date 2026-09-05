@@ -70,4 +70,4 @@ export function validateAgentEnvelope(value,{maxRequests=4}={}){
 
 export function toolError(request,code,message,retryable=false){return Object.freeze({requestId:request.requestId,capability:request.capability,status:'error',error:{code:ERROR_CODES.has(code)?code:'TOOL_EXECUTION_FAILED',message:String(message||'工具执行失败'),retryable:Boolean(retryable)}});}
 
-export function toolSuccess(request,result){return Object.freeze({requestId:request.requestId,capability:request.capability,status:'ok',data:structuredClone(result.data||{}),warnings:(result.warnings||[]).map(String),provenance:{provider:String(result.provenance?.plugin||result.provenance?.provider||''),fetchedAt:new Date().toISOString()}});}
+export function toolSuccess(request,result){return Object.freeze({requestId:request.requestId,capability:request.capability,status:'ok',data:structuredClone(result.data||{}),warnings:(result.warnings||[]).map(String),provenance:{provider:String(result.provenance?.provider||result.provenance?.plugin||''),fetchedAt:new Date().toISOString()}});}

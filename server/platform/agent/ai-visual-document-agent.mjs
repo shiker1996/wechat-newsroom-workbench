@@ -88,6 +88,7 @@ export async function runAiVisualDocumentAgent({
   toolContext = {},
   maxOutputTokens = AI_VISUAL_AGENT_OUTPUT_MAX_TOKENS,
   budget = {},
+  resumeFrom = '',
   onProgress = () => {},
   onEvent = () => {},
 } = {}) {
@@ -198,6 +199,7 @@ export async function runAiVisualDocumentAgent({
     catalog: generationCatalog,
     messages: [{ role: 'system', protected: true, content: `${agentSystem}${generationStageOverride({ requiredPageCount: maxPages, canvas, outputPath, documentLabel, nativeTools })}` }, ...baseMessages],
     store,
+    ...(resumeFrom ? { resumeFrom: String(resumeFrom) } : {}),
     budget: {
       maxModelSteps: Number(budget.maxModelSteps) || Math.max(18, maxPages + 12),
       maxToolCalls: Number(budget.maxToolCalls) || Math.max(18, maxPages + 12),

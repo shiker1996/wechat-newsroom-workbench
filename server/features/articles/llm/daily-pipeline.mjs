@@ -49,9 +49,9 @@ const DAILY_QUALITY_GATE_TOOL = decisionToolDefinition({
     },
   },
 });
-function artifact(store, batchId, kind, name, filePath) {
+function artifact(store, batchId, kind, name, filePath, trace = {}) {
   const stat = fs.statSync(filePath);
-  store.upsertArtifact({ batchId, kind, name, path: filePath, size: stat.size, modifiedAt: stat.mtime.toISOString() });
+  store.upsertArtifact({ batchId, kind, name, path: filePath, size: stat.size, modifiedAt: stat.mtime.toISOString(), rootRunId: trace.rootRunId ?? null, workflowRunId: trace.workflowRunId ?? null, stageId: trace.stageId ?? null });
 }
 function normalizeEvent(event) {
   const card = event.card || {};
@@ -240,15 +240,16 @@ export async function runDailyPipeline({ gateway, store, batchId, provider, work
   const title = final.match(/^#\s+(.+)$/m)?.[1]?.trim() || `${batch.batch_date} 大厂早报`;
   store.saveDocument({ batchId, kind: 'daily-draft', title, content: draft, filePath: draftPath, status: 'draft' });
   store.saveDocument({ batchId, kind: 'daily-final', title, content: final, filePath: finalPath, status: 'finalized' });
-  artifact(store, batchId, '早报事实清单', '01-news-items.json', factPath);
-  artifact(store, batchId, '早报初稿', '02-draft.md', draftPath);
-  artifact(store, batchId, '标题候选', '02-titles.md', titlePath);
-  artifact(store, batchId, '自然化稿', '03-humanized.md', humanPath);
-  artifact(store, batchId, '审阅修订稿', '04-reviewed.md', reviewedPath);
-  artifact(store, batchId, 'SEO 优化稿', '05-seo-optimized.md', seoPath);
-  artifact(store, batchId, '早报质量门禁', '06-quality-gate.json', gatePath);
-  artifact(store, batchId, '图表规划', '07-visual-plan.json', visualPlanPath);
-  artifact(store, batchId, '早报终稿', '03-FINAL.md', finalPath);
+  const trace={rootRunId,workflowRunId,stageId:'daily-pipeline'};
+  artifact(store, batchId, '早报事实清单', '01-news-items.json', factPath, trace);
+  artifact(store, batchId, '早报初稿', '02-draft.md', draftPath, trace);
+  artifact(store, batchId, '标题候选', '02-titles.md', titlePath, trace);
+  artifact(store, batchId, '自然化稿', '03-humanized.md', humanPath, trace);
+  artifact(store, batchId, '审阅修订稿', '04-reviewed.md', reviewedPath, trace);
+  artifact(store, batchId, 'SEO 优化稿', '05-seo-optimized.md', seoPath, trace);
+  artifact(store, batchId, '早报质量门禁', '06-quality-gate.json', gatePath, trace);
+  artifact(store, batchId, '图表规划', '07-visual-plan.json', visualPlanPath, trace);
+  artifact(store, batchId, '早报终稿', '03-FINAL.md', finalPath, trace);
   onProgress(`批次早报完成：${selectedFocuses.length} 个关系 · ${newsItems.length} 个关联事件 · ${count} 个可见字符`);
   return { workdir, finalPath, title, visibleChars: count, eventCount: newsItems.length, focuses:selectedFocuses };
 }

@@ -749,6 +749,20 @@ export function runDatabaseMigrations(db, migrateSchema) {
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
+  // Artifact trace columns are additive and kept outside the public schema
+  // counter so existing v43 databases can receive them without changing the
+  // migration contract consumed by older clients.
+  if (arguments.length < 2) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const columns = new Set(db.prepare('PRAGMA table_info(artifacts)').all().map((column) => column.name));
+      for (const [name, definition] of [['agent_run_id','TEXT'],['root_run_id','TEXT'],['workflow_run_id','TEXT'],['stage_id','TEXT']]) {
+        if (!columns.has(name)) db.exec(`ALTER TABLE artifacts ADD COLUMN ${name} ${definition}`);
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_artifacts_root_run ON artifacts(root_run_id,modified_at); CREATE INDEX IF NOT EXISTS idx_artifacts_agent_run ON artifacts(agent_run_id,modified_at);');
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
   const violations = db.prepare('PRAGMA foreign_key_check').all();
   if (violations.length) throw new Error(`数据库迁移后存在 ${violations.length} 项外键完整性错误`);
 }

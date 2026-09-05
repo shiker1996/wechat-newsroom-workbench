@@ -122,7 +122,9 @@ function serveStatic(request, response, url) {
   if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return false;
   const type = mime[path.extname(filePath)] ?? 'application/octet-stream';
   const versioned = searchParams.has('v');
-  const cacheControl = versioned
+  // 生产环境的带版本资源可以长期缓存；本地开发默认不缓存，避免漏改
+  // query 版本号时浏览器继续使用旧 JS/CSS，导致测试结果与工作区不一致。
+  const cacheControl = versioned && process.env.NODE_ENV === 'production'
     ? 'public, max-age=31536000, immutable'
     : pathname === '/' || path.extname(filePath) === '.html'
       ? 'no-cache'
@@ -343,7 +345,7 @@ async function api(request, response, url) {
   if (await handleModelRoutes({ request, response, pathname, root, config, store, models, body, json })) return;
   if (await handleThemeRoutes({ request, response, pathname, searchParams, json, store, body, models })) return;
   if (await handleContentRoutes({ request, response, pathname, searchParams, store, artifactRoots, mime, json, body, root, models })) return;
-  if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body,
+  if (await handleSystemRoutes({ request, response, pathname, searchParams, root, config, store, json, body, aiJobs,
     binaryBody, createWorkbenchBackup, models })) return;
   const mediaResult = await handleMediaRoutes({ request, response, pathname, searchParams, store, config, json, body, path, fs, os, mime, root, execFileAsync, isInsideRoots, getImageWorkspace, batchArticlesDir, saveLocalImage, uploadImageToCdn, articleWorkdir, models, planImagePlaceholders, writeUtf8, saveImageMetadata, imageManifestFile, aiJobs, planArticleVisuals, defaultTypesetTheme, TYPESET_THEMES, analyzeVisualComplexity });
   if (mediaResult !== false) return mediaResult;

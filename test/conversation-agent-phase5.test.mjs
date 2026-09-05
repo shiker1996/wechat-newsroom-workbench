@@ -49,6 +49,57 @@ test('生产 Agent Run 支持通过系统接口取消活动执行并持久化 ab
   await assert.rejects(running,(error)=>error.code==='AGENT_ABORTED');assert.equal(store.getAgentRun(activeId).status,'aborted');
 });
 
+test('Batch Job Run Trace 可直接重新入队失败任务', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-job-retry-'));
+  const store = new Store(path.join(root, 'test.db'));
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  const batch = store.createBatch({ date: '2026-08-14', title: 'Job retry' });
+  const rootRunId = 'job:failed-job';
+  store.startAgentRun({ id: rootRunId, entryPoint: 'batch-job:social-card-beautify', skillId: 'batch-social-card-beautify', batchId: batch.id, provider: 'mock', rootRunId, workflowRunId: rootRunId, stageId: 'job' });
+  store.finishAgentRun(rootRunId, { status: 'failed', error: '模拟失败' });
+  let started = null;
+  const aiJobs = {
+    get: () => ({ requestedProvider: 'mock', provider: 'mock', runOptions: { styleBrief: '重试视觉' } }),
+    start: (input) => { started = input; return { id: 'retry-job', ...input, status: 'queued' }; },
+  };
+  let response;
+  const handled = await handleSystemRoutes({ request: { method: 'POST' }, response: {}, pathname: `/api/runs/${encodeURIComponent(rootRunId)}/retry`, searchParams: new URLSearchParams(), root, config: {}, store, aiJobs, json: (_response, status, data) => { response = { status, data }; }, body: async () => ({}) });
+  assert.equal(handled, true);
+  assert.equal(response.status, 202);
+  assert.equal(response.data.requeued, true);
+  assert.equal(started.type, 'social-card-beautify');
+  assert.equal(started.batchId, batch.id);
+  assert.equal(started.styleBrief, '重试视觉');
+});
+
+test('Batch Job Run Trace 可从子 Agent checkpoint 重新入队恢复任务', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-job-resume-'));
+  const store = new Store(path.join(root, 'test.db'));
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  const batch = store.createBatch({ date: '2026-08-14', title: 'Job resume' });
+  const rootRunId = 'job:resume-job';
+  const agentRunId = 'agent:resume-stage';
+  store.startAgentRun({ id: rootRunId, entryPoint: 'batch-job:social-card-beautify', skillId: 'batch-social-card-beautify', batchId: batch.id, provider: 'mock', rootRunId, workflowRunId: rootRunId, stageId: 'job' });
+  store.finishAgentRun(rootRunId, { status: 'failed', error: '模拟中断' });
+  store.startAgentRun({ id: agentRunId, entryPoint: 'social-card-ai-visual-generation', skillId: 'social-card-ai-visual-generator', batchId: batch.id, provider: 'mock', rootRunId, workflowRunId: rootRunId, stageId: 'social-card-ai-visual-generation' });
+  store.saveAgentCheckpoint(agentRunId, { schemaVersion: 1, phase: 'tools_completed', nextStep: 3, resumable: true, generationSnapshotId: 947 });
+  let started = null;
+  const aiJobs = {
+    get: () => ({ requestedProvider: 'mock', provider: 'mock', runOptions: { styleBrief: '继续视觉' } }),
+    start: (input) => { started = input; return { id: 'resume-job-2', ...input, status: 'queued' }; },
+  };
+  let response;
+  const handled = await handleSystemRoutes({ request: { method: 'POST' }, response: {}, pathname: `/api/runs/${encodeURIComponent(rootRunId)}/resume`, searchParams: new URLSearchParams(), root, config: {}, store, aiJobs, json: (_response, status, data) => { response = { status, data }; }, body: async () => ({}) });
+  assert.equal(handled, true);
+  assert.equal(response.status, 202);
+  assert.equal(response.data.requeued, true);
+  assert.equal(response.data.resumed, true);
+  assert.equal(response.data.newRootRunId, 'job:resume-job-2');
+  assert.equal(started.type, 'social-card-beautify');
+  assert.equal(started.resumeFrom, agentRunId);
+  assert.equal(started.styleBrief, '继续视觉');
+});
+
 test('阶段 5 三入口共享工具卡协议且新编辑室不再转换 fetchEvents',()=>{
   const renderer=fs.readFileSync(new URL('../public/src/core/agent-events.js',import.meta.url),'utf8');
   const adapter=fs.readFileSync(new URL('../server/features/articles/application/agent/editorial-adapter.mjs',import.meta.url),'utf8');

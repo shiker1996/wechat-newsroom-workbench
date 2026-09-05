@@ -28,6 +28,18 @@ const checks = [
     file: 'server/platform/http/routes/content-routes.mjs',
     forbidden: [/models\.complete\(\{\s*provider\s*:\s*input\.provider[^\n]*social-feedback-adjustment/, /models\.complete\(\{\s*provider\s*:\s*input\.provider[^\n]*content-feedback-adjustment/],
   },
+  {
+    file: 'server/platform/http/routes/task-routes.mjs',
+    forbidden: [/tagBatch\(\{\s*gateway:\s*models\b/, /ensureBatchEventCards\(\{\s*gateway:\s*models\b/],
+  },
+  {
+    file: 'server/platform/http/routes/article-routes.mjs',
+    forbidden: [/draftArticle\(\{\s*gateway:\s*models\b/],
+  },
+  {
+    file: 'server/features/batches/application/ai-job-handlers.mjs',
+    forbidden: [/retryPipelineFailure\(\{[^\n]*gateway,\s*config/],
+  },
 ];
 
 const failures = [];

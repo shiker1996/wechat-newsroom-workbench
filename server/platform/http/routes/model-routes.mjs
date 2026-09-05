@@ -4,7 +4,7 @@ export async function handleModelRoutes(context) {
   const { request, response, pathname, root, config, store, models, body, json } = context;
 
   if (request.method === 'GET' && pathname === '/api/models') {
-    json(response, 200, { ...models.listProviders(), calls: store.listModelCalls(50) });
+    json(response, 200, { ...models.listProviders(), calls: store.listModelCalls(150) });
     return true;
   }
   if (request.method === 'POST' && pathname === '/api/models/config') {

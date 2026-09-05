@@ -14,6 +14,13 @@ function duration(row) {
   return Math.max(0, new Date(row.finished_at).getTime() - new Date(row.started_at).getTime());
 }
 
+function replayPromptMessages(snapshot) {
+  const source = snapshot?.snapshot?.harness?.messages || snapshot?.snapshot?.messages || [];
+  const messages = Array.isArray(source) ? source : (Array.isArray(source.messages) ? source.messages : []);
+  return messages.filter((message) => message && ['system', 'user', 'assistant', 'tool'].includes(String(message.role || '').toLowerCase()))
+    .map((message) => ({ role: String(message.role).toLowerCase(), content: message.content ?? '', name: message.name || undefined }));
+}
+
 export function buildRunMetrics(trace = {}) {
   const runs = Array.isArray(trace.runs) ? trace.runs : (trace.run ? [trace.run] : []);
   const modelCalls = Array.isArray(trace.modelCalls) ? trace.modelCalls : [];
@@ -89,7 +96,7 @@ export function buildReplayFixture(trace = {}, { snapshots = [] } = {}) {
     runs: (trace.runs || (trace.run ? [trace.run] : [])).map((run) => ({ id: run.id, entryPoint: run.entry_point || run.entryPoint, skillId: run.skill_id || run.skillId,
       status: run.status, generationSnapshotId: run.generation_snapshot_id || run.generationSnapshotId, rootRunId: run.root_run_id || run.rootRunId,
       workflowRunId: run.workflow_run_id || run.workflowRunId, stageId: run.stage_id || run.stageId })),
-    snapshots: snapshots.map((snapshot) => ({ id: snapshot.id, purpose: snapshot.purpose, snapshotHash: hash(snapshot.snapshot), createdAt: snapshot.created_at || snapshot.createdAt })),
+    snapshots: snapshots.map((snapshot) => ({ id: snapshot.id, purpose: snapshot.purpose, snapshotHash: hash(snapshot.snapshot), createdAt: snapshot.created_at || snapshot.createdAt, promptMessages: replayPromptMessages(snapshot) })),
     modelResponses,
     toolResults,
     metrics: buildRunMetrics(trace),

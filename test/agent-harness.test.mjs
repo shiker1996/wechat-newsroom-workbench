@@ -87,6 +87,32 @@ test('Pipeline stage 通过 Harness 建立可追踪 Run 并关联模型调用', 
   assert.equal(calls[0].stageId, 'drafting');
 });
 
+test('Pipeline stage 失败 checkpoint 可从原阶段 Run 重试并建立父子关联', async () => {
+  const runs = [], checkpoints = new Map();
+  const store = {
+    startAgentRun: (run) => { runs.push({ ...run }); return run; },
+    appendAgentRunEvent: () => {}, saveAgentStep: () => {},
+    saveAgentCheckpoint: (agentRunId, state) => { checkpoints.set(agentRunId, { agent_run_id: agentRunId, state }); },
+    finishAgentRun: (agentRunId, result) => { const run = runs.find((item) => item.id === agentRunId); if (run) Object.assign(run, result); },
+    getLatestAgentCheckpoint: (agentRunId) => checkpoints.get(agentRunId) || null,
+    claimAgentResume: () => true, releaseAgentResume: () => {},
+  };
+  let attempts = 0;
+  const gateway = { complete: async () => { attempts += 1; if (attempts === 1) throw new Error('阶段失败'); return { content: '重试成功' }; } };
+  await assert.rejects(runPipelineStage({ store, gateway, purpose: 'retryable-stage', entryPoint: 'retryable-stage', stageId: 'retryable-stage' }), /阶段失败/);
+  const failed = runs[0], checkpoint = checkpoints.get(failed.id).state;
+  assert.equal(failed.status, 'failed');
+  assert.equal(checkpoint.phase, 'stage_failed');
+  assert.equal(checkpoint.resumable, true);
+  const result = await runPipelineStage({ store, gateway, purpose: 'retryable-stage', entryPoint: 'retryable-stage', stageId: 'retryable-stage', resumeFrom: failed.id });
+  assert.equal(result.content, '重试成功');
+  assert.equal(runs.length, 2);
+  assert.equal(runs[1].parentRunId, failed.id);
+  assert.equal(runs[1].rootRunId, failed.rootRunId);
+  assert.equal(runs[1].workflowRunId, failed.workflowRunId);
+  assert.equal(checkpoints.get(runs[1].id).state.resumable, false);
+});
+
 test('Harness snapshot 不存在或不匹配时不得回退到实时配置', async () => {
   const request = { skillId: 'demo', entryPoint: 'demo', snapshotId: 'frozen', context: { modelStep: final } };
   await assert.rejects(runSkill(request), { code: 'SKILL_SNAPSHOT_UNAVAILABLE' });

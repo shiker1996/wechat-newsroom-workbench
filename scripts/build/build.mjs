@@ -41,7 +41,8 @@ function checkLocalImports(filePath, content) {
   const importPattern = /(?:\bfrom\s*|\bimport\s*)["'](\.[^"']+)["']/g;
   for (const match of content.matchAll(importPattern)) {
     const specifier = match[1];
-    const base = path.resolve(path.dirname(filePath), specifier);
+    const fileSpecifier = specifier.split(/[?#]/, 1)[0];
+    const base = path.resolve(path.dirname(filePath), fileSpecifier);
     const candidates = [base, `${base}.js`, `${base}.mjs`, path.join(base, "index.js"), path.join(base, "index.mjs")];
     if (!candidates.some((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile())) {
       console.error(`  本地 import 不存在 ${path.relative(root, filePath)} -> ${specifier}`);
@@ -83,7 +84,7 @@ const html = fs.readFileSync(path.join(publicDir, "index.html"), "utf8");
 for (const match of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)) {
   const src = match[1];
   if (/^(?:https?:)?\/\//i.test(src)) continue;
-  const filePath = path.resolve(publicDir, src.replace(/^\//, ""));
+  const filePath = path.resolve(publicDir, src.split(/[?#]/, 1)[0].replace(/^\//, ""));
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     console.error(`  HTML 脚本引用不存在 ${src}`);
     ok = false;

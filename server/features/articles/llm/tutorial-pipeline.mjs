@@ -25,7 +25,7 @@ const TUTORIAL_QUALITY_GATE_TOOL=decisionToolDefinition({
     }}},
   }},
 });
-function artifact(store,batchId,candidateId,kind,name,filePath){const stat=fs.statSync(filePath);store.upsertArtifact({batchId,candidateId,track:'article',kind,name,path:filePath,size:stat.size,modifiedAt:stat.mtime.toISOString()});}
+function artifact(store,batchId,candidateId,kind,name,filePath,trace={}){const stat=fs.statSync(filePath);store.upsertArtifact({batchId,candidateId,track:'article',kind,name,path:filePath,size:stat.size,modifiedAt:stat.mtime.toISOString(),rootRunId:trace.rootRunId??null,workflowRunId:trace.workflowRunId??null,stageId:trace.stageId??null});}
 async function textCall(gateway,input,system,user,maxOutputTokens){return gateway.complete({...input,maxOutputTokens,messages:[{role:'system',content:system,protected:true},{role:'user',content:user,protected:true}]});}
 function applyTitle(markdown,title){const value=String(markdown||'').trim(),safe=String(title||'').trim();if(!safe)return value;return /^#\s+.+$/m.test(value)?value.replace(/^#\s+.+$/m,`# ${safe}`):`# ${safe}\n\n${value}`;}
 
@@ -138,9 +138,10 @@ export async function runTutorialPipeline({gateway,store,batchId,candidateId,pro
   const title=final.match(/^#\s+(.+)$/m)?.[1]?.trim()||fact.topic;
   store.saveDocument({batchId,candidateId,kind:'draft',title,content:draft,filePath:draftPath,status:'draft'});
   store.saveDocument({batchId,candidateId,kind:'final',title,content:final,filePath:finalPath,status:'finalized'});
-  artifact(store,batchId,candidateId,'自主写作初稿','04-draft.md',draftPath);artifact(store,batchId,candidateId,'自主写作质量门禁','08-quality-gate.json',gatePath);artifact(store,batchId,candidateId,'图表规划','09-visual-plan.json',visualPlanPath);artifact(store,batchId,candidateId,'文章终稿','09-FINAL.md',finalPath);
-  artifact(store,batchId,candidateId,'标题候选','03-titles.md',titlePath);artifact(store,batchId,candidateId,'自然化稿','05-humanized.md',humanPath);
-  artifact(store,batchId,candidateId,'审阅修订稿','06-reviewed.md',reviewedPath);artifact(store,batchId,candidateId,'SEO 优化稿','08-seo-optimized.md',seoPath);
+  const trace={rootRunId,workflowRunId,stageId:'tutorial-pipeline'};
+  artifact(store,batchId,candidateId,'自主写作初稿','04-draft.md',draftPath,trace);artifact(store,batchId,candidateId,'自主写作质量门禁','08-quality-gate.json',gatePath,trace);artifact(store,batchId,candidateId,'图表规划','09-visual-plan.json',visualPlanPath,trace);artifact(store,batchId,candidateId,'文章终稿','09-FINAL.md',finalPath,trace);
+  artifact(store,batchId,candidateId,'标题候选','03-titles.md',titlePath,trace);artifact(store,batchId,candidateId,'自然化稿','05-humanized.md',humanPath,trace);
+  artifact(store,batchId,candidateId,'审阅修订稿','06-reviewed.md',reviewedPath,trace);artifact(store,batchId,candidateId,'SEO 优化稿','08-seo-optimized.md',seoPath,trace);
   store.updateBatch(batchId,{stage:'typeset',status:'review'});onProgress(`${label}成稿完成：${count} 个可见字符`);
   return {candidateId,workdir,finalPath,title,visibleChars:count};
 }

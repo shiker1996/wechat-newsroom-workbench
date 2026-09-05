@@ -1,5 +1,5 @@
 import { evaluateEditorialReadiness, normalizeRejectedAngles, selectWriterSkill } from '../../../features/articles/index.mjs';
-import { resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
+import { createRequestHarnessGateway, resolveSkillToolPolicy } from '../../skills/pipeline-runtime.mjs';
 import { listArticleStageSkillSlots, listEntryWriterSkills, resolveArticleStageSkills, resolveEntryWriterSkill } from '../../skills/entry-routing.mjs';
 import { executeCapabilityWithPreference } from '../../tools/capability-slots.mjs';
 import { getToolRegistry } from '../../tools/index.mjs';
@@ -178,11 +178,17 @@ export async function handleArticleRoutes(context) {
   const draftMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/draft$/);
   if (draftMatch && request.method === 'POST') {
     const input = await body(request);
-    const result = await draftArticle({ gateway: models, store, candidateId: Number(draftMatch[1]),
-      provider: input.provider, instructions: input.instructions, existingDraft: input.existingDraft });
-    return json(response, 200, { content: result.content, provider: result.provider, model: result.model,
-      usage: result.usage, context: { beforeTokens: result.context.beforeTokens,
-        afterTokens: result.context.afterTokens, compressed: result.context.compressed } });
+    const candidate=store.getCandidate(Number(draftMatch[1]));
+    if(!candidate)return json(response,404,{error:'候选不存在'});
+    const harness=createRequestHarnessGateway({gateway:models,store,entryPoint:'article-draft',skillId:'article-drafting',provider:input.provider||models.config.defaultProvider,batchId:candidate.batch_id,candidateId:candidate.id,stageId:'article-drafting'});
+    try {
+      const result = await draftArticle({ gateway: harness.gateway, store, candidateId: candidate.id,
+        provider: input.provider, instructions: input.instructions, existingDraft: input.existingDraft });
+      harness.finish('completed');
+      return json(response, 200, { content: result.content, provider: result.provider, model: result.model,
+        usage: result.usage, context: { beforeTokens: result.context.beforeTokens,
+          afterTokens: result.context.afterTokens, compressed: result.context.compressed } });
+    } catch(error){ harness.finish('failed',error.message); throw error; }
   }
   const articleMatch = pathname.match(/^\/api\/candidates\/(\d+)\/ai\/article$/);
   if (articleMatch && request.method === 'POST') {

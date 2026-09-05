@@ -1,1 +1,40 @@
-{"schemaVersion":1,"id":"wechat-mp-personal-writing","name":"心得经验文章","version":"1.0.0","kind":"writer","entryPoints":["independent-writing"],"contentTypes":["experience"],"inputContract":"personal_fact_base","outputContract":"wechat_markdown","requiredCapabilities":[],"optionalCapabilities":["cap_content_web_search","cap_content_news_search","cap_content_document_search"],"compatibleApp":">=0.1.0","source":{"type":"builtin","url":""},"agentEntryPoints":["independent-writing"],"runtimeKind":"stage-skill","agentGates":["assistant-reply"]}
+{
+  "schemaVersion": 1,
+  "id": "wechat-mp-personal-writing",
+  "name": "心得经验文章",
+  "version": "1.0.0",
+  "kind": "writer",
+  "entryPoints": [
+    "independent-writing"
+  ],
+  "contentTypes": [
+    "experience"
+  ],
+  "inputContract": "personal_fact_base",
+  "outputContract": "wechat_markdown",
+  "requiredCapabilities": [],
+  "optionalCapabilities": [
+    "cap_content_web_search",
+    "cap_content_news_search",
+    "cap_content_document_search"
+  ],
+  "compatibleApp": ">=0.1.0",
+  "source": {
+    "type": "builtin",
+    "url": ""
+  },
+  "agentEntryPoints": [
+    "independent-writing"
+  ],
+  "runtimeKind": "stage-skill",
+  "agentGates": [
+    "assistant-reply"
+  ],
+  "budget": {
+    "maxModelSteps": 3,
+    "maxToolCalls": 5,
+    "timeoutMs": 120000,
+    "maxParallelToolCalls": 3
+  },
+  "gates": []
+}
