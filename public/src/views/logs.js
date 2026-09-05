@@ -321,7 +321,17 @@ function bindLogs() {
       event.preventDefault(); showTraceDetail(event.target.closest("[data-trace-item]").dataset.traceItem);
     }
   });
-  document.getElementById("run-trace-dialog")?.addEventListener("close", () => { document.body.classList.remove("run-trace-open"); document.getElementById("run-trace-actions")?.replaceChildren(); closeTraceDetail(); clearTraceSegmentFilter(); });
+  document.getElementById("run-trace-dialog")?.addEventListener("close", () => {
+    tracePoller?.cancel();
+    tracePoller = null;
+    activeTraceId = "";
+    traceFingerprint = "";
+    traceRefreshInFlight = false;
+    document.body.classList.remove("run-trace-open");
+    document.getElementById("run-trace-actions")?.replaceChildren();
+    closeTraceDetail();
+    clearTraceSegmentFilter();
+  });
 }
 
 async function loadLogGovernance() {
@@ -538,9 +548,77 @@ async function runTraceAction(action, rootRunId) {
   } finally { actions?.querySelectorAll("button").forEach((button) => { button.disabled = false; }); }
 }
 
+async function fetchTraceSnapshot(id, includeReplay = false) {
+  const encoded = encodeURIComponent(id);
+  const query = "?eventLimit=5000&modelCallLimit=2000&toolLimit=2000";
+  const requestOptions = { cache: "no-store" };
+  const requests = [request(`/api/runs/${encoded}${query}`, requestOptions), request(`/api/runs/${encoded}/metrics`, requestOptions)];
+  if (includeReplay) requests.push(request(`/api/runs/${encoded}/replay`, requestOptions));
+  const results = await Promise.allSettled(requests);
+  if (results[0].status === "rejected") throw results[0].reason;
+  return { trace: results[0].value, metrics: results[1].status === "fulfilled" ? results[1].value : {}, replayFixture: includeReplay && results[2]?.status === "fulfilled" ? results[2].value : null };
+}
+
+async function refreshOpenRunTrace(id, { initial = false } = {}) {
+  const snapshot = await fetchTraceSnapshot(id, initial);
+  const dialog = document.getElementById("run-trace-dialog");
+  if (!dialog?.open || activeTraceId !== id) return { changed: false, active: false };
+  const nextFingerprint = traceDataFingerprint(snapshot.trace, snapshot.metrics);
+  const active = (snapshot.trace.runs || []).some((run) => ["running", "testing"].includes(run.status));
+  if (!initial && nextFingerprint === traceFingerprint) return { changed: false, active };
+  const selectedRef = document.querySelector("#run-trace-content .trace-row.is-selected")?.dataset.traceRef || "";
+  const filterRef = document.querySelector("#run-trace-overview [data-trace-segment].is-active")?.dataset.traceSegmentRef || "";
+  const detailWasOpen = !document.getElementById("run-trace-detail")?.hidden;
+  const contentScrollTop = document.getElementById("run-trace-content")?.scrollTop || 0;
+  const waterfallScrollTop = document.querySelector(".run-trace-waterfall-list")?.scrollTop || 0;
+  traceFingerprint = nextFingerprint;
+  if (initial && snapshot.replayFixture) traceReplayFixture = snapshot.replayFixture;
+  renderRunTrace(snapshot.trace, snapshot.metrics, id, traceReplayFixture);
+  if (selectedRef && detailWasOpen) {
+    const selected = [...document.querySelectorAll("#run-trace-content .trace-row")].find((row) => row.dataset.traceRef === selectedRef);
+    if (selected) showTraceDetail(selected.dataset.traceItem);
+  }
+  if (filterRef) {
+    const segment = [...document.querySelectorAll("#run-trace-overview [data-trace-segment]")].find((item) => item.dataset.traceSegmentRef === filterRef);
+    if (segment) applyTraceSegmentFilter(segment);
+  }
+  requestAnimationFrame(() => {
+    const content = document.getElementById("run-trace-content");
+    const waterfall = document.querySelector(".run-trace-waterfall-list");
+    if (content) content.scrollTop = contentScrollTop;
+    if (waterfall) waterfall.scrollTop = waterfallScrollTop;
+  });
+  setTraceLiveStatus(active ? `LIVE CAPTURE · ${new Date().toLocaleTimeString()}` : `已${snapshot.trace.status === "failed" ? "失败" : "完成"} · ${new Date().toLocaleTimeString()}`);
+  return { changed: true, active };
+}
+
+function startTraceAutoRefresh(id) {
+  tracePoller?.cancel();
+  activeTraceId = id;
+  tracePoller = poll(async () => {
+    const dialog = document.getElementById("run-trace-dialog");
+    if (!dialog?.open || activeTraceId !== id) return true;
+    if (traceRefreshInFlight) return false;
+    traceRefreshInFlight = true;
+    try {
+      const result = await refreshOpenRunTrace(id);
+      return !result.active;
+    } catch {
+      setTraceLiveStatus("LIVE CAPTURE · 同步失败，稍后重试");
+      return false;
+    } finally { traceRefreshInFlight = false; }
+  }, { interval: RUN_TRACE_POLL_INTERVAL_MS, maxInterval: RUN_TRACE_POLL_INTERVAL_MS, timeout: Number.MAX_SAFE_INTEGER });
+  tracePoller.promise.catch(() => {});
+}
+
 async function openRunTrace(rootRunId) {
   const id = String(rootRunId || "").trim();
   if (!id) return;
+  tracePoller?.cancel();
+  tracePoller = null;
+  activeTraceId = id;
+  traceFingerprint = "";
+  traceRefreshInFlight = false;
   const dialog = document.getElementById("run-trace-dialog");
   document.getElementById("run-trace-title").textContent = `运行详情 · ${id}`;
   document.getElementById("run-trace-subtitle").textContent = "正在加载持久化 Trace…";
@@ -550,16 +628,13 @@ async function openRunTrace(rootRunId) {
   traceDetailRecords = new Map(); traceReplayFixture = null; closeTraceDetail();
   document.getElementById("run-trace-content").innerHTML = '<div class="empty-state">正在加载运行链路、提示词与执行记录…</div>';
   if (!dialog.open) { document.body.classList.add("run-trace-open"); dialog.showModal(); }
+  setTraceLiveStatus("LIVE CAPTURE · 正在同步");
   try {
-    const encoded = encodeURIComponent(id);
-    const query = "?eventLimit=5000&modelCallLimit=2000&toolLimit=2000";
-    const [traceResult, metricsResult, replayResult] = await Promise.allSettled([request(`/api/runs/${encoded}${query}`), request(`/api/runs/${encoded}/metrics`), request(`/api/runs/${encoded}/replay`)]);
-    if (traceResult.status === "rejected") throw traceResult.reason;
-    const metrics = metricsResult.status === "fulfilled" ? metricsResult.value : {};
-    const replayFixture = replayResult.status === "fulfilled" ? replayResult.value : null;
-    renderRunTrace(traceResult.value, metrics, id, replayFixture);
+    const result = await refreshOpenRunTrace(id, { initial: true });
+    if (result.active) startTraceAutoRefresh(id);
   } catch (error) {
     document.getElementById("run-trace-content").innerHTML = `<div class="empty-state">运行 Trace 加载失败：${escapeHtml(error.message || String(error))}</div>`;
+    setTraceLiveStatus("LIVE CAPTURE · 加载失败");
   }
 }
 
@@ -618,7 +693,7 @@ function renderModelDetail(item, logKey) {
 
 async function loadLogs(logType) {
   const qs = logType ? `?type=${encodeURIComponent(logType)}&limit=${LOG_LIST_LIMIT}` : `?limit=${LOG_LIST_LIMIT}`;
-  const logs = (await request("/api/logs" + qs)).filter((item) => item.log_type !== "model");
+  const logs = (await request("/api/logs" + qs, { cache: "no-store" })).filter((item) => item.log_type !== "model");
   const filteredLogs = logs.filter((item) => {
     if (currentLogStatus && String(item.status || "") !== currentLogStatus) return false;
     if (!currentLogQuery) return true;

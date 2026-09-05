@@ -14,7 +14,7 @@ const viewModules = {
   hotspots: "./views/hotspots.js", artifacts: "./views/artifacts.js",
   system: "./views/system.js", skills: "./views/skills.js", sources: "./views/subscriptions.js",
   themes: "./views/theme-manager.js",
-  models: "./views/models.js?v=20260905-model-calls8", logs: "./views/logs.js?v=20260905-runtrace-models23",
+  models: "./views/models.js?v=20260905-model-calls8", logs: "./views/logs.js?v=20260905-runtrace-live24",
   calendar: "./views/calendar.js",
   "material-inbox": "./views/material-inbox.js", "wechat-review-prep": "./views/wechat-review-prep.js", "wechat-review": "./views/wechat-review.js", "content-feedback": "./views/content-feedback.js",
 };
@@ -99,7 +99,7 @@ const jobNoticeState = new Map();
 let jobNoticeTimer = null;
 // 浏览器前进/后退触发 go 时不重复压栈
 let navigatingFromHistory = false;
-const moduleVersion = "20260905-runtrace-models23";
+const moduleVersion = "20260905-runtrace-live24";
 
 const titles = {
   dashboard: "工作台总览", batches: "批次管理", overview: "热点全景",
