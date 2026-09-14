@@ -45,7 +45,7 @@
         "node": ">=24"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "3.1109.0",
+        "@aws-sdk/client-s3": "3.1131.0",
         "@mermaid-js/mermaid-cli": "11.17.0",
         "markdown-it": "^14.1.0",
         "npm": "11.19.1",
